@@ -43,6 +43,7 @@
         let jetSound;
 
         let gameStarted = false;
+        let playthroughCount = 0; // 0=1週目, 1=2週目, ...
 
         function showTitle(scene) {
             const title = scene.add.image(scene.game.config.width / 2, scene.game.config.height / 2, 'title');
@@ -146,6 +147,26 @@
             this.currentMarkerColor = 0x00ff00;
             this.astronautMode = false;
 
+            // 2週目以降に前回の状態が残らないよう、リスタート時に必ず初期化
+            this.astronaut = null;
+            this.moonCar = null;
+            this.playerClimbing = false;
+            this.enemiesRetreating = false;
+            this.cameraRising = false;
+            this.returningToShip = false;
+            this.crewFound = false;
+            this.crewFollowing = false;
+            this.crews = [];
+            this.enemies = [];
+            this.lasers = [];
+            this.astronautGameOver = false;
+            this.chargedFired = false;
+            this.beamHoldStart = null;
+            this.beamEnergy = 100;
+            this.astronautFacing = null;
+            this.astronautVY = 0;
+            this.escapeJetSound = null;
+
             // キーボード入力の設定
             const enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
@@ -232,6 +253,7 @@
             this.spaceship.setGravityY(80);
             this.spaceship.displayWidth = 50;
             this.spaceship.displayHeight = 50;
+            this.spaceship.setDepth(5); // 脱出ポッドより手前に
             const bodyRadius = Math.floor(this.spaceship.width / 3);
             this.spaceship.body.setCircle(bodyRadius);
             this.spaceship.body.setOffset(this.spaceship.width / 2 - bodyRadius, this.spaceship.height / 2 - bodyRadius);
@@ -405,6 +427,12 @@
                 }
                 if (this.astronautMinX !== undefined) {
                     this.astronaut.x = Phaser.Math.Clamp(this.astronaut.x, this.astronautMinX, this.astronautMaxX);
+                    // モノリス接触でビームゲージ満タン
+                    const atMonolith = this.astronaut.x <= this.astronautMinX + 0.5
+                        || this.astronaut.x >= this.astronautMaxX - 0.5;
+                    if (atMonolith) {
+                        this.beamEnergy = 100;
+                    }
                 }
 
                 // 足音（移動中かつ接地時、ランダムで間隔再生）
@@ -771,7 +799,8 @@
                     const exitDir = this.astronaut.x < this.moonCar.x ? -1 : 1;
                     const exitTex = exitDir > 0 ? 'crew_R' : 'crew_L';
                     const doorY = this.groundFeetY - 30;
-                    for (let i = 0; i < 2; i++) {
+                    const crewCount = 2 + playthroughCount; // 1週目2人、2週目3人、...
+                    for (let i = 0; i < crewCount; i++) {
                         const c = this.add.image(this.moonCar.x, doorY, exitTex);
                         c.setDisplaySize(15, 15);
                         c.setOrigin(0.5, 1);
@@ -808,6 +837,10 @@
                     const ladderTop = this.spaceship.y + 20;
                     const ladderBottom = this.spaceship.y + 45;
                     const crews = this.crews.slice();
+                    // 待機列の方向（アストロノート進行方向と反対側）
+                    const queueDir = this.astronautFacing === 'right' ? -1 : 1;
+                    const queueSpacing = 13;
+                    const queueY = ladderBottom + this.astronaut.displayHeight / 2;
                     // 仲間を順にハシゴ下まで移動→登って船内へ
                     crews.forEach((c, idx) => {
                         this.time.delayedCall(idx * 900, () => {
@@ -816,7 +849,7 @@
                             this.tweens.add({
                                 targets: c,
                                 x: ladderX,
-                                y: ladderBottom + this.astronaut.displayHeight / 2,
+                                y: queueY,
                                 duration: 400,
                                 ease: 'Sine.easeInOut',
                                 onComplete: () => {
@@ -830,6 +863,22 @@
                                     });
                                 }
                             });
+                            // 後続の仲間は1つ前の待機スロットへシフト
+                            for (let j = idx + 1; j < crews.length; j++) {
+                                const t = crews[j];
+                                const slot = j - idx; // 1,2,3...（ハシゴ直後の位置から）
+                                const tx = ladderX + queueDir * queueSpacing * slot;
+                                const faceJ = tx < t.x ? 'L' : 'R';
+                                t.setTexture('crew_' + faceJ);
+                                this.tweens.add({
+                                    targets: t,
+                                    x: tx,
+                                    y: queueY,
+                                    duration: 400,
+                                    ease: 'Sine.easeInOut',
+                                    onComplete: () => t.setTexture('crew')
+                                });
+                            }
                         });
                     });
                     // 2人が乗り込んだ後、プレイヤーがハシゴを登る
@@ -864,7 +913,7 @@
                                             ease: 'Sine.easeInOut'
                                         });
                                         // 発射前2秒：ハッチ開
-                                        this.sound.play('hatchopen', { volume: 0.7 });
+                                        this.sound.play('hatchopen', { volume: 0.25 });
                                         // 2秒後：宇宙船上部からポッド打ち上げ
                                         this.time.delayedCall(2000, () => {
                                             // 脱出音：点火とジェットを同時再生
@@ -872,10 +921,10 @@
                                             this.escapeJetSound = this.sound.add('escape-jet', { loop: true, volume: 0.6 });
                                             this.escapeJetSound.play();
                                             const podX = this.spaceship.x;
-                                            const podY = this.spaceship.y - 20;
+                                            const podY = this.spaceship.y - 10;
                                             const pod = this.add.image(podX, podY, 'pod');
                                             pod.setDisplaySize(24, 24);
-                                            pod.setDepth(11);
+                                            pod.setDepth(3); // 宇宙船(5)より下のレイヤーから出現
 
                                             // エイリアンたちは地中へ散り散りに退却
                                             this.enemiesRetreating = true;
@@ -901,7 +950,7 @@
 
                                             // 発射マズル：着陸粉塵と同じ要領で左右へ舞い上がる煙
                                             const muzzle = this.add.particles('dustLarge');
-                                            muzzle.setDepth(10);
+                                            muzzle.setDepth(3); // 宇宙船(5)の背後
                                             const makeSide = (sx, angleRange) => muzzle.createEmitter({
                                                 x: sx,
                                                 y: podY + 2,
@@ -920,7 +969,7 @@
                                             rightEm.explode(26);
                                             // 炎のチラッとした赤味（少量）
                                             const flame = this.add.particles('jetParticle');
-                                            flame.setDepth(10);
+                                            flame.setDepth(3); // 宇宙船(5)の背後
                                             const flameL = flame.createEmitter({
                                                 x: podX - 8, y: podY + 2,
                                                 speed: { min: 80, max: 200 },
@@ -947,7 +996,7 @@
 
                                             // 下部の噴射ノズル炎（ポッドに追従し、上昇中は常時噴射）
                                             const nozzle = this.add.graphics();
-                                            nozzle.setDepth(10);
+                                            nozzle.setDepth(3); // 宇宙船(5)の背後
                                             const drawNozzle = () => {
                                                 nozzle.clear();
                                                 const nx = pod.x;
@@ -981,14 +1030,40 @@
                                                         targets: this.cameras.main,
                                                         scrollY: this.cameras.main.scrollY - 180,
                                                         duration: 1600,
-                                                        ease: 'Cubic.easeOut'
+                                                        ease: 'Cubic.easeOut',
+                                                        onComplete: () => {
+                                                            // カメラ停止後に「To be continued in next season...」表示 → Enterでタイトルへ
+                                                            const camW = this.cameras.main.width;
+                                                            const camH = this.cameras.main.height;
+                                                            const toBeContinued = this.add.text(camW / 2, camH / 2, 'To be continued in next season...', {
+                                                                fontSize: '32px',
+                                                                fill: '#FFF',
+                                                                fontStyle: 'italic'
+                                                            }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
+                                                            const pressEnter = this.add.text(camW / 2, camH / 2 + 50, 'Press ENTER to return to title', {
+                                                                fontSize: '18px',
+                                                                fill: '#AAA'
+                                                            }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
+                                                            this.tweens.add({
+                                                                targets: [toBeContinued, pressEnter],
+                                                                alpha: 1,
+                                                                duration: 1500,
+                                                                ease: 'Sine.easeIn',
+                                                                onComplete: () => {
+                                                                    this.input.keyboard.once('keydown-ENTER', () => {
+                                                                        playthroughCount++;
+                                                                        this.scene.restart();
+                                                                    });
+                                                                }
+                                                            });
+                                                        }
                                                     });
                                                 }
                                             });
 
                                             this.tweens.add({
                                                 targets: pod,
-                                                y: pod.y - 900,
+                                                y: pod.y - 1050,
                                                 duration: 3000,
                                                 ease: 'Cubic.easeIn',
                                                 onComplete: () => {
@@ -1014,7 +1089,7 @@
                         // 前走者：最初はプレイヤー、以降は一つ前の仲間
                         const leaderX = idx === 0 ? this.astronaut.x : this.crews[idx - 1].x;
                         const leaderFeetY = idx === 0 ? this.astronaut.y + yOffset : this.crews[idx - 1].y;
-                        const targetX = leaderX + backDir * 20;
+                        const targetX = leaderX + backDir * 13;
                         const prevX = c.x;
                         c.x = Phaser.Math.Linear(c.x, targetX, 0.06);
                         c.y = Phaser.Math.Linear(c.y, leaderFeetY, 0.12);
@@ -1556,10 +1631,10 @@
                 debris.angle += debris.getData('rotationSpeed');
             });
 
-            // 宇宙船とデブリとの衝突をチェック（一時OFF）
-            // this.physics.overlap(this.spaceship, this.debrisGroup, () => {
-            //     gameOver(this, 'Craaaash!');
-            // });
+            // 宇宙船とデブリとの衝突をチェック
+            this.physics.overlap(this.spaceship, this.debrisGroup, () => {
+                gameOver(this, 'Craaaash!');
+            });
 
         }
 
