@@ -19,8 +19,39 @@
 <body oncontextmenu='return false;' oncopy='return false;'>
 
     <script>
+        // 8bitエフェクト用PostFXパイプライン（ピクセル化・減色・スキャンライン）
+        const PixelArtPipeline = new Phaser.Class({
+            Extends: Phaser.Renderer.WebGL.Pipelines.PostFXPipeline,
+            initialize: function PixelArtPipeline(game) {
+                Phaser.Renderer.WebGL.Pipelines.PostFXPipeline.call(this, {
+                    game: game,
+                    renderTarget: true,
+                    fragShader: [
+                        'precision mediump float;',
+                        'uniform sampler2D uMainSampler;',
+                        'uniform vec2 uResolution;',
+                        'varying vec2 outTexCoord;',
+                        'void main() {',
+                        '  float pixelSize = 2.0;',
+                        '  vec2 px = pixelSize / uResolution;',
+                        '  vec2 coord = floor(outTexCoord / px) * px + px * 0.5;',
+                        '  vec4 color = texture2D(uMainSampler, coord);',
+                        '  float levels = 32.0;',
+                        '  color.rgb = floor(color.rgb * levels) / (levels - 1.0);',
+                        '  float scan = mod(gl_FragCoord.y, 3.0) < 1.0 ? 0.82 : 1.0;',
+                        '  color.rgb *= scan;',
+                        '  gl_FragColor = color;',
+                        '}'
+                    ].join('\n')
+                });
+            },
+            onPreRender: function () {
+                this.set2f('uResolution', this.renderer.width, this.renderer.height);
+            }
+        });
+
         const config = {
-            type: Phaser.AUTO,
+            type: Phaser.WEBGL,
             width: 1400,
             height: 900,
             physics: {
@@ -30,6 +61,7 @@
                     debug: false
                 }
             },
+            pipeline: { 'PixelArt': PixelArtPipeline },
             scene: {
                 preload: preload,
                 create: create,
@@ -390,6 +422,8 @@
             // カメラの初期位置とズームを設定
             this.cameras.main.centerOn(this.spaceship.x, this.spaceship.y);
             this.cameras.main.setZoom(1.2);
+            // 8bitエフェクトを全体にかける
+            this.cameras.main.setPostPipeline('PixelArt');
 
             // カメラのズームが変更されたときにタイトル画像のスケールを調整するリスナーを追加
             this.cameras.main.addListener('zoomchange', (cam, newZoom) => {
