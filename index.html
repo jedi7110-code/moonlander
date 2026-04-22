@@ -423,7 +423,7 @@
             this.cameras.main.centerOn(this.spaceship.x, this.spaceship.y);
             this.cameras.main.setZoom(1.2);
             // 8bitエフェクトを全体にかける
-            this.cameras.main.setPostPipeline('PixelArt');
+            // this.cameras.main.setPostPipeline('PixelArt'); // 一旦OFF（マスクとの干渉）
 
             // カメラのズームが変更されたときにタイトル画像のスケールを調整するリスナーを追加
             this.cameras.main.addListener('zoomchange', (cam, newZoom) => {

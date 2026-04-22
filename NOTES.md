@@ -61,3 +61,19 @@
 - **Prince of Persia (初代)** — 慣性のある歩き／走り／ジャンプ、フレームごとに意味がある動き
 
 → Stage 3 以降の宇宙飛行士モーションは、チカチカしたドット絵ではなく**重量感のある滑らかな動き**を目指す。ジャンプ・着地・走り・しゃがみなどフレーム数を多めに。
+
+## 既知の不具合 / 技術メモ
+
+### 8bit PostFX パイプラインと GeometryMask の干渉
+- `PixelArt` PostFX パイプライン (index.html 冒頭の WebGL シェーダー) を `cameras.main.setPostPipeline('PixelArt')` で適用すると、エイリアン捕獲時の「地中へ消える」演出が壊れる（astronaut が地面下でも見えたまま）。
+- 原因: Phaser 3.55.2 では PostFX の render target に stencil buffer が正しく引き継がれず、`createGeometryMask()` の clipping が効かなくなる。
+- 試した対策と結果:
+  - `createBitmapMask()` に変更 → NG（同じ症状）。
+  - 捕獲時に `removePostPipeline` で一時停止 → NG（フリーズ or 効かず）。
+  - astronaut の alpha フェードで代替 → 視覚的に違和感。
+- 暫定対応: `setPostPipeline('PixelArt')` を **コメントアウト** して 8bit を OFF。
+- 恒久対応候補:
+  1. Phaser 3.60+ へアップグレード（PostFX と mask の互換性改善あり）。
+  2. 8bit を CSS filter（`image-rendering: pixelated` ＋ 低解像度レンダリング）で再現して PostFX を使わない。
+  3. マスクを使わずに astronaut を alpha/crop で消す方式に寄せる。
+- 関連: `stargate.html`（動作確認用の単独シェーダーサンドボックス、git 管理外）。
