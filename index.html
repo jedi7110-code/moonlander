@@ -12,13 +12,13 @@
     <meta property="og:site_name" content="Moonlander" />
     <meta property="og:image" content="https://moon-alpha.vercel.app/assets/ogp.jpg" />
     <meta name="robots" content="noindex,nofollow">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
 
 <body oncontextmenu='return false;' oncopy='return false;'>
 
-    <!-- 8bit/CRT風エフェクト用SVGフィルタ（posterize + bloom） -->
+    <!-- 8bit/CRT風エフェクト用SVGフィルタ（posterize + 2段ブルーム） -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
         <filter id="crt-8bit" color-interpolation-filters="sRGB">
             <feComponentTransfer in="SourceGraphic" result="posterized">
@@ -33,7 +33,7 @@
                 0 0 1.8 0 -0.95
                 0 0 0 1 0" result="bright"/>
             <!-- 近距離ブルーム（シャープな発光コア） -->
-            <feGaussianBlur in="bright" stdDeviation="2" result="blurNear"/>
+            <feGaussianBlur in="bright" stdDeviation="1" result="blurNear"/>
             <!-- 遠距離ハレーション（広がる柔らかい光） -->
             <feGaussianBlur in="bright" stdDeviation="6" result="blurFar"/>
             <!-- ハレーションを加算（8%） -->
@@ -161,11 +161,11 @@
                     }
                 });
 
-                // 降下序盤からスラスター点火（早めに噴射を見せる）
+                // 降下序盤からスラスター点火（早めに噴射を見せる。loopなしで1回だけ再生）
                 scene.time.delayedCall(600, () => {
                     scene.jetParticles.up.setPosition(scene.spaceship.x, scene.spaceship.y + 25);
                     scene.jetParticles.up.on = true;
-                    if (!jetSound.isPlaying) jetSound.play();
+                    if (!jetSound.isPlaying) jetSound.play({ loop: false });
                 });
             }
 
@@ -193,8 +193,20 @@
             this.load.image('spaceship', 'assets/spaceship.png');
             this.load.image('spacemy', 'assets/spacemy.png');
             this.load.image('spaceman', 'assets/player-f.png');
+            this.load.image('spaceman_B', 'assets/player-b.png');
+            this.load.image('spaceman_BL', 'assets/player-bl.png');
+            this.load.image('spaceman_BR', 'assets/player-br.png');
+            this.load.image('spaceman_FL', 'assets/player-fl.png');
+            this.load.image('spaceman_FR', 'assets/player-fr.png');
             this.load.image('spaceman_L', 'assets/player-l.png');
             this.load.image('spaceman_R', 'assets/player-r.png');
+            this.load.image('player_0', 'assets/player-0.png');
+            this.load.image('player_L1', 'assets/player-l1.png');
+            this.load.image('player_L2', 'assets/player-l2.png');
+            this.load.image('player_L3', 'assets/player-l3.png');
+            this.load.image('player_R1', 'assets/player-r1.png');
+            this.load.image('player_R2', 'assets/player-r2.png');
+            this.load.image('player_R3', 'assets/player-r3.png');
             this.load.image('spaceshipshadow', 'assets/spaceshipshadow.png');
             this.load.image('flag', 'assets/flag.png');
             this.load.image('flag-flash', 'assets/flag-flash.png');
@@ -415,6 +427,13 @@
             jetGfx.generateTexture('jetParticle', 6, 6);
             jetGfx.destroy();
 
+            // ビームチャージ用パーティクルテクスチャ（1px 白ドット）
+            const chargeGfx = this.make.graphics({ add: false });
+            chargeGfx.fillStyle(0xffffff);
+            chargeGfx.fillRect(0, 0, 1, 1);
+            chargeGfx.generateTexture('chargeParticle', 1, 1);
+            chargeGfx.destroy();
+
             // 粉塵パーティクル用テクスチャ（薄いベージュの丸）
             const dustGfx = this.make.graphics({ add: false });
             dustGfx.fillStyle(0xc8b89a);
@@ -471,6 +490,38 @@
                 right: this.add.particles('jetParticle').createEmitter(emitterConfig({ min: 165, max: 195 }))
             };
 
+            // ビームチャージ用パーティクルエミッター（銃口前方の扇状エリアから中心に集束）
+            const chargeParticles = this.add.particles('chargeParticle');
+            chargeParticles.setDepth(11);
+            // 集束点をクロージャで保持してemitCallbackから参照
+            this._chargeFocus = { x: 0, y: 0 };
+            const sceneRef = this;
+            this.beamChargeEmitter = chargeParticles.createEmitter({
+                x: 0,
+                y: 0,
+                emitZone: {
+                    type: 'random',
+                    source: new Phaser.Geom.Rectangle(4, -18, 20, 36)
+                },
+                lifespan: { min: 320, max: 480 },
+                scale: { start: 1, end: 0 },
+                alpha: { start: 1, end: 1 },
+                frequency: 28,
+                quantity: 1,
+                on: false,
+                emitCallback: function (particle) {
+                    // 発生位置(particle.x/y)から集束点へ向かう速度を算出
+                    const dx = sceneRef._chargeFocus.x - particle.x;
+                    const dy = sceneRef._chargeFocus.y - particle.y;
+                    const lifeSec = particle.life / 1000;
+                    if (lifeSec > 0) {
+                        particle.velocityX = dx / lifeSec;
+                        particle.velocityY = dy / lifeSec;
+                    }
+                }
+            });
+            this.beamChargeLastDir = 1;
+
             // 爆発アニメーションの作成
             this.anims.create({
                 key: 'explode',
@@ -504,6 +555,100 @@
                 hideOnComplete: true
             });
 
+            // 宇宙飛行士の振り向きアニメーション
+            // ハシゴ降下後（左向き）: 後ろ → BL → L → FL → 正面
+            this.anims.create({
+                key: 'astronaut_turn_to_front_L',
+                frames: [
+                    { key: 'spaceman_B' },
+                    { key: 'spaceman_BL' },
+                    { key: 'spaceman_L' },
+                    { key: 'spaceman_FL' },
+                    { key: 'spaceman' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+            // ハシゴ降下後（右向き）: 後ろ → BR → R → FR → 正面
+            this.anims.create({
+                key: 'astronaut_turn_to_front_R',
+                frames: [
+                    { key: 'spaceman_B' },
+                    { key: 'spaceman_BR' },
+                    { key: 'spaceman_R' },
+                    { key: 'spaceman_FR' },
+                    { key: 'spaceman' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+            // ハシゴ登る前（左向き経由）: 正面 → FL → L → BL → 後ろ
+            this.anims.create({
+                key: 'astronaut_turn_to_back_L',
+                frames: [
+                    { key: 'spaceman' },
+                    { key: 'spaceman_FL' },
+                    { key: 'spaceman_L' },
+                    { key: 'spaceman_BL' },
+                    { key: 'spaceman_B' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+            // ハシゴ登る前（右向き経由）: 正面 → FR → R → BR → 後ろ
+            this.anims.create({
+                key: 'astronaut_turn_to_back_R',
+                frames: [
+                    { key: 'spaceman' },
+                    { key: 'spaceman_FR' },
+                    { key: 'spaceman_R' },
+                    { key: 'spaceman_BR' },
+                    { key: 'spaceman_B' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+
+            // 横移動中の左右切替アニメ（F を挟まず軽めに）
+            // L → R: FL → FR
+            this.anims.create({
+                key: 'astronaut_turn_flip_LtoR',
+                frames: [
+                    { key: 'spaceman_FL' },
+                    { key: 'spaceman_FR' }
+                ],
+                frameRate: 18,
+                repeat: 0
+            });
+            // R → L: FR → FL
+            this.anims.create({
+                key: 'astronaut_turn_flip_RtoL',
+                frames: [
+                    { key: 'spaceman_FR' },
+                    { key: 'spaceman_FL' }
+                ],
+                frameRate: 18,
+                repeat: 0
+            });
+
+            // 宇宙飛行士の歩行アニメーション（左向き基準。右向きは flipX で反転）
+            // 順序: 0 → L1 → L2 → L1 → 0 → R1 → R2 → R1 の繰り返し（8フレーム）
+            this.anims.create({
+                key: 'astronaut_walk',
+                frames: [
+                    { key: 'player_0' },
+                    { key: 'player_L1' },
+                    { key: 'player_L2' },
+                    { key: 'player_L1' },
+                    { key: 'player_0' },
+                    { key: 'player_R1' },
+                    { key: 'player_R2' },
+                    { key: 'player_R1' }
+                ],
+                frameRate: 14,
+                repeat: -1
+            });
+
             // コントローラーの作成
             const arrows = ['left', 'up', 'down', 'right']
             const buttons = arrows.map((cursor) => document.getElementById(cursor))
@@ -535,22 +680,83 @@
                 const jumpPower = -150;
                 const onGround = this.astronaut.y >= this.astronautGroundY;
 
-                // 爆発後は一切の操作・更新を停止（演出のみ残す）
+                // 爆発後は操作不可（ビームだけは飛び続ける）
                 if (this.astronautGameOver) {
                     if (this.beamTameSound && this.beamTameSound.isPlaying) this.beamTameSound.stop();
+                    // チャージパーティクル発生を停止（既存粒子はlifespanで自然消滅）
+                    if (this.beamChargeEmitter) this.beamChargeEmitter.on = false;
+                    if (this.lasers) {
+                        this.lasers = this.lasers.filter(l => {
+                            const dx = l.dir * l.speed * dt;
+                            l.beam.x += dx;
+                            l.glow.x += dx;
+                            if (this.time.now - l.born > l.life) {
+                                l.beam.destroy();
+                                l.glow.destroy();
+                                return false;
+                            }
+                            return true;
+                        });
+                    }
                     return;
                 }
 
                 // 左右移動（停止しても向きは維持）
                 const isMoving = !this.playerClimbing && (this.cursors.left.isDown || this.cursors.right.isDown);
+                const prevFacing = this.astronautFacing;
                 if (!this.playerClimbing && this.cursors.left.isDown) {
                     this.astronaut.x -= moveSpeed * dt;
-                    this.astronaut.setTexture('spaceman_L');
+                    this.astronaut.setFlipX(false); // 元画像は左向き
                     this.astronautFacing = 'left';
+                    // 右→左の切替時、正面経由の向き変更アニメ
+                    if (prevFacing === 'right' && onGround) {
+                        this.astronaut.anims.play('astronaut_turn_flip_RtoL');
+                    }
                 } else if (!this.playerClimbing && this.cursors.right.isDown) {
                     this.astronaut.x += moveSpeed * dt;
-                    this.astronaut.setTexture('spaceman_R');
+                    this.astronaut.setFlipX(true); // 右向きは左右反転
                     this.astronautFacing = 'right';
+                    // 左→右の切替時
+                    if (prevFacing === 'left' && onGround) {
+                        this.astronaut.anims.play('astronaut_turn_flip_LtoR');
+                    }
+                }
+
+                // 初回の移動で通常ズームへ戻す（ハシゴ降り時のアップからゲームプレイ用ズームへ）
+                if (isMoving && this.astronautHasMoved === false) {
+                    this.astronautHasMoved = true;
+                    this.tweens.add({
+                        targets: this.cameras.main,
+                        zoom: 2.7,
+                        duration: 800,
+                        ease: 'Sine.easeInOut'
+                    });
+                }
+
+                // アニメーション制御（地上で動いているときだけ歩行、空中は開脚で固定）
+                // 振り向きアニメ再生中は何も触らない
+                const currentAnimKey = this.astronaut.anims.currentAnim ? this.astronaut.anims.currentAnim.key : null;
+                const playingTurn = this.astronaut.anims.isPlaying && currentAnimKey &&
+                    (currentAnimKey.startsWith('astronaut_turn_'));
+                if (!this.playerClimbing && !playingTurn) {
+                    if (!onGround) {
+                        // ジャンプ中：アニメ停止、開脚ポーズ（L2）で固定
+                        if (this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
+                        if (this.astronaut.texture.key !== 'player_L2') this.astronaut.setTexture('player_L2');
+                    } else if (isMoving) {
+                        // 地上で移動中：歩行アニメ
+                        if (!this.astronaut.anims.isPlaying || this.astronaut.anims.currentAnim.key !== 'astronaut_walk') {
+                            this.astronaut.anims.play('astronaut_walk');
+                        }
+                    } else if (this.astronautHasMoved) {
+                        // 一度動いた後の静止：横向きベースフレーム（0）
+                        if (this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
+                        if (this.astronaut.texture.key !== 'player_0') this.astronaut.setTexture('player_0');
+                    } else {
+                        // まだ動いていない状態：正面向き
+                        if (this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
+                        if (this.astronaut.texture.key !== 'spaceman') this.astronaut.setTexture('spaceman');
+                    }
                 }
                 if (this.astronautMinX !== undefined) {
                     this.astronaut.x = Phaser.Math.Clamp(this.astronaut.x, this.astronautMinX, this.astronautMaxX);
@@ -603,6 +809,34 @@
                     this.beamTameSound.stop();
                 }
 
+                // ビームチャージ中（ぎゅーん音が鳴るタイミング＝長押し判定が確立後）に粒が集束
+                if (this.beamChargeEmitter) {
+                    const chargeHoldMs = this.beamHoldStart ? this.time.now - this.beamHoldStart : 0;
+                    // 単発連打では発動しないよう、長押し300ms経過後から表示
+                    const isChargingParticles = charging && !this.chargedFired && chargeHoldMs > 300;
+                    if (isChargingParticles) {
+                        const pdir = this.astronautFacing === 'left' ? -1 : 1;
+                        // 集束点：銃口付近
+                        const focusX = this.astronaut.x + pdir * 7;
+                        const focusY = this.astronaut.y - 3;
+                        this._chargeFocus.x = focusX;
+                        this._chargeFocus.y = focusY;
+                        this.beamChargeEmitter.setPosition(focusX, focusY);
+                        // 向きが変わったら発生エリアを反転
+                        if (this.beamChargeLastDir !== pdir) {
+                            const zoneX = pdir > 0 ? 4 : -24;
+                            this.beamChargeEmitter.setEmitZone({
+                                type: 'random',
+                                source: new Phaser.Geom.Rectangle(zoneX, -18, 20, 36)
+                            });
+                            this.beamChargeLastDir = pdir;
+                        }
+                        this.beamChargeEmitter.on = true;
+                    } else {
+                        this.beamChargeEmitter.on = false;
+                    }
+                }
+
                 // スペース押下：チャージ計測開始（ここでは発射しない）
                 if (!this.playerClimbing && this.astronautFacing && Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
                     this.beamHoldStart = this.time.now;
@@ -614,7 +848,7 @@
                         const ratio = Phaser.Math.Clamp(this.beamEnergy / 100, 0, 1);
                         const dir = this.astronautFacing === 'left' ? -1 : 1;
                         const startX = this.astronaut.x + dir * 6;
-                        const startY = this.astronaut.y - 2;
+                        const startY = this.astronaut.y - 3;
                         const r = Math.round(0xff * (1 - ratio));
                         const g = Math.round(0xff * ratio);
                         const b = Math.round(0xcc * ratio);
@@ -783,6 +1017,7 @@
                             this.beamGaugeBg.setVisible(false);
                             this.beamGaugeFill.setVisible(false);
                             this.bloodSound.play();
+                            if (this.astronaut && this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
 
                             const captureX = hitCrew.x;
                             const captureY = hitCrew.y - hitCrew.displayHeight / 2;
@@ -847,6 +1082,7 @@
                             this.beamGaugeBg.setVisible(false);
                             this.beamGaugeFill.setVisible(false);
                             this.bloodSound.play();
+                            if (this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
 
                             // プレイヤーの上に泡が徐々に増えて覆い尽くし、地中へ引きずり込まれる
                             const captureX = this.astronaut.x;
@@ -1016,21 +1252,33 @@
                         this.beamGaugeFill.setVisible(false);
                         this.beamHoldStart = null;
                         if (this.beamTameSound.isPlaying) this.beamTameSound.stop();
+                        this.astronaut.anims.stop();
+                        this.astronaut.setFlipX(false);
+                        // ハシゴまで歩いて移動（横向き歩行アニメ）
                         const face = ladderX < this.astronaut.x ? 'L' : 'R';
-                        this.astronaut.setTexture('spaceman_' + face);
+                        this.astronaut.setFlipX(face === 'R');
+                        this.astronaut.anims.play('astronaut_walk');
                         this.tweens.add({
                             targets: this.astronaut,
                             x: ladderX,
                             duration: 400,
                             ease: 'Sine.easeInOut',
                             onComplete: () => {
+                                this.astronaut.anims.stop();
+                                this.astronaut.setFlipX(false);
+                                // 振り向きアニメ：正面→(L or R)→後ろ、降りた時と同じ方向
                                 this.astronaut.setTexture('spaceman');
-                                this.tweens.add({
-                                    targets: this.astronaut,
-                                    y: ladderTop - 5,
-                                    duration: 1000,
-                                    ease: 'Sine.easeInOut',
-                                    onComplete: () => {
+                                const turnDir = this.astronautTurnDir || 'L';
+                                this.astronaut.anims.play('astronaut_turn_to_back_' + turnDir);
+                                // 振り向き完了後に登り開始
+                                this.astronaut.once('animationcomplete-astronaut_turn_to_back_' + turnDir, () => {
+                                    this.astronaut.setTexture('spaceman_B');
+                                    this.tweens.add({
+                                        targets: this.astronaut,
+                                        y: ladderTop - 5,
+                                        duration: 1000,
+                                        ease: 'Sine.easeInOut',
+                                        onComplete: () => {
                                         this.astronaut.setVisible(false);
                                         // 登り終えたら徐々にズームアウト（ポッド上昇中も続く）
                                         this.tweens.add({
@@ -1202,6 +1450,7 @@
                                             });
                                         });
                                     }
+                                });
                                 });
                             }
                         });
@@ -1516,6 +1765,12 @@
                     const ladder = this.add.graphics({ lineStyle: { width: 1, color: 0xcccccc } });
                     ladder.setDepth(7);
 
+                    // ハシゴが出てくるタイミングで、宇宙船の足元（ハシゴ付近）にカメラをパン＋ズーム
+                    const targetPanX = this.spaceship.x;
+                    const targetPanY = this.spaceship.y + 30; // ハシゴ中央あたり
+                    this.cameras.main.pan(targetPanX, targetPanY, 1500, 'Sine.easeInOut');
+                    this.cameras.main.zoomTo(4.0, 1500, 'Sine.easeInOut');
+
                     // ハシゴがスッと伸びるアニメーション
                     let ladderProgress = 0;
                     const ladderTween = this.tweens.addCounter({
@@ -1541,13 +1796,14 @@
                             }
                         },
                         onComplete: () => {
-                            // ハシゴが伸びきったら宇宙飛行士が降りてくる
-                            const astronaut = this.add.image(
+                            // ハシゴが伸びきったら宇宙飛行士が降りてくる（後ろ向き）
+                            const astronaut = this.add.sprite(
                                 ladderX,
                                 ladderTop,
-                                'spaceman'
+                                'spaceman_B'
                             );
-                            astronaut.setDisplaySize(15, 15);
+                            // 元画像は 725x904（縦長、アスペクト比 ~0.8）。アスペクト維持
+                            astronaut.setDisplaySize(15, 19);
                             astronaut.setDepth(8);
 
                             this.tweens.add({
@@ -1556,13 +1812,19 @@
                                 duration: 1500,
                                 ease: 'Sine.easeInOut',
                                 onComplete: () => {
+                                    // 故障車の方向を先に決めて、振り向き方向も合わせる
+                                    const carDirEarly = Phaser.Math.Between(0, 1) ? 1 : -1;
+                                    this.astronautTurnDir = carDirEarly > 0 ? 'R' : 'L';
+                                    // 降りきったら振り向いて正面を向く（方向に応じてR/L版）
+                                    astronaut.setFlipX(false);
+                                    astronaut.anims.play('astronaut_turn_to_front_' + this.astronautTurnDir);
                                     // そのまま操作可能にする（物理不要、手動制御）
                                     this.astronaut = astronaut;
                                     this.astronautGroundY = astronaut.y; // 地面のY座標を記憶
-                                    // 移動範囲を背景画像内にクランプ（ズーム2.5での可視域を背景内に収める）
+                                    // 移動範囲を背景画像内にクランプ（ズーム2.7での可視域を背景内に収める）
                                     const bgTex = this.textures.get('background').getSourceImage();
                                     const bgCenterX = this.scale.width / 2;
-                                    const camHalfW = this.scale.width / 2.5 / 2;
+                                    const camHalfW = this.scale.width / 2.7 / 2;
                                     this.astronautMinX = (bgCenterX - bgTex.width / 2) + camHalfW;
                                     this.astronautMaxX = (bgCenterX + bgTex.width / 2) - camHalfW;
                                     // 仮：移動限界の外側に2001モノリス（立体感あり）
@@ -1609,8 +1871,8 @@
                                     this.beamGaugeBg = this.add.rectangle(0, 0, 10, 1, 0x000000).setDepth(11);
                                     this.beamGaugeFill = this.add.rectangle(0, 0, 10, 1, 0x00ffcc).setDepth(12);
 
-                                    // 大破した月面探査車（着陸地点から遠くに配置）
-                                    const carDir = Phaser.Math.Between(0, 1) ? 1 : -1;
+                                    // 大破した月面探査車（振り向き方向と同じ側に配置）
+                                    const carDir = this.astronautTurnDir === 'R' ? 1 : -1;
                                     const carX = astronaut.x + carDir * Phaser.Math.Between(800, 1200);
                                     const carFeetY = astronaut.y + astronaut.displayHeight / 2;
                                     this.moonCar = this.add.image(carX, carFeetY, 'mooncar');
@@ -1670,14 +1932,8 @@
                                     this.time.delayedCall(1500, this.spawnEnemy);
 
                                     this.astronautMode = true; // 宇宙飛行士操作モード
-
-                                    // ズームイン
-                                    this.tweens.add({
-                                        targets: this.cameras.main,
-                                        zoom: 2.5,
-                                        duration: 1000,
-                                        ease: 'Sine.easeInOut'
-                                    });
+                                    this.astronautHasMoved = false; // 初回移動で通常ズームへ切り替え
+                                    // ズームはハシゴが伸び始める時から既に進行中
 
                                     // 大破車の方向を >>> で表示（2回繰り返し）
                                     if (this.moonCar) {
