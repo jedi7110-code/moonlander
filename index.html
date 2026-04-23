@@ -491,37 +491,45 @@
                 right: this.add.particles('jetParticle').createEmitter(emitterConfig({ min: 165, max: 195 }))
             };
 
-            // ビームチャージ用パーティクルエミッター（銃口前方の扇状エリアから中心に集束）
+            // ビームチャージ用パーティクルエミッター
+            // 銃口の前に半円状に分布、中心近くほど密度高・遠くほど疎。明滅しながらその場で消える
             const chargeParticles = this.add.particles('chargeParticle');
             chargeParticles.setDepth(11);
-            // 集束点をクロージャで保持してemitCallbackから参照
             this._chargeFocus = { x: 0, y: 0 };
+            this._chargeDir = 1;         // 1 or -1（銃の向き）
+            this._chargeProgress = 0;    // 0→1（長押し時間の進行度）
             const sceneRef = this;
             this.beamChargeEmitter = chargeParticles.createEmitter({
                 x: 0,
                 y: 0,
-                emitZone: {
-                    type: 'random',
-                    source: new Phaser.Geom.Rectangle(4, -18, 20, 36)
-                },
-                lifespan: { min: 320, max: 480 },
-                scale: { start: 1, end: 0 },
-                alpha: { start: 1, end: 1 },
-                frequency: 28,
+                lifespan: { min: 160, max: 280 }, // 短寿命で明滅感
+                scale: { start: 1, end: 1 },
+                alpha: { start: 0, end: 0 },      // 下のonUpdateで 0→peak→0
+                frequency: 18,
                 quantity: 1,
                 on: false,
-                emitCallback: function (particle) {
-                    // 発生位置(particle.x/y)から集束点へ向かう速度を算出
-                    const dx = sceneRef._chargeFocus.x - particle.x;
-                    const dy = sceneRef._chargeFocus.y - particle.y;
-                    const lifeSec = particle.life / 1000;
-                    if (lifeSec > 0) {
-                        particle.velocityX = dx / lifeSec;
-                        particle.velocityY = dy / lifeSec;
-                    }
+                emitCallback: function (particle, emitter) {
+                    // 長押し進行度
+                    const progress = sceneRef._chargeProgress;
+                    // リング（環状）分布：内側の空洞半径がチャージで縮み、徐々に銃口寄りへ寄せる
+                    const outerRadius = 15 - progress * 3; // 15 → 12
+                    const innerRadius = (1 - progress) * 10; // 10 → 0（内側が縮んで埋まっていく）
+                    // リング内で内側エッジ寄りに偏らせる（t^2 で 0 近辺が濃い）
+                    const t = Math.pow(Math.random(), 2);
+                    const radius = innerRadius + t * (outerRadius - innerRadius);
+                    // 前方扇形（角度 ±60°）+ 銃の向き dir で左右反転
+                    const halfFan = Math.PI / 3;
+                    const angle = (Math.random() * 2 - 1) * halfFan;
+                    const dx = Math.cos(angle) * radius * sceneRef._chargeDir;
+                    const dy = Math.sin(angle) * radius;
+                    particle.x = emitter.x.propertyValue + dx;
+                    particle.y = emitter.y.propertyValue + dy;
                 }
             });
-            this.beamChargeLastDir = 1;
+            // アルファを寿命の半ばでピークにする明滅カーブ
+            this.beamChargeEmitter.alpha.onUpdate = (particle, key, t) => {
+                return Math.sin(Math.PI * t);
+            };
 
             // 爆発アニメーションの作成
             this.anims.create({
@@ -810,28 +818,20 @@
                     this.beamTameSound.stop();
                 }
 
-                // ビームチャージ中（ぎゅーん音が鳴るタイミング＝長押し判定が確立後）に粒が集束
+                // ビームチャージ中、銃口前方の半円状エリアに明滅粒がランダム出現
+                // チャージ進行で最大半径が縮み、近くほど粒が密集する
                 if (this.beamChargeEmitter) {
                     const chargeHoldMs = this.beamHoldStart ? this.time.now - this.beamHoldStart : 0;
-                    // 単発連打では発動しないよう、長押し300ms経過後から表示
                     const isChargingParticles = charging && !this.chargedFired && chargeHoldMs > 300;
                     if (isChargingParticles) {
                         const pdir = this.astronautFacing === 'left' ? -1 : 1;
-                        // 集束点：銃口付近
                         const focusX = this.astronaut.x + pdir * 7;
                         const focusY = this.astronaut.y - 3;
                         this._chargeFocus.x = focusX;
                         this._chargeFocus.y = focusY;
+                        this._chargeDir = pdir;
+                        this._chargeProgress = Phaser.Math.Clamp((chargeHoldMs - 300) / 1200, 0, 1);
                         this.beamChargeEmitter.setPosition(focusX, focusY);
-                        // 向きが変わったら発生エリアを反転
-                        if (this.beamChargeLastDir !== pdir) {
-                            const zoneX = pdir > 0 ? 4 : -24;
-                            this.beamChargeEmitter.setEmitZone({
-                                type: 'random',
-                                source: new Phaser.Geom.Rectangle(zoneX, -18, 20, 36)
-                            });
-                            this.beamChargeLastDir = pdir;
-                        }
                         this.beamChargeEmitter.on = true;
                     } else {
                         this.beamChargeEmitter.on = false;
