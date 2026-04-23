@@ -28,13 +28,16 @@ body {
     display: block;
     max-width: 1200px;
     max-height: 800px;
-    filter: url(#pixelart-posterize) saturate(1.1) contrast(1.08);
+    filter: url(#crt-8bit) saturate(1.15) contrast(1.08);
 }
 
 .crt-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
+}
+
+.crt-scanlines {
     background-image: repeating-linear-gradient(
         to bottom,
         rgba(0, 0, 0, 0.28) 0,
@@ -44,6 +47,20 @@ body {
     );
     mix-blend-mode: multiply;
     z-index: 2;
+}
+
+.crt-subpixel {
+    background-image: repeating-linear-gradient(
+        to right,
+        rgba(255, 120, 120, 0.18) 0,
+        rgba(255, 120, 120, 0.18) 1px,
+        rgba(120, 255, 120, 0.18) 1px,
+        rgba(120, 255, 120, 0.18) 2px,
+        rgba(120, 120, 255, 0.18) 2px,
+        rgba(120, 120, 255, 0.18) 3px
+    );
+    mix-blend-mode: soft-light;
+    z-index: 3;
 }
 
 body.no-crt #game-container canvas {
