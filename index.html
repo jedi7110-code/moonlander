@@ -22,9 +22,9 @@
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
         <filter id="crt-8bit" color-interpolation-filters="sRGB">
             <feComponentTransfer in="SourceGraphic" result="posterized">
-                <feFuncR type="discrete" tableValues="0 0.032 0.065 0.097 0.129 0.161 0.194 0.226 0.258 0.29 0.323 0.355 0.387 0.419 0.452 0.484 0.516 0.548 0.581 0.613 0.645 0.677 0.71 0.742 0.774 0.806 0.839 0.871 0.903 0.935 0.968 1"/>
-                <feFuncG type="discrete" tableValues="0 0.032 0.065 0.097 0.129 0.161 0.194 0.226 0.258 0.29 0.323 0.355 0.387 0.419 0.452 0.484 0.516 0.548 0.581 0.613 0.645 0.677 0.71 0.742 0.774 0.806 0.839 0.871 0.903 0.935 0.968 1"/>
-                <feFuncB type="discrete" tableValues="0 0.032 0.065 0.097 0.129 0.161 0.194 0.226 0.258 0.29 0.323 0.355 0.387 0.419 0.452 0.484 0.516 0.548 0.581 0.613 0.645 0.677 0.71 0.742 0.774 0.806 0.839 0.871 0.903 0.935 0.968 1"/>
+                <feFuncR type="discrete" tableValues="0 0.016 0.032 0.048 0.063 0.079 0.095 0.111 0.127 0.143 0.159 0.175 0.19 0.206 0.222 0.238 0.254 0.27 0.286 0.302 0.317 0.333 0.349 0.365 0.381 0.397 0.413 0.429 0.444 0.46 0.476 0.492 0.508 0.524 0.54 0.556 0.571 0.587 0.603 0.619 0.635 0.651 0.667 0.683 0.698 0.714 0.73 0.746 0.762 0.778 0.794 0.81 0.825 0.841 0.857 0.873 0.889 0.905 0.921 0.937 0.952 0.968 0.984 1"/>
+                <feFuncG type="discrete" tableValues="0 0.016 0.032 0.048 0.063 0.079 0.095 0.111 0.127 0.143 0.159 0.175 0.19 0.206 0.222 0.238 0.254 0.27 0.286 0.302 0.317 0.333 0.349 0.365 0.381 0.397 0.413 0.429 0.444 0.46 0.476 0.492 0.508 0.524 0.54 0.556 0.571 0.587 0.603 0.619 0.635 0.651 0.667 0.683 0.698 0.714 0.73 0.746 0.762 0.778 0.794 0.81 0.825 0.841 0.857 0.873 0.889 0.905 0.921 0.937 0.952 0.968 0.984 1"/>
+                <feFuncB type="discrete" tableValues="0 0.016 0.032 0.048 0.063 0.079 0.095 0.111 0.127 0.143 0.159 0.175 0.19 0.206 0.222 0.238 0.254 0.27 0.286 0.302 0.317 0.333 0.349 0.365 0.381 0.397 0.413 0.429 0.444 0.46 0.476 0.492 0.508 0.524 0.54 0.556 0.571 0.587 0.603 0.619 0.635 0.651 0.667 0.683 0.698 0.714 0.73 0.746 0.762 0.778 0.794 0.81 0.825 0.841 0.857 0.873 0.889 0.905 0.921 0.937 0.952 0.968 0.984 1"/>
             </feComponentTransfer>
             <!-- 明部抽出（かなり明るい部分のみ残す） -->
             <feColorMatrix in="posterized" type="matrix" values="
@@ -101,6 +101,7 @@
         };
 
         const game = new Phaser.Game(config);
+        window.__game = game;
 
         let cursors;
         let jetSound;
@@ -135,9 +136,9 @@
                 scene.tweens.add({
                     targets: scene.spaceship,
                     y: 150,
-                    duration: 3000,
+                    duration: 4200,
                     ease: 'Back.easeOut',
-                    easeParams: [2.8],
+                    easeParams: [2.4],
                     onUpdate: () => {
                         scene.jetParticles.up.setPosition(scene.spaceship.x, scene.spaceship.y + 25);
                     },
@@ -161,7 +162,7 @@
                 });
 
                 // 降下序盤からスラスター点火（早めに噴射を見せる）
-                scene.time.delayedCall(400, () => {
+                scene.time.delayedCall(600, () => {
                     scene.jetParticles.up.setPosition(scene.spaceship.x, scene.spaceship.y + 25);
                     scene.jetParticles.up.on = true;
                     if (!jetSound.isPlaying) jetSound.play();
@@ -196,6 +197,7 @@
             this.load.image('spaceman_R', 'assets/player-r.png');
             this.load.image('spaceshipshadow', 'assets/spaceshipshadow.png');
             this.load.image('flag', 'assets/flag.png');
+            this.load.image('flag-flash', 'assets/flag-flash.png');
             this.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
             this.load.image('title', 'assets/title.png');
             this.load.audio('title', 'assets/sound/title.wav'); // ビープ音
@@ -322,13 +324,35 @@
             this.fuelGauge.setScale(0);
 
 
-            // 着陸エリアのスプライトを作成
+            // 着陸エリアのスプライトを作成（当たり判定用、描画は別スプライトへ）
             this.moon = this.add.sprite(Phaser.Math.Between(100, this.game.config.width - 100), this.game.config.height - 98, 'flag');
             this.physics.add.existing(this.moon, true);
             this.moon.body.allowGravity = false;
             this.moon.displayWidth = 80;
             this.moon.displayHeight = 70;
             this.moon.body.setSize(30, 5, false).setOffset(0, this.moon.displayHeight - 5 + 5);
+            this.moon.setVisible(false);
+
+            // 旗の見た目（着陸地点の足元を基準に2倍サイズで上に伸ばす）
+            const flagGroundY = this.moon.y + this.moon.displayHeight / 2;
+            this.flagVisual = this.add.image(this.moon.x, flagGroundY, 'flag');
+            this.flagVisual.setOrigin(0.5, 1);
+            this.flagVisual.setDisplaySize(160, 140);
+
+            // 点滅エフェクト（同位置・同サイズで重ね、ふんわりON/OFF）
+            this.flagFlash = this.add.image(this.moon.x, flagGroundY, 'flag-flash');
+            this.flagFlash.setOrigin(0.5, 1);
+            this.flagFlash.setDisplaySize(160, 140);
+            this.flagFlash.setDepth(this.flagVisual.depth + 1);
+            this.flagFlash.setAlpha(0);
+            this.tweens.add({
+                targets: this.flagFlash,
+                alpha: 1,
+                duration: 900,
+                ease: 'Sine.easeInOut',
+                yoyo: true,
+                repeat: -1
+            });
 
             // ゴール地面の的（楕円＋十字線）を作成して点滅させる
             this.markerX = this.moon.x + 6;
