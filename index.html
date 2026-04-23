@@ -12,6 +12,7 @@
     <meta property="og:site_name" content="Moonlander" />
     <meta property="og:image" content="https://moon-alpha.vercel.app/assets/ogp.jpg" />
     <meta name="robots" content="noindex,nofollow">
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css?v=10">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
@@ -1009,8 +1010,10 @@
                             e.setTexture(prefix + (sign < 0 ? 'L' : 'R'));
                         }
                         const enemyBox = e.isBoss ? shrink(e, 6, 5) : shrink(e, 2, 3);
-                        // 仲間が捕まった場合もゲームオーバー（救出失敗）
-                        const hitCrew = this.crewFollowing ? this.crews.find(c => c.visible && Phaser.Geom.Intersects.RectangleToRectangle(shrink(c, 3, 2), enemyBox)) : null;
+                        // 仲間が捕まった場合もゲームオーバー（救出失敗）。ハシゴ登り中も対象
+                        const hitCrew = this.crews && this.crews.length
+                            ? this.crews.find(c => c.visible && Phaser.Geom.Intersects.RectangleToRectangle(shrink(c, 3, 2), enemyBox))
+                            : null;
                         if (!this.astronautGameOver && hitCrew) {
                             this.astronautGameOver = true;
                             this.crewFollowing = false;
@@ -1018,6 +1021,10 @@
                             this.beamGaugeFill.setVisible(false);
                             this.bloodSound.play();
                             if (this.astronaut && this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
+                            // 進行中の人間tweenを全停止（捕獲された仲間のtweenは下で新規作成）
+                            this.tweens.killTweensOf(this.astronaut);
+                            this.crews.forEach(c => this.tweens.killTweensOf(c));
+                            this.crews.forEach(c => { if (c.anims && c.anims.isPlaying) c.anims.stop(); });
 
                             const captureX = hitCrew.x;
                             const captureY = hitCrew.y - hitCrew.displayHeight / 2;
@@ -1077,12 +1084,19 @@
                             });
                             break; // このフレームで以降の処理は不要
                         }
-                        if (!this.astronautGameOver && !this.returningToShip && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
+                        if (!this.astronautGameOver && this.astronaut.visible && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
                             this.astronautGameOver = true;
+                            this.crewFollowing = false;
                             this.beamGaugeBg.setVisible(false);
                             this.beamGaugeFill.setVisible(false);
                             this.bloodSound.play();
                             if (this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
+                            // 進行中の人間tweenを全停止（捕獲演出は下で新規作成）
+                            this.tweens.killTweensOf(this.astronaut);
+                            if (this.crews) {
+                                this.crews.forEach(c => this.tweens.killTweensOf(c));
+                                this.crews.forEach(c => { if (c.anims && c.anims.isPlaying) c.anims.stop(); });
+                            }
 
                             // プレイヤーの上に泡が徐々に増えて覆い尽くし、地中へ引きずり込まれる
                             const captureX = this.astronaut.x;
@@ -1207,6 +1221,7 @@
                     // 仲間を順にハシゴ下まで移動→登って船内へ
                     crews.forEach((c, idx) => {
                         this.time.delayedCall(idx * 900, () => {
+                            if (this.astronautGameOver) return;
                             const face = ladderX < c.x ? 'L' : 'R';
                             c.setTexture('crew_' + face);
                             this.tweens.add({
@@ -1247,6 +1262,8 @@
                     // 2人が乗り込んだ後、プレイヤーがハシゴを登る
                     const playerStart = crews.length * 900 + 1400;
                     this.time.delayedCall(playerStart, () => {
+                        // 捕獲されている場合は登らない（地中から復活してしまうバグ対策）
+                        if (this.astronautGameOver) return;
                         this.playerClimbing = true;
                         this.beamGaugeBg.setVisible(false);
                         this.beamGaugeFill.setVisible(false);
@@ -1812,9 +1829,10 @@
                                 duration: 1500,
                                 ease: 'Sine.easeInOut',
                                 onComplete: () => {
-                                    // 故障車の方向を先に決めて、振り向き方向も合わせる
+                                    // 故障車の方向を先に決める。振り向きは車と逆方向（自然な視線の動き）
                                     const carDirEarly = Phaser.Math.Between(0, 1) ? 1 : -1;
-                                    this.astronautTurnDir = carDirEarly > 0 ? 'R' : 'L';
+                                    this.astronautCarDir = carDirEarly;
+                                    this.astronautTurnDir = carDirEarly > 0 ? 'L' : 'R';
                                     // 降りきったら振り向いて正面を向く（方向に応じてR/L版）
                                     astronaut.setFlipX(false);
                                     astronaut.anims.play('astronaut_turn_to_front_' + this.astronautTurnDir);
@@ -1871,8 +1889,8 @@
                                     this.beamGaugeBg = this.add.rectangle(0, 0, 10, 1, 0x000000).setDepth(11);
                                     this.beamGaugeFill = this.add.rectangle(0, 0, 10, 1, 0x00ffcc).setDepth(12);
 
-                                    // 大破した月面探査車（振り向き方向と同じ側に配置）
-                                    const carDir = this.astronautTurnDir === 'R' ? 1 : -1;
+                                    // 大破した月面探査車（振り向き方向の逆側に配置）
+                                    const carDir = this.astronautCarDir;
                                     const carX = astronaut.x + carDir * Phaser.Math.Between(800, 1200);
                                     const carFeetY = astronaut.y + astronaut.displayHeight / 2;
                                     this.moonCar = this.add.image(carX, carFeetY, 'mooncar');
