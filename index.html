@@ -120,8 +120,6 @@
             scene.spaceshipShadow.setAlpha(0);
 
             function startGame() {
-                gameStarted = true;
-                scene.spaceship.setGravityY(80);
                 scene.spaceshipShadow.setAlpha(1);
                 scene.tweens.add({
                     targets: title,
@@ -132,6 +130,42 @@
                     }
                 });
                 scene.titleSound.play();
+
+                // Phase 1: 母艦から降下（中心を少し行き過ぎて上に戻るビヨーン挙動。スラスター噴射しながら）
+                scene.tweens.add({
+                    targets: scene.spaceship,
+                    y: 150,
+                    duration: 3000,
+                    ease: 'Back.easeOut',
+                    easeParams: [2.8],
+                    onUpdate: () => {
+                        scene.jetParticles.up.setPosition(scene.spaceship.x, scene.spaceship.y + 25);
+                    },
+                    onComplete: () => {
+                        // 中心到達と同時に操作可能へ（スナップ感を消すため残存モメンタムを付与）
+                        scene.jetParticles.up.on = false;
+                        if (jetSound.isPlaying) jetSound.stop();
+                        scene.spaceship.setVelocityY(-25); // わずかに上向きの残存速度
+                        scene.spaceship.setGravityY(80);
+                        gameStarted = true;
+
+                        // 燃料ゲージをポップイン表示
+                        scene.tweens.add({
+                            targets: [scene.fuelGaugeBorder, scene.fuelGauge],
+                            alpha: 1,
+                            scale: 1,
+                            duration: 280,
+                            ease: 'Back.easeOut'
+                        });
+                    }
+                });
+
+                // 降下序盤からスラスター点火（早めに噴射を見せる）
+                scene.time.delayedCall(400, () => {
+                    scene.jetParticles.up.setPosition(scene.spaceship.x, scene.spaceship.y + 25);
+                    scene.jetParticles.up.on = true;
+                    if (!jetSound.isPlaying) jetSound.play();
+                });
             }
 
             title.once('pointerup', startGame);
@@ -141,7 +175,7 @@
         function restartGame(scene) {
             gameStarted = false;
             scene.spaceship.setVisible(true);
-            scene.spaceship.setPosition(scene.game.config.width / 2, 150);
+            scene.spaceship.setPosition(scene.game.config.width / 2, -280);
             scene.spaceship.setVelocity(0);
             scene.spaceship.setAcceleration(0);
             scene.spaceship.setGravityY(80);
@@ -277,11 +311,15 @@
             this.fuelGaugeBorder = this.add.graphics({ lineStyle: { width: 2, color: 0xFFFFFF }, fillStyle: { color: 0xFFFFFF } });
             this.fuelGaugeBorder.strokeRect(0, 0, 8, 50);
             this.fuelGaugeBorder.setDepth(9);
+            this.fuelGaugeBorder.setAlpha(0);
+            this.fuelGaugeBorder.setScale(0);
 
             // 燃料ゲージを作成（縦型、宇宙船に追従）
             this.fuelGauge = this.add.graphics({ fillStyle: { color: 0xaf3035 } });
             this.fuelGauge.fillRect(1, 1, 6, 48);
             this.fuelGauge.setDepth(9);
+            this.fuelGauge.setAlpha(0);
+            this.fuelGauge.setScale(0);
 
 
             // 着陸エリアのスプライトを作成
@@ -306,9 +344,9 @@
                 ease: 'Sine.easeInOut'
             });
 
-            // 宇宙船のスプライトを作成
+            // 宇宙船のスプライトを作成（タイトル中は画面外・上空の母艦付近で待機）
             const spaceshipTexture = Phaser.Math.Between(1, 20) === 1 ? 'spacemy' : 'spaceship';
-            this.spaceship = this.physics.add.sprite(this.game.config.width / 2, 150, spaceshipTexture);
+            this.spaceship = this.physics.add.sprite(this.game.config.width / 2, -280, spaceshipTexture);
             this.spaceship.setCollideWorldBounds(true); // 画面外に出ないように設定
             this.spaceship.setDrag(0); // 慣性の設定
             this.spaceship.setAngularDrag(8); // 慣性の設定
@@ -450,8 +488,8 @@
                 v.addEventListener('touchend', () => this.cursors[arrows[i]].isDown = false);
             })
 
-            // カメラの初期位置とズームを設定
-            this.cameras.main.centerOn(this.spaceship.x, this.spaceship.y);
+            // カメラの初期位置とズームを設定（タイトル中は固定・宇宙船の最終位置付近）
+            this.cameras.main.centerOn(this.spaceship.x, 150);
             this.cameras.main.setZoom(1.2);
             // 8bitエフェクトを全体にかける
             // this.cameras.main.setPostPipeline('PixelArt'); // 一旦OFF（マスクとの干渉）
@@ -1198,6 +1236,23 @@
                 this.spaceship.setVelocity(0);
                 this.spaceship.setAcceleration(0);
                 this.spaceship.setGravityY(0);
+
+                // タイトル/降下中もデブリは流れ続ける
+                if (this.debrisGroup) {
+                    const cam = this.cameras.main;
+                    const camLeft = cam.worldView.left;
+                    const camRight = cam.worldView.right;
+                    this.debrisGroup.getChildren().forEach((debris) => {
+                        debris.x += debris.getData('speed') * this.sys.game.loop.delta / 500;
+                        const margin = debris.displayWidth;
+                        if (debris.x > camRight + margin) {
+                            debris.x = camLeft - margin;
+                        } else if (debris.x < camLeft - margin) {
+                            debris.x = camRight + margin;
+                        }
+                        debris.angle += debris.getData('rotationSpeed');
+                    });
+                }
                 return;
             }
 
