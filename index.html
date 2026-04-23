@@ -12,11 +12,26 @@
     <meta property="og:site_name" content="Moonlander" />
     <meta property="og:image" content="https://moon-alpha.vercel.app/assets/ogp.jpg" />
     <meta name="robots" content="noindex,nofollow">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
 
 <body oncontextmenu='return false;' oncopy='return false;'>
+
+    <!-- 8bit風エフェクト用SVGフィルタ（32階調posterize） -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <filter id="pixelart-posterize" color-interpolation-filters="sRGB">
+            <feComponentTransfer>
+                <feFuncR type="discrete" tableValues="0 0.032 0.065 0.097 0.129 0.161 0.194 0.226 0.258 0.29 0.323 0.355 0.387 0.419 0.452 0.484 0.516 0.548 0.581 0.613 0.645 0.677 0.71 0.742 0.774 0.806 0.839 0.871 0.903 0.935 0.968 1"/>
+                <feFuncG type="discrete" tableValues="0 0.032 0.065 0.097 0.129 0.161 0.194 0.226 0.258 0.29 0.323 0.355 0.387 0.419 0.452 0.484 0.516 0.548 0.581 0.613 0.645 0.677 0.71 0.742 0.774 0.806 0.839 0.871 0.903 0.935 0.968 1"/>
+                <feFuncB type="discrete" tableValues="0 0.032 0.065 0.097 0.129 0.161 0.194 0.226 0.258 0.29 0.323 0.355 0.387 0.419 0.452 0.484 0.516 0.548 0.581 0.613 0.645 0.677 0.71 0.742 0.774 0.806 0.839 0.871 0.903 0.935 0.968 1"/>
+            </feComponentTransfer>
+        </filter>
+    </svg>
+
+    <div id="game-container">
+        <div class="crt-overlay"></div>
+    </div>
 
     <script>
         // 8bitエフェクト用PostFXパイプライン（ピクセル化・減色・スキャンライン）
@@ -62,6 +77,7 @@
                 }
             },
             pipeline: { 'PixelArt': PixelArtPipeline },
+            parent: 'game-container',
             scene: {
                 preload: preload,
                 create: create,

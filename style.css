@@ -17,11 +17,41 @@ body {
     touch-action: manipulation;
 }
 
-canvas {
-    display: block;
+#game-container {
+    position: relative;
+    display: inline-block;
     margin-top: 30px;
+    line-height: 0;
+}
+
+#game-container canvas {
+    display: block;
     max-width: 1200px;
     max-height: 800px;
+    filter: url(#pixelart-posterize) saturate(1.1) contrast(1.08);
+}
+
+.crt-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.28) 0,
+        rgba(0, 0, 0, 0.28) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    mix-blend-mode: multiply;
+    z-index: 2;
+}
+
+body.no-crt #game-container canvas {
+    filter: none;
+}
+
+body.no-crt .crt-overlay {
+    display: none;
 }
 
 
