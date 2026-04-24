@@ -698,10 +698,10 @@
                 const jumpPower = -150;
                 const onGround = this.astronaut.y >= this.astronautGroundY;
 
-                // 爆発後は操作不可（ビームだけは飛び続ける）
+                // 捕獲後はプレイヤー操作不可（ビーム関連を停止し、レーザーだけ飛び続ける）
+                // ※敵の移動・追加捕獲判定は継続させるため return しない
                 if (this.astronautGameOver) {
                     if (this.beamTameSound && this.beamTameSound.isPlaying) this.beamTameSound.stop();
-                    // チャージパーティクル発生を停止（既存粒子はlifespanで自然消滅）
                     if (this.beamChargeEmitter) this.beamChargeEmitter.on = false;
                     if (this.lasers) {
                         this.lasers = this.lasers.filter(l => {
@@ -716,13 +716,12 @@
                             return true;
                         });
                     }
-                    return;
                 }
 
-                // 左右移動（停止しても向きは維持）
-                const isMoving = !this.playerClimbing && (this.cursors.left.isDown || this.cursors.right.isDown);
+                // 左右移動（捕獲後は操作不可）
+                const isMoving = !this.astronautGameOver && !this.playerClimbing && (this.cursors.left.isDown || this.cursors.right.isDown);
                 const prevFacing = this.astronautFacing;
-                if (!this.playerClimbing && this.cursors.left.isDown) {
+                if (!this.astronautGameOver && !this.playerClimbing && this.cursors.left.isDown) {
                     this.astronaut.x -= moveSpeed * dt;
                     this.astronaut.setFlipX(false); // 元画像は左向き
                     this.astronautFacing = 'left';
@@ -730,7 +729,7 @@
                     if (prevFacing === 'right' && onGround) {
                         this.astronaut.anims.play('astronaut_turn_flip_RtoL');
                     }
-                } else if (!this.playerClimbing && this.cursors.right.isDown) {
+                } else if (!this.astronautGameOver && !this.playerClimbing && this.cursors.right.isDown) {
                     this.astronaut.x += moveSpeed * dt;
                     this.astronaut.setFlipX(true); // 右向きは左右反転
                     this.astronautFacing = 'right';
@@ -848,14 +847,14 @@
                 }
 
                 // スペース押下：チャージ計測開始（ここでは発射しない）
-                if (!this.playerClimbing && this.astronautFacing && Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
+                if (!this.astronautGameOver && !this.playerClimbing && this.astronautFacing && Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
                     this.beamHoldStart = this.time.now;
                     this.chargedFired = false;
                     // 押下時のエネルギーでチャージ可否をロック（回復による途中チャージ可能化を防ぐ）
                     this.chargeAllowed = this.beamEnergy >= 50;
                 }
                 // スペース離した瞬間：チャージが発火してなければ通常ビーム
-                if (!this.playerClimbing && Phaser.Input.Keyboard.JustUp(this.cursors.space)) {
+                if (!this.astronautGameOver && !this.playerClimbing && Phaser.Input.Keyboard.JustUp(this.cursors.space)) {
                     if (this.astronautFacing && this.beamHoldStart && !this.chargedFired && this.beamEnergy >= 5) {
                         const ratio = Phaser.Math.Clamp(this.beamEnergy / 100, 0, 1);
                         const dir = this.astronautFacing === 'left' ? -1 : 1;
@@ -880,7 +879,7 @@
                 }
 
                 // 長押し1.5秒 + 押下時に既にエネルギー50以上 → チャージビーム（画面端まで貫通）
-                if (!this.playerClimbing && this.astronautFacing && this.cursors.space.isDown && this.beamHoldStart
+                if (!this.astronautGameOver && !this.playerClimbing && this.astronautFacing && this.cursors.space.isDown && this.beamHoldStart
                     && !this.chargedFired && this.time.now - this.beamHoldStart >= 1500 && this.chargeAllowed) {
                     this.chargedFired = true;
                     const dir = this.astronautFacing === 'left' ? -1 : 1;
@@ -951,6 +950,7 @@
                                     ab.setDisplaySize(abSize, abSize);
                                     ab.setDepth(10);
                                     ab.play('bloodAlienSplat');
+                                    if (e.shadow) e.shadow.destroy();
                                     e.destroy();
                                     this.enemyKills++;
                                     if (this.enemyKills % 5 === 0) this.bossesDue++;
@@ -972,15 +972,15 @@
                 }
 
                 // ジャンプ（押し始めで初速、離したら上昇を切って強弱をつける）
-                if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && onGround) {
+                if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && onGround && !this.astronautGameOver) {
                     this.astronautVY = jumpPower;
                 }
                 if (Phaser.Input.Keyboard.JustUp(this.cursors.up) && this.astronautVY < 0) {
                     this.astronautVY *= 0.35;
                 }
 
-                // 重力＋位置更新（帰還時はtween任せで物理停止）
-                if (!this.returningToShip) {
+                // 重力＋位置更新（帰還時・捕獲後はtween任せで物理停止）
+                if (!this.returningToShip && !this.astronautGameOver) {
                     this.astronautVY += gravity * dt;
                     this.astronaut.y += this.astronautVY * dt;
 
@@ -995,6 +995,9 @@
                     }
                 }
 
+                // 影は X方向のみ追従（Yは地面に固定済み）
+                if (this.astronaut.shadow) this.astronaut.shadow.x = this.astronaut.x;
+
                 // 地底人の移動＋宇宙飛行士との衝突
                 if (this.enemies && this.enemies.length) {
                     const enemySpeed = 45;
@@ -1004,14 +1007,27 @@
                         return new Phaser.Geom.Rectangle(b.x + px, b.y + py, b.width - px * 2, b.height - py * 2);
                     };
                     const astroBox = shrink(this.astronaut, 3, 2);
+                    // 生存中（=未捕獲）のターゲット候補を集める
+                    const liveTargets = [];
+                    if (this.astronaut && this.astronaut.visible && !this.astronaut.captured) liveTargets.push(this.astronaut);
+                    if (this.crews) this.crews.forEach(c => { if (c.visible && !c.captured) liveTargets.push(c); });
+
                     for (const e of this.enemies) {
                         // 半分以上出るまでは当たり判定なし
                         if (e.emerging && e.y > this.groundFeetY + e.displayHeight / 2) continue;
-                        // 出現中は移動・方向転換しない（当たり判定は維持）
-                        if (!e.emerging) {
-                            // 主人公が空中の間は方向転換しない（飛び越え後すぐ捕まるのを防止）
-                            if (onGround) {
-                                const dx = this.astronaut.x - e.x;
+                        // 出現中・捕獲動作中は移動・方向転換しない
+                        if (!e.emerging && !e.capturing) {
+                            // 最寄りの未捕獲ターゲットを追う（捕まったキャラには寄って来ない）
+                            let targetX = null;
+                            let minDist = Infinity;
+                            for (const t of liveTargets) {
+                                const d = Math.abs(t.x - e.x);
+                                if (d < minDist) { minDist = d; targetX = t.x; }
+                            }
+                            // 主人公が空中の間は方向転換しない（飛び越え後すぐ捕まるのを防止）。
+                            // ただしゲームオーバー後は常に最寄り未捕獲を追う。
+                            if ((onGround || this.astronautGameOver) && targetX !== null) {
+                                const dx = targetX - e.x;
                                 e.lastDir = dx === 0 ? (e.lastDir || 1) : Math.sign(dx);
                             }
                             const sign = e.lastDir || 1;
@@ -1020,163 +1036,220 @@
                             const prefix = e.isBoss ? 'boss_' : 'alien_';
                             e.setTexture(prefix + (sign < 0 ? 'L' : 'R'));
                         }
+                        // 影をX方向に追従
+                        if (e.shadow) e.shadow.x = e.x;
                         const enemyBox = e.isBoss ? shrink(e, 6, 5) : shrink(e, 2, 3);
                         // 仲間が捕まった場合もゲームオーバー（救出失敗）。ハシゴ登り中も対象
-                        const hitCrew = this.crews && this.crews.length
-                            ? this.crews.find(c => c.visible && Phaser.Geom.Intersects.RectangleToRectangle(shrink(c, 3, 2), enemyBox))
+                        // 既に捕獲済みの仲間と、既に捕獲動作中の敵は対象外
+                        const hitCrew = !e.capturing && this.crews && this.crews.length
+                            ? this.crews.find(c => c.visible && !c.captured && Phaser.Geom.Intersects.RectangleToRectangle(shrink(c, 3, 2), enemyBox))
                             : null;
-                        if (!this.astronautGameOver && hitCrew) {
-                            this.astronautGameOver = true;
-                            this.crewFollowing = false;
-                            this.beamGaugeBg.setVisible(false);
-                            this.beamGaugeFill.setVisible(false);
-                            this.bloodSound.play();
-                            if (this.astronaut && this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
-                            // 進行中の人間tweenを全停止（捕獲された仲間のtweenは下で新規作成）
-                            this.tweens.killTweensOf(this.astronaut);
-                            this.crews.forEach(c => this.tweens.killTweensOf(c));
-                            this.crews.forEach(c => { if (c.anims && c.anims.isPlaying) c.anims.stop(); });
+                        if (hitCrew) {
+                            const isFirstCapture = !this.astronautGameOver;
+                            hitCrew.captured = true;
+                            e.capturing = true;
+                            this.bloodSound.play(); // 各捕獲で鳴らす
 
-                            const captureX = hitCrew.x;
-                            const captureY = hitCrew.y - hitCrew.displayHeight / 2;
-                            hitCrew.setDepth(9);
-                            hitCrew.setMask(this.groundMask);
-                            e.setDepth(10);
-                            e.setMask(this.groundMask);
-
-                            const cBubbles = [];
-                            const cTotal = 60;
-                            for (let i = 0; i < cTotal; i++) {
-                                this.time.delayedCall(i * 33, () => {
-                                    if (!this.astronautGameOver) return;
-                                    const bx = captureX + Phaser.Math.Between(-7, 7);
-                                    const by = captureY + Phaser.Math.Between(-8, 8);
-                                    const r = Phaser.Math.FloatBetween(0.5, 2);
-                                    const b = this.add.circle(bx, by, r, 0x33dd33, Phaser.Math.FloatBetween(0.5, 0.9));
-                                    b.setDepth(11);
-                                    b.setMask(this.groundMask);
-                                    cBubbles.push(b);
-                                    this.tweens.add({
-                                        targets: b,
-                                        x: b.x + Phaser.Math.Between(-2, 2),
-                                        y: b.y + Phaser.Math.Between(-2, 2),
-                                        scaleX: Phaser.Math.FloatBetween(0.7, 1.3),
-                                        scaleY: Phaser.Math.FloatBetween(0.7, 1.3),
-                                        duration: Phaser.Math.Between(250, 450),
-                                        ease: 'Sine.easeInOut',
-                                        yoyo: true,
-                                        repeat: -1
-                                    });
-                                });
-                            }
-
-                            this.tweens.add({
-                                targets: e,
-                                x: captureX,
-                                duration: 500,
-                                ease: 'Sine.easeOut'
-                            });
-
-                            this.time.delayedCall(cTotal * 33 + 300, () => {
-                                hitCrew.setVisible(false);
-                                const sinkY = this.groundFeetY + 50;
-                                this.tweens.add({
-                                    targets: [...cBubbles, e],
-                                    y: sinkY,
-                                    duration: 1000,
-                                    ease: 'Sine.easeIn',
-                                    onComplete: () => {
-                                        cBubbles.forEach(b => b.destroy());
-                                        e.destroy();
-                                        this.add.text(captureX, captureY - 20, 'Rescue Failed', { fontSize: '20px', fill: '#FFF' }).setOrigin(0.5).setDepth(12);
-                                        this.time.delayedCall(2500, () => { this.scene.restart(); });
-                                    }
-                                });
-                            });
-                            break; // このフレームで以降の処理は不要
-                        }
-                        if (!this.astronautGameOver && this.astronaut.visible && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
-                            this.astronautGameOver = true;
-                            this.crewFollowing = false;
-                            this.beamGaugeBg.setVisible(false);
-                            this.beamGaugeFill.setVisible(false);
-                            this.bloodSound.play();
-                            if (this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
-                            // 進行中の人間tweenを全停止（捕獲演出は下で新規作成）
-                            this.tweens.killTweensOf(this.astronaut);
-                            if (this.crews) {
+                            if (isFirstCapture) {
+                                this.astronautGameOver = true;
+                                this.crewFollowing = false;
+                                this.beamGaugeBg.setVisible(false);
+                                this.beamGaugeFill.setVisible(false);
+                                if (this.astronaut && this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
+                                // 進行中の人間tweenを全停止（捕獲された仲間のtweenは下で新規作成）
+                                this.tweens.killTweensOf(this.astronaut);
                                 this.crews.forEach(c => this.tweens.killTweensOf(c));
                                 this.crews.forEach(c => { if (c.anims && c.anims.isPlaying) c.anims.stop(); });
                             }
 
-                            // プレイヤーの上に泡が徐々に増えて覆い尽くし、地中へ引きずり込まれる
-                            const captureX = this.astronaut.x;
-                            const captureY = this.astronaut.y;
+                            // 空中の他の仲間を自然に地面へ落下（重力風のtween）
+                            this.crews.forEach(c => {
+                                if (c !== hitCrew && !c.captured && c.y < this.groundFeetY - 1) {
+                                    const dur = Math.min(400, (this.groundFeetY - c.y) * 8);
+                                    this.tweens.add({ targets: c, y: this.groundFeetY, duration: dur, ease: 'Quad.easeIn' });
+                                }
+                            });
 
-                            // プレイヤーはエイリアンと一緒に地中へ沈む（エイリアンより手前・泡より奥）
-                            this.astronaut.setDepth(10.5);
-                            this.astronaut.setMask(this.groundMask);
-                            e.setDepth(10);
-                            e.setMask(this.groundMask);
+                            // 着地後に捕獲アニメ開始（自然な着地）
+                            const startCaptureAnim = () => {
+                                const captureX = hitCrew.x;
+                                const captureY = hitCrew.y - hitCrew.displayHeight / 2;
+                                hitCrew.setDepth(9);
+                                hitCrew.setMask(this.groundMask);
+                                e.setDepth(10);
+                                e.setMask(this.groundMask);
 
-                            // 細かい泡が2秒かけて徐々に侵食していく
-                            const bubbles = [];
-                            const totalBubbles = 60;
-                            for (let i = 0; i < totalBubbles; i++) {
-                                this.time.delayedCall(i * 33, () => {
-                                    if (!this.astronautGameOver) return;
-                                    const bx = captureX + Phaser.Math.Between(-7, 7);
-                                    const by = captureY + Phaser.Math.Between(-8, 8);
-                                    const r = Phaser.Math.FloatBetween(0.5, 2);
-                                    const b = this.add.circle(bx, by, r, 0x33dd33, Phaser.Math.FloatBetween(0.5, 0.9));
-                                    b.setDepth(11);
-                                    b.setMask(this.groundMask);
-                                    bubbles.push(b);
+                                const cBubbles = [];
+                                const cTotal = 60;
+                                for (let i = 0; i < cTotal; i++) {
+                                    this.time.delayedCall(i * 33, () => {
+                                        if (!hitCrew.captured) return;
+                                        const bx = captureX + Phaser.Math.Between(-7, 7);
+                                        const by = captureY + Phaser.Math.Between(-8, 8);
+                                        const r = Phaser.Math.FloatBetween(0.5, 2);
+                                        const b = this.add.circle(bx, by, r, 0x33dd33, Phaser.Math.FloatBetween(0.5, 0.9));
+                                        b.setDepth(11);
+                                        b.setMask(this.groundMask);
+                                        cBubbles.push(b);
+                                        this.tweens.add({
+                                            targets: b,
+                                            x: b.x + Phaser.Math.Between(-2, 2),
+                                            y: b.y + Phaser.Math.Between(-2, 2),
+                                            scaleX: Phaser.Math.FloatBetween(0.7, 1.3),
+                                            scaleY: Phaser.Math.FloatBetween(0.7, 1.3),
+                                            duration: Phaser.Math.Between(250, 450),
+                                            ease: 'Sine.easeInOut',
+                                            yoyo: true,
+                                            repeat: -1
+                                        });
+                                    });
+                                }
+
+                                // エイリアンを捕獲点に寄せる
+                                this.tweens.add({
+                                    targets: e,
+                                    x: captureX,
+                                    duration: 500,
+                                    ease: 'Sine.easeOut'
+                                });
+
+                                this.time.delayedCall(cTotal * 33 + 300, () => {
+                                    hitCrew.setVisible(false);
+                                    const sinkY = this.groundFeetY + 50;
                                     this.tweens.add({
-                                        targets: b,
-                                        x: b.x + Phaser.Math.Between(-2, 2),
-                                        y: b.y + Phaser.Math.Between(-2, 2),
-                                        scaleX: Phaser.Math.FloatBetween(0.7, 1.3),
-                                        scaleY: Phaser.Math.FloatBetween(0.7, 1.3),
-                                        duration: Phaser.Math.Between(250, 450),
-                                        ease: 'Sine.easeInOut',
-                                        yoyo: true,
-                                        repeat: -1
+                                        targets: [...cBubbles, e],
+                                        y: sinkY,
+                                        duration: 1000,
+                                        ease: 'Sine.easeIn',
+                                        onComplete: () => {
+                                            cBubbles.forEach(b => b.destroy());
+                                            if (e.shadow) e.shadow.destroy();
+                                            e.destroy();
+                                            if (isFirstCapture) {
+                                                this.add.text(captureX, captureY - 20, 'Rescue Failed', { fontSize: '20px', fill: '#FFF' }).setOrigin(0.5).setDepth(12);
+                                                this.time.delayedCall(2500, () => { this.scene.restart(); });
+                                            }
+                                        }
                                     });
                                 });
+                            };
+
+                            // 仲間が空中なら自然落下tween → 着地後に捕獲アニメ開始
+                            if (hitCrew.y >= this.groundFeetY - 1) {
+                                startCaptureAnim();
+                            } else {
+                                const dur = Math.min(400, (this.groundFeetY - hitCrew.y) * 8);
+                                this.tweens.add({ targets: hitCrew, y: this.groundFeetY, duration: dur, ease: 'Quad.easeIn', onComplete: startCaptureAnim });
+                            }
+                            break; // このフレームで以降の処理は不要
+                        }
+                        if (!e.capturing && !this.astronaut.captured && this.astronaut.visible && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
+                            const isFirstCapture = !this.astronautGameOver;
+                            this.astronaut.captured = true;
+                            e.capturing = true;
+                            this.bloodSound.play(); // 各捕獲で鳴らす
+
+                            if (isFirstCapture) {
+                                this.astronautGameOver = true;
+                                this.crewFollowing = false;
+                                this.beamGaugeBg.setVisible(false);
+                                this.beamGaugeFill.setVisible(false);
+                                if (this.astronaut.anims && this.astronaut.anims.isPlaying) this.astronaut.anims.stop();
+                                // 進行中の人間tweenを全停止（捕獲演出は下で新規作成）
+                                this.tweens.killTweensOf(this.astronaut);
+                                if (this.crews) {
+                                    this.crews.forEach(c => this.tweens.killTweensOf(c));
+                                    this.crews.forEach(c => { if (c.anims && c.anims.isPlaying) c.anims.stop(); });
+                                }
                             }
 
-                            // エイリアンを寄せる
-                            this.tweens.add({
-                                targets: e,
-                                x: captureX,
-                                duration: 500,
-                                ease: 'Sine.easeOut'
+                            // 空中の仲間を自然落下tweenで地面へ
+                            if (this.crews) this.crews.forEach(c => {
+                                if (!c.captured && c.y < this.groundFeetY - 1) {
+                                    const dur = Math.min(400, (this.groundFeetY - c.y) * 8);
+                                    this.tweens.add({ targets: c, y: this.groundFeetY, duration: dur, ease: 'Quad.easeIn' });
+                                }
                             });
 
-                            // 泡が覆い尽くしたら地中へ：同じタイミングだがエイリアンが先に沈む
-                            this.time.delayedCall(totalBubbles * 33 + 300, () => {
-                                const sinkY = this.groundFeetY + 50;
+                            // 着地後に捕獲アニメ開始（プレイヤーは重力で自然落下）
+                            const startCaptureAnim = () => {
+                                const captureX = this.astronaut.x;
+                                const captureY = this.astronaut.y;
+                                this.astronaut.setDepth(10.5);
+                                this.astronaut.setMask(this.groundMask);
+                                e.setDepth(10);
+                                e.setMask(this.groundMask);
+
+                                const bubbles = [];
+                                const totalBubbles = 60;
+                                for (let i = 0; i < totalBubbles; i++) {
+                                    this.time.delayedCall(i * 33, () => {
+                                        if (!this.astronaut.captured) return;
+                                        const bx = captureX + Phaser.Math.Between(-7, 7);
+                                        const by = captureY + Phaser.Math.Between(-8, 8);
+                                        const r = Phaser.Math.FloatBetween(0.5, 2);
+                                        const b = this.add.circle(bx, by, r, 0x33dd33, Phaser.Math.FloatBetween(0.5, 0.9));
+                                        b.setDepth(11);
+                                        b.setMask(this.groundMask);
+                                        bubbles.push(b);
+                                        this.tweens.add({
+                                            targets: b,
+                                            x: b.x + Phaser.Math.Between(-2, 2),
+                                            y: b.y + Phaser.Math.Between(-2, 2),
+                                            scaleX: Phaser.Math.FloatBetween(0.7, 1.3),
+                                            scaleY: Phaser.Math.FloatBetween(0.7, 1.3),
+                                            duration: Phaser.Math.Between(250, 450),
+                                            ease: 'Sine.easeInOut',
+                                            yoyo: true,
+                                            repeat: -1
+                                        });
+                                    });
+                                }
+
+                                // エイリアンを捕獲点に寄せる
                                 this.tweens.add({
-                                    targets: [...bubbles, e],
-                                    y: sinkY,
-                                    duration: 1000,
-                                    ease: 'Sine.easeIn',
-                                    onComplete: () => {
-                                        bubbles.forEach(b => b.destroy());
-                                        e.destroy();
-                                        this.add.text(captureX, captureY - 20, 'Mission Failed', { fontSize: '20px', fill: '#FFF' }).setOrigin(0.5).setDepth(12);
-                                        this.time.delayedCall(2500, () => { this.scene.restart(); });
-                                    }
+                                    targets: e,
+                                    x: captureX,
+                                    duration: 500,
+                                    ease: 'Sine.easeOut'
                                 });
-                                this.tweens.add({
-                                    targets: this.astronaut,
-                                    y: sinkY,
-                                    duration: 1000,
-                                    delay: 120,
-                                    ease: 'Sine.easeIn'
+
+                                // 泡が覆い尽くしたら地中へ
+                                this.time.delayedCall(totalBubbles * 33 + 300, () => {
+                                    const sinkY = this.groundFeetY + 50;
+                                    this.tweens.add({
+                                        targets: [...bubbles, e],
+                                        y: sinkY,
+                                        duration: 1000,
+                                        ease: 'Sine.easeIn',
+                                        onComplete: () => {
+                                            bubbles.forEach(b => b.destroy());
+                                            if (e.shadow) e.shadow.destroy();
+                                            e.destroy();
+                                            if (isFirstCapture) {
+                                                this.add.text(captureX, captureY - 20, 'Mission Failed', { fontSize: '20px', fill: '#FFF' }).setOrigin(0.5).setDepth(12);
+                                                this.time.delayedCall(2500, () => { this.scene.restart(); });
+                                            }
+                                        }
+                                    });
+                                    this.tweens.add({
+                                        targets: this.astronaut,
+                                        y: sinkY,
+                                        duration: 1000,
+                                        delay: 120,
+                                        ease: 'Sine.easeIn'
+                                    });
                                 });
-                            });
+                            };
+
+                            // プレイヤーが空中なら自然落下tween → 着地後に捕獲アニメ開始
+                            if (this.astronaut.y >= this.astronautGroundY) {
+                                startCaptureAnim();
+                            } else {
+                                this.astronautVY = 0; // gravity停止後に残ったVYをクリア
+                                const dur = Math.min(400, (this.astronautGroundY - this.astronaut.y) * 8);
+                                this.tweens.add({ targets: this.astronaut, y: this.astronautGroundY, duration: dur, ease: 'Quad.easeIn', onComplete: startCaptureAnim });
+                            }
                         }
                     }
                 }
@@ -1193,6 +1266,8 @@
                         c.setDisplaySize(15, 15);
                         c.setOrigin(0.5, 1);
                         c.setDepth(7);
+                        // 影は地面に固定（生成時はドア上、降下後は地面）
+                        c.shadow = createGroundShadow(this, c.x, this.groundFeetY, 14);
                         this.crews.push(c);
                         this.time.delayedCall(i * 400, () => {
                             // ぴょんと降りる：横に出つつY方向はバウンドで着地
@@ -1504,10 +1579,17 @@
                         else if (!isMoving && onGround) c.setTexture('crew');
                     });
                 }
+                // 仲間の影は X方向に追従、可視状態も同期
+                if (this.crews) this.crews.forEach(c => {
+                    if (c.shadow) {
+                        c.shadow.x = c.x;
+                        c.shadow.setVisible(c.visible);
+                    }
+                });
 
-                // カメラを宇宙飛行士に追従（ポッド打ち上げ中はスキップ）
+                // カメラを宇宙飛行士に追従（ポッド打ち上げ中・捕獲後はスキップ）
                 const cam = this.cameras.main;
-                if (!this.cameraRising) {
+                if (!this.cameraRising && !this.astronautGameOver) {
                     const currentX = cam.scrollX + cam.width / 2;
                     const currentY = cam.scrollY + cam.height / 2;
                     cam.centerOn(
@@ -1845,6 +1927,8 @@
                                     // そのまま操作可能にする（物理不要、手動制御）
                                     this.astronaut = astronaut;
                                     this.astronautGroundY = astronaut.y; // 地面のY座標を記憶
+                                    // 足元の影（地面固定、ジャンプしても影は動かない）
+                                    astronaut.shadow = createGroundShadow(this, astronaut.x, astronaut.y + astronaut.displayHeight / 2, 14);
                                     // 移動範囲を背景画像内にクランプ（ズーム2.7での可視域を背景内に収める）
                                     const bgTex = this.textures.get('background').getSourceImage();
                                     const bgCenterX = this.scale.width / 2;
@@ -1940,6 +2024,8 @@
                                         enemy.setDepth(8);
                                         enemy.setMask(this.groundMask);
                                         enemy.emerging = true;
+                                        // 影：地中から出てくる瞬間から地面に表示（敵が地上に出てくる予兆）
+                                        enemy.shadow = createGroundShadow(this, enemy.x, this.groundFeetY, isBoss ? 36 : 12);
                                         this.tweens.add({
                                             targets: enemy,
                                             y: this.groundFeetY,
@@ -2063,6 +2149,22 @@
         }
 
         let explosionPlaying = false;
+
+        // 地上キャラクターの影（多層楕円で疑似ブラー）。深度 6.5 (moon car 6 と crews 7 の間)
+        function createGroundShadow(scene, x, footY, width) {
+            const g = scene.add.graphics();
+            // 外側ほど薄く広く（ぼかし表現）
+            g.fillStyle(0x000000, 0.04);
+            g.fillEllipse(0, 0, width * 1.5, 4.5);
+            g.fillStyle(0x000000, 0.06);
+            g.fillEllipse(0, 0, width * 1.2, 3.6);
+            g.fillStyle(0x000000, 0.08);
+            g.fillEllipse(0, 0, width, 3);
+            g.x = x;
+            g.y = footY + 1;
+            g.setDepth(6.5);
+            return g;
+        }
 
         // プチノイズ防止：Web Audio API の setTargetAtTime で指数関数的なエンベロープ減衰
         // 終端に向かって変化速度がゼロに漸近するためクリックが原理的に出ない
