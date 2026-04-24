@@ -1356,6 +1356,12 @@
                                 ease: 'Sine.easeInOut',
                                 onComplete: () => {
                                     c.setTexture('crew');
+                                    // 影を登りに合わせてフェードアウト
+                                    if (c.shadow) {
+                                        const sh = c.shadow;
+                                        c.shadow = null;
+                                        this.tweens.add({ targets: sh, alpha: 0, duration: 1000, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
+                                    }
                                     this.tweens.add({
                                         targets: c,
                                         y: ladderTop - 5,
@@ -1393,12 +1399,6 @@
                         this.beamGaugeFill.setVisible(false);
                         this.beamHoldStart = null;
                         this.chargeAllowed = false;
-                        // 影をフェードアウトして消す
-                        if (this.astronaut.shadow) {
-                            const sh = this.astronaut.shadow;
-                            this.tweens.add({ targets: sh, alpha: 0, duration: 800, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
-                            this.astronaut.shadow = null;
-                        }
                         if (this.beamTameSound.isPlaying) this.beamTameSound.stop();
                         this.astronaut.anims.stop();
                         this.astronaut.setFlipX(false);
@@ -1421,6 +1421,12 @@
                                 // 振り向き完了後に登り開始
                                 this.astronaut.once('animationcomplete-astronaut_turn_to_back_' + turnDir, () => {
                                     this.astronaut.setTexture('spaceman_B');
+                                    // 影を登りに合わせてフェードアウト（上に行くほど薄く）
+                                    if (this.astronaut.shadow) {
+                                        const sh = this.astronaut.shadow;
+                                        this.astronaut.shadow = null;
+                                        this.tweens.add({ targets: sh, alpha: 0, duration: 1000, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
+                                    }
                                     this.tweens.add({
                                         targets: this.astronaut,
                                         y: ladderTop - 5,
