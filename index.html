@@ -2121,7 +2121,8 @@
                                     this.astronautHasMoved = false; // 初回移動で通常ズームへ切り替え
                                     // ズームはハシゴが伸び始める時から既に進行中
 
-                                    // 大破車の方向を >>> で表示（2回繰り返し）
+                                    // 大破車の方向を >>> で表示（振り向きアニメで方向が分かるようになったので非表示。一応残す）
+                                    /*
                                     if (this.moonCar) {
                                         const arrow = this.moonCar.x > astronaut.x ? '>' : '<';
                                         const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
@@ -2151,6 +2152,7 @@
                                         };
                                         this.time.delayedCall(1500, showArrow);
                                     }
+                                    */
                                 }
                             });
                         }
