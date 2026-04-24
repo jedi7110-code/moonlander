@@ -770,7 +770,7 @@
                     this.astronautHasMoved = true;
                     this.tweens.add({
                         targets: this.cameras.main,
-                        zoom: 2.7,
+                        zoom: 2.75,
                         duration: 800,
                         ease: 'Sine.easeInOut'
                     });
@@ -1095,6 +1095,12 @@
                                     this.tweens.add({ targets: c, y: this.groundFeetY, duration: dur, ease: 'Quad.easeIn' });
                                 }
                             });
+                            // プレイヤーも空中なら自然に地面へ落下（仲間捕獲時に重力停止で空中固定になるバグ対策）
+                            if (this.astronaut && this.astronaut.y < this.astronautGroundY - 1) {
+                                this.astronautVY = 0;
+                                const dur = Math.min(400, (this.astronautGroundY - this.astronaut.y) * 8);
+                                this.tweens.add({ targets: this.astronaut, y: this.astronautGroundY, duration: dur, ease: 'Quad.easeIn' });
+                            }
 
                             // 着地後に捕獲アニメ開始（自然な着地）
                             const startCaptureAnim = () => {
@@ -1329,13 +1335,13 @@
                     this.returningToShip = true;
                     this.crewFollowing = false;
                     const ladderX = this.spaceship.x - 5;
-                    const ladderTop = this.spaceship.y + 20;
-                    const ladderBottom = this.spaceship.y + 45;
+                    const ladderTop = this.spaceship.y + 10; // 宇宙船の内部から伸ばす
+                    const ladderBottom = this.spaceship.y + 60; // プレイヤー足元近くまで延長
                     const crews = this.crews.slice();
                     // 待機列の方向（アストロノート進行方向と反対側）
                     const queueDir = this.astronautFacing === 'right' ? -1 : 1;
                     const queueSpacing = 13;
-                    const queueY = ladderBottom + this.astronaut.displayHeight / 2;
+                    const queueY = this.groundFeetY; // ハシゴの根元（地面）まで移動してから登る
                     // 仲間を順にハシゴ下まで移動→登って船内へ
                     crews.forEach((c, idx) => {
                         this.time.delayedCall(idx * 900, () => {
@@ -1910,8 +1916,9 @@
                 this.time.delayedCall(1000, () => {
                     // ハシゴを描画（宇宙船の下から伸びる）
                     const ladderX = this.spaceship.x - 5;
-                    const ladderTop = this.spaceship.y + 20;
-                    const ladderBottom = this.spaceship.y + 45;
+                    const ladderTop = this.spaceship.y + 10; // 宇宙船の内部から伸ばす
+                    const ladderBottom = this.spaceship.y + 60; // プレイヤー足元近くまで延長
+                    const astronautDestY = this.spaceship.y + 50; // 着地中心位置（地面）は据え置き
                     const ladder = this.add.graphics({ lineStyle: { width: 1, color: 0xcccccc } });
                     ladder.setDepth(7);
 
@@ -1919,7 +1926,7 @@
                     const targetPanX = this.spaceship.x;
                     const targetPanY = this.spaceship.y + 30; // ハシゴ中央あたり
                     this.cameras.main.pan(targetPanX, targetPanY, 1500, 'Sine.easeInOut');
-                    this.cameras.main.zoomTo(4.0, 1500, 'Sine.easeInOut');
+                    this.cameras.main.zoomTo(4.5, 1500, 'Sine.easeInOut');
 
                     // ハシゴがスッと伸びるアニメーション
                     let ladderProgress = 0;
@@ -1936,9 +1943,9 @@
                             // 2本の縦線
                             ladder.lineBetween(ladderX - 3, ladderTop, ladderX - 3, currentBottom);
                             ladder.lineBetween(ladderX + 3, ladderTop, ladderX + 3, currentBottom);
-                            // 横棒（3本）
-                            const steps = 7;
-                            for (let s = 0; s <= steps; s++) {
+                            // 横棒：始端と終端は閉じない（H形）。コマ数 +2
+                            const steps = 9;
+                            for (let s = 1; s < steps; s++) {
                                 const stepY = ladderTop + (currentBottom - ladderTop) * (s / steps);
                                 if (stepY <= currentBottom) {
                                     ladder.lineBetween(ladderX - 3, stepY, ladderX + 3, stepY);
@@ -1957,14 +1964,14 @@
                             astronaut.setDepth(8);
 
                             // 影を先に作成し、降下中にフェードイン（着地予定位置に）
-                            const destFootY = ladderBottom + 5 + 19 / 2;
+                            const destFootY = astronautDestY + 19 / 2;
                             astronaut.shadow = createGroundShadow(this, astronaut.x, destFootY, 14);
                             astronaut.shadow.alpha = 0;
                             this.tweens.add({ targets: astronaut.shadow, alpha: 1, duration: 1500, ease: 'Sine.easeInOut' });
 
                             this.tweens.add({
                                 targets: astronaut,
-                                y: ladderBottom + 5,
+                                y: astronautDestY,
                                 duration: 1500,
                                 ease: 'Sine.easeInOut',
                                 onComplete: () => {
@@ -1981,10 +1988,10 @@
                                     this.astronaut = astronaut;
                                     this.astronautGroundY = astronaut.y; // 地面のY座標を記憶
                                     // 影は降下開始時に既に作成済み（フェードイン中）
-                                    // 移動範囲を背景画像内にクランプ（ズーム2.7での可視域を背景内に収める）
+                                    // 移動範囲を背景画像内にクランプ（ズーム2.75での可視域を背景内に収める）
                                     const bgTex = this.textures.get('background').getSourceImage();
                                     const bgCenterX = this.scale.width / 2;
-                                    const camHalfW = this.scale.width / 2.7 / 2;
+                                    const camHalfW = this.scale.width / 2.75 / 2;
                                     this.astronautMinX = (bgCenterX - bgTex.width / 2) + camHalfW;
                                     this.astronautMaxX = (bgCenterX + bgTex.width / 2) - camHalfW;
                                     // 仮：移動限界の外側に2001モノリス（立体感あり）
@@ -2206,7 +2213,7 @@
 
             // 宇宙船とデブリとの衝突をチェック
             this.physics.overlap(this.spaceship, this.debrisGroup, () => {
-                gameOver(this, 'Craaaash!');
+                gameOver(this, '');
             });
 
         }
