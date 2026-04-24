@@ -77,3 +77,71 @@
   2. 8bit を CSS filter（`image-rendering: pixelated` ＋ 低解像度レンダリング）で再現して PostFX を使わない。
   3. マスクを使わずに astronaut を alpha/crop で消す方式に寄せる。
 - 関連: `stargate.html`（動作確認用の単独シェーダーサンドボックス、git 管理外）。
+
+## ファイル分割の検討メモ
+
+### 現状（2026-04-24 時点）
+- `index.html` 単一ファイル、約 2415 行
+- うちJSが 2200+ 行
+- ビルドツールなし、静的ホスティング (paxcreation.com/moon)
+- 個人開発、機能追加継続中
+
+### 分割するか？の判断材料
+
+**メリット:**
+- ファイル探索が速くなる（キャプチャ系、影系、UI系をすぐ見つけられる）
+- 機能追加時の影響範囲が明確
+- gitのdiffが見やすくなる
+- 同じファイルを複数Macで編集する時のコンフリクト減
+
+**デメリット:**
+- 初回の分割作業が手間（バグ混入リスク）
+- ロード順を守る必要（モジュール使えば解決）
+
+### 3つの選択肢
+
+**A. 現状維持**
+- 2415行はまだ「Cmd+F で乗り切れる」サイズ
+- 3000-4000行になったら再検討
+
+**B. プレーンな複数 `<script>` タグ**
+```html
+<script src="js/audio.js"></script>
+<script src="js/shadows.js"></script>
+<script src="js/main.js"></script>
+```
+- ビルド不要、最小変更
+- ロード順に注意が必要
+
+**C. ES Modules（推奨）**
+```html
+<script type="module" src="js/main.js"></script>
+```
+```js
+// js/audio.js
+export function fadeStopSound(...) { ... }
+// js/main.js
+import { fadeStopSound } from './audio.js';
+```
+- モダンブラウザはネイティブ対応、ビルド不要
+- 依存関係が明示的、ロード順自動解決
+- Vercel/静的ホスティングでも問題なし
+
+### 推奨分割（C案の場合）
+```
+js/
+├── main.js          (シーン設定・update ループ)
+├── audio.js         (fadeStopSound, startSoundCancelFade)
+├── shadows.js       (createGroundShadow, spawnDissolveStain)
+├── player.js        (astronaut の移動・ジャンプ・捕獲)
+├── enemies.js       (敵スポーン・移動)
+├── crews.js         (仲間の追従・登り)
+├── ladder.js        (ハシゴ伸長・降下/登り演出)
+├── ui.js            (燃料/ビームゲージ)
+└── animations.js    (anims.create 系)
+```
+
+### 推奨方針
+- **今のうちに C案で分割**しておくのがオススメ
+- 理由: 機能追加を続けるならコスト回収が早い、ES Modules の学習コストほぼゼロ、一度分割すれば「あの機能どこ？」のストレスが消える
+- やるなら段階的に：最初に `audio.js` と `shadows.js`（純粋関数だけ）を切り出してテストし、問題なければ進める
