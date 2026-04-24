@@ -26,6 +26,16 @@ body {
     overflow: hidden;
 }
 
+/* PC/タブレット（769px以上）はブラウザ中央に配置 */
+@media screen and (min-width: 769px) {
+    html, body {
+        align-items: center;
+    }
+    #game-container {
+        margin-top: 0;
+    }
+}
+
 #game-container canvas {
     display: block;
     max-width: 1200px;
