@@ -2011,6 +2011,15 @@
                                         g.lineTo(innerX, monoY);
                                         g.closePath();
                                         g.fillPath();
+                                        // 上面（蓋）：光が当たるので側面より明るめ
+                                        g.fillStyle(0x3a3a3a);
+                                        g.beginPath();
+                                        g.moveTo(p.x - monoW / 2, topY);
+                                        g.lineTo(p.x + monoW / 2, topY);
+                                        g.lineTo(p.x + monoW / 2 + p.innerDir * depthX, topY + depthY);
+                                        g.lineTo(p.x - monoW / 2 + p.innerDir * depthX, topY + depthY);
+                                        g.closePath();
+                                        g.fillPath();
                                         // 前面
                                         g.fillStyle(0x000000);
                                         g.fillRect(p.x - monoW / 2, topY, monoW, monoH);
