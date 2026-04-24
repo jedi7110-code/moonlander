@@ -283,6 +283,7 @@
             this.chargedFired = false;
             this.beamHoldStart = null;
             this.beamEnergy = 100;
+            this.chargeAllowed = false; // 押下時のエネルギーで判定（>=50でtrue）
             this.astronautFacing = null;
             this.astronautVY = 0;
             this.escapeJetSound = null;
@@ -813,7 +814,7 @@
                 const gb = Math.round(0xcc * gaugeRatio);
                 const normalColor = (gr << 16) | (gg << 8) | gb;
                 // 長押し中はゲージが点滅（チャージ中表示）
-                const charging = this.cursors.space.isDown && this.beamHoldStart && this.beamEnergy >= 50;
+                const charging = this.cursors.space.isDown && this.beamHoldStart && this.chargeAllowed;
                 if (charging) {
                     const flashOn = (Math.floor(this.time.now / 80) % 2) === 0;
                     this.beamGaugeFill.fillColor = flashOn ? 0xffffff : normalColor;
@@ -850,6 +851,8 @@
                 if (!this.playerClimbing && this.astronautFacing && Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
                     this.beamHoldStart = this.time.now;
                     this.chargedFired = false;
+                    // 押下時のエネルギーでチャージ可否をロック（回復による途中チャージ可能化を防ぐ）
+                    this.chargeAllowed = this.beamEnergy >= 50;
                 }
                 // スペース離した瞬間：チャージが発火してなければ通常ビーム
                 if (!this.playerClimbing && Phaser.Input.Keyboard.JustUp(this.cursors.space)) {
@@ -876,9 +879,9 @@
                     this.beamHoldStart = null;
                 }
 
-                // 長押し2秒 + エネルギー50以上 → チャージビーム（画面端まで貫通）
+                // 長押し1.5秒 + 押下時に既にエネルギー50以上 → チャージビーム（画面端まで貫通）
                 if (!this.playerClimbing && this.astronautFacing && this.cursors.space.isDown && this.beamHoldStart
-                    && !this.chargedFired && this.time.now - this.beamHoldStart >= 1500 && this.beamEnergy >= 50) {
+                    && !this.chargedFired && this.time.now - this.beamHoldStart >= 1500 && this.chargeAllowed) {
                     this.chargedFired = true;
                     const dir = this.astronautFacing === 'left' ? -1 : 1;
                     const startX = this.astronaut.x + dir * 6;
@@ -1276,6 +1279,7 @@
                         this.beamGaugeBg.setVisible(false);
                         this.beamGaugeFill.setVisible(false);
                         this.beamHoldStart = null;
+                        this.chargeAllowed = false;
                         if (this.beamTameSound.isPlaying) this.beamTameSound.stop();
                         this.astronaut.anims.stop();
                         this.astronaut.setFlipX(false);
