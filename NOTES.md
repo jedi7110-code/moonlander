@@ -18,16 +18,17 @@
 - 5体撃破ごとにボス出現（大型・HP高・低速）
 - 接触で爆発ゲームオーバー
 
-### Stage 4: クルー救出ミッション（次に実装）
-- 岩陰から 2〜3 人の仲間を救出
-- 仲間は岩オブジェクトの陰に隠れている（発見要素）
-- 接触で連れ歩き、宇宙船に戻すと救出カウント
-- 連れている間は移動速度/ビーム威力にペナルティ（検討）
-- 全員救出でステージクリア
+### Stage 4: クルー救出ミッション ✅（基本実装済み）
+- 着陸後ハシゴ降下→月面で大破した月面探査車に近づく→仲間が降りてくる
+- 仲間は車から「ぴょんと」バウンドして降下、地面着地後に追従開始（着地まで捕獲対象外）
+- プレイヤー追従中、エイリアン接触で「Rescue Failed」、宇宙船に戻ると登って脱出
+- 仲間モーションはプレイヤーと同じ8フレーム歩行＋振り向き＋ジャンプ固定ポーズ
+- ハシゴ登り中・待機列も捕獲判定あり（誰かが捕まると全員停止）
 
-#### 必要アセット
-- 岩オブジェクト（隠れ場所として配置）
-- 壊れた大きい月面探索車（ランドマーク／背景演出）
+#### 残タスク／検討事項
+- 岩陰に隠す要素は未実装（現状は車から直接出現）
+- 連れている時のペナルティ（速度/ビーム威力）未実装
+- 周回ごとの仲間数増加は実装済み（1週目2人、2週目3人...）
 
 ### Stage 5: 母艦帰還ミッション
 - 月面脱出後、母艦ステーションへ戻る
@@ -62,21 +63,43 @@
 
 → Stage 3 以降の宇宙飛行士モーションは、チカチカしたドット絵ではなく**重量感のある滑らかな動き**を目指す。ジャンプ・着地・走り・しゃがみなどフレーム数を多めに。
 
+## 直近のセッションで実装済み（2026-04-25〜26）
+
+### 演出・UI
+- **CRTフィルター**: SVG (posterize 64階調) + スキャンライン + RGB サブピクセル + ブルーム発光（CSS filter, GeometryMask と互換）
+- **ガイドUI**: ハシゴ降下後に「Go rescue the crew」、仲間出現時に「Return to the ship」を矢印 `>>>` と共に表示。仲間出現時はカメラ 4.2 ズームイン → ラベル消滅と同期で 2.7 へ復帰
+- **画面四隅の角丸**: `border-radius: 18px` を `#game-container` に
+- **OGP/favicon**: 設定済み
+
+### モーション
+- プレイヤー＆仲間: 5方向 (B, BL, L, FL, F, FR, R, BR) + 歩行3フレーム
+- 振り向きアニメ: ハシゴ降下後 B→BL→L→FL→F、登る時は逆。横移動の左右切替時は FL↔FR の短いトランジション
+- ジャンプ中は L2（開脚）固定、捕獲時は anims.stop()
+
+### エフェクト
+- **ビームチャージ**: 銃口前方の扇形リング状に明滅粒子、長押し進行で銃口寄りに集中
+- **エネミー出現**: 砂埃の煙（dustWhite, グレー）+ 小石（chargeParticle, 0.5-1.5px）の2系統。地面ラインで消滅
+- **着陸時**: 燃料ゲージ ポップイン（Back.easeOut）、開始時は宇宙船を画面外から Back.easeOut で「ビヨーン」着地
+
+### フォント
+- Google Fonts **Barlow Condensed** (weight 400/600) を全テキストに適用
+- italic と weight 700 は使わない
+- SVG＋addBase64ではなく **Canvas2D 描画 → toDataURL → addBase64** でテクスチャ化（@font-face 反映のため）
+- `document.fonts.load` を Promise.all で全 weights 待機してからテクスチャ生成
+
+### バグ修正
+- ハシゴ登り中に捕獲されるとプレイヤーが地中から復活して登りtweenが進むバグ → `astronautGameOver` チェックと `tweens.killTweensOf` で全人間モーション停止
+- Phaser 3.55 の `maxParallelDownloads=32` で全アセットがロードされない問題 → config に `loader: { maxParallelDownloads: 100 }` 追加
+- SVG `text` 要素の `>` `<` がパースエラーで緑四角になる → `&amp; &lt; &gt;` エスケープ
+- SVG data URI がブラウザサンドボックスで @font-face を参照できない → Canvas2D 方式に変更
+
 ## 既知の不具合 / 技術メモ
 
-### 8bit PostFX パイプラインと GeometryMask の干渉
-- `PixelArt` PostFX パイプライン (index.html 冒頭の WebGL シェーダー) を `cameras.main.setPostPipeline('PixelArt')` で適用すると、エイリアン捕獲時の「地中へ消える」演出が壊れる（astronaut が地面下でも見えたまま）。
-- 原因: Phaser 3.55.2 では PostFX の render target に stencil buffer が正しく引き継がれず、`createGeometryMask()` の clipping が効かなくなる。
-- 試した対策と結果:
-  - `createBitmapMask()` に変更 → NG（同じ症状）。
-  - 捕獲時に `removePostPipeline` で一時停止 → NG（フリーズ or 効かず）。
-  - astronaut の alpha フェードで代替 → 視覚的に違和感。
-- 暫定対応: `setPostPipeline('PixelArt')` を **コメントアウト** して 8bit を OFF。
-- 恒久対応候補:
-  1. Phaser 3.60+ へアップグレード（PostFX と mask の互換性改善あり）。
-  2. 8bit を CSS filter（`image-rendering: pixelated` ＋ 低解像度レンダリング）で再現して PostFX を使わない。
-  3. マスクを使わずに astronaut を alpha/crop で消す方式に寄せる。
-- 関連: `stargate.html`（動作確認用の単独シェーダーサンドボックス、git 管理外）。
+### 8bit PostFX パイプラインと GeometryMask の干渉 → CSS filter で解決済み
+- 旧: `setPostPipeline('PixelArt')` だと `createGeometryMask()` の clipping が効かない
+- 現状: **CSS filter (SVG posterize + scanline overlay + bloom)** で 8bit/CRT 風効果を実現
+- WebGL マスク処理は通常通り動作（地中引きずり込み演出も正常）
+- `PixelArt` パイプラインは登録だけ残してあるが未使用
 
 ## ファイル分割の検討メモ
 
