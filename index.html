@@ -13,7 +13,10 @@
     <meta property="og:image" content="https://paxcreation.com/moon/assets/ogp.png" />
     <meta name="robots" content="noindex,nofollow">
     <link rel="icon" href="assets/favi.ico">
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=11">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
 
@@ -266,6 +269,103 @@
         }
 
         function create() {
+            // テキストを SVG → 画像化してテクスチャ登録
+            // 4x解像度で描画→1/4で表示するスーパーサンプリングでクッキリさせる（コントラストはそのまま）
+            const SVG_SCALE = 4;
+            // テキストを Canvas 2D で描画して PNG dataURL に。
+            // SVGデータURIだと@font-faceフォントが反映されないことがあるため Canvas に変更。
+            const makeLabelSVG = (text, opts = {}) => {
+                const fontSize = (opts.fontSize || 9) * SVG_SCALE;
+                const fill = opts.fill || '#cceedd';
+                const fontWeight = opts.fontWeight || 'bold';
+                const fontStyle = opts.fontStyle || 'normal';
+                const fontFamily = opts.fontFamily || "'Barlow Condensed', sans-serif";
+                const stroke = opts.stroke;
+                const strokeWidth = opts.strokeWidth != null ? opts.strokeWidth * SVG_SCALE : 0;
+                const letterSpacing = opts.letterSpacing != null ? opts.letterSpacing * SVG_SCALE : 0;
+                const pad = SVG_SCALE * 2 + Math.ceil(strokeWidth);
+
+                // 計測用キャンバスでテキストの実幅を取得
+                const measureCanvas = document.createElement('canvas');
+                const mctx = measureCanvas.getContext('2d');
+                mctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+                const baseWidth = mctx.measureText(text).width;
+                const totalWidth = baseWidth + letterSpacing * Math.max(0, text.length - 1);
+                const w = Math.ceil(totalWidth) + pad * 2;
+                const h = fontSize + pad * 2;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+                ctx.textBaseline = 'alphabetic';
+                ctx.textAlign = 'left';
+
+                let cursorX = pad;
+                const baseY = fontSize + pad - SVG_SCALE;
+                for (let i = 0; i < text.length; i++) {
+                    const ch = text[i];
+                    if (stroke) {
+                        ctx.strokeStyle = stroke;
+                        ctx.lineWidth = strokeWidth;
+                        ctx.lineJoin = 'round';
+                        ctx.strokeText(ch, cursorX, baseY);
+                    }
+                    ctx.fillStyle = fill;
+                    ctx.fillText(ch, cursorX, baseY);
+                    cursorX += ctx.measureText(ch).width + letterSpacing;
+                }
+                return canvas.toDataURL('image/png');
+            };
+            // 失敗テキスト用ヘルパー（プレーンな白文字）
+            this.makeFailLabel = (key, text) => {
+                if (this.textures.exists(key)) return;
+                this.textures.addBase64(key, makeLabelSVG(text, {
+                    fontSize: 28,
+                    fontWeight: '600',
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fill: '#ffffff',
+                    letterSpacing: 0.5
+                }));
+            };
+            // Bebas Neue が読み込まれてから SVG をラスタライズ（フォント未読込だとフォールバック表示になる）
+            const generateLabels = () => {
+                if (!this.textures.exists('label_rescue')) {
+                    this.textures.addBase64('label_rescue', makeLabelSVG('Go rescue the crew', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 0.3 }));
+                }
+                if (!this.textures.exists('label_returnship')) {
+                    this.textures.addBase64('label_returnship', makeLabelSVG('Return to the ship', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 0.3 }));
+                }
+                this.makeFailLabel('label_missionfailed', 'Mission Failed');
+                this.makeFailLabel('label_rescuefailed', 'Rescue Failed');
+
+                // 方向矢印もSVGでクッキリ
+                const arrowOpts = {
+                    fontSize: 8,
+                    fill: '#88ffaa',
+                    fontWeight: '600',
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    charW: 0.45
+                };
+                ['>', '>>', '>>>', '<', '<<', '<<<'].forEach(s => {
+                    const key = 'label_arrow_' + s.replace(/>/g, 'r').replace(/</g, 'l');
+                    if (!this.textures.exists(key)) {
+                        this.textures.addBase64(key, makeLabelSVG(s, arrowOpts));
+                    }
+                });
+            };
+            if (document.fonts && document.fonts.load) {
+                Promise.all([
+                    document.fonts.load("400 20px 'Barlow Condensed'"),
+                    document.fonts.load("600 20px 'Barlow Condensed'")
+                ]).then(generateLabels).catch(generateLabels);
+            } else {
+                generateLabels();
+            }
+            // 4x で描画したビットマップを 1/4 で表示するためのスケール
+            this._labelDisplayScale = 1 / SVG_SCALE;
+
             // 的マーカーの描画ヘルパー
             this.drawLandingMarker = (color) => {
                 this.landingMarker.clear();
@@ -461,6 +561,13 @@
             dustGfx.fillCircle(3, 3, 3);
             dustGfx.generateTexture('dustParticle', 6, 6);
             dustGfx.destroy();
+
+            // 白ベースの粉塵パーティクル（tint で正確に色変更可能）
+            const dustWhiteGfx = this.make.graphics({ add: false });
+            dustWhiteGfx.fillStyle(0xffffff);
+            dustWhiteGfx.fillCircle(3, 3, 3);
+            dustWhiteGfx.generateTexture('dustWhite', 6, 6);
+            dustWhiteGfx.destroy();
 
             // 粉塵パーティクル用テクスチャ（大きめの煙）
             const dustGfxLarge = this.make.graphics({ add: false });
@@ -1180,7 +1287,7 @@
                         // 仲間が捕まった場合もゲームオーバー（救出失敗）。ハシゴ登り中も対象
                         // 既に捕獲済みの仲間と、既に捕獲動作中の敵は対象外
                         const hitCrew = !e.capturing && this.crews && this.crews.length
-                            ? this.crews.find(c => c.visible && !c.captured && Phaser.Geom.Intersects.RectangleToRectangle(shrink(c, 3, 2), enemyBox))
+                            ? this.crews.find(c => c.visible && !c.captured && c.landed && Phaser.Geom.Intersects.RectangleToRectangle(shrink(c, 3, 2), enemyBox))
                             : null;
                         if (hitCrew) {
                             const isFirstCapture = !this.astronautGameOver;
@@ -1273,7 +1380,7 @@
                                             if (e.shadow) e.shadow.destroy();
                                             e.destroy();
                                             if (isFirstCapture) {
-                                                this.add.text(captureX, captureY - 20, 'Rescue Failed', { fontSize: '20px', fill: '#FFF' }).setOrigin(0.5).setDepth(12);
+                                                this.add.image(captureX, captureY - 20, 'label_rescuefailed').setOrigin(0.5).setDepth(12).setScale(this._labelDisplayScale || 0.25);
                                                 this.time.delayedCall(2500, () => { this.scene.restart(); });
                                             }
                                         }
@@ -1377,7 +1484,7 @@
                                             if (e.shadow) e.shadow.destroy();
                                             e.destroy();
                                             if (isFirstCapture) {
-                                                this.add.text(captureX, captureY - 20, 'Mission Failed', { fontSize: '20px', fill: '#FFF' }).setOrigin(0.5).setDepth(12);
+                                                this.add.image(captureX, captureY - 20, 'label_missionfailed').setOrigin(0.5).setDepth(12).setScale(this._labelDisplayScale || 0.25);
                                                 this.time.delayedCall(2500, () => { this.scene.restart(); });
                                             }
                                         }
@@ -1416,6 +1523,7 @@
                         const c = this.add.sprite(this.moonCar.x, doorY, 'crew_L2');
                         c.setFlipX(exitDir > 0);
                         c.setDisplaySize(15, 19);
+                        c.landed = false; // 着地までは捕獲対象外
                         c.setOrigin(0.5, 1);
                         c.setDepth(7);
                         // 影は地面に固定（生成時はドア上、降下後は地面）
@@ -1435,14 +1543,69 @@
                                 duration: 350,
                                 ease: 'Quad.easeIn', // 重力で加速して落下（プレイヤーと同じ感じ）
                                 onComplete: () => {
-                                    // 着地：アイドルポーズへ
+                                    // 着地：アイドルポーズへ＋捕獲対象に
                                     c.setTexture('crew_0');
+                                    c.landed = true;
                                 }
                             });
                         });
                     }
                     this.time.delayedCall(400 + 600 + 200, () => {
                         this.crewFollowing = true;
+
+                        // 宇宙船方向の >>> + 「Return to the ship」ラベル表示
+                        if (this.spaceship) {
+                            const isRight = this.spaceship.x > this.astronaut.x;
+                            const arrow = isRight ? '>' : '<';
+                            const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
+                            const offsetX = (isRight ? 1 : -1) * 25;
+                            const originX = isRight ? 0 : 1;
+                            const labelY = this.astronaut.y - 22;
+                            const arrowY = this.astronaut.y - 15;
+                            const ARROW_LOOPS = 2;
+                            const STAGES = 3;
+                            const STEP_DUR = 200;
+                            const STEP_HOLD = 150;
+                            const STEP_TOTAL = STEP_DUR * 2 + STEP_HOLD;
+                            const totalSteps = ARROW_LOOPS * STAGES;
+                            const totalDuration = STEP_TOTAL * totalSteps;
+
+                            // 文字が読めるようにズームイン → ラベル消滅と同期して通常に戻す
+                            const ZOOM_IN = 4.2;
+                            const ZOOM_BACK = 2.7;
+                            const prevZoom = this.cameras.main.zoom;
+                            this.cameras.main.zoomTo(ZOOM_IN, 600, 'Sine.easeInOut');
+
+                            const baseAstro = this.astronaut;
+                            const labelImg = this.add.image(
+                                baseAstro.x + offsetX, labelY, 'label_returnship'
+                            ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
+                            this.tweens.add({ targets: labelImg, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
+
+                            let step = 0;
+                            const showArrow2 = () => {
+                                if (step >= totalSteps) return;
+                                const txt = arrows[step % STAGES];
+                                const arrowKey = 'label_arrow_' + txt.replace(/>/g, 'r').replace(/</g, 'l');
+                                const a = this.add.image(
+                                    baseAstro.x + offsetX, arrowY, arrowKey
+                                ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
+                                this.tweens.add({
+                                    targets: a, alpha: 1, duration: STEP_DUR, yoyo: true, hold: STEP_HOLD,
+                                    onComplete: () => { a.destroy(); step++; showArrow2(); }
+                                });
+                            };
+                            showArrow2();
+
+                            this.time.delayedCall(totalDuration + 100, () => {
+                                this.tweens.add({
+                                    targets: labelImg, alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                                    onComplete: () => labelImg.destroy()
+                                });
+                                // ラベル消えるのと同時に元のズームへ戻す
+                                this.cameras.main.zoomTo(ZOOM_BACK, 600, 'Sine.easeInOut');
+                            });
+                        }
                     });
                 }
 
@@ -1697,11 +1860,12 @@
                                                             const toBeContinued = this.add.text(camW / 2, camH / 2, 'To be continued in next season...', {
                                                                 fontSize: '32px',
                                                                 fill: '#FFF',
-                                                                fontStyle: 'italic'
+                                                                fontFamily: "'Barlow Condensed', sans-serif"
                                                             }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
                                                             const pressEnter = this.add.text(camW / 2, camH / 2 + 50, 'Press ENTER to return to title', {
                                                                 fontSize: '18px',
-                                                                fill: '#AAA'
+                                                                fill: '#AAA',
+                                                                fontFamily: "'Barlow Condensed', sans-serif"
                                                             }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
                                                             this.tweens.add({
                                                                 targets: [toBeContinued, pressEnter],
@@ -2249,6 +2413,62 @@
                                         enemy.shadow = createGroundShadow(this, enemy.x, this.groundFeetY, isBoss ? 36 : 12);
                                         enemy.shadow.alpha = 0;
                                         this.tweens.add({ targets: enemy.shadow, alpha: 1, duration: 900, ease: 'Sine.easeOut' });
+
+                                        // 出現時：地面が割れて飛び出すイメージで2種類のパーティクルを同時発射
+                                        const groundY = this.groundFeetY;
+                                        // 砂埃の最大到達高さ＝エイリアン身長の半分くらい
+                                        const dustGravity = 500;
+                                        const dustMaxV = Math.sqrt(2 * dustGravity * (enemyH / 2)); // 物理計算で初速を決める
+
+                                        // (1) 砂埃の煙（白ベース＋グレーtintで正確な月面色、地面で消滅）
+                                        const dustBurst = this.add.particles('dustWhite');
+                                        dustBurst.setDepth(7);
+                                        const dustEm = dustBurst.createEmitter({
+                                            x: spawnX,
+                                            y: groundY - 1, // 地面直前から
+                                            speed: { min: dustMaxV * 0.5, max: dustMaxV },
+                                            angle: { min: 240, max: 300 },
+                                            scale: { start: 0.25, end: 1.0 },
+                                            alpha: { start: 0.7, end: 0 },
+                                            tint: [0xaaaaaa, 0x999999, 0x888888, 0xbbbbbb],
+                                            lifespan: { min: 500, max: 900 },
+                                            gravityY: dustGravity,
+                                            quantity: 1,
+                                            on: false,
+                                            // 地面ラインに戻ったら消滅
+                                            deathZone: {
+                                                type: 'onEnter',
+                                                source: new Phaser.Geom.Rectangle(spawnX - 400, groundY, 800, 800)
+                                            }
+                                        });
+                                        const dustCount = isBoss ? 26 : 16;
+                                        dustEm.explode(dustCount, spawnX, groundY);
+                                        this.time.delayedCall(1200, () => dustBurst.destroy());
+
+                                        // (2) 小石・砂粒（暗めグレーで、出てきた地面位置で消滅）
+                                        const stoneBurst = this.add.particles('chargeParticle');
+                                        stoneBurst.setDepth(8);
+                                        const stoneEm = stoneBurst.createEmitter({
+                                            x: spawnX,
+                                            y: groundY - 1, // 地面直前から発生（即時消滅を回避）
+                                            speed: { min: 25, max: 70 },
+                                            angle: { min: 250, max: 290 },
+                                            scale: { min: 1, max: 2.5 },
+                                            alpha: { start: 1, end: 1 },
+                                            tint: [0x666666, 0x888888, 0x555555, 0x777777],
+                                            lifespan: { min: 350, max: 700 },
+                                            gravityY: 320,
+                                            quantity: 1,
+                                            on: false,
+                                            // 地面ラインに戻ったら即消滅
+                                            deathZone: {
+                                                type: 'onEnter',
+                                                source: new Phaser.Geom.Rectangle(spawnX - 400, groundY, 800, 800)
+                                            }
+                                        });
+                                        const stoneCount = isBoss ? 28 : 18;
+                                        stoneEm.explode(stoneCount, spawnX, groundY);
+                                        this.time.delayedCall(1500, () => stoneBurst.destroy());
                                         this.tweens.add({
                                             targets: enemy,
                                             y: this.groundFeetY,
@@ -2268,28 +2488,54 @@
                                     this.astronautHasMoved = false; // 初回移動で通常ズームへ切り替え
                                     // ズームはハシゴが伸び始める時から既に進行中
 
-                                    // 大破車の方向を >>> で表示（振り向きアニメで方向が分かるようになったので非表示。一応残す）
-                                    /*
+                                    // 大破車の方向を >>> で表示＋上に英語ラベル（SVG 画像でクッキリ）
                                     if (this.moonCar) {
                                         const arrow = this.moonCar.x > astronaut.x ? '>' : '<';
                                         const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
+                                        const isRight = this.moonCar.x > astronaut.x;
+                                        const offsetX = (isRight ? 1 : -1) * 25;
+                                        const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
+                                        const labelY = astronaut.y - 22;
+                                        const arrowY = astronaut.y - 15;
+                                        const ARROW_LOOPS = 2;
+                                        const STAGES = 3;
+                                        const STEP_DUR = 200; // フェードイン
+                                        const STEP_HOLD = 150;
+                                        const STEP_TOTAL = STEP_DUR * 2 + STEP_HOLD; // 1ステップの総時間 (in+hold+out)
+                                        const totalSteps = ARROW_LOOPS * STAGES;
+                                        const totalDuration = STEP_TOTAL * totalSteps;
+
+                                        // ラベル：矢印と同じ位置・同じoriginで、最初から最後まで出っ放し
+                                        this.time.delayedCall(1500, () => {
+                                            const label = this.add.image(
+                                                astronaut.x + offsetX, labelY, 'label_rescue'
+                                            ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
+                                            this.tweens.add({
+                                                targets: label, alpha: 1, duration: 250, ease: 'Sine.easeOut'
+                                            });
+                                            this.time.delayedCall(totalDuration + 100, () => {
+                                                this.tweens.add({
+                                                    targets: label, alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                                                    onComplete: () => label.destroy()
+                                                });
+                                            });
+                                        });
+
+                                        // 矢印：2ループ（>, >>, >>> を 2回繰り返し）
                                         let step = 0;
                                         const showArrow = () => {
-                                            if (step >= 6) return; // 3段階 × 2回
-                                            const txt = arrows[step % 3];
-                                            const offsetX = (this.moonCar.x > astronaut.x ? 1 : -1) * 25;
-                                            const isRight = this.moonCar.x > astronaut.x;
-                                            const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
-                                            const a = this.add.text(
-                                                astronaut.x + offsetX, astronaut.y - 15,
-                                                txt, { fontSize: '8px', fill: '#88ffaa', fontFamily: 'monospace' }
-                                            ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0);
+                                            if (step >= totalSteps) return;
+                                            const txt = arrows[step % STAGES];
+                                            const arrowKey = 'label_arrow_' + txt.replace(/>/g, 'r').replace(/</g, 'l');
+                                            const a = this.add.image(
+                                                astronaut.x + offsetX, arrowY, arrowKey
+                                            ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
                                             this.tweens.add({
                                                 targets: a,
                                                 alpha: 1,
-                                                duration: 200,
+                                                duration: STEP_DUR,
                                                 yoyo: true,
-                                                hold: 150,
+                                                hold: STEP_HOLD,
                                                 onComplete: () => {
                                                     a.destroy();
                                                     step++;
@@ -2299,7 +2545,6 @@
                                         };
                                         this.time.delayedCall(1500, showArrow);
                                     }
-                                    */
                             }, 1);
                         }
                     });
@@ -2331,7 +2576,7 @@
                     this.jetParticles.right.on = false;
                     this.dustEmitters.forEach(e => e.on = false);
 
-                    this.add.text(this.spaceship.x, this.spaceship.y - 50, 'Mission Failed', { fontSize: '32px', fill: '#FFF' }).setOrigin(0.5, 0.5).setDepth(11);
+                    this.add.image(this.spaceship.x, this.spaceship.y - 50, 'label_missionfailed').setOrigin(0.5, 0.5).setDepth(11).setScale((this._labelDisplayScale || 0.25) * 1.6);
                     this.endSound.play();
                     gameStarted = false;
 
@@ -2545,10 +2790,17 @@
                     explosion.destroy();
                 });
 
-                // ゲームオーバーメッセージを2秒遅らせて表示する
-                setTimeout(() => {
-                    scene.add.text(scene.spaceship.x, scene.spaceship.y - 50, message, { fontSize: '32px', fill: '#FFF' }).setOrigin(0.5, 0.5).setDepth(11);
-                }, 1000); // 2000ミリ秒（2秒）後に実行
+                // ゲームオーバーメッセージ（messageが空ならテキスト表示なし）
+                if (message) {
+                    setTimeout(() => {
+                        const failKeyMap = {
+                            'Mission Failed': 'label_missionfailed',
+                            'Rescue Failed': 'label_rescuefailed'
+                        };
+                        const failKey = failKeyMap[message] || 'label_missionfailed';
+                        scene.add.image(scene.spaceship.x, scene.spaceship.y - 50, failKey).setOrigin(0.5, 0.5).setDepth(11).setScale((scene._labelDisplayScale || 0.25) * 1.6);
+                    }, 1000);
+                }
 
                 // ゲームのアップデートを爆発アニメーションが終了してから停止する
                 setTimeout(() => {
