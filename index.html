@@ -94,6 +94,9 @@
             },
             pipeline: { 'PixelArt': PixelArtPipeline },
             parent: 'game-container',
+            loader: {
+                maxParallelDownloads: 100  // ローダーのパラレルダウンロード上限を上げる（Phaser 3.55の停止対策）
+            },
             scene: {
                 preload: preload,
                 create: create,
@@ -212,10 +215,8 @@
             this.load.image('player_0', 'assets/player-0.png');
             this.load.image('player_L1', 'assets/player-l1.png');
             this.load.image('player_L2', 'assets/player-l2.png');
-            this.load.image('player_L3', 'assets/player-l3.png');
             this.load.image('player_R1', 'assets/player-r1.png');
             this.load.image('player_R2', 'assets/player-r2.png');
-            this.load.image('player_R3', 'assets/player-r3.png');
             this.load.image('spaceshipshadow', 'assets/spaceshipshadow.png');
             this.load.image('flag', 'assets/flag.png');
             this.load.image('flag-flash', 'assets/flag-flash.png');
@@ -238,8 +239,18 @@
             this.load.image('alien_R', 'assets/alien1-r.png'); // 地底人（右向き）
             this.load.image('mooncar', 'assets/moon-car.png'); // 大破した月面探査車
             this.load.image('crew', 'assets/crew-f.png'); // 救出する仲間（正面）
+            this.load.image('crew_0', 'assets/crew-0.png'); // 仲間（横向きアイドル）
+            this.load.image('crew_B', 'assets/crew-b.png'); // 仲間（後ろ向き）
+            this.load.image('crew_BL', 'assets/crew-bl.png'); // 仲間（左後ろ向き）
+            this.load.image('crew_BR', 'assets/crew-br.png'); // 仲間（右後ろ向き）
+            this.load.image('crew_FL', 'assets/crew-fl.png'); // 仲間（左斜め前）
+            this.load.image('crew_FR', 'assets/crew-fr.png'); // 仲間（右斜め前）
             this.load.image('crew_L', 'assets/crew-l.png'); // 仲間（左向き）
+            this.load.image('crew_L1', 'assets/crew-l1.png'); // 仲間（左歩行1）
+            this.load.image('crew_L2', 'assets/crew-l2.png'); // 仲間（左歩行2）
             this.load.image('crew_R', 'assets/crew-r.png'); // 仲間（右向き）
+            this.load.image('crew_R1', 'assets/crew-r1.png'); // 仲間（右歩行1）
+            this.load.image('crew_R2', 'assets/crew-r2.png'); // 仲間（右歩行2）
             this.load.image('boss_L', 'assets/boss-l.png'); // ボス（左向き）
             this.load.image('boss_R', 'assets/boss-r.png'); // ボス（右向き）
             this.load.spritesheet('blood', 'assets/blood-p.png', { frameWidth: 512, frameHeight: 512 }); // 被弾エフェクト
@@ -687,6 +698,91 @@
                 ],
                 frameRate: 14,
                 repeat: -1
+            });
+
+            // ----- 仲間（crew）のアニメーション群（プレイヤーと同形状）-----
+            // 仲間用ベース：crew には純粋な「後ろ向き」テクスチャがないため
+            // ハシゴ登り時の後ろ向きには crew_BL / crew_BR を流用する
+            this.anims.create({
+                key: 'crew_walk',
+                frames: [
+                    { key: 'crew_0' },
+                    { key: 'crew_L1' },
+                    { key: 'crew_L2' },
+                    { key: 'crew_L1' },
+                    { key: 'crew_0' },
+                    { key: 'crew_R1' },
+                    { key: 'crew_R2' },
+                    { key: 'crew_R1' }
+                ],
+                frameRate: 14,
+                repeat: -1
+            });
+            this.anims.create({
+                key: 'crew_turn_to_front_L',
+                frames: [
+                    { key: 'crew_B' },
+                    { key: 'crew_BL' },
+                    { key: 'crew_L' },
+                    { key: 'crew_FL' },
+                    { key: 'crew' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'crew_turn_to_front_R',
+                frames: [
+                    { key: 'crew_B' },
+                    { key: 'crew_BR' },
+                    { key: 'crew_R' },
+                    { key: 'crew_FR' },
+                    { key: 'crew' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'crew_turn_to_back_L',
+                frames: [
+                    { key: 'crew' },
+                    { key: 'crew_FL' },
+                    { key: 'crew_L' },
+                    { key: 'crew_BL' },
+                    { key: 'crew_B' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'crew_turn_to_back_R',
+                frames: [
+                    { key: 'crew' },
+                    { key: 'crew_FR' },
+                    { key: 'crew_R' },
+                    { key: 'crew_BR' },
+                    { key: 'crew_B' }
+                ],
+                frameRate: 12,
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'crew_turn_flip_LtoR',
+                frames: [
+                    { key: 'crew_FL' },
+                    { key: 'crew_FR' }
+                ],
+                frameRate: 18,
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'crew_turn_flip_RtoL',
+                frames: [
+                    { key: 'crew_FR' },
+                    { key: 'crew_FL' }
+                ],
+                frameRate: 18,
+                repeat: 0
             });
 
             // コントローラーの作成
@@ -1296,12 +1392,14 @@
                 if (this.moonCar && !this.crewFound && Math.abs(this.astronaut.x - this.moonCar.x) < 80) {
                     this.crewFound = true;
                     const exitDir = this.astronaut.x < this.moonCar.x ? -1 : 1;
-                    const exitTex = exitDir > 0 ? 'crew_R' : 'crew_L';
                     const doorY = this.groundFeetY - 30;
                     const crewCount = 2 + playthroughCount; // 1週目2人、2週目3人、...
                     for (let i = 0; i < crewCount; i++) {
-                        const c = this.add.image(this.moonCar.x, doorY, exitTex);
-                        c.setDisplaySize(15, 15);
+                        // Sprite で作成（アニメーション再生のため）。元画像は左向き、右降下時は反転
+                        // 空中のため開脚ポーズ（L2）で出現
+                        const c = this.add.sprite(this.moonCar.x, doorY, 'crew_L2');
+                        c.setFlipX(exitDir > 0);
+                        c.setDisplaySize(15, 19);
                         c.setOrigin(0.5, 1);
                         c.setDepth(7);
                         // 影は地面に固定（生成時はドア上、降下後は地面）
@@ -1319,7 +1417,11 @@
                                 targets: c,
                                 y: this.groundFeetY,
                                 duration: 600,
-                                ease: 'Bounce.easeOut'
+                                ease: 'Bounce.easeOut',
+                                onComplete: () => {
+                                    // 着地：アイドルポーズへ
+                                    c.setTexture('crew_0');
+                                }
                             });
                         });
                     }
@@ -1336,7 +1438,7 @@
                     this.crewFollowing = false;
                     const ladderX = this.spaceship.x - 5;
                     const ladderTop = this.spaceship.y + 10; // 宇宙船の内部から伸ばす
-                    const ladderBottom = this.spaceship.y + 60; // プレイヤー足元近くまで延長
+                    const ladderBottom = this.spaceship.y + 56; // プレイヤー足元の少し上まで
                     const crews = this.crews.slice();
                     // 待機列の方向（アストロノート進行方向と反対側）
                     const queueDir = this.astronautFacing === 'right' ? -1 : 1;
@@ -1347,7 +1449,9 @@
                         this.time.delayedCall(idx * 900, () => {
                             if (this.astronautGameOver) return;
                             const face = ladderX < c.x ? 'L' : 'R';
-                            c.setTexture('crew_' + face);
+                            // 歩行アニメでハシゴへ
+                            c.setFlipX(face === 'R');
+                            c.anims.play('crew_walk');
                             this.tweens.add({
                                 targets: c,
                                 x: ladderX,
@@ -1355,19 +1459,28 @@
                                 duration: 400,
                                 ease: 'Sine.easeInOut',
                                 onComplete: () => {
+                                    if (this.astronautGameOver) return;
+                                    c.anims.stop();
+                                    c.setFlipX(false);
                                     c.setTexture('crew');
-                                    // 影を登りに合わせてフェードアウト
-                                    if (c.shadow) {
-                                        const sh = c.shadow;
-                                        c.shadow = null;
-                                        this.tweens.add({ targets: sh, alpha: 0, duration: 1000, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
-                                    }
-                                    this.tweens.add({
-                                        targets: c,
-                                        y: ladderTop - 5,
-                                        duration: 1000,
-                                        ease: 'Sine.easeInOut',
-                                        onComplete: () => c.setVisible(false)
+                                    // 振り向き：正面 → (FL/FR) → (L/R) → (BL/BR)
+                                    c.anims.play('crew_turn_to_back_' + face);
+                                    c.once('animationcomplete-crew_turn_to_back_' + face, () => {
+                                        if (this.astronautGameOver) return;
+                                        c.setTexture('crew_B');
+                                        // 影を登りに合わせてフェードアウト
+                                        if (c.shadow) {
+                                            const sh = c.shadow;
+                                            c.shadow = null;
+                                            this.tweens.add({ targets: sh, alpha: 0, duration: 1000, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
+                                        }
+                                        this.tweens.add({
+                                            targets: c,
+                                            y: ladderTop - 5,
+                                            duration: 1000,
+                                            ease: 'Sine.easeInOut',
+                                            onComplete: () => c.setVisible(false)
+                                        });
                                     });
                                 }
                             });
@@ -1377,14 +1490,19 @@
                                 const slot = j - idx; // 1,2,3...（ハシゴ直後の位置から）
                                 const tx = ladderX + queueDir * queueSpacing * slot;
                                 const faceJ = tx < t.x ? 'L' : 'R';
-                                t.setTexture('crew_' + faceJ);
+                                t.setFlipX(faceJ === 'R');
+                                if (!t.anims.isPlaying || t.anims.currentAnim.key !== 'crew_walk') t.anims.play('crew_walk');
                                 this.tweens.add({
                                     targets: t,
                                     x: tx,
                                     y: queueY,
                                     duration: 400,
                                     ease: 'Sine.easeInOut',
-                                    onComplete: () => t.setTexture('crew')
+                                    onComplete: () => {
+                                        t.anims.stop();
+                                        t.setFlipX(false);
+                                        t.setTexture('crew');
+                                    }
                                 });
                             }
                         });
@@ -1631,9 +1749,21 @@
                         c.x = Phaser.Math.Linear(c.x, targetX, 0.06);
                         c.y = Phaser.Math.Linear(c.y, leaderFeetY, 0.12);
                         const dx = c.x - prevX;
-                        if (dx < -0.15) c.setTexture('crew_L');
-                        else if (dx > 0.15) c.setTexture('crew_R');
-                        else if (!isMoving && onGround) c.setTexture('crew');
+                        const moving = Math.abs(dx) > 0.15;
+                        const airborne = c.y < this.groundFeetY - 0.5;
+                        if (airborne) {
+                            // ジャンプ中：開脚ポーズ（L2）で固定
+                            if (c.anims.isPlaying) c.anims.stop();
+                            if (c.texture.key !== 'crew_L2') c.setTexture('crew_L2');
+                        } else if (moving) {
+                            c.setFlipX(dx > 0); // 元画像は左向き、右移動時は反転
+                            if (!c.anims.isPlaying || c.anims.currentAnim.key !== 'crew_walk') {
+                                c.anims.play('crew_walk');
+                            }
+                        } else {
+                            if (c.anims.isPlaying && c.anims.currentAnim.key === 'crew_walk') c.anims.stop();
+                            if (c.texture.key !== 'crew_0') c.setTexture('crew_0');
+                        }
                     });
                 }
                 // 仲間の影は X方向に追従、可視状態も同期
@@ -1923,7 +2053,7 @@
                     // ハシゴを描画（宇宙船の下から伸びる）
                     const ladderX = this.spaceship.x - 5;
                     const ladderTop = this.spaceship.y + 10; // 宇宙船の内部から伸ばす
-                    const ladderBottom = this.spaceship.y + 60; // プレイヤー足元近くまで延長
+                    const ladderBottom = this.spaceship.y + 56; // プレイヤー足元の少し上まで
                     const astronautDestY = this.spaceship.y + 50; // 着地中心位置（地面）は据え置き
                     const ladder = this.add.graphics({ lineStyle: { width: 1, color: 0xcccccc } });
                     ladder.setDepth(7);
@@ -2267,7 +2397,7 @@
             g.fillStyle(0x000000, 0.08);
             g.fillEllipse(0, 0, width, 3);
             g.x = x;
-            g.y = footY + 1;
+            g.y = footY;
             g.setDepth(6.5);
             return g;
         }
