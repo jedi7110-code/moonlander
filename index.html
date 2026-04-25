@@ -1096,9 +1096,25 @@
                 // ジャンプ（押し始めで初速、離したら上昇を切って強弱をつける）
                 if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && onGround && !this.astronautGameOver) {
                     this.astronautVY = jumpPower;
+                    // 追従中の仲間も同じ初速でジャンプ（chain感のため段階的にdelay）
+                    if (this.crewFollowing && this.crews) {
+                        this.crews.forEach((c, idx) => {
+                            this.time.delayedCall((idx + 1) * 110, () => {
+                                if (!c.captured && c.y >= this.groundFeetY - 0.5) c.vy = jumpPower;
+                            });
+                        });
+                    }
                 }
                 if (Phaser.Input.Keyboard.JustUp(this.cursors.up) && this.astronautVY < 0) {
                     this.astronautVY *= 0.35;
+                    // 仲間も同様に上昇打ち切り（同じdelayでプレイヤーの動きを模倣）
+                    if (this.crewFollowing && this.crews) {
+                        this.crews.forEach((c, idx) => {
+                            this.time.delayedCall((idx + 1) * 110, () => {
+                                if (c.vy && c.vy < 0) c.vy *= 0.35;
+                            });
+                        });
+                    }
                 }
 
                 // 重力＋位置更新（帰還時・捕獲後はtween任せで物理停止）
@@ -1416,8 +1432,8 @@
                             this.tweens.add({
                                 targets: c,
                                 y: this.groundFeetY,
-                                duration: 600,
-                                ease: 'Bounce.easeOut',
+                                duration: 350,
+                                ease: 'Quad.easeIn', // 重力で加速して落下（プレイヤーと同じ感じ）
                                 onComplete: () => {
                                     // 着地：アイドルポーズへ
                                     c.setTexture('crew_0');
@@ -1472,15 +1488,9 @@
                                         if (c.shadow) {
                                             const sh = c.shadow;
                                             c.shadow = null;
-                                            this.tweens.add({ targets: sh, alpha: 0, duration: 1000, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
+                                            this.tweens.add({ targets: sh, alpha: 0, duration: 1500, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
                                         }
-                                        this.tweens.add({
-                                            targets: c,
-                                            y: ladderTop - 5,
-                                            duration: 1000,
-                                            ease: 'Sine.easeInOut',
-                                            onComplete: () => c.setVisible(false)
-                                        });
+                                        steppedClimb(this, c, ladderTop, 8, 100, 70, () => c.setVisible(false), 1);
                                     });
                                 }
                             });
@@ -1543,14 +1553,9 @@
                                     if (this.astronaut.shadow) {
                                         const sh = this.astronaut.shadow;
                                         this.astronaut.shadow = null;
-                                        this.tweens.add({ targets: sh, alpha: 0, duration: 1000, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
+                                        this.tweens.add({ targets: sh, alpha: 0, duration: 1500, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
                                     }
-                                    this.tweens.add({
-                                        targets: this.astronaut,
-                                        y: ladderTop - 5,
-                                        duration: 1000,
-                                        ease: 'Sine.easeInOut',
-                                        onComplete: () => {
+                                    steppedClimb(this, this.astronaut, ladderTop, 8, 100, 70, () => {
                                         this.astronaut.setVisible(false);
                                         // 登り終えたら徐々にズームアウト（ポッド上昇中も続く）
                                         this.tweens.add({
@@ -1728,8 +1733,7 @@
                                                 }
                                             });
                                         });
-                                    }
-                                });
+                                }, 1);
                                 });
                             }
                         });
@@ -1743,23 +1747,41 @@
                     this.crews.forEach((c, idx) => {
                         // 前走者：最初はプレイヤー、以降は一つ前の仲間
                         const leaderX = idx === 0 ? this.astronaut.x : this.crews[idx - 1].x;
-                        const leaderFeetY = idx === 0 ? this.astronaut.y + yOffset : this.crews[idx - 1].y;
                         const targetX = leaderX + backDir * 13;
                         const prevX = c.x;
                         c.x = Phaser.Math.Linear(c.x, targetX, 0.06);
-                        c.y = Phaser.Math.Linear(c.y, leaderFeetY, 0.12);
+                        // Y方向：ジャンプは別途 delayedCall で c.vy を設定。ここは重力で落下のみ
+                        if (c.vy === undefined) c.vy = 0;
+                        c.vy += 200 * dt;
+                        c.y += c.vy * dt;
+                        if (c.y >= this.groundFeetY) {
+                            c.y = this.groundFeetY;
+                            c.vy = 0;
+                        }
                         const dx = c.x - prevX;
                         const moving = Math.abs(dx) > 0.15;
                         const airborne = c.y < this.groundFeetY - 0.5;
+                        const playingTurn = c.anims.isPlaying && c.anims.currentAnim && c.anims.currentAnim.key.startsWith('crew_turn_');
                         if (airborne) {
-                            // ジャンプ中：開脚ポーズ（L2）で固定
+                            // 空中（車降り中など）：開脚ポーズ（L2）で固定
                             if (c.anims.isPlaying) c.anims.stop();
                             if (c.texture.key !== 'crew_L2') c.setTexture('crew_L2');
+                        } else if (playingTurn) {
+                            // 振り向きアニメ再生中は触らない
                         } else if (moving) {
-                            c.setFlipX(dx > 0); // 元画像は左向き、右移動時は反転
-                            if (!c.anims.isPlaying || c.anims.currentAnim.key !== 'crew_walk') {
-                                c.anims.play('crew_walk');
+                            const newFacing = dx > 0 ? 'right' : 'left';
+                            if (c.facing && c.facing !== newFacing) {
+                                // 方向転換：FL/FR を挟む flip アニメを再生
+                                c.setFlipX(newFacing === 'right');
+                                const flipAnim = newFacing === 'right' ? 'crew_turn_flip_LtoR' : 'crew_turn_flip_RtoL';
+                                c.anims.play(flipAnim);
+                            } else {
+                                c.setFlipX(newFacing === 'right'); // 元画像は左向き
+                                if (!c.anims.isPlaying || c.anims.currentAnim.key !== 'crew_walk') {
+                                    c.anims.play('crew_walk');
+                                }
                             }
+                            c.facing = newFacing;
                         } else {
                             if (c.anims.isPlaying && c.anims.currentAnim.key === 'crew_walk') c.anims.stop();
                             if (c.texture.key !== 'crew_0') c.setTexture('crew_0');
@@ -2105,12 +2127,7 @@
                             astronaut.shadow.alpha = 0;
                             this.tweens.add({ targets: astronaut.shadow, alpha: 1, duration: 1500, ease: 'Sine.easeInOut' });
 
-                            this.tweens.add({
-                                targets: astronaut,
-                                y: astronautDestY,
-                                duration: 1500,
-                                ease: 'Sine.easeInOut',
-                                onComplete: () => {
+                            steppedClimb(this, astronaut, astronautDestY, 8, 100, 70, () => {
                                     // 故障車の方向を先に決める。振り向きは車と逆方向（自然な視線の動き）
                                     const carDirEarly = Phaser.Math.Between(0, 1) ? 1 : -1;
                                     this.astronautCarDir = carDirEarly;
@@ -2283,8 +2300,7 @@
                                         this.time.delayedCall(1500, showArrow);
                                     }
                                     */
-                                }
-                            });
+                            }, 1);
                         }
                     });
                 });
@@ -2357,6 +2373,30 @@
         }
 
         let explosionPlaying = false;
+
+        // ハシゴをスムーズなトントンで登り降りさせる（ワープせず、短いtweenを連鎖）
+        // midOffset: 中間ステップだけYに足すオフセット。最終着地位置は変えない（足がステップに乗るよう微調整）
+        function steppedClimb(scene, target, finalY, steps, stepDuration, pauseDuration, onComplete, midOffset = 0) {
+            const startY = target.y;
+            const stepDist = (finalY - startY) / steps;
+            let currentStep = 0;
+            const doStep = () => {
+                if (currentStep >= steps) { if (onComplete) onComplete(); return; }
+                currentStep++;
+                const isLast = currentStep === steps;
+                scene.tweens.add({
+                    targets: target,
+                    y: startY + stepDist * currentStep + (isLast ? 0 : midOffset),
+                    duration: stepDuration,
+                    ease: 'Sine.easeOut',
+                    onComplete: () => {
+                        if (pauseDuration > 0) scene.time.delayedCall(pauseDuration, doStep);
+                        else doStep();
+                    }
+                });
+            };
+            doStep();
+        }
 
         // 溶かされた人の緑のシミ（捕獲沈下後に影の替わりに広がる）
         // 月面のシミなので、歩き回るキャラ（敵 depth 8、仲間 7、月面車 6）の全てより下に置く
