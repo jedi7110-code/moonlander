@@ -374,6 +374,51 @@
             // 4x で描画したビットマップを 1/4 で表示するためのスケール
             this._labelDisplayScale = 1 / SVG_SCALE;
 
+            // ラベル＋矢印を囲む4隅ブラケット（[ ] 風の L字マーク4つ）を描画。
+            // anchorX = ラベル/矢印の origin 基準 x、isRight = ラベルが右側に伸びるか。
+            this.makeGuideBubble = (anchorX, labelY, arrowY, label, isRight, color, depth) => {
+                const STAGES = 3;
+                const scale = (this._labelDisplayScale || 0.25) / 6;
+                const tex = this.textures.get('arrow_unit');
+                const srcW = tex.getSourceImage().width;
+                const srcH = tex.getSourceImage().height;
+                const arrowVisibleW = srcW * scale * (40 / 60);
+                const arrowImgH = srcH * scale;
+                const arrowsTotalW = arrowVisibleW * STAGES;
+                const labelW = label.displayWidth;
+                const labelH = label.displayHeight;
+                const contentW = Math.max(labelW, arrowsTotalW);
+                const left = isRight ? anchorX : anchorX - contentW;
+                const right = isRight ? anchorX + contentW : anchorX;
+                const top = labelY - labelH / 2;
+                const bottom = arrowY + arrowImgH / 2;
+                const padX = 6;
+                const padY = 5;
+                const bx = left - padX;
+                const by = top - padY;
+                const bw = (right - left) + padX * 2;
+                const bh = (bottom - top) + padY * 2;
+                const stroke = 1;
+                // ブラケット1辺の長さ（横と縦で同じ長さ。bw/bh のうち短い方の 1/4 程度）
+                const arm = Math.max(3, Math.min(8, Math.min(bw, bh) / 4));
+
+                const g = this.add.graphics();
+                g.setDepth(depth);
+                // 背景：線と同じ色を 10% 透過で塗りつぶし
+                g.fillStyle(color, 0.1);
+                g.fillRect(bx, by, bw, bh);
+                g.lineStyle(stroke, color, 1);
+                // 左右は全長で繋ぐ
+                g.lineBetween(bx, by, bx, by + bh);
+                g.lineBetween(bx + bw, by, bx + bw, by + bh);
+                // 上下は四隅の短い arm のみ
+                g.lineBetween(bx, by, bx + arm, by);
+                g.lineBetween(bx + bw - arm, by, bx + bw, by);
+                g.lineBetween(bx, by + bh, bx + arm, by + bh);
+                g.lineBetween(bx + bw - arm, by + bh, bx + bw, by + bh);
+                return g;
+            };
+
             // arrow.svg を 1〜3 個並べて方向矢印を作るヘルパー。
             // SVG: viewBox 0-60, 矢印の見える幅は 0-40 (= 全体の 2/3)。
             // 右向き＝そのまま、左向き＝flipX で反転。
@@ -1741,7 +1786,7 @@
                             const offsetX = (isRight ? 1 : -1) * 25;
                             const originX = isRight ? 0 : 1;
                             const labelY = this.astronaut.y - 22;
-                            const arrowY = this.astronaut.y - 15;
+                            const arrowY = this.astronaut.y - 14;
                             const ARROW_LOOPS = 2;
                             const STAGES = 3;
                             const STEP_DUR = 200;
@@ -1760,16 +1805,23 @@
                             const labelImg = this.add.image(
                                 baseAstro.x + offsetX, labelY, 'label_returnship'
                             ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
-                            this.tweens.add({ targets: labelImg, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
+                            // 吹き出し枠（角丸＋プレイヤー方向の tail）
+                            const bubble2 = this.makeGuideBubble(
+                                baseAstro.x + offsetX, labelY, arrowY, labelImg, isRight, 0x88ffaa, 11.5
+                            ).setAlpha(0);
+                            this.tweens.add({ targets: [labelImg, bubble2], alpha: 1, duration: 250, ease: 'Sine.easeOut' });
 
                             // >, >>, >>> サイクルは残す。ただし位置は固定（プレイヤー移動に追従しない）
                             const fixedAnchorX2 = baseAstro.x + offsetX;
+                            // 矢印は makeLabelSVG の左右 padding (8px in canvas → 表示 2px) 分内側に寄せて、
+                            // ラベルのテキスト端と矢印端を揃える
+                            const arrowAnchorX2 = fixedAnchorX2 + (isRight ? 1 : -1) * 8 * (this._labelDisplayScale || 0.25);
                             let step = 0;
                             const showArrow2 = () => {
                                 if (step >= totalSteps) return;
                                 const count = (step % STAGES) + 1;
                                 const group = this.makeArrowGroup(
-                                    fixedAnchorX2, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
+                                    arrowAnchorX2, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
                                 );
                                 this.tweens.add({
                                     targets: group, alpha: 1, duration: STEP_DUR, yoyo: true, hold: STEP_HOLD,
@@ -1780,8 +1832,8 @@
 
                             this.time.delayedCall(totalDuration + 100, () => {
                                 this.tweens.add({
-                                    targets: labelImg, alpha: 0, duration: 300, ease: 'Sine.easeIn',
-                                    onComplete: () => labelImg.destroy()
+                                    targets: [labelImg, bubble2], alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                                    onComplete: () => { labelImg.destroy(); bubble2.destroy(); }
                                 });
                                 // ラベル消えるのと同時に元のズームへ戻す
                                 this.cameras.main.zoomTo(ZOOM_BACK, 600, 'Sine.easeInOut');
@@ -2705,7 +2757,7 @@
                                         const offsetX = (isRight ? 1 : -1) * 25;
                                         const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
                                         const labelY = astronaut.y - 22;
-                                        const arrowY = astronaut.y - 15;
+                                        const arrowY = astronaut.y - 14;
                                         const ARROW_LOOPS = 2;
                                         const STAGES = 3;
                                         const STEP_DUR = 200; // フェードイン
@@ -2721,24 +2773,29 @@
                                             const label = this.add.image(
                                                 fixedAnchorX, labelY, 'label_rescue'
                                             ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
+                                            const bubble = this.makeGuideBubble(
+                                                fixedAnchorX, labelY, arrowY, label, isRight, 0x88ffaa, 11.5
+                                            ).setAlpha(0);
                                             this.tweens.add({
-                                                targets: label, alpha: 1, duration: 250, ease: 'Sine.easeOut'
+                                                targets: [label, bubble], alpha: 1, duration: 250, ease: 'Sine.easeOut'
                                             });
                                             this.time.delayedCall(totalDuration + 100, () => {
                                                 this.tweens.add({
-                                                    targets: label, alpha: 0, duration: 300, ease: 'Sine.easeIn',
-                                                    onComplete: () => label.destroy()
+                                                    targets: [label, bubble], alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                                                    onComplete: () => { label.destroy(); bubble.destroy(); }
                                                 });
                                             });
                                         });
 
                                         // 矢印：>, >>, >>> サイクルは残し、位置は固定（プレイヤー移動に追従しない）
+                                        // ラベルの内側 padding 分（表示 2px）を矢印を内側に寄せて端を揃える
+                                        const arrowAnchorX = fixedAnchorX + (isRight ? 1 : -1) * 8 * (this._labelDisplayScale || 0.25);
                                         let step = 0;
                                         const showArrow = () => {
                                             if (step >= totalSteps) return;
                                             const count = (step % STAGES) + 1;
                                             const group = this.makeArrowGroup(
-                                                fixedAnchorX, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
+                                                arrowAnchorX, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
                                             );
                                             this.tweens.add({
                                                 targets: group,
