@@ -402,20 +402,28 @@
                 // ブラケット1辺の長さ（横と縦で同じ長さ。bw/bh のうち短い方の 1/4 程度）
                 const arm = Math.max(3, Math.min(8, Math.min(bw, bh) / 4));
 
+                // Graphics を中心 (centerX, centerY) に配置し、ローカル座標 (-bw/2..+bw/2)
+                // で描画する。これで scaleX 0→1 のアニメで「中心から左右に開く」演出ができる。
+                const cx = bx + bw / 2;
+                const cy = by + bh / 2;
+                const lx = -bw / 2, rxp = bw / 2;
+                const typ = -bh / 2, byp = bh / 2;
                 const g = this.add.graphics();
+                g.x = cx;
+                g.y = cy;
                 g.setDepth(depth);
                 // 背景：線と同じ色を 10% 透過で塗りつぶし
                 g.fillStyle(color, 0.1);
-                g.fillRect(bx, by, bw, bh);
+                g.fillRect(lx, typ, bw, bh);
                 g.lineStyle(stroke, color, 1);
                 // 左右は全長で繋ぐ
-                g.lineBetween(bx, by, bx, by + bh);
-                g.lineBetween(bx + bw, by, bx + bw, by + bh);
+                g.lineBetween(lx, typ, lx, byp);
+                g.lineBetween(rxp, typ, rxp, byp);
                 // 上下は四隅の短い arm のみ
-                g.lineBetween(bx, by, bx + arm, by);
-                g.lineBetween(bx + bw - arm, by, bx + bw, by);
-                g.lineBetween(bx, by + bh, bx + arm, by + bh);
-                g.lineBetween(bx + bw - arm, by + bh, bx + bw, by + bh);
+                g.lineBetween(lx, typ, lx + arm, typ);
+                g.lineBetween(rxp - arm, typ, rxp, typ);
+                g.lineBetween(lx, byp, lx + arm, byp);
+                g.lineBetween(rxp - arm, byp, rxp, byp);
                 return g;
             };
 
@@ -604,7 +612,7 @@
             this.goalTimer = 0;
             this.explosionSound = this.sound.add('explosion', { loop: false, volume: 1 });
             this.emptySound = this.sound.add('empty', { loop: true, volume: 0.1 });
-            this.endSound = this.sound.add('end', { loop: false, volume: 0.15 });
+            this.endSound = this.sound.add('end', { loop: false, volume: 0.075 });
             this.footstepSounds = [];
             for (let i = 1; i <= 5; i++) {
                 this.footstepSounds.push(this.sound.add(`footsteps${i}`, { loop: false, volume: 0.2 }));
@@ -614,17 +622,18 @@
             this.beamHitSound = this.sound.add('beamhit', { loop: false, volume: 0.5 });
             this.beamTameSound = this.sound.add('beam-tame', { loop: true, volume: 0.1 });
             this.bloodSound = this.sound.add('blood', { loop: false, volume: 0.5 });
-            this.deadSound = this.sound.add('dead', { loop: false, volume: 0.3 });
-            this.rescueIntroSound = this.sound.add('rescue1', { loop: false, volume: 0.3 });
-            this.climbSound = this.sound.add('climb', { loop: false, volume: 0.15 });
+            this.deadSound = this.sound.add('dead', { loop: false, volume: 0.15 });
+            this.rescueIntroSound = this.sound.add('rescue1', { loop: false, volume: 0.15 });
+            this.climbSound = this.sound.add('climb', { loop: false, volume: 0.075 });
             this.rescueLandSounds = [
-                this.sound.add('rescue2', { loop: false, volume: 0.3 }),
-                this.sound.add('rescue3', { loop: false, volume: 0.3 }),
-                this.sound.add('rescue4', { loop: false, volume: 0.3 })
+                this.sound.add('rescue2', { loop: false, volume: 0.15 }),
+                this.sound.add('rescue3', { loop: false, volume: 0.15 }),
+                this.sound.add('rescue4', { loop: false, volume: 0.15 })
             ];
             // 「会話」のように rescue1 終了後に rescue2/3/4 を順次再生するためのキュー
             this.rescueLandQueue = 0;
             this.rescueLandPlaying = false;
+            this.rescueResponded = false; // scene.restart 後も初期化されるよう明示リセット
             this.tryPlayRescueLand = () => {
                 if (this.rescueLandPlaying) return;
                 if (this.rescueIntroSound && this.rescueIntroSound.isPlaying) return;
@@ -1785,9 +1794,9 @@
                             const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
                             const offsetX = (isRight ? 1 : -1) * 25;
                             const originX = isRight ? 0 : 1;
-                            const labelY = this.astronaut.y - 22;
-                            const arrowY = this.astronaut.y - 14;
-                            const ARROW_LOOPS = 2;
+                            const labelY = this.astronaut.y - 30;
+                            const arrowY = this.astronaut.y - 22;
+                            const ARROW_LOOPS = 3;
                             const STAGES = 3;
                             const STEP_DUR = 200;
                             const STEP_HOLD = 150;
@@ -1805,11 +1814,12 @@
                             const labelImg = this.add.image(
                                 baseAstro.x + offsetX, labelY, 'label_returnship'
                             ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
-                            // 吹き出し枠（角丸＋プレイヤー方向の tail）
+                            // 吹き出し枠：中心から左右に開くアニメ（scaleX 0→1）
                             const bubble2 = this.makeGuideBubble(
                                 baseAstro.x + offsetX, labelY, arrowY, labelImg, isRight, 0x88ffaa, 11.5
-                            ).setAlpha(0);
-                            this.tweens.add({ targets: [labelImg, bubble2], alpha: 1, duration: 250, ease: 'Sine.easeOut' });
+                            ).setScale(0, 1);
+                            this.tweens.add({ targets: labelImg, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
+                            this.tweens.add({ targets: bubble2, scaleX: 1, duration: 300, ease: 'Sine.easeOut' });
 
                             // >, >>, >>> サイクルは残す。ただし位置は固定（プレイヤー移動に追従しない）
                             const fixedAnchorX2 = baseAstro.x + offsetX;
@@ -1832,8 +1842,13 @@
 
                             this.time.delayedCall(totalDuration + 100, () => {
                                 this.tweens.add({
-                                    targets: [labelImg, bubble2], alpha: 0, duration: 300, ease: 'Sine.easeIn',
-                                    onComplete: () => { labelImg.destroy(); bubble2.destroy(); }
+                                    targets: labelImg, alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                                    onComplete: () => labelImg.destroy()
+                                });
+                                // 枠は中心へ閉じる
+                                this.tweens.add({
+                                    targets: bubble2, scaleX: 0, duration: 300, ease: 'Sine.easeIn',
+                                    onComplete: () => bubble2.destroy()
                                 });
                                 // ラベル消えるのと同時に元のズームへ戻す
                                 this.cameras.main.zoomTo(ZOOM_BACK, 600, 'Sine.easeInOut');
@@ -2756,9 +2771,9 @@
                                         const isRight = this.moonCar.x > astronaut.x;
                                         const offsetX = (isRight ? 1 : -1) * 25;
                                         const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
-                                        const labelY = astronaut.y - 22;
-                                        const arrowY = astronaut.y - 14;
-                                        const ARROW_LOOPS = 2;
+                                        const labelY = astronaut.y - 30;
+                                        const arrowY = astronaut.y - 22;
+                                        const ARROW_LOOPS = 3;
                                         const STAGES = 3;
                                         const STEP_DUR = 200; // フェードイン
                                         const STEP_HOLD = 150;
@@ -2775,14 +2790,17 @@
                                             ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
                                             const bubble = this.makeGuideBubble(
                                                 fixedAnchorX, labelY, arrowY, label, isRight, 0x88ffaa, 11.5
-                                            ).setAlpha(0);
-                                            this.tweens.add({
-                                                targets: [label, bubble], alpha: 1, duration: 250, ease: 'Sine.easeOut'
-                                            });
+                                            ).setScale(0, 1);
+                                            this.tweens.add({ targets: label, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
+                                            this.tweens.add({ targets: bubble, scaleX: 1, duration: 300, ease: 'Sine.easeOut' });
                                             this.time.delayedCall(totalDuration + 100, () => {
                                                 this.tweens.add({
-                                                    targets: [label, bubble], alpha: 0, duration: 300, ease: 'Sine.easeIn',
-                                                    onComplete: () => { label.destroy(); bubble.destroy(); }
+                                                    targets: label, alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                                                    onComplete: () => label.destroy()
+                                                });
+                                                this.tweens.add({
+                                                    targets: bubble, scaleX: 0, duration: 300, ease: 'Sine.easeIn',
+                                                    onComplete: () => bubble.destroy()
                                                 });
                                             });
                                         });
