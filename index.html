@@ -1762,12 +1762,14 @@
                             ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
                             this.tweens.add({ targets: labelImg, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
 
+                            // >, >>, >>> サイクルは残す。ただし位置は固定（プレイヤー移動に追従しない）
+                            const fixedAnchorX2 = baseAstro.x + offsetX;
                             let step = 0;
                             const showArrow2 = () => {
                                 if (step >= totalSteps) return;
                                 const count = (step % STAGES) + 1;
                                 const group = this.makeArrowGroup(
-                                    baseAstro.x + offsetX, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
+                                    fixedAnchorX2, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
                                 );
                                 this.tweens.add({
                                     targets: group, alpha: 1, duration: STEP_DUR, yoyo: true, hold: STEP_HOLD,
@@ -2093,8 +2095,14 @@
                     const backDir = this.astronautFacing === 'left' ? 1 : (this.astronautFacing === 'right' ? -1 : -1);
 
                     this.crews.forEach((c, idx) => {
-                        // 前走者：最初はプレイヤー、以降は一つ前の仲間
-                        const leaderX = idx === 0 ? this.astronaut.x : this.crews[idx - 1].x;
+                        // 既に捕まった／破棄済みの仲間はスキップ
+                        if (!c.active || c.captured) return;
+                        // 前走者：最初はプレイヤー、以降は一つ前の生きてる仲間
+                        let leaderX = this.astronaut.x;
+                        for (let k = idx - 1; k >= 0; k--) {
+                            const prev = this.crews[k];
+                            if (prev && prev.active && !prev.captured) { leaderX = prev.x; break; }
+                        }
                         const targetX = leaderX + backDir * 13;
                         const prevX = c.x;
                         c.x = Phaser.Math.Linear(c.x, targetX, 0.06);
@@ -2706,10 +2714,12 @@
                                         const totalSteps = ARROW_LOOPS * STAGES;
                                         const totalDuration = STEP_TOTAL * totalSteps;
 
-                                        // ラベル：矢印と同じ位置・同じoriginで、最初から最後まで出っ放し
-                                        this.time.delayedCall(1500, () => {
+                                        // ラベル＆矢印は同じアンカー位置で固定（プレイヤー移動に追従しない）
+                                        const fixedAnchorX = astronaut.x + offsetX;
+                                        // 0.5秒だけ遅らせて出す（操作開始の直後すぎないように）
+                                        this.time.delayedCall(500, () => {
                                             const label = this.add.image(
-                                                astronaut.x + offsetX, labelY, 'label_rescue'
+                                                fixedAnchorX, labelY, 'label_rescue'
                                             ).setOrigin(originX, 0.5).setDepth(12).setAlpha(0).setScale(this._labelDisplayScale || 0.25);
                                             this.tweens.add({
                                                 targets: label, alpha: 1, duration: 250, ease: 'Sine.easeOut'
@@ -2722,13 +2732,13 @@
                                             });
                                         });
 
-                                        // 矢印：2ループ（>, >>, >>> を 2回繰り返し）
+                                        // 矢印：>, >>, >>> サイクルは残し、位置は固定（プレイヤー移動に追従しない）
                                         let step = 0;
                                         const showArrow = () => {
                                             if (step >= totalSteps) return;
                                             const count = (step % STAGES) + 1;
                                             const group = this.makeArrowGroup(
-                                                astronaut.x + offsetX, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
+                                                fixedAnchorX, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
                                             );
                                             this.tweens.add({
                                                 targets: group,
@@ -2743,7 +2753,7 @@
                                                 }
                                             });
                                         };
-                                        this.time.delayedCall(1500, showArrow);
+                                        this.time.delayedCall(500, showArrow);
                                     }
                             }, 1);
                         }
