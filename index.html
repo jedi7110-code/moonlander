@@ -13,9 +13,6 @@
     <meta property="og:image" content="https://paxcreation.com/moon/assets/ogp.png" />
     <meta name="robots" content="noindex,nofollow">
     <link rel="icon" href="assets/favi.ico">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=11">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
@@ -129,6 +126,8 @@
 
             function startGame() {
                 scene.spaceshipShadow.setAlpha(1);
+                // ENTER 開始時の SE：landing.wav（goal キーと共用、開始音 0.15）
+                if (scene.goalSound) scene.goalSound.play({ volume: 0.15 });
                 scene.tweens.add({
                     targets: title,
                     alpha: 0,
@@ -137,7 +136,6 @@
                         title.destroy();
                     }
                 });
-                scene.titleSound.play();
 
                 // Phase 1: 母艦から降下（中心を少し行き過ぎて上に戻るビヨーン挙動。スラスター噴射しながら）
                 scene.tweens.add({
@@ -225,8 +223,7 @@
             this.load.image('flag-flash', 'assets/flag-flash.png');
             this.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
             this.load.image('title', 'assets/title.png');
-            this.load.audio('title', 'assets/sound/title.wav'); // ビープ音
-            this.load.audio('goal', 'assets/sound/goal.wav'); // ランディング音
+            this.load.audio('goal', 'assets/sound/landing.wav'); // ランディング音
             this.load.audio('explosion', 'assets/sound/explosion.wav'); // 爆発音
             this.load.audio('jet', 'assets/sound/jet.wav'); // ジェット音
             this.load.audio('empty', 'assets/sound/empty.wav'); // エンプティー音
@@ -235,9 +232,15 @@
             this.load.audio('beamhit', 'assets/sound/beamhit.wav'); // ビーム命中音
             this.load.audio('beam-tame', 'assets/sound/beam-tame.wav'); // ビームチャージ音
             this.load.audio('blood', 'assets/sound/blood.wav'); // 被弾音
+            this.load.audio('dead', 'assets/sound/dead.wav'); // 捕獲時の絶命音
             this.load.audio('hatchopen', 'assets/sound/hatchopen.wav'); // ハッチ開
             this.load.audio('escape-injection', 'assets/sound/escape-injection.wav'); // 脱出点火
             this.load.audio('escape-jet', 'assets/sound/escape-jet.wav'); // 脱出ジェット
+            this.load.audio('rescue1', 'assets/sound/rescue-1.wav'); // 仲間出現前のSE
+            this.load.audio('rescue2', 'assets/sound/rescue-2.wav'); // 仲間着地時(ランダム)
+            this.load.audio('rescue3', 'assets/sound/rescue-3.wav');
+            this.load.audio('rescue4', 'assets/sound/rescue-4.wav');
+            this.load.audio('climb', 'assets/sound/climb.wav'); // 登れと指示する声
             // 地底人 6コマアニメ（全コマ左向き。右向きは flipX で反転）
             this.load.image('alien_1', 'assets/alien-s-1.png');
             this.load.image('alien_2', 'assets/alien-s-2.png');
@@ -291,7 +294,7 @@
                 const fill = opts.fill || '#cceedd';
                 const fontWeight = opts.fontWeight || 'bold';
                 const fontStyle = opts.fontStyle || 'normal';
-                const fontFamily = opts.fontFamily || "'Barlow Condensed', sans-serif";
+                const fontFamily = opts.fontFamily || "Helvetica, Arial, sans-serif";
                 const stroke = opts.stroke;
                 const strokeWidth = opts.strokeWidth != null ? opts.strokeWidth * SVG_SCALE : 0;
                 const letterSpacing = opts.letterSpacing != null ? opts.letterSpacing * SVG_SCALE : 0;
@@ -336,7 +339,7 @@
                 this.textures.addBase64(key, makeLabelSVG(text, {
                     fontSize: 28,
                     fontWeight: '600',
-                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontFamily: "Helvetica, Arial, sans-serif",
                     fill: '#ffffff',
                     letterSpacing: 0.5
                 }));
@@ -344,10 +347,10 @@
             // Bebas Neue が読み込まれてから SVG をラスタライズ（フォント未読込だとフォールバック表示になる）
             const generateLabels = () => {
                 if (!this.textures.exists('label_rescue')) {
-                    this.textures.addBase64('label_rescue', makeLabelSVG('Go rescue the crew', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 0.3 }));
+                    this.textures.addBase64('label_rescue', makeLabelSVG('Go rescue the crew', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "Helvetica, Arial, sans-serif", letterSpacing: 0.3 }));
                 }
                 if (!this.textures.exists('label_returnship')) {
-                    this.textures.addBase64('label_returnship', makeLabelSVG('Return to the ship', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 0.3 }));
+                    this.textures.addBase64('label_returnship', makeLabelSVG('Return to the ship', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "Helvetica, Arial, sans-serif", letterSpacing: 0.3 }));
                 }
                 this.makeFailLabel('label_missionfailed', 'Mission Failed');
                 this.makeFailLabel('label_rescuefailed', 'Rescue Failed');
@@ -357,7 +360,7 @@
                     fontSize: 8,
                     fill: '#88ffaa',
                     fontWeight: '600',
-                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontFamily: "Helvetica, Arial, sans-serif",
                     charW: 0.45
                 };
                 ['>', '>>', '>>>', '<', '<<', '<<<'].forEach(s => {
@@ -366,15 +369,13 @@
                         this.textures.addBase64(key, makeLabelSVG(s, arrowOpts));
                     }
                 });
+                // ゴール外着地メッセージ（矢印と同サイズ・赤寄りピンク）
+                if (!this.textures.exists('label_offtarget')) {
+                    this.textures.addBase64('label_offtarget', makeLabelSVG('Landed too far from target', { ...arrowOpts, fill: '#ff6688' }));
+                }
             };
-            if (document.fonts && document.fonts.load) {
-                Promise.all([
-                    document.fonts.load("400 20px 'Barlow Condensed'"),
-                    document.fonts.load("600 20px 'Barlow Condensed'")
-                ]).then(generateLabels).catch(generateLabels);
-            } else {
-                generateLabels();
-            }
+            // Helvetica はシステムフォントなので待機不要
+            generateLabels();
             // 4x で描画したビットマップを 1/4 で表示するためのスケール
             this._labelDisplayScale = 1 / SVG_SCALE;
 
@@ -535,12 +536,11 @@
             this.spaceshipShadow.displayHeight = 50; // 宇宙船と同じサイズに設定
 
             this.cursors = this.input.keyboard.createCursorKeys();
-            this.titleSound = this.sound.add('title', { loop: false, volume: 0.05 });
             this.goalSound = this.sound.add('goal', { loop: false, volume: 0.05 });
             this.goalTimer = 0;
             this.explosionSound = this.sound.add('explosion', { loop: false, volume: 1 });
             this.emptySound = this.sound.add('empty', { loop: true, volume: 0.1 });
-            this.endSound = this.sound.add('end', { loop: false, volume: 0.3 });
+            this.endSound = this.sound.add('end', { loop: false, volume: 0.15 });
             this.footstepSounds = [];
             for (let i = 1; i <= 5; i++) {
                 this.footstepSounds.push(this.sound.add(`footsteps${i}`, { loop: false, volume: 0.2 }));
@@ -550,6 +550,30 @@
             this.beamHitSound = this.sound.add('beamhit', { loop: false, volume: 0.5 });
             this.beamTameSound = this.sound.add('beam-tame', { loop: true, volume: 0.1 });
             this.bloodSound = this.sound.add('blood', { loop: false, volume: 0.5 });
+            this.deadSound = this.sound.add('dead', { loop: false, volume: 0.3 });
+            this.rescueIntroSound = this.sound.add('rescue1', { loop: false, volume: 0.3 });
+            this.climbSound = this.sound.add('climb', { loop: false, volume: 0.15 });
+            this.rescueLandSounds = [
+                this.sound.add('rescue2', { loop: false, volume: 0.3 }),
+                this.sound.add('rescue3', { loop: false, volume: 0.3 }),
+                this.sound.add('rescue4', { loop: false, volume: 0.3 })
+            ];
+            // 「会話」のように rescue1 終了後に rescue2/3/4 を順次再生するためのキュー
+            this.rescueLandQueue = 0;
+            this.rescueLandPlaying = false;
+            this.tryPlayRescueLand = () => {
+                if (this.rescueLandPlaying) return;
+                if (this.rescueIntroSound && this.rescueIntroSound.isPlaying) return;
+                if (this.rescueLandQueue <= 0) return;
+                this.rescueLandQueue--;
+                this.rescueLandPlaying = true;
+                const snd = Phaser.Utils.Array.GetRandom(this.rescueLandSounds);
+                snd.once('complete', () => {
+                    this.rescueLandPlaying = false;
+                    this.tryPlayRescueLand();
+                });
+                snd.play();
+            };
             jetSound = this.sound.add('jet', { loop: true, volume: 0.5 });
             cursors = this.input.keyboard.createCursorKeys();
 
@@ -1378,6 +1402,7 @@
                                 e.anims.play('alien_attack');
                             }
                             this.bloodSound.play(); // 各捕獲で鳴らす
+                            if (this.deadSound) this.deadSound.play();
 
                             if (isFirstCapture) {
                                 this.astronautGameOver = true;
@@ -1467,7 +1492,6 @@
                                             if (e.shadow) e.shadow.destroy();
                                             e.destroy();
                                             if (isFirstCapture) {
-                                                this.add.image(captureX, captureY - 20, 'label_rescuefailed').setOrigin(0.5).setDepth(12).setScale(this._labelDisplayScale || 0.25);
                                                 this.time.delayedCall(2500, () => { this.scene.restart(); });
                                             }
                                         }
@@ -1494,6 +1518,7 @@
                                 e.anims.play('alien_attack');
                             }
                             this.bloodSound.play(); // 各捕獲で鳴らす
+                            if (this.deadSound) this.deadSound.play();
 
                             if (isFirstCapture) {
                                 this.astronautGameOver = true;
@@ -1579,7 +1604,6 @@
                                             if (e.shadow) e.shadow.destroy();
                                             e.destroy();
                                             if (isFirstCapture) {
-                                                this.add.image(captureX, captureY - 20, 'label_missionfailed').setOrigin(0.5).setDepth(12).setScale(this._labelDisplayScale || 0.25);
                                                 this.time.delayedCall(2500, () => { this.scene.restart(); });
                                             }
                                         }
@@ -1609,6 +1633,11 @@
                 // 仲間：車に近づくと2人が車のドア（高さ30px）からぴょんと降りてくる
                 if (this.moonCar && !this.crewFound && Math.abs(this.astronaut.x - this.moonCar.x) < 80) {
                     this.crewFound = true;
+                    // 仲間が出てくる前のSE → 終わった後にキューを消化
+                    if (this.rescueIntroSound) {
+                        this.rescueIntroSound.once('complete', () => this.tryPlayRescueLand && this.tryPlayRescueLand());
+                        this.rescueIntroSound.play();
+                    }
                     const exitDir = this.astronaut.x < this.moonCar.x ? -1 : 1;
                     const doorY = this.groundFeetY - 30;
                     const crewCount = 2 + playthroughCount; // 1週目2人、2週目3人、...
@@ -1641,6 +1670,13 @@
                                     // 着地：アイドルポーズへ＋捕獲対象に
                                     c.setTexture('crew_0');
                                     c.landed = true;
+                                    // 着地時のSE（rescue-2/3/4 のランダム1つ）。
+                                    // 「会話」感を出すため、最初の1人の着地でのみ返事して残りはスキップ。
+                                    if (!this.rescueResponded) {
+                                        this.rescueResponded = true;
+                                        this.rescueLandQueue++;
+                                        if (this.tryPlayRescueLand) this.tryPlayRescueLand();
+                                    }
                                 }
                             });
                         });
@@ -1710,6 +1746,8 @@
                     && this.spaceship && Math.abs(this.astronaut.x - this.spaceship.x) < 20) {
                     this.returningToShip = true;
                     this.crewFollowing = false;
+                    // 「早く登れ」の指示音（仲間がハシゴを登り始める前）
+                    if (this.climbSound) this.climbSound.play();
                     const ladderX = this.spaceship.x - 5;
                     const ladderTop = this.spaceship.y + 10; // 宇宙船の内部から伸ばす
                     const ladderBottom = this.spaceship.y + 56; // プレイヤー足元の少し上まで
@@ -1952,15 +1990,18 @@
                                                             // カメラ停止後に「To be continued in next season...」表示 → Enterでタイトルへ
                                                             const camW = this.cameras.main.width;
                                                             const camH = this.cameras.main.height;
-                                                            const toBeContinued = this.add.text(camW / 2, camH / 2, 'To be continued in next season...', {
+                                                            // 文字間に hair space (U+200A) を挟んで字間を空ける
+                                                            // (Phaser 3.55 の Text は letterSpacing 未対応で context 直設定もリセットされるため)
+                                                            const spaceText = (str) => str;  // 字間挿入は廃止（Helvetica は標準字間で良いため）
+                                                            const toBeContinued = this.add.text(camW / 2, camH / 2, spaceText('To be continued in next season...'), {
                                                                 fontSize: '32px',
                                                                 fill: '#FFF',
-                                                                fontFamily: "'Barlow Condensed', sans-serif"
+                                                                fontFamily: "Helvetica, Arial, sans-serif"
                                                             }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
-                                                            const pressEnter = this.add.text(camW / 2, camH / 2 + 50, 'Press ENTER to return to title', {
+                                                            const pressEnter = this.add.text(camW / 2, camH / 2 + 50, spaceText('Press ENTER to return to title'), {
                                                                 fontSize: '18px',
                                                                 fill: '#AAA',
-                                                                fontFamily: "'Barlow Condensed', sans-serif"
+                                                                fontFamily: "Helvetica, Arial, sans-serif"
                                                             }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
                                                             this.tweens.add({
                                                                 targets: [toBeContinued, pressEnter],
@@ -2578,6 +2619,8 @@
                                             duration: 900,
                                             ease: 'Sine.easeOut',
                                             onComplete: () => {
+                                                // 出現中にビームで撃破されている可能性あり
+                                                if (!enemy.active) return;
                                                 enemy.emerging = false;
                                                 enemy.clearMask();
                                                 // 出現完了 → F→FR/FL で振り向き → 1-6 ループへ
@@ -2692,7 +2735,11 @@
                     this.jetParticles.right.on = false;
                     this.dustEmitters.forEach(e => e.on = false);
 
-                    this.add.image(this.spaceship.x, this.spaceship.y - 50, 'label_missionfailed').setOrigin(0.5, 0.5).setDepth(11).setScale((this._labelDisplayScale || 0.25) * 1.6);
+                    // 成功着地と同様に船にカメラを寄せる
+                    this.cameras.main.pan(this.spaceship.x, this.spaceship.y + 30, 1500, 'Sine.easeInOut');
+                    this.cameras.main.zoomTo(4.5, 1500, 'Sine.easeInOut');
+
+                    this.add.image(this.spaceship.x, this.spaceship.y - 30, 'label_offtarget').setOrigin(0.5, 0.5).setDepth(11).setScale(this._labelDisplayScale || 0.25);
                     this.endSound.play();
                     gameStarted = false;
 
@@ -2701,7 +2748,7 @@
                     });
                 } else {
                     // 速すぎるor傾いている：爆発
-                    gameOver(this, 'Mission Failed');
+                    gameOver(this, '');
                 }
             }
 
