@@ -238,8 +238,20 @@
             this.load.audio('hatchopen', 'assets/sound/hatchopen.wav'); // ハッチ開
             this.load.audio('escape-injection', 'assets/sound/escape-injection.wav'); // 脱出点火
             this.load.audio('escape-jet', 'assets/sound/escape-jet.wav'); // 脱出ジェット
-            this.load.image('alien_L', 'assets/alien1-l.png'); // 地底人（左向き）
-            this.load.image('alien_R', 'assets/alien1-r.png'); // 地底人（右向き）
+            // 地底人 6コマアニメ（全コマ左向き。右向きは flipX で反転）
+            this.load.image('alien_1', 'assets/alien-s-1.png');
+            this.load.image('alien_2', 'assets/alien-s-2.png');
+            this.load.image('alien_3', 'assets/alien-s-3.png');
+            this.load.image('alien_4', 'assets/alien-s-4.png');
+            this.load.image('alien_5', 'assets/alien-s-5.png');
+            this.load.image('alien_6', 'assets/alien-s-6.png');
+            // 出現時(F=正面)、振り向き用 (FL=左寄り正面 / FR=右寄り正面)
+            this.load.image('alien_F', 'assets/alien-s-f.png');
+            this.load.image('alien_FL', 'assets/alien-s-fl.png');
+            this.load.image('alien_FR', 'assets/alien-s-fr.png');
+            // 攻撃（捕獲）2コマ。A2 で停止
+            this.load.image('alien_A1', 'assets/alien-s-a1.png');
+            this.load.image('alien_A2', 'assets/alien-s-a2.png');
             this.load.image('mooncar', 'assets/moon-car.png'); // 大破した月面探査車
             this.load.image('crew', 'assets/crew-f.png'); // 救出する仲間（正面）
             this.load.image('crew_0', 'assets/crew-0.png'); // 仲間（横向きアイドル）
@@ -502,7 +514,7 @@
             });
 
             // 宇宙船のスプライトを作成（タイトル中は画面外・上空の母艦付近で待機）
-            const spaceshipTexture = Phaser.Math.Between(1, 20) === 1 ? 'spacemy' : 'spaceship';
+            const spaceshipTexture = 'spaceship';
             this.spaceship = this.physics.add.sprite(this.game.config.width / 2, -280, spaceshipTexture);
             this.spaceship.setCollideWorldBounds(true); // 画面外に出ないように設定
             this.spaceship.setDrag(0); // 慣性の設定
@@ -805,6 +817,54 @@
                 ],
                 frameRate: 14,
                 repeat: -1
+            });
+
+            // 地底人の歩行アニメ（6コマ・ループ）
+            this.anims.create({
+                key: 'alien_walk',
+                frames: [
+                    { key: 'alien_1' },
+                    { key: 'alien_2' },
+                    { key: 'alien_3' },
+                    { key: 'alien_4' },
+                    { key: 'alien_5' },
+                    { key: 'alien_6' }
+                ],
+                frameRate: 12,
+                repeat: -1
+            });
+            // 振り向きアニメ（FL/FR は絶対向きなので flipX しない）
+            this.anims.create({
+                key: 'alien_turn_LtoR',
+                frames: [{ key: 'alien_FL' }, { key: 'alien_FR' }],
+                frameRate: 14,
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'alien_turn_RtoL',
+                frames: [{ key: 'alien_FR' }, { key: 'alien_FL' }],
+                frameRate: 14,
+                repeat: 0
+            });
+            // 出現直後のトランジション（F → FL / FR、ワンショット）
+            this.anims.create({
+                key: 'alien_emerge_L',
+                frames: [{ key: 'alien_F' }, { key: 'alien_FL' }],
+                frameRate: 8,
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'alien_emerge_R',
+                frames: [{ key: 'alien_F' }, { key: 'alien_FR' }],
+                frameRate: 8,
+                repeat: 0
+            });
+            // 攻撃（捕獲）：A1 → A2、A2 で停止（元画像は左向き、右向きは flipX）
+            this.anims.create({
+                key: 'alien_attack',
+                frames: [{ key: 'alien_A1' }, { key: 'alien_A2' }],
+                frameRate: 10,
+                repeat: 0
             });
 
             // ----- 仲間（crew）のアニメーション群（プレイヤーと同形状）-----
@@ -1271,15 +1331,34 @@
                             }
                             // 主人公が空中の間は方向転換しない（飛び越え後すぐ捕まるのを防止）。
                             // ただしゲームオーバー後は常に最寄り未捕獲を追う。
-                            if ((onGround || this.astronautGameOver) && targetX !== null) {
+                            const prevDir = e.lastDir || 1;
+                            if ((onGround || this.astronautGameOver) && targetX !== null && !e.turning && !e.emergeTransitioning) {
                                 const dx = targetX - e.x;
-                                e.lastDir = dx === 0 ? (e.lastDir || 1) : Math.sign(dx);
+                                e.lastDir = dx === 0 ? prevDir : Math.sign(dx);
                             }
                             const sign = e.lastDir || 1;
                             const sp = e.isBoss ? 28 : enemySpeed;
-                            e.x += sign * sp * dt;
-                            const prefix = e.isBoss ? 'boss_' : 'alien_';
-                            e.setTexture(prefix + (sign < 0 ? 'L' : 'R'));
+                            // 振り向き／出現トランジション中は移動・アニメ切替しない
+                            if (!e.isBoss && !e.turning && !e.emergeTransitioning && sign !== prevDir
+                                && e.anims.currentAnim && e.anims.currentAnim.key === 'alien_walk') {
+                                e.turning = true;
+                                e.setFlipX(false); // FL/FR は絶対向き
+                                const turnKey = sign > 0 ? 'alien_turn_LtoR' : 'alien_turn_RtoL';
+                                e.anims.play(turnKey);
+                                e.once('animationcomplete', () => {
+                                    if (!e.active) return;
+                                    e.turning = false;
+                                    e.setFlipX(e.lastDir > 0);
+                                    e.anims.play('alien_walk');
+                                });
+                            } else if (!e.turning && !e.emergeTransitioning) {
+                                e.x += sign * sp * dt;
+                                if (e.isBoss) {
+                                    e.setTexture('boss_' + (sign < 0 ? 'L' : 'R'));
+                                } else if (e.anims.currentAnim && e.anims.currentAnim.key === 'alien_walk') {
+                                    e.setFlipX(sign > 0);
+                                }
+                            }
                         }
                         // 影をX方向に追従
                         if (e.shadow) e.shadow.x = e.x;
@@ -1293,6 +1372,11 @@
                             const isFirstCapture = !this.astronautGameOver;
                             hitCrew.captured = true;
                             e.capturing = true;
+                            // 雑魚は攻撃モーション（A1→A2、A2 で停止）
+                            if (!e.isBoss) {
+                                e.setFlipX(e.lastDir > 0); // A1/A2 は左向き、右向き時のみ反転
+                                e.anims.play('alien_attack');
+                            }
                             this.bloodSound.play(); // 各捕獲で鳴らす
 
                             if (isFirstCapture) {
@@ -1325,6 +1409,9 @@
                             const startCaptureAnim = () => {
                                 const captureX = hitCrew.x;
                                 const captureY = hitCrew.y - hitCrew.displayHeight / 2;
+                                // 重なりは中心一致ではなく約2/3。エイリアンを進行方向の手前側に寄せる
+                                const overlapOffset = (e.displayWidth || 33) / 3;
+                                const enemyTargetX = hitCrew.x - Math.sign(e.lastDir || 1) * overlapOffset;
                                 hitCrew.setDepth(9);
                                 hitCrew.setMask(this.groundMask);
                                 e.setDepth(10);
@@ -1356,10 +1443,10 @@
                                     });
                                 }
 
-                                // エイリアンを捕獲点に寄せる
+                                // エイリアンを捕獲点に寄せる（2/3重なりの位置へ）
                                 this.tweens.add({
                                     targets: e,
-                                    x: captureX,
+                                    x: enemyTargetX,
                                     duration: 500,
                                     ease: 'Sine.easeOut'
                                 });
@@ -1401,6 +1488,11 @@
                             const isFirstCapture = !this.astronautGameOver;
                             this.astronaut.captured = true;
                             e.capturing = true;
+                            // 雑魚は攻撃モーション（A1→A2、A2 で停止）
+                            if (!e.isBoss) {
+                                e.setFlipX(e.lastDir > 0); // A1/A2 は左向き、右向き時のみ反転
+                                e.anims.play('alien_attack');
+                            }
                             this.bloodSound.play(); // 各捕獲で鳴らす
 
                             if (isFirstCapture) {
@@ -1429,6 +1521,9 @@
                             const startCaptureAnim = () => {
                                 const captureX = this.astronaut.x;
                                 const captureY = this.astronaut.y;
+                                // 重なりは中心一致ではなく約2/3。エイリアンを進行方向の手前側に寄せる
+                                const overlapOffset = (e.displayWidth || 33) / 3;
+                                const enemyTargetX = this.astronaut.x - Math.sign(e.lastDir || 1) * overlapOffset;
                                 this.astronaut.setDepth(10.5);
                                 this.astronaut.setMask(this.groundMask);
                                 e.setDepth(10);
@@ -1460,10 +1555,10 @@
                                     });
                                 }
 
-                                // エイリアンを捕獲点に寄せる
+                                // エイリアンを捕獲点に寄せる（2/3重なりの位置へ）
                                 this.tweens.add({
                                     targets: e,
-                                    x: captureX,
+                                    x: enemyTargetX,
                                     duration: 500,
                                     ease: 'Sine.easeOut'
                                 });
@@ -2394,16 +2489,24 @@
                                         const isBoss = this.bossesDue > 0;
                                         if (isBoss) this.bossesDue--;
                                         const dirFace = spawnX < this.astronaut.x ? 'R' : 'L';
-                                        const initTex = (isBoss ? 'boss_' : 'alien_') + dirFace;
                                         const enemyH = isBoss ? 40 : 24;
-                                        const enemy = this.add.image(spawnX, this.groundFeetY + enemyH, initTex);
+                                        // 雑魚は spritesheet 風アニメ（add.sprite）、ボスは従来通り add.image
+                                        const enemy = isBoss
+                                            ? this.add.image(spawnX, this.groundFeetY + enemyH, 'boss_' + dirFace)
+                                            : this.add.sprite(spawnX, this.groundFeetY + enemyH, 'alien_F'); // 出現中は正面
                                         enemy.setOrigin(0.5, 1);
                                         if (isBoss) {
                                             enemy.setDisplaySize(40, 40);
                                             enemy.hp = 10;
                                         } else {
-                                            enemy.setDisplaySize(12, 24);
+                                            // 元画像比率 800:584 を維持（h=24 → w≒33）
+                                            enemy.setDisplaySize(33, 24);
                                             enemy.hp = 3;
+                                            enemy.lastDir = dirFace === 'R' ? 1 : -1;
+                                            // alien_1 と alien_2-6 で元画像サイズが異なるため、
+                                            // フレーム切替のたびに displaySize を再適用してサイズを固定
+                                            enemy.on('animationupdate', () => enemy.setDisplaySize(33, 24));
+                                            // 出現中は正面固定。emerging 完了後に walk を開始（下の tween onComplete）
                                         }
                                         enemy.isBoss = isBoss;
                                         enemy.setDepth(8);
@@ -2477,6 +2580,19 @@
                                             onComplete: () => {
                                                 enemy.emerging = false;
                                                 enemy.clearMask();
+                                                // 出現完了 → F→FR/FL で振り向き → 1-6 ループへ
+                                                if (!enemy.isBoss) {
+                                                    enemy.setFlipX(false); // F/FL/FR は絶対向き
+                                                    enemy.emergeTransitioning = true;
+                                                    const emergeKey = enemy.lastDir > 0 ? 'alien_emerge_R' : 'alien_emerge_L';
+                                                    enemy.anims.play(emergeKey);
+                                                    enemy.once('animationcomplete', () => {
+                                                        if (!enemy.active) return;
+                                                        enemy.emergeTransitioning = false;
+                                                        enemy.setFlipX(enemy.lastDir > 0); // 1-6 は左向き
+                                                        enemy.anims.play('alien_walk');
+                                                    });
+                                                }
                                             }
                                         });
                                         this.enemies.push(enemy);
