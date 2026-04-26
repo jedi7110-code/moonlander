@@ -1787,8 +1787,8 @@
                     this.time.delayedCall(400 + 600 + 200, () => {
                         this.crewFollowing = true;
 
-                        // 宇宙船方向の >>> + 「Return to the ship」ラベル表示
-                        if (this.spaceship) {
+                        // 宇宙船方向の >>> + 「Return to the ship」ラベル表示（1週目のみ）
+                        if (this.spaceship && playthroughCount === 0) {
                             const isRight = this.spaceship.x > this.astronaut.x;
                             const arrow = isRight ? '>' : '<';
                             const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
@@ -2104,13 +2104,13 @@
                                                         duration: 1600,
                                                         ease: 'Cubic.easeOut',
                                                         onComplete: () => {
-                                                            // カメラ停止後に「To be continued in next season...」表示 → Enterでタイトルへ
+                                                            // カメラ停止後にエンディングメッセージ表示 → Enterでタイトルへ
                                                             const camW = this.cameras.main.width;
                                                             const camH = this.cameras.main.height;
                                                             // 文字間に hair space (U+200A) を挟んで字間を空ける
                                                             // (Phaser 3.55 の Text は letterSpacing 未対応で context 直設定もリセットされるため)
                                                             const spaceText = (str) => str;  // 字間挿入は廃止（Helvetica は標準字間で良いため）
-                                                            const toBeContinued = this.add.text(camW / 2, camH / 2, spaceText('To be continued in next season...'), {
+                                                            const toBeContinued = this.add.text(camW / 2, camH / 2, spaceText('Other crew are still out there...'), {
                                                                 fontSize: '32px',
                                                                 fill: '#FFF',
                                                                 fontFamily: "Helvetica, Arial, sans-serif"
@@ -2764,8 +2764,8 @@
                                     this.astronautHasMoved = false; // 初回移動で通常ズームへ切り替え
                                     // ズームはハシゴが伸び始める時から既に進行中
 
-                                    // 大破車の方向を >>> で表示＋上に英語ラベル（SVG 画像でクッキリ）
-                                    if (this.moonCar) {
+                                    // 大破車の方向を >>> で表示＋上に英語ラベル（1週目のみ）
+                                    if (this.moonCar && playthroughCount === 0) {
                                         const arrow = this.moonCar.x > astronaut.x ? '>' : '<';
                                         const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
                                         const isRight = this.moonCar.x > astronaut.x;
