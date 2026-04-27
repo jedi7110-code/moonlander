@@ -84,6 +84,14 @@ body.no-crt .crt-overlay {
     display: none;
 }
 
+/* 捕獲時のグリッチ：ゲーム canvas と同じ位置・サイズに JS で同期 */
+#glitch-overlay {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    display: none;
+}
+
 
 .button-container {
     position: fixed;
