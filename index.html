@@ -260,6 +260,13 @@
             this.load.image('alienB_F', 'assets/alien-b-f.png');
             this.load.image('alienB_FL', 'assets/alien-b-fl.png');
             this.load.image('alienB_FR', 'assets/alien-b-fr.png');
+            this.load.image('alienB_A1', 'assets/alien-b-a1.png');
+            this.load.image('alienB_A2', 'assets/alien-b-a2.png');
+            this.load.image('alienB_A3', 'assets/alien-b-a3.png');
+            this.load.image('alienB_A4', 'assets/alien-b-a4.png');
+            this.load.image('alienB_A5', 'assets/alien-b-a5.png');
+            this.load.image('alienB_A6', 'assets/alien-b-a6.png');
+            this.load.image('alienB_A7', 'assets/alien-b-a7.png');
             this.load.image('mooncar', 'assets/moon-car.png'); // 大破した月面探査車
             this.load.image('crew', 'assets/crew-f.png'); // 救出する仲間（正面）
             this.load.image('crew_0', 'assets/crew-0.png'); // 仲間（横向きアイドル）
@@ -1006,6 +1013,17 @@
                 frameRate: 14,
                 repeat: 0
             });
+            // ボスの攻撃（捕獲）：A1 → A7、A7 で停止
+            this.anims.create({
+                key: 'bossAlien_attack',
+                frames: [
+                    { key: 'alienB_A1' }, { key: 'alienB_A2' }, { key: 'alienB_A3' },
+                    { key: 'alienB_A4' }, { key: 'alienB_A5' }, { key: 'alienB_A6' },
+                    { key: 'alienB_A7' }
+                ],
+                frameRate: 8,
+                repeat: 0
+            });
 
             // ----- 仲間（crew）のアニメーション群（プレイヤーと同形状）-----
             // 仲間用ベース：crew には純粋な「後ろ向き」テクスチャがないため
@@ -1516,11 +1534,9 @@
                             // 捕まった仲間はその場で停止（落下・横移動の進行中tweenを切る）
                             this.tweens.killTweensOf(hitCrew);
                             if (hitCrew.anims && hitCrew.anims.isPlaying) hitCrew.anims.stop();
-                            // 雑魚は攻撃モーション（A1→A2、A2 で停止）
-                            if (!e.isBoss) {
-                                e.setFlipX(e.lastDir > 0); // A1/A2 は左向き、右向き時のみ反転
-                                e.anims.play('alien_attack');
-                            }
+                            // 攻撃モーション（雑魚 A1→A2、ボス A1→A2→A3、最終フレームで停止）
+                            e.setFlipX(e.lastDir > 0); // A 系は左向き、右向き時のみ反転
+                            e.anims.play(e.isBoss ? 'bossAlien_attack' : 'alien_attack');
                             this.bloodSound.play(); // 各捕獲で鳴らす
                             if (this.deadSound) this.deadSound.play();
 
@@ -1534,6 +1550,9 @@
                                 this.tweens.killTweensOf(this.astronaut);
                                 this.crews.forEach(c => this.tweens.killTweensOf(c));
                                 this.crews.forEach(c => { if (c.anims && c.anims.isPlaying) c.anims.stop(); });
+                                // やられた瞬間にカメラを寄せる
+                                this.cameras.main.pan(hitCrew.x, hitCrew.y, 600, 'Sine.easeInOut');
+                                this.cameras.main.zoomTo(4.5, 600, 'Sine.easeInOut');
                             }
 
                             // 空中の他の仲間を自然に地面へ落下（重力風のtween）
@@ -1628,11 +1647,9 @@
                             const isFirstCapture = !this.astronautGameOver;
                             this.astronaut.captured = true;
                             e.capturing = true;
-                            // 雑魚は攻撃モーション（A1→A2、A2 で停止）
-                            if (!e.isBoss) {
-                                e.setFlipX(e.lastDir > 0); // A1/A2 は左向き、右向き時のみ反転
-                                e.anims.play('alien_attack');
-                            }
+                            // 攻撃モーション（雑魚 A1→A2、ボス A1→A2→A3、最終フレームで停止）
+                            e.setFlipX(e.lastDir > 0); // A 系は左向き、右向き時のみ反転
+                            e.anims.play(e.isBoss ? 'bossAlien_attack' : 'alien_attack');
                             this.bloodSound.play(); // 各捕獲で鳴らす
                             if (this.deadSound) this.deadSound.play();
 
@@ -1648,6 +1665,9 @@
                                     this.crews.forEach(c => this.tweens.killTweensOf(c));
                                     this.crews.forEach(c => { if (c.anims && c.anims.isPlaying) c.anims.stop(); });
                                 }
+                                // やられた瞬間にカメラを寄せる
+                                this.cameras.main.pan(this.astronaut.x, this.astronaut.y, 600, 'Sine.easeInOut');
+                                this.cameras.main.zoomTo(4.5, 600, 'Sine.easeInOut');
                             }
 
                             // 空中の仲間を自然落下tweenで地面へ
@@ -2670,7 +2690,8 @@
                                         const enemy = this.add.sprite(spawnX, this.groundFeetY + enemyH, isBoss ? 'alienB_F' : 'alien_F');
                                         enemy.setOrigin(0.5, 1);
                                         if (isBoss) {
-                                            enemy.setDisplaySize(56, 56);
+                                            // 元画像比率 1000:776 を維持（h=56 → w≒72）
+                                            enemy.setDisplaySize(72, 56);
                                             enemy.hp = 10;
                                         } else {
                                             // 元画像比率 1000:600 (10:6) を維持（h=24 → w=40）
