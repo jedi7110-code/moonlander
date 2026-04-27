@@ -1477,7 +1477,8 @@
                                 e.lastDir = dx === 0 ? prevDir : Math.sign(dx);
                             }
                             const sign = e.lastDir || 1;
-                            const sp = e.isBoss ? 30 : enemySpeed;
+                            // 個体ごとに spawn 時に固定された速度（base ±2 ランダム）
+                            const sp = e.speed != null ? e.speed : (e.isBoss ? 30 : enemySpeed);
                             const animPrefix = e.isBoss ? 'bossAlien_' : 'alien_';
                             const walkKey = animPrefix + 'walk';
                             // 振り向き／出現トランジション中は移動・アニメ切替しない
@@ -1806,8 +1807,8 @@
                             const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
                             const offsetX = (isRight ? 1 : -1) * 25;
                             const originX = isRight ? 0 : 1;
-                            const labelY = this.astronaut.y - 30;
-                            const arrowY = this.astronaut.y - 22;
+                            const labelY = this.astronaut.y - 32;
+                            const arrowY = this.astronaut.y - 24;
                             const ARROW_LOOPS = 3;
                             const STAGES = 3;
                             const STEP_DUR = 200;
@@ -2679,6 +2680,9 @@
                                         enemy.lastDir = dirFace === 'R' ? 1 : -1;
                                         // 出現中は正面固定。emerging 完了後に walk を開始（下の tween onComplete）
                                         enemy.isBoss = isBoss;
+                                        // 速度は spawn 時に固定（base ±2 のランダム個体差）
+                                        const baseSpeed = isBoss ? 30 : 50;
+                                        enemy.speed = baseSpeed + Phaser.Math.Between(-2, 2);
                                         enemy.setDepth(8);
                                         enemy.setMask(this.groundMask);
                                         enemy.emerging = true;
@@ -2782,8 +2786,8 @@
                                         const isRight = this.moonCar.x > astronaut.x;
                                         const offsetX = (isRight ? 1 : -1) * 25;
                                         const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
-                                        const labelY = astronaut.y - 30;
-                                        const arrowY = astronaut.y - 22;
+                                        const labelY = astronaut.y - 32;
+                                        const arrowY = astronaut.y - 24;
                                         const ARROW_LOOPS = 3;
                                         const STAGES = 3;
                                         const STEP_DUR = 200; // フェードイン
