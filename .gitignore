@@ -1,3 +1,5 @@
 .DS_Store
 ._*
 .vscode/
+.claude/settings.local.json
+.claude/launch.json.local
