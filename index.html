@@ -219,7 +219,6 @@
             this.load.image('player_L2', 'assets/player-l2.png');
             this.load.image('player_R1', 'assets/player-r1.png');
             this.load.image('player_R2', 'assets/player-r2.png');
-            this.load.image('spaceshipshadow', 'assets/spaceshipshadow.png');
             this.load.image('flag', 'assets/flag.png');
             this.load.image('flag-flash', 'assets/flag-flash.png');
             this.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
@@ -602,10 +601,23 @@
             this.spaceship.body.setOffset(this.spaceship.width / 2 - bodyRadius, this.spaceship.height / 2 - bodyRadius);
             this.spaceship.defaultTextureName = 'spaceship';
 
-            // 着陸の影を作成
-            this.spaceshipShadow = this.add.image(this.spaceship.x, this.moon.y + 47, 'spaceshipshadow');
-            this.spaceshipShadow.displayWidth = 50; // 宇宙船と同じサイズに設定
-            this.spaceshipShadow.displayHeight = 50; // 宇宙船と同じサイズに設定
+            // 着陸の影を作成（Graphics で 5 段階の多重楕円ソフトシャドウを描く）
+            // ベース横幅 110 で描き、setScale で実サイズに合わせる
+            this.spaceshipShadow = this.add.graphics();
+            // 中心が一番濃く (0.06)、外側に向かって薄く。中心は広めで外側のリング間隔は狭い。
+            this.spaceshipShadow.fillStyle(0x000000, 0.03);
+            this.spaceshipShadow.fillEllipse(0, 0, 110, 30); // outer (一番薄い)
+            this.spaceshipShadow.fillStyle(0x000000, 0.035);
+            this.spaceshipShadow.fillEllipse(0, 0, 106, 29);
+            this.spaceshipShadow.fillStyle(0x000000, 0.04);
+            this.spaceshipShadow.fillEllipse(0, 0, 100, 27);
+            this.spaceshipShadow.fillStyle(0x000000, 0.05);
+            this.spaceshipShadow.fillEllipse(0, 0, 92, 25);
+            this.spaceshipShadow.fillStyle(0x000000, 0.06);
+            this.spaceshipShadow.fillEllipse(0, 0, 72, 20);  // 中心（広めで一番濃い）
+            this.spaceshipShadow.x = this.spaceship.x;
+            this.spaceshipShadow.y = this.moon.y + 35; // 地面ライン（宇宙船の足元）
+            this.spaceshipShadow.setScale(50 / 100); // 初期表示横幅 50px
 
             this.cursors = this.input.keyboard.createCursorKeys();
             this.goalSound = this.sound.add('goal', { loop: false, volume: 0.05 });
@@ -2390,7 +2402,7 @@
 
                 // 宇宙船の影の位置を更新（宇宙船の真下、地面の高さ）
                 this.spaceshipShadow.x = this.spaceship.x;
-                this.spaceshipShadow.y = this.moon.y + 58;
+                this.spaceshipShadow.y = this.moon.y + 35; // 地面ライン
 
                 // ゴールエリアからの高さを計算
                 const heightAboveGoal = Math.max(this.spaceship.y - (this.moon.y - 260), 0);
@@ -2401,8 +2413,7 @@
 
                 // 影のサイズを計算（高さに応じて50〜100の範囲）
                 const shadowSize = 110 - (heightAboveGoal / 4.6);
-                this.spaceshipShadow.displayWidth = shadowSize;
-                this.spaceshipShadow.displayHeight = shadowSize;
+                this.spaceshipShadow.setScale(shadowSize / 100); // ベース直径 100 を縮尺
 
                 // 地面に近い＋ジェット噴射中の時だけ粉塵を左右に舞い上がらせる
                 const groundDistance = (this.game.config.height - 63) - (this.spaceship.y + 25);
