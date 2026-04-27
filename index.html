@@ -3,15 +3,14 @@
 
 <head prefix="og:http://ogp.me/ns#">
     <title>Moonlander</title>
-    <meta name="description" content="Moonlanderというゲームを実行します。このゲームでは、プレイヤーが宇宙船を上下左右に操作して、デブリを避け目標となるフラッグに着陸することが目的です。フラッグ手前の月面に0.5秒止まるとクリアです。">
+    <meta name="description" content="20XX年、月面探査クルーからの消息が途絶えた。月面下で、未知の脅威が目覚める。生還を賭けた、たった一人の救出作戦。">
     <meta charset="utf-8">
     <meta property="og:url" content="https://paxcreation.com/moon/" />
     <meta property="og:type" content="product" />
     <meta property="og:title" content="Moonlander" />
-    <meta property="og:description" content="Moonlanderというゲームを実行します。このゲームでは、プレイヤーが宇宙船を上下左右に操作して、デブリをかわす目標となるフラッグに着陸することが目的です。フラッグ手前の月面に0.5秒止まるとクリアです。" />
+    <meta property="og:description" content="20XX年、月面探査クルーからの消息が途絶えた。月面下で、未知の脅威が目覚める。生還を賭けた、たった一人の救出作戦。" />
     <meta property="og:site_name" content="Moonlander" />
     <meta property="og:image" content="https://paxcreation.com/moon/assets/ogp.png" />
-    <meta name="robots" content="noindex,nofollow">
     <link rel="icon" href="assets/favi.ico">
     <link rel="stylesheet" href="style.css?v=13">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
@@ -526,11 +525,19 @@
             // 攻撃（捕獲）2コマ。A2 で停止
             this.load.image('alien_A1', 'assets/alien-s-a1.png');
             this.load.image('alien_A2', 'assets/alien-s-a2.png');
-            // ボス（雑魚と同じ仕組み。歩行は現状 B_1 のみ、2-6 は後ほど追加予定）
-            this.load.image('alienB_1', 'assets/alien-b-1.png');
+            // ボス（雑魚と同じ仕組み）
+            this.load.image('alienB_L', 'assets/alien-b-l.png');     // 横向き静止
             this.load.image('alienB_F', 'assets/alien-b-f.png');
             this.load.image('alienB_FL', 'assets/alien-b-fl.png');
             this.load.image('alienB_FR', 'assets/alien-b-fr.png');
+            // 歩行 7 コマ
+            this.load.image('alienB_W1', 'assets/alien-b-w1.png');
+            this.load.image('alienB_W2', 'assets/alien-b-w2.png');
+            this.load.image('alienB_W3', 'assets/alien-b-w3.png');
+            this.load.image('alienB_W4', 'assets/alien-b-w4.png');
+            this.load.image('alienB_W5', 'assets/alien-b-w5.png');
+            this.load.image('alienB_W6', 'assets/alien-b-w6.png');
+            this.load.image('alienB_W7', 'assets/alien-b-w7.png');
             this.load.image('alienB_A1', 'assets/alien-b-a1.png');
             this.load.image('alienB_A2', 'assets/alien-b-a2.png');
             this.load.image('alienB_A3', 'assets/alien-b-a3.png');
@@ -1253,11 +1260,15 @@
                 frameRate: 10,
                 repeat: 0
             });
-            // ----- ボス用アニメ（雑魚と同形状。歩行は B_1 単発のみ、2-6 追加で拡張予定）-----
+            // ----- ボス用アニメ（雑魚と同形状）-----
             this.anims.create({
                 key: 'bossAlien_walk',
-                frames: [{ key: 'alienB_1' }],
-                frameRate: 12,
+                frames: [
+                    { key: 'alienB_W1' }, { key: 'alienB_W2' }, { key: 'alienB_W3' },
+                    { key: 'alienB_W4' }, { key: 'alienB_W5' }, { key: 'alienB_W6' },
+                    { key: 'alienB_W7' }
+                ],
+                frameRate: 8,
                 repeat: -1
             });
             this.anims.create({
@@ -1787,6 +1798,9 @@
                                 e.x += sign * sp * dt;
                                 if (e.anims.currentAnim && e.anims.currentAnim.key === walkKey) {
                                     e.setFlipX(sign > 0);
+                                    // ボスの walk フレームは影との隙間を埋めるため 2px 下げる
+                                    if (e.isBoss) e.y = this.groundFeetY + 2;
+                                    else e.y = this.groundFeetY;
                                 }
                             }
                         }
@@ -2108,12 +2122,12 @@
                             const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
                             const offsetX = (isRight ? 1 : -1) * 25;
                             const originX = isRight ? 0 : 1;
-                            const labelY = this.astronaut.y - 32;
-                            const arrowY = this.astronaut.y - 24;
+                            const labelY = this.astronaut.y - 34;
+                            const arrowY = this.astronaut.y - 26;
                             const ARROW_LOOPS = 3;
                             const STAGES = 3;
-                            const STEP_DUR = 200;
-                            const STEP_HOLD = 150;
+                            const STEP_DUR = 160;
+                            const STEP_HOLD = 120; // 9 steps × 440ms = 3960ms（4秒以内）
                             const STEP_TOTAL = STEP_DUR * 2 + STEP_HOLD;
                             const totalSteps = ARROW_LOOPS * STAGES;
                             const totalDuration = STEP_TOTAL * totalSteps;
@@ -2971,8 +2985,8 @@
                                         const enemy = this.add.sprite(spawnX, this.groundFeetY + enemyH, isBoss ? 'alienB_F' : 'alien_F');
                                         enemy.setOrigin(0.5, 1);
                                         if (isBoss) {
-                                            // 元画像比率 1000:776 を維持（h=56 → w≒72）
-                                            enemy.setDisplaySize(72, 56);
+                                            // 元画像比率 1100:770 を維持（h=56 → w=80）
+                                            enemy.setDisplaySize(80, 56);
                                             enemy.hp = 10;
                                         } else {
                                             // 元画像比率 1000:600 (10:6) を維持（h=24 → w=40）
@@ -2989,7 +3003,7 @@
                                         enemy.setMask(this.groundMask);
                                         enemy.emerging = true;
                                         // 影：地中から出てくる瞬間から地面に表示（フェードインで予兆を演出）
-                                        enemy.shadow = createGroundShadow(this, enemy.x, this.groundFeetY, isBoss ? 50 : 24);
+                                        enemy.shadow = createGroundShadow(this, enemy.x, this.groundFeetY, isBoss ? 60 : 24, isBoss ? 2 : 0);
                                         enemy.shadow.alpha = 0;
                                         this.tweens.add({ targets: enemy.shadow, alpha: 1, duration: 900, ease: 'Sine.easeOut' });
 
@@ -3088,12 +3102,12 @@
                                         const isRight = this.moonCar.x > astronaut.x;
                                         const offsetX = (isRight ? 1 : -1) * 25;
                                         const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
-                                        const labelY = astronaut.y - 32;
-                                        const arrowY = astronaut.y - 24;
+                                        const labelY = astronaut.y - 34;
+                                        const arrowY = astronaut.y - 26;
                                         const ARROW_LOOPS = 3;
                                         const STAGES = 3;
-                                        const STEP_DUR = 200; // フェードイン
-                                        const STEP_HOLD = 150;
+                                        const STEP_DUR = 160; // フェードイン
+                                        const STEP_HOLD = 120; // 9 steps × 440ms = 3960ms（4秒以内）
                                         const STEP_TOTAL = STEP_DUR * 2 + STEP_HOLD; // 1ステップの総時間 (in+hold+out)
                                         const totalSteps = ARROW_LOOPS * STAGES;
                                         const totalDuration = STEP_TOTAL * totalSteps;
@@ -3278,15 +3292,15 @@
         }
 
         // 地上キャラクターの影（多層楕円で疑似ブラー）。深度 6.5 (moon car 6 と crews 7 の間)
-        function createGroundShadow(scene, x, footY, width) {
+        function createGroundShadow(scene, x, footY, width, heightBoost = 0) {
             const g = scene.add.graphics();
             // 外側ほど薄く広く（ぼかし表現）
             g.fillStyle(0x000000, 0.04);
-            g.fillEllipse(0, 0, width * 1.5, 4.5);
+            g.fillEllipse(0, 0, width * 1.5, 4.5 + heightBoost);
             g.fillStyle(0x000000, 0.06);
-            g.fillEllipse(0, 0, width * 1.2, 3.6);
+            g.fillEllipse(0, 0, width * 1.2, 3.6 + heightBoost);
             g.fillStyle(0x000000, 0.08);
-            g.fillEllipse(0, 0, width, 3);
+            g.fillEllipse(0, 0, width, 3 + heightBoost);
             g.x = x;
             g.y = footY;
             g.setDepth(6.5);
