@@ -715,7 +715,7 @@
             // ラベル＋矢印を囲む4隅ブラケット（[ ] 風の L字マーク4つ）を描画。
             // anchorX = ラベル/矢印の origin 基準 x、isRight = ラベルが右側に伸びるか。
             this.makeGuideBubble = (anchorX, labelY, arrowY, label, isRight, color, depth) => {
-                const STAGES = 3;
+                const STAGES = 10;
                 const scale = (this._labelDisplayScale || 0.25) / 6;
                 const tex = this.textures.get('arrow_unit');
                 const srcW = tex.getSourceImage().width;
@@ -768,17 +768,18 @@
             // arrow.svg を 1〜3 個並べて方向矢印を作るヘルパー。
             // SVG: viewBox 0-60, 矢印の見える幅は 0-40 (= 全体の 2/3)。
             // 右向き＝そのまま、左向き＝flipX で反転。
-            this.makeArrowGroup = (anchorX, anchorY, count, isRight, depth, scale) => {
+            this.makeArrowGroup = (anchorX, anchorY, count, isRight, depth, scale, slotSpacing) => {
                 const dir = isRight ? 1 : -1;
                 const tex = this.textures.get('arrow_unit');
                 const srcW = tex.getSourceImage().width;     // 実ラスタ幅
                 const imageW = srcW * scale;                 // 表示時の画像本体幅
-                const arrowVisibleW = imageW * (40 / 60);    // 並びの間隔（密着）
+                const arrowVisibleW = imageW * (40 / 60);    // 既定の間隔（密着）
+                const spacing = (slotSpacing != null && slotSpacing > 0) ? slotSpacing : arrowVisibleW;
                 // 右向き: anchorX を矢印群の左端に。左向き: anchorX を矢印群の右端に。
                 const baseX = isRight ? anchorX : anchorX - imageW;
                 const arrows = [];
                 for (let i = 0; i < count; i++) {
-                    const ax = baseX + dir * arrowVisibleW * i;
+                    const ax = baseX + dir * spacing * i;
                     arrows.push(this.add.image(ax, anchorY, 'arrow_unit')
                         .setOrigin(0, 0.5)
                         .setDepth(depth)
@@ -2178,10 +2179,10 @@
                             const originX = isRight ? 0 : 1;
                             const labelY = this.astronaut.y - 34;
                             const arrowY = this.astronaut.y - 26;
-                            const ARROW_LOOPS = 3;
-                            const STAGES = 3;
+                            const ARROW_LOOPS = 1; // STAGES=7 で 7 steps × 440ms = 3080ms（4秒以内）
+                            const STAGES = 10;
                             const STEP_DUR = 160;
-                            const STEP_HOLD = 120; // 9 steps × 440ms = 3960ms（4秒以内）
+                            const STEP_HOLD = 80; // STAGES=10 で 10 steps × 400ms = 4000ms（4秒以内）
                             const STEP_TOTAL = STEP_DUR * 2 + STEP_HOLD;
                             const totalSteps = ARROW_LOOPS * STAGES;
                             const totalDuration = STEP_TOTAL * totalSteps;
@@ -2208,12 +2209,19 @@
                             // 矢印は makeLabelSVG の左右 padding (8px in canvas → 表示 2px) 分内側に寄せて、
                             // ラベルのテキスト端と矢印端を揃える
                             const arrowAnchorX2 = fixedAnchorX2 + (isRight ? 1 : -1) * 8 * (this._labelDisplayScale || 0.25);
+                            // 矢印の間隔を枠（=ラベル）幅に合わせて等分
+                            const arrowScale2 = (this._labelDisplayScale || 0.25) / 6;
+                            const arrowImgW2 = (this.textures.get('arrow_unit').getSourceImage().width) * arrowScale2;
+                            const arrowVisibleW2 = arrowImgW2 * (40 / 60);
+                            const arrowSpan2 = (labelImg.displayWidth || 0) - 4; // 内側 2px 寄せ × 2
+                            const computed2 = STAGES > 1 ? (arrowSpan2 - arrowImgW2) / (STAGES - 1) : 0;
+                            const arrowSlotSpacing2 = Math.max(arrowVisibleW2, computed2); // 最低でも密着
                             let step = 0;
                             const showArrow2 = () => {
                                 if (step >= totalSteps) return;
                                 const count = (step % STAGES) + 1;
                                 const group = this.makeArrowGroup(
-                                    arrowAnchorX2, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
+                                    arrowAnchorX2, arrowY, count, isRight, 12, arrowScale2, arrowSlotSpacing2
                                 );
                                 this.tweens.add({
                                     targets: group, alpha: 1, duration: STEP_DUR, yoyo: true, hold: STEP_HOLD,
@@ -3158,10 +3166,10 @@
                                         const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
                                         const labelY = astronaut.y - 34;
                                         const arrowY = astronaut.y - 26;
-                                        const ARROW_LOOPS = 3;
-                                        const STAGES = 3;
+                                        const ARROW_LOOPS = 1; // STAGES=7 で 7 steps × 440ms = 3080ms（4秒以内）
+                                        const STAGES = 10;
                                         const STEP_DUR = 160; // フェードイン
-                                        const STEP_HOLD = 120; // 9 steps × 440ms = 3960ms（4秒以内）
+                                        const STEP_HOLD = 80; // STAGES=10 で 10 steps × 400ms = 4000ms（4秒以内）
                                         const STEP_TOTAL = STEP_DUR * 2 + STEP_HOLD; // 1ステップの総時間 (in+hold+out)
                                         const totalSteps = ARROW_LOOPS * STAGES;
                                         const totalDuration = STEP_TOTAL * totalSteps;
@@ -3193,12 +3201,22 @@
                                         // 矢印：>, >>, >>> サイクルは残し、位置は固定（プレイヤー移動に追従しない）
                                         // ラベルの内側 padding 分（表示 2px）を矢印を内側に寄せて端を揃える
                                         const arrowAnchorX = fixedAnchorX + (isRight ? 1 : -1) * 8 * (this._labelDisplayScale || 0.25);
+                                        // 矢印の間隔を枠（=ラベル）幅に合わせて等分。label sprite は delayedCall 内で生成
+                                        // されるためテクスチャから直接サイズを取得
+                                        const arrowScale = (this._labelDisplayScale || 0.25) / 6;
+                                        const arrowImgW = (this.textures.get('arrow_unit').getSourceImage().width) * arrowScale;
+                                        const arrowVisibleW = arrowImgW * (40 / 60);
+                                        const labelTexW = this.textures.get('label_rescue').getSourceImage().width;
+                                        const labelDisplayW = labelTexW * (this._labelDisplayScale || 0.25);
+                                        const arrowSpan = labelDisplayW - 4;
+                                        const computed = STAGES > 1 ? (arrowSpan - arrowImgW) / (STAGES - 1) : 0;
+                                        const arrowSlotSpacing = Math.max(arrowVisibleW, computed);
                                         let step = 0;
                                         const showArrow = () => {
                                             if (step >= totalSteps) return;
                                             const count = (step % STAGES) + 1;
                                             const group = this.makeArrowGroup(
-                                                arrowAnchorX, arrowY, count, isRight, 12, (this._labelDisplayScale || 0.25) / 6
+                                                arrowAnchorX, arrowY, count, isRight, 12, arrowScale, arrowSlotSpacing
                                             );
                                             this.tweens.add({
                                                 targets: group,
