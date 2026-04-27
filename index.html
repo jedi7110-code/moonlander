@@ -404,6 +404,17 @@
             // タイトル画像をカメラに固定
             title.setScrollFactor(0);
 
+            // 操作キーガイド（タイトル下）
+            const keyGuide = scene.add.text(
+                scene.game.config.width / 2,
+                scene.game.config.height / 2 + 260,
+                'USE ARROW KEYS + SPACE'.split('').join(' '),
+                {
+                    fontSize: '20px',
+                    fill: '#88ffaa',
+                    fontFamily: "Helvetica, Arial, sans-serif"
+                }
+            ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
 
             scene.spaceshipShadow.setAlpha(0);
 
@@ -412,11 +423,12 @@
                 // ENTER 開始時の SE：landing.wav（goal キーと共用、開始音 0.15）
                 if (scene.goalSound) scene.goalSound.play({ volume: 0.15 });
                 scene.tweens.add({
-                    targets: title,
+                    targets: [title, keyGuide],
                     alpha: 0,
                     duration: 500,
                     onComplete: () => {
                         title.destroy();
+                        keyGuide.destroy();
                     }
                 });
 
