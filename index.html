@@ -1446,8 +1446,8 @@
                     if (this.crews) this.crews.forEach(c => { if (c.visible && !c.captured) liveTargets.push(c); });
 
                     for (const e of this.enemies) {
-                        // 半分以上出るまでは当たり判定なし
-                        if (e.emerging && e.y > this.groundFeetY + e.displayHeight / 2) continue;
+                        // 完全に地上に出るまで（emerge tween 完了まで）は捕獲対象外
+                        if (e.emerging) continue;
                         // 出現中・捕獲動作中は移動・方向転換しない
                         if (!e.emerging && !e.capturing) {
                             // 最寄りの未捕獲ターゲットを追う（捕まったキャラには寄って来ない）
