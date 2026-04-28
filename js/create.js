@@ -12,6 +12,9 @@ scene._labelDisplayScale = 1 / SVG_SCALE;
 attachUiGuide(scene);
 scene.currentMarkerColor = 0x00ff00;
 scene.astronautMode = false;
+scene.gameStarted = false; // showTitle → ENTER で true に
+// playthroughCount は scene.scene.restart() を跨いで保持（Phaser は同じ scene インスタンスを再利用）
+if (scene.playthroughCount === undefined) scene.playthroughCount = 0;
 
 // 2週目以降に前回の状態が残らないよう、リスタート時に必ず初期化
 scene.astronaut = null;

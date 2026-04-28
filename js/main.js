@@ -66,13 +66,10 @@
         window.GlitchOverlay = GlitchOverlay;
 
 
-        let gameStarted = false;
-        let playthroughCount = 0; // 0=1週目, 1=2週目, ...
-
-        // gameOver は jetSound（scene 経由）と gameStarted（module-local）への副作用を必要とする。
+        // gameOver は scene.jetSound 停止と scene.gameStarted リセットを行う。
         const gameOver = (scene, message) => _gameOverImpl(scene, message, {
             jetSound: scene.jetSound,
-            onStart: () => { gameStarted = false; }
+            onStart: () => { scene.gameStarted = false; }
         });
 
         function showTitle(scene) {
@@ -127,7 +124,7 @@
                         fadeStopSound(scene, scene.jetSound, 0.5);
                         scene.spaceship.setVelocityY(-25); // わずかに上向きの残存速度
                         scene.spaceship.setGravityY(80);
-                        gameStarted = true;
+                        scene.gameStarted = true;
 
                         // 燃料ゲージをポップイン表示
                         scene.tweens.add({
@@ -161,7 +158,7 @@
         }
 
         function restartGame(scene) {
-            gameStarted = false;
+            scene.gameStarted = false;
             scene.spaceship.setVisible(true);
             scene.spaceship.setPosition(scene.game.config.width / 2, -280);
             scene.spaceship.setVelocity(0);
@@ -840,7 +837,7 @@
                     }
                     const exitDir = this.astronaut.x < this.moonCar.x ? -1 : 1;
                     const doorY = this.groundFeetY - 30;
-                    const crewCount = 2 + playthroughCount; // 1週目2人、2週目3人、...
+                    const crewCount = 2 + this.playthroughCount; // 1週目2人、2週目3人、...
                     for (let i = 0; i < crewCount; i++) {
                         // Sprite で作成（アニメーション再生のため）。元画像は左向き、右降下時は反転
                         // 空中のため開脚ポーズ（L2）で出現
@@ -885,7 +882,7 @@
                         this.crewFollowing = true;
 
                         // 宇宙船方向の >>> + 「Return to the ship」ラベル表示（1週目のみ）
-                        if (this.spaceship && playthroughCount === 0) {
+                        if (this.spaceship && this.playthroughCount === 0) {
                             const isRight = this.spaceship.x > this.astronaut.x;
                             const arrow = isRight ? '>' : '<';
                             const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
@@ -1231,7 +1228,7 @@
                                                                 ease: 'Sine.easeIn',
                                                                 onComplete: () => {
                                                                     this.input.keyboard.once('keydown-ENTER', () => {
-                                                                        playthroughCount++;
+                                                                        this.playthroughCount++;
                                                                         this.scene.restart();
                                                                     });
                                                                 }
@@ -1352,7 +1349,7 @@
                 return;
             }
 
-            if (!gameStarted) {
+            if (!this.gameStarted) {
                 this.spaceship.setVelocity(0);
                 this.spaceship.setAcceleration(0);
                 this.spaceship.setGravityY(0);
@@ -1376,7 +1373,7 @@
                 return;
             }
 
-            if (gameStarted) {
+            if (this.gameStarted) {
                 // 宇宙船の速度に基づいてカメラの位置を調整（パララックス効果）
                 const maxCameraOffset = 100;
                 const offsetX = Phaser.Math.Clamp(-this.spaceship.body.velocity.x / 50, -maxCameraOffset, maxCameraOffset);
@@ -1594,7 +1591,7 @@
                 this.landingMarker.setVisible(false);
                 this.debrisGroup.getChildren().forEach(d => d.setVisible(false));
 
-                gameStarted = false; // 操作を無効化
+                this.gameStarted = false; // 操作を無効化
 
                 // ハシゴが出てきて、宇宙飛行士が降りてくる演出
                 this.time.delayedCall(1000, () => {
@@ -1872,7 +1869,7 @@
                                     // ズームはハシゴが伸び始める時から既に進行中
 
                                     // 大破車の方向を >>> で表示＋上に英語ラベル（1週目のみ）
-                                    if (this.moonCar && playthroughCount === 0) {
+                                    if (this.moonCar && this.playthroughCount === 0) {
                                         const arrow = this.moonCar.x > astronaut.x ? '>' : '<';
                                         const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
                                         const isRight = this.moonCar.x > astronaut.x;
@@ -1956,7 +1953,7 @@
             }
 
             // 宇宙船が地面に達したかどうかを確認（ゴール成功時は除外）
-            if (gameStarted && this.spaceship.y + this.spaceship.displayHeight / 2 >= this.game.config.height - 63) {
+            if (this.gameStarted && this.spaceship.y + this.spaceship.displayHeight / 2 >= this.game.config.height - 63) {
                 const groundSpeed = Math.sqrt(
                     this.spaceship.body.velocity.x * this.spaceship.body.velocity.x +
                     this.spaceship.body.velocity.y * this.spaceship.body.velocity.y
@@ -1984,7 +1981,7 @@
 
                     this.add.image(this.spaceship.x, this.spaceship.y - 30, 'label_offtarget').setOrigin(0.5, 0.5).setDepth(11).setScale(this._labelDisplayScale || 0.25);
                     this.endSound.play();
-                    gameStarted = false;
+                    this.gameStarted = false;
 
                     this.time.delayedCall(3000, () => {
                         restartGame(this);
