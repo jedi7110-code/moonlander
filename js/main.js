@@ -66,40 +66,23 @@
 
 
         function showTitle(scene) {
-            const title = scene.add.image(scene.game.config.width / 2, scene.game.config.height / 2, 'title');
-            title.setDisplaySize(800, 500); // タイトル画像のサイズ
-            title.setInteractive();
-
-            // タイトル画像をカメラに固定
-            title.setScrollFactor(0);
-
-            // 操作キーガイド（タイトル下）
-            const keyGuide = scene.add.text(
-                scene.game.config.width / 2,
-                scene.game.config.height / 2 + 260,
-                'USE ARROW KEYS + SPACE'.split('').join(' '),
-                {
-                    fontSize: '20px',
-                    fill: '#88ffaa',
-                    fontFamily: "Helvetica, Arial, sans-serif"
-                }
-            ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+            // タイトル/操作ガイド/PRESS ENTER は HTML(loading-screen)側で表示
+            const loadingScreen = document.getElementById('loading-screen');
 
             scene.spaceshipShadow.setAlpha(0);
 
+            let started = false;
             function startGame() {
+                if (started) return;
+                started = true;
+                // HTMLタイトル画面をフェードアウトして除去
+                if (loadingScreen) {
+                    loadingScreen.classList.add('hidden');
+                    setTimeout(() => loadingScreen.remove(), 500);
+                }
                 scene.spaceshipShadow.setAlpha(1);
                 // ENTER 開始時の SE：landing.wav（goal キーと共用、開始音 0.15）
                 if (scene.goalSound) scene.goalSound.play({ volume: 0.15 });
-                scene.tweens.add({
-                    targets: [title, keyGuide],
-                    alpha: 0,
-                    duration: 500,
-                    onComplete: () => {
-                        title.destroy();
-                        keyGuide.destroy();
-                    }
-                });
 
                 // Phase 1: 母艦から降下（中心を少し行き過ぎて上に戻るビヨーン挙動。スラスター噴射しながら）
                 scene.tweens.add({
@@ -146,7 +129,12 @@
                 });
             }
 
-            title.once('pointerup', startGame);
+            // HTMLタイトル画面のクリックでも開始
+            if (loadingScreen) {
+                loadingScreen.addEventListener('click', () => {
+                    if (loadingScreen.classList.contains('title')) startGame();
+                });
+            }
             scene.input.keyboard.once('keydown-ENTER', startGame);
         }
 

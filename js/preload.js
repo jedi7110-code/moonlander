@@ -9,10 +9,9 @@ scene.load.on('progress', (value) => {
 scene.load.on('complete', () => {
     if (loadingFill) loadingFill.style.width = '100%';
     if (loadingScreen) {
-        setTimeout(() => {
-            loadingScreen.classList.add('hidden');
-            setTimeout(() => loadingScreen.remove(), 500);
-        }, 200);
+        // 黒80%オーバーレイを外して明るい状態へフェード → タイトル状態へ
+        loadingScreen.classList.add('lit');
+        setTimeout(() => loadingScreen.classList.add('title'), 800);
     }
 });
 

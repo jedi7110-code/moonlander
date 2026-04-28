@@ -30,21 +30,6 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
 
-    <!-- ローディング画面：>>> と同じ緑ブラケット枠＋ゲージ -->
-    <div id="loading-screen">
-        <div class="loading-frame">
-            <div class="loading-frame-bg"></div>
-            <div class="loading-frame-side l"></div>
-            <div class="loading-frame-side r"></div>
-            <div class="loading-frame-arm tl"></div>
-            <div class="loading-frame-arm tr"></div>
-            <div class="loading-frame-arm bl"></div>
-            <div class="loading-frame-arm br"></div>
-            <div class="loading-text">LOADING</div>
-            <div class="loading-gauge"><div class="loading-gauge-fill"></div></div>
-        </div>
-    </div>
-
     <!-- 8bit/CRT風エフェクト用SVGフィルタ（posterize + 2段ブルーム） -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
         <filter id="crt-8bit" color-interpolation-filters="sRGB">
@@ -73,6 +58,24 @@
     <div id="game-container">
         <div class="crt-overlay crt-subpixel"></div>
         <div class="crt-overlay crt-scanlines"></div>
+        <!-- ローディング画面：ゲーム枠内 / opening-title.jpg をモニター背景に表示 -->
+        <div id="loading-screen">
+            <div class="loading-frame">
+                <div class="loading-frame-bg"></div>
+                <div class="loading-frame-side l"></div>
+                <div class="loading-frame-side r"></div>
+                <div class="loading-frame-arm tl"></div>
+                <div class="loading-frame-arm tr"></div>
+                <div class="loading-frame-arm bl"></div>
+                <div class="loading-frame-arm br"></div>
+                <div class="loading-text">LOADING</div>
+                <div class="loading-gauge"><div class="loading-gauge-fill"></div></div>
+            </div>
+            <div class="title-screen">
+                <img class="title-image" src="assets/title-green.png" alt="Moonlander">
+                <div class="title-press">PRESS ENTER</div>
+            </div>
+        </div>
     </div>
 
     <!-- 捕獲時のグリッチ用：ブラウザ最前面の WebGL オーバーレイ -->
