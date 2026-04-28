@@ -1,5 +1,17 @@
 # Moonlander 開発メモ
 
+## 開発環境（必読）
+
+`index.html` は ES Modules (`<script type="module" src="js/main.js">`) を使用しているため、`file://` プロトコルでは動かない。**必ずローカル HTTP サーバ経由で開く**。
+
+```bash
+cd /path/to/moon
+python3 -m http.server 8080
+# → http://localhost:8080/ をブラウザで開く
+```
+
+Claude Code 上では `preview_start` で `.claude/launch.json` の `moon-dev` を起動。
+
 ## ゲーム展開ロードマップ
 
 ### Stage 1: 月面着陸 ✅
