@@ -18,7 +18,7 @@ export function startBriefing(loadingScreen, onDismiss) {
             '> SIGNAL: UAC-7710-A3',
             '> AUTH: PAX',
             '',
-            'CLASSIFIED MEMO TO LANDER OPERATOR:',
+            'CLASSIFIED MEMO TO LANDER COMMANDER:',
             '',
             'UNKNOWN ARTIFACT DETECTED ON LUNAR SURFACE.',
             'SCIENCE TEAM SENT FOR INVESTIGATION.',
@@ -33,14 +33,14 @@ export function startBriefing(loadingScreen, onDismiss) {
             'WARNING: SUBSURFACE BIO-SIGNATURES DETECTED.',
             'ASSUME ALL CONTACT IS HOSTILE.',
             '',
-            'GOOD LUCK, OPERATOR.'
+            'GOOD LUCK, COMMANDER.'
         ].join('\n'),
         J: [
             '> セキュアリンク確立',
             '> シグナル: UAC-7710-A3',
             '> 認証: PAX',
             '',
-            '機密通信 着陸船オペレーターへ:',
+            '機密通信 着陸船コマンダーへ:',
             '',
             '月面に未確認の人工物を検出。',
             '調査のため科学班を派遣。',
@@ -55,7 +55,7 @@ export function startBriefing(loadingScreen, onDismiss) {
             '警告: 地下に生体反応を検出。',
             '接触対象はすべて敵性とみなせ。',
             '',
-            '武運を祈る、オペレーター。'
+            '武運を祈る、コマンダー。'
         ].join('\n')
     };
     let text = texts.E;
