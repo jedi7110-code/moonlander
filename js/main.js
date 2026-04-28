@@ -5,6 +5,7 @@
         import { registerAnimations } from './animations.js';
         import { generateLabels, SVG_SCALE } from './ui-text.js';
         import { attachUiGuide } from './ui-guide.js';
+        import { preload as preloadAssets } from './preload.js';
 
         // 8bitエフェクト用PostFXパイプライン（ピクセル化・減色・スキャンライン）
         const PixelArtPipeline = new Phaser.Class({
@@ -179,122 +180,7 @@
         }
 
         function preload() {
-            // ロード進捗をローディング画面のゲージに反映
-            const loadingFill = document.querySelector('.loading-gauge-fill');
-            const loadingScreen = document.getElementById('loading-screen');
-            this.load.on('progress', (value) => {
-                if (loadingFill) loadingFill.style.width = (value * 100) + '%';
-            });
-            this.load.on('complete', () => {
-                if (loadingFill) loadingFill.style.width = '100%';
-                if (loadingScreen) {
-                    setTimeout(() => {
-                        loadingScreen.classList.add('hidden');
-                        setTimeout(() => loadingScreen.remove(), 500);
-                    }, 200);
-                }
-            });
-
-            this.load.image('background', 'assets/background.jpg');
-            this.load.image('arrow_unit', 'assets/arrow.svg'); // 右向き矢印1個分（左向きは flipX）
-            this.load.image('pod', 'assets/pod.png');
-            this.load.image('spaceship', 'assets/spaceship.png');
-            this.load.image('spacemy', 'assets/spacemy.png');
-            this.load.image('spaceman', 'assets/player-f.png');
-            this.load.image('spaceman_B', 'assets/player-b.png');
-            this.load.image('spaceman_BL', 'assets/player-bl.png');
-            this.load.image('spaceman_BR', 'assets/player-br.png');
-            this.load.image('spaceman_FL', 'assets/player-fl.png');
-            this.load.image('spaceman_FR', 'assets/player-fr.png');
-            this.load.image('spaceman_L', 'assets/player-l.png');
-            this.load.image('spaceman_R', 'assets/player-r.png');
-            this.load.image('player_0', 'assets/player-0.png');
-            this.load.image('player_L1', 'assets/player-l1.png');
-            this.load.image('player_L2', 'assets/player-l2.png');
-            this.load.image('player_R1', 'assets/player-r1.png');
-            this.load.image('player_R2', 'assets/player-r2.png');
-            this.load.image('flag', 'assets/flag.png');
-            this.load.image('flag-flash', 'assets/flag-flash.png');
-            this.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
-            this.load.image('title', 'assets/title.png');
-            this.load.audio('goal', 'assets/sound/landing.wav'); // ランディング音
-            this.load.audio('explosion', 'assets/sound/explosion.wav'); // 爆発音
-            this.load.audio('jet', 'assets/sound/jet.wav'); // ジェット音
-            this.load.audio('empty', 'assets/sound/empty.wav'); // エンプティー音
-            this.load.audio('end', 'assets/sound/end.wav'); // ミッション失敗音
-            this.load.audio('beam', 'assets/sound/beam.wav'); // ビーム発射音
-            this.load.audio('beamhit', 'assets/sound/beamhit.wav'); // ビーム命中音
-            this.load.audio('beam-tame', 'assets/sound/beam-tame.wav'); // ビームチャージ音
-            this.load.audio('blood', 'assets/sound/blood.wav'); // 被弾音
-            this.load.audio('dead', 'assets/sound/dead.wav'); // 捕獲時の絶命音
-            this.load.audio('hatchopen', 'assets/sound/hatchopen.wav'); // ハッチ開
-            this.load.audio('escape-injection', 'assets/sound/escape-injection.wav'); // 脱出点火
-            this.load.audio('escape-jet', 'assets/sound/escape-jet.wav'); // 脱出ジェット
-            this.load.audio('rescue1', 'assets/sound/rescue-1.wav'); // 仲間出現前のSE
-            this.load.audio('rescue2', 'assets/sound/rescue-2.wav'); // 仲間着地時(ランダム)
-            this.load.audio('rescue3', 'assets/sound/rescue-3.wav');
-            this.load.audio('rescue4', 'assets/sound/rescue-4.wav');
-            this.load.audio('climb', 'assets/sound/climb.wav'); // 登れと指示する声
-            // 地底人 6コマアニメ（全コマ左向き。右向きは flipX で反転）
-            this.load.image('alien_1', 'assets/alien-s-1.png');
-            this.load.image('alien_2', 'assets/alien-s-2.png');
-            this.load.image('alien_3', 'assets/alien-s-3.png');
-            this.load.image('alien_4', 'assets/alien-s-4.png');
-            this.load.image('alien_5', 'assets/alien-s-5.png');
-            this.load.image('alien_6', 'assets/alien-s-6.png');
-            // 出現時(F=正面)、振り向き用 (FL=左寄り正面 / FR=右寄り正面)
-            this.load.image('alien_F', 'assets/alien-s-f.png');
-            this.load.image('alien_FL', 'assets/alien-s-fl.png');
-            this.load.image('alien_FR', 'assets/alien-s-fr.png');
-            // 攻撃（捕獲）2コマ。A2 で停止
-            this.load.image('alien_A1', 'assets/alien-s-a1.png');
-            this.load.image('alien_A2', 'assets/alien-s-a2.png');
-            // ボス（雑魚と同じ仕組み）
-            this.load.image('alienB_L', 'assets/alien-b-l.png');     // 横向き静止
-            this.load.image('alienB_F', 'assets/alien-b-f.png');
-            this.load.image('alienB_FL', 'assets/alien-b-fl.png');
-            this.load.image('alienB_FR', 'assets/alien-b-fr.png');
-            // 歩行 7 コマ
-            this.load.image('alienB_W1', 'assets/alien-b-w1.png');
-            this.load.image('alienB_W2', 'assets/alien-b-w2.png');
-            this.load.image('alienB_W3', 'assets/alien-b-w3.png');
-            this.load.image('alienB_W4', 'assets/alien-b-w4.png');
-            this.load.image('alienB_W5', 'assets/alien-b-w5.png');
-            this.load.image('alienB_W6', 'assets/alien-b-w6.png');
-            this.load.image('alienB_W7', 'assets/alien-b-w7.png');
-            this.load.image('alienB_A1', 'assets/alien-b-a1.png');
-            this.load.image('alienB_A2', 'assets/alien-b-a2.png');
-            this.load.image('alienB_A3', 'assets/alien-b-a3.png');
-            this.load.image('alienB_A4', 'assets/alien-b-a4.png');
-            this.load.image('alienB_A5', 'assets/alien-b-a5.png');
-            this.load.image('alienB_A6', 'assets/alien-b-a6.png');
-            this.load.image('alienB_A7', 'assets/alien-b-a7.png');
-            this.load.image('mooncar', 'assets/moon-car.png'); // 大破した月面探査車
-            this.load.image('crew', 'assets/crew-f.png'); // 救出する仲間（正面）
-            this.load.image('crew_0', 'assets/crew-0.png'); // 仲間（横向きアイドル）
-            this.load.image('crew_B', 'assets/crew-b.png'); // 仲間（後ろ向き）
-            this.load.image('crew_BL', 'assets/crew-bl.png'); // 仲間（左後ろ向き）
-            this.load.image('crew_BR', 'assets/crew-br.png'); // 仲間（右後ろ向き）
-            this.load.image('crew_FL', 'assets/crew-fl.png'); // 仲間（左斜め前）
-            this.load.image('crew_FR', 'assets/crew-fr.png'); // 仲間（右斜め前）
-            this.load.image('crew_L', 'assets/crew-l.png'); // 仲間（左向き）
-            this.load.image('crew_L1', 'assets/crew-l1.png'); // 仲間（左歩行1）
-            this.load.image('crew_L2', 'assets/crew-l2.png'); // 仲間（左歩行2）
-            this.load.image('crew_R', 'assets/crew-r.png'); // 仲間（右向き）
-            this.load.image('crew_R1', 'assets/crew-r1.png'); // 仲間（右歩行1）
-            this.load.image('crew_R2', 'assets/crew-r2.png'); // 仲間（右歩行2）
-            this.load.image('boss_L', 'assets/boss-l.png'); // ボス（左向き）
-            this.load.image('boss_R', 'assets/boss-r.png'); // ボス（右向き）
-            this.load.spritesheet('blood', 'assets/blood-p.png', { frameWidth: 512, frameHeight: 512 }); // 被弾エフェクト
-            this.load.spritesheet('bloodAlien', 'assets/blood-a.png', { frameWidth: 512, frameHeight: 512 }); // エイリアン撃破エフェクト
-            for (let i = 1; i <= 5; i++) {
-                this.load.audio(`footsteps${i}`, `assets/sound/footsteps${i}.wav`);
-            }
-
-            for (let i = 1; i <= 15; i++) {
-                const paddedIndex = i.toString().padStart(2, '0');
-                this.load.image(`debris${i}`, `assets/debris${paddedIndex}.png`); //デブリ
-            }
+            preloadAssets(this);
         }
 
         function create() {
