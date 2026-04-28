@@ -67,16 +67,13 @@
         const GlitchOverlay = createGlitchOverlay(game);
         window.GlitchOverlay = GlitchOverlay;
 
-        let cursors;
-        let jetSound;
 
         let gameStarted = false;
         let playthroughCount = 0; // 0=1週目, 1=2週目, ...
 
-        // gameOver は jetSound と gameStarted への副作用を必要とする。
-        // これらは module-local let なので closure 経由で注入する。
+        // gameOver は jetSound（scene 経由）と gameStarted（module-local）への副作用を必要とする。
         const gameOver = (scene, message) => _gameOverImpl(scene, message, {
-            jetSound,
+            jetSound: scene.jetSound,
             onStart: () => { gameStarted = false; }
         });
 
@@ -129,7 +126,7 @@
                     onComplete: () => {
                         // 中心到達と同時に操作可能へ（スナップ感を消すため残存モメンタムを付与）
                         scene.jetParticles.up.on = false;
-                        fadeStopSound(scene, jetSound, 0.5);
+                        fadeStopSound(scene, scene.jetSound, 0.5);
                         scene.spaceship.setVelocityY(-25); // わずかに上向きの残存速度
                         scene.spaceship.setGravityY(80);
                         gameStarted = true;
@@ -149,14 +146,14 @@
                 scene.time.delayedCall(600, () => {
                     scene.jetParticles.up.setPosition(scene.spaceship.x, scene.spaceship.y + 25);
                     scene.jetParticles.up.on = true;
-                    if (!jetSound.isPlaying) {
+                    if (!scene.jetSound.isPlaying) {
                         // 前回 fade で gain=0 のままになっている可能性があるため復元してから再生
-                        if (jetSound.volumeNode && jetSound.manager) {
-                            const ctx = jetSound.manager.context;
-                            jetSound.volumeNode.gain.cancelScheduledValues(ctx.currentTime);
-                            jetSound.volumeNode.gain.setValueAtTime(0.5, ctx.currentTime);
+                        if (scene.jetSound.volumeNode && scene.jetSound.manager) {
+                            const ctx = scene.jetSound.manager.context;
+                            scene.jetSound.volumeNode.gain.cancelScheduledValues(ctx.currentTime);
+                            scene.jetSound.volumeNode.gain.setValueAtTime(0.5, ctx.currentTime);
                         }
-                        jetSound.play({ loop: false });
+                        scene.jetSound.play({ loop: false });
                     }
                 });
             }
@@ -390,8 +387,7 @@
                 });
                 snd.play();
             };
-            jetSound = this.sound.add('jet', { loop: true, volume: 0.5 });
-            cursors = this.input.keyboard.createCursorKeys();
+            this.jetSound = this.sound.add('jet', { loop: true, volume: 0.5 });
 
             // ジェット噴射用パーティクルテクスチャを生成
             const jetGfx = this.make.graphics({ add: false });
@@ -1770,10 +1766,10 @@
 
                 
                 // ジェット音の再生タイミング（フェードでプチノイズ防止）
-                if (cursors.up.isDown || cursors.down.isDown || cursors.left.isDown || cursors.right.isDown) {
-                    startSoundCancelFade(jetSound, 0.5);
+                if (this.cursors.up.isDown || this.cursors.down.isDown || this.cursors.left.isDown || this.cursors.right.isDown) {
+                    startSoundCancelFade(this.jetSound, 0.5);
                 } else {
-                    fadeStopSound(this, jetSound, 0.5);
+                    fadeStopSound(this, this.jetSound, 0.5);
                 }
 
                 // 燃料を消費
@@ -1925,7 +1921,7 @@
                 this.goalSound.play();
 
                 // ゴール時にjet音を停止（フェード）
-                fadeStopSound(this, jetSound, 0.5);
+                fadeStopSound(this, this.jetSound, 0.5);
 
                 // エンプティー音を停止
                 if (this.emptySound.isPlaying) {
@@ -2321,7 +2317,7 @@
                     this.spaceship.setGravityY(0);
                     this.spaceship.angle = 0;
 
-                    fadeStopSound(this, jetSound, 0.5);
+                    fadeStopSound(this, this.jetSound, 0.5);
                     if (this.emptySound.isPlaying) { this.emptySound.stop(); }
                     this.jetParticles.up.on = false;
                     this.jetParticles.down.on = false;
