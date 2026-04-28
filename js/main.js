@@ -1,6 +1,7 @@
         import { fadeStopSound, startSoundCancelFade } from './audio.js';
         import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
+        import { gameOver as _gameOverImpl } from './gameover.js';
 
         // 8bitエフェクト用PostFXパイプライン（ピクセル化・減色・スキャンライン）
         const PixelArtPipeline = new Phaser.Class({
@@ -67,6 +68,13 @@
 
         let gameStarted = false;
         let playthroughCount = 0; // 0=1週目, 1=2週目, ...
+
+        // gameOver は jetSound と gameStarted への副作用を必要とする。
+        // これらは module-local let なので closure 経由で注入する。
+        const gameOver = (scene, message) => _gameOverImpl(scene, message, {
+            jetSound,
+            onStart: () => { gameStarted = false; }
+        });
 
         function showTitle(scene) {
             const title = scene.add.image(scene.game.config.width / 2, scene.game.config.height / 2, 'title');
@@ -2968,74 +2976,4 @@
 
         }
 
-        let explosionPlaying = false;
-
-        function gameOver(scene, message) {
-            // 爆発時にjet音を停止
-            if (jetSound.isPlaying) {
-                jetSound.stop();
-            }
-
-            if (!explosionPlaying) {
-                explosionPlaying = true;
-
-                // 爆発アニメーションを作成して再生
-                const explosion = scene.add.sprite(scene.spaceship.x, scene.spaceship.y, 'explosion');
-                explosion.setDepth(10);
-                explosion.play('explode');
-
-                // 爆発音を再生
-                scene.explosionSound.play();
-
-                // ジェット噴射・粉塵パーティクルを停止
-                scene.jetParticles.up.on = false;
-                scene.jetParticles.down.on = false;
-                scene.jetParticles.left.on = false;
-                scene.jetParticles.right.on = false;
-                scene.dustEmitters.forEach(e => e.on = false);
-
-                // 宇宙船・影・ゲージを非表示にする
-                scene.spaceship.setVisible(false);
-                scene.spaceshipShadow.setVisible(false);
-                scene.fuelGaugeBorder.setVisible(false);
-                scene.fuelGauge.setVisible(false);
-
-                explosion.on('animationcomplete', () => {
-                    explosionPlaying = false;
-                    explosion.destroy();
-                });
-
-                // ゲームオーバーメッセージ（messageが空ならテキスト表示なし）
-                if (message) {
-                    setTimeout(() => {
-                        const failKeyMap = {
-                            'Mission Failed': 'label_missionfailed',
-                            'Rescue Failed': 'label_rescuefailed'
-                        };
-                        const failKey = failKeyMap[message] || 'label_missionfailed';
-                        scene.add.image(scene.spaceship.x, scene.spaceship.y - 50, failKey).setOrigin(0.5, 0.5).setDepth(11).setScale((scene._labelDisplayScale || 0.25) * 1.6);
-                    }, 1000);
-                }
-
-                // ゲームのアップデートを爆発アニメーションが終了してから停止する
-                setTimeout(() => {
-                    scene.scene.pause();
-                }, 3000); // 3000ミリ秒（3秒）後に実行
-
-                // setTimeout(() => {
-                //     resetGame(scene);
-                // }, 3000);
-
-                gameStarted = false; // ゲームが開始されていない状態に戻す
-                setTimeout(() => {
-                    scene.scene.restart();
-                }, 3000);
-
-                // 爆発時にエンプティー音を停止
-                if (scene.emptySound.isPlaying) {
-                    scene.emptySound.stop();
-                }
-
-            }
-        }
 
