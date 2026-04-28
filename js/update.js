@@ -1394,7 +1394,7 @@ const speed = Math.sqrt(
     scene.spaceship.body.velocity.x * scene.spaceship.body.velocity.x +
     scene.spaceship.body.velocity.y * scene.spaceship.body.velocity.y
 );
-const isSlow = speed < 80; // ゆっくり降下中のみ
+const isSlow = speed < 85; // ゆっくり降下中のみ
 
 if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.spaceship.getBounds(), landingZone)) {
     // コトンと着地：即座に停止して接地感を出す
@@ -1604,9 +1604,10 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
                             enemy.lastDir = dirFace === 'R' ? 1 : -1;
                             // 出現中は正面固定。emerging 完了後に walk を開始（下の tween onComplete）
                             enemy.isBoss = isBoss;
-                            // 速度は spawn 時に固定（base ±2 のランダム個体差）
-                            const baseSpeed = isBoss ? 30 : 50;
-                            enemy.speed = baseSpeed + Phaser.Math.Between(-2, 2);
+                            // 速度は spawn 時に固定。雑魚は 50〜60 のランダム、ボスは 30 ±2 個体差
+                            enemy.speed = isBoss
+                                ? 30 + Phaser.Math.Between(-2, 2)
+                                : Phaser.Math.Between(50, 60);
                             enemy.setDepth(8);
                             enemy.setMask(scene.groundMask);
                             enemy.emerging = true;
