@@ -1,6 +1,6 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets } from './preload.js';
+        import { preload as preloadAssets, startBriefing } from './preload.js';
         import { create as createScene } from './create.js';
         import { update as updateScene } from './update.js';
 
@@ -175,7 +175,24 @@
                     if (loadingScreen.classList.contains('title')) startGame();
                 });
             }
-            scene.input.keyboard.once('keydown-ENTER', startGame);
+            // ENTER 状態遷移：title → briefing → game
+            scene.input.keyboard.on('keydown-ENTER', () => {
+                if (!loadingScreen) {
+                    // 死亡後リスタート / クリア後周回：そのまま開始
+                    startGame();
+                    return;
+                }
+                const cls = loadingScreen.classList;
+                if (cls.contains('briefing')) return; // ブリーフィング自身が処理
+                const dismissedAt = loadingScreen._briefingDismissedAt || 0;
+                if (Date.now() - dismissedAt < 300) return; // ブリーフィング離脱直後の同一ENTER無視
+                if (cls.contains('title')) {
+                    // タイトル → ブリーフィングへ遷移
+                    startBriefing(loadingScreen, () => startGame());
+                    return;
+                }
+                startGame();
+            });
         }
 
         function preload() {

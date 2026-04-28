@@ -9,7 +9,7 @@ export function makeLabelSVG(text, opts = {}) {
     const fill = opts.fill || '#cceedd';
     const fontWeight = opts.fontWeight || 'bold';
     const fontStyle = opts.fontStyle || 'normal';
-    const fontFamily = opts.fontFamily || "Helvetica, Arial, sans-serif";
+    const fontFamily = opts.fontFamily || "Courier New, Menlo, monospace";
     const stroke = opts.stroke;
     const strokeWidth = opts.strokeWidth != null ? opts.strokeWidth * SVG_SCALE : 0;
     const letterSpacing = opts.letterSpacing != null ? opts.letterSpacing * SVG_SCALE : 0;
@@ -55,7 +55,7 @@ export function makeFailLabel(scene, key, text) {
     scene.textures.addBase64(key, makeLabelSVG(text, {
         fontSize: 28,
         fontWeight: '600',
-        fontFamily: "Helvetica, Arial, sans-serif",
+        fontFamily: "Courier New, Menlo, monospace",
         fill: '#ffffff',
         letterSpacing: 0.5
     }));
@@ -64,10 +64,10 @@ export function makeFailLabel(scene, key, text) {
 // Bebas Neue が読み込まれてから SVG をラスタライズ（フォント未読込だとフォールバック表示になる）
 export function generateLabels(scene) {
     if (!scene.textures.exists('label_rescue')) {
-        scene.textures.addBase64('label_rescue', makeLabelSVG('Go rescue the crew', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "Helvetica, Arial, sans-serif", letterSpacing: 0.3 }));
+        scene.textures.addBase64('label_rescue', makeLabelSVG('Go rescue the crew', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "Courier New, Menlo, monospace", letterSpacing: 0.3 }));
     }
     if (!scene.textures.exists('label_returnship')) {
-        scene.textures.addBase64('label_returnship', makeLabelSVG('Return to the ship', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "Helvetica, Arial, sans-serif", letterSpacing: 0.3 }));
+        scene.textures.addBase64('label_returnship', makeLabelSVG('Return to the ship', { fontSize: 5, fill: '#cceedd', fontWeight: '600', fontFamily: "Courier New, Menlo, monospace", letterSpacing: 0.3 }));
     }
     makeFailLabel(scene, 'label_missionfailed', 'Mission Failed');
     makeFailLabel(scene, 'label_rescuefailed', 'Rescue Failed');

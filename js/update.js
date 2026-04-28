@@ -1049,12 +1049,12 @@ if (scene.astronautMode && scene.astronaut) {
                                                 const toBeContinued = scene.add.text(camW / 2, camH / 2, spaceText('Other crew are still out there...'), {
                                                     fontSize: '32px',
                                                     fill: '#FFF',
-                                                    fontFamily: "Helvetica, Arial, sans-serif"
+                                                    fontFamily: "Courier New, Menlo, monospace"
                                                 }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
                                                 const pressEnter = scene.add.text(camW / 2, camH / 2 + 50, spaceText('Press ENTER to return to title'), {
                                                     fontSize: '18px',
                                                     fill: '#AAA',
-                                                    fontFamily: "Helvetica, Arial, sans-serif"
+                                                    fontFamily: "Courier New, Menlo, monospace"
                                                 }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
                                                 scene.tweens.add({
                                                     targets: [toBeContinued, pressEnter],
