@@ -48,12 +48,9 @@ export function gameOver(scene, message) {
             }, 1000);
         }
 
-        // ゲームのアップデートを爆発アニメーションが終了してから停止する
-        setTimeout(() => {
-            scene.scene.pause();
-        }, 3000); // 3000ミリ秒（3秒）後に実行
-
         scene.gameStarted = false; // 操作無効化
+
+        // 爆発演出が終わってからスタート位置（待機画面）へ復帰
         setTimeout(() => {
             scene.scene.restart();
         }, 3000);

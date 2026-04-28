@@ -188,21 +188,57 @@ body.no-crt .crt-overlay {
         0 0 9px rgba(136, 255, 170, 0.25),
         0.5px 0 0 rgba(255, 80, 80, 0.12),
         -0.5px 0 0 rgba(80, 200, 255, 0.12);
-    animation: title-press-blink 1.1s steps(2, end) infinite;
+    animation: title-press-blink 1.8s steps(2, end) infinite;
 }
 @keyframes title-flicker {
     0%, 100% { opacity: 1; }
-    47% { opacity: 1; }
-    48% { opacity: 0.55; }
-    49% { opacity: 1; }
     72% { opacity: 1; }
-    73% { opacity: 0.78; }
+    73% { opacity: 0.85; }
     74% { opacity: 1; }
 }
 @keyframes title-press-blink {
-    0%, 50% { opacity: 1; }
-    50.01%, 100% { opacity: 0; }
+    0%, 49% { opacity: 1; }
+    50%, 99% { opacity: 0; }
+    100% { opacity: 1; }
 }
+/* 死亡後のリスタートプロンプト */
+#restart-prompt {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #c8ffd8;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.18em;
+    z-index: 11;
+    pointer-events: none;
+    display: none;
+    /* タイトルと同じCRT発光・色滲み */
+    text-shadow:
+        0 0 2px rgba(200, 255, 216, 0.55),
+        0 0 5px rgba(136, 255, 170, 0.38),
+        0 0 9px rgba(136, 255, 170, 0.25),
+        0.5px 0 0 rgba(255, 80, 80, 0.12),
+        -0.5px 0 0 rgba(80, 200, 255, 0.12);
+    animation: title-press-blink 1.8s steps(2, end) infinite;
+}
+#restart-prompt.show { display: block; }
+/* タイトルロゴ下に表示するときの位置 */
+#restart-prompt.below-logo {
+    top: 78%;
+}
+/* スタート時の黒フェード切替 */
+#fade-overlay {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity 0.4s ease-in-out;
+}
+#fade-overlay.fade-in { opacity: 1; }
 #loading-screen.hidden {
     opacity: 0;
     pointer-events: none;

@@ -36,7 +36,7 @@ scene.load.image('player_R2', 'assets/player-r2.png');
 scene.load.image('flag', 'assets/flag.png');
 scene.load.image('flag-flash', 'assets/flag-flash.png');
 scene.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
-scene.load.image('title', 'assets/title.png');
+scene.load.image('title', 'assets/title.png?v=2');
 scene.load.audio('goal', 'assets/sound/landing.wav'); // ランディング音
 scene.load.audio('explosion', 'assets/sound/explosion.wav'); // 爆発音
 scene.load.audio('jet', 'assets/sound/jet.wav'); // ジェット音

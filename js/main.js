@@ -66,8 +66,24 @@
 
 
         function showTitle(scene) {
-            // タイトル/操作ガイド/PRESS ENTER は HTML(loading-screen)側で表示
+            // 状態判定：初回（HTML側） / クリア後の周回 or 死亡後リスタート（Phaserロゴ + HTMLプロンプト）
             const loadingScreen = document.getElementById('loading-screen');
+            const restartPrompt = document.getElementById('restart-prompt');
+            let oldTitle = null;
+
+            if (!loadingScreen) {
+                // 旧 title.png を Phaser で表示
+                const titleY = 410;
+                oldTitle = scene.add.image(scene.game.config.width / 2, titleY, 'title');
+                // 比率 1192x592 を維持してリサイズ
+                oldTitle.setDisplaySize(800, 800 * 592 / 1192);
+                oldTitle.setScrollFactor(0).setDepth(100);
+                // PRESS ENTER は HTML 側の #restart-prompt（CRT 緑グロー＋点滅）を再利用
+                if (restartPrompt) {
+                    restartPrompt.textContent = 'PRESS ENTER';
+                    restartPrompt.classList.add('below-logo', 'show');
+                }
+            }
 
             scene.spaceshipShadow.setAlpha(0);
 
@@ -75,11 +91,35 @@
             function startGame() {
                 if (started) return;
                 started = true;
-                // HTMLタイトル画面をフェードアウトして除去
-                if (loadingScreen) {
-                    loadingScreen.classList.add('hidden');
-                    setTimeout(() => loadingScreen.remove(), 500);
+
+                const fadeOverlay = document.getElementById('fade-overlay');
+                const FADE_MS = 400;
+                // 初回タイトルからのスタートのみ黒フェード切替。リスタート時は即時切替
+                const useFade = !!loadingScreen;
+
+                if (useFade) {
+                    if (fadeOverlay) fadeOverlay.classList.add('fade-in');
+                    setTimeout(() => {
+                        if (loadingScreen) loadingScreen.remove();
+                        if (restartPrompt) restartPrompt.classList.remove('show');
+                        if (fadeOverlay) fadeOverlay.classList.remove('fade-in');
+                    }, FADE_MS);
+                } else {
+                    if (restartPrompt) {
+                        restartPrompt.classList.remove('show', 'below-logo');
+                    }
                 }
+
+                // 周回/リスタート開始：旧タイトルをフェードアウトして除去
+                if (oldTitle) {
+                    scene.tweens.add({
+                        targets: oldTitle,
+                        alpha: 0,
+                        duration: 500,
+                        onComplete: () => oldTitle.destroy()
+                    });
+                }
+
                 scene.spaceshipShadow.setAlpha(1);
                 // ENTER 開始時の SE：landing.wav（goal キーと共用、開始音 0.15）
                 if (scene.goalSound) scene.goalSound.play({ volume: 0.15 });
