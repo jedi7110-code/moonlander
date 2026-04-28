@@ -1,12 +1,10 @@
-// 爆発演出 + シーン restart。jetSound 停止と gameStarted リセットは呼び出し側から opts で注入。
+// 爆発演出 + シーン restart。scene.jetSound 停止と scene.gameStarted リセットを内包。
 let explosionPlaying = false;
 
-export function gameOver(scene, message, opts = {}) {
-    const { jetSound, onStart } = opts;
-
+export function gameOver(scene, message) {
     // 爆発時にjet音を停止
-    if (jetSound && jetSound.isPlaying) {
-        jetSound.stop();
+    if (scene.jetSound && scene.jetSound.isPlaying) {
+        scene.jetSound.stop();
     }
 
     if (!explosionPlaying) {
@@ -55,7 +53,7 @@ export function gameOver(scene, message, opts = {}) {
             scene.scene.pause();
         }, 3000); // 3000ミリ秒（3秒）後に実行
 
-        if (onStart) onStart(); // gameStarted = false など、操作無効化フックを呼び出し側に委譲
+        scene.gameStarted = false; // 操作無効化
         setTimeout(() => {
             scene.scene.restart();
         }, 3000);
