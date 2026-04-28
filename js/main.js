@@ -169,10 +169,12 @@
                 });
             }
 
-            // HTMLタイトル画面のクリックでも開始
+            // HTMLタイトル画面のクリックでもブリーフィングへ遷移（ゲームは直接開始しない）
             if (loadingScreen) {
                 loadingScreen.addEventListener('click', () => {
-                    if (loadingScreen.classList.contains('title')) startGame();
+                    if (loadingScreen.classList.contains('title')) {
+                        startBriefing(loadingScreen, () => startGame());
+                    }
                 });
             }
             // ENTER 状態遷移：title → briefing → game

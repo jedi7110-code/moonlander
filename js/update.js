@@ -1604,10 +1604,10 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
                             enemy.lastDir = dirFace === 'R' ? 1 : -1;
                             // 出現中は正面固定。emerging 完了後に walk を開始（下の tween onComplete）
                             enemy.isBoss = isBoss;
-                            // 速度は spawn 時に固定。雑魚は 50〜60 のランダム、ボスは 30 ±2 個体差
+                            // 速度は spawn 時に固定。雑魚は 48〜55 のランダム、ボスは 28〜35 のランダム
                             enemy.speed = isBoss
-                                ? 30 + Phaser.Math.Between(-2, 2)
-                                : Phaser.Math.Between(50, 60);
+                                ? Phaser.Math.Between(28, 35)
+                                : Phaser.Math.Between(48, 55);
                             enemy.setDepth(8);
                             enemy.setMask(scene.groundMask);
                             enemy.emerging = true;
