@@ -95,7 +95,15 @@ body.no-crt .crt-overlay {
 /* ローディング画面：>>> と同じスコープ風ブラケット＋緑ゲージ */
 #loading-screen {
     position: absolute;
-    inset: 0;
+    /* canvas のサイズに合わせて固定（親コンテナがブラウザ幅で縮んでも
+       オーバーレイは canvas と同じ 1200×800 を維持してオーバーレイの
+       ロゴ/ブリーフィングが小さくならないようにする） */
+    top: 0;
+    left: 0;
+    width: 1200px;
+    height: 800px;
+    max-width: 1200px;
+    max-height: 800px;
     background: #000 url('assets/opening-title.jpg') center center / cover no-repeat;
     display: flex;
     align-items: center;
@@ -184,7 +192,7 @@ body.no-crt .crt-overlay {
     overflow-x: hidden;
     scrollbar-width: none;
     box-sizing: border-box;
-    border: 1px solid #000;
+    border: none;
 }
 .briefing-text::-webkit-scrollbar { display: none; width: 0; }
 .briefing-text::after {
