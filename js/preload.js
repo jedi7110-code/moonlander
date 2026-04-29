@@ -82,9 +82,48 @@ export function startBriefing(loadingScreen, onDismiss) {
 
     // タイピング中はコマンド音をループ再生＋開始SE（単発、小音量）
     const commandAudio = new Audio('assets/sound/command.wav');
-    commandAudio.loop = true;
-    commandAudio.volume = 0.3;
-    commandAudio.play().catch(() => {});
+    // 行ごとに再生し直し、改行（空白時間）では音を出さない
+    commandAudio.loop = false;
+    const COMMAND_VOL = 0.2;
+    commandAudio.volume = COMMAND_VOL;
+    // ブツ切りノイズ対策：停止時はクイックフェードアウト
+    let commandFadeTimer = null;
+    function fadeOutCommand(ms = 120) {
+        if (commandFadeTimer) return;
+        const startVol = commandAudio.volume;
+        const t0 = Date.now();
+        commandFadeTimer = setInterval(() => {
+            const t = (Date.now() - t0) / ms;
+            if (t >= 1) {
+                clearInterval(commandFadeTimer);
+                commandFadeTimer = null;
+                commandAudio.pause();
+                commandAudio.currentTime = 0;
+                commandAudio.volume = COMMAND_VOL;
+            } else {
+                commandAudio.volume = startVol * (1 - t);
+            }
+        }, 16);
+    }
+    function startCommand() {
+        if (commandFadeTimer) { clearInterval(commandFadeTimer); commandFadeTimer = null; }
+        // ポップノイズ対策：0からクイックフェードインで再生
+        commandAudio.volume = 0;
+        commandAudio.currentTime = 0;
+        commandAudio.play().catch(() => {});
+        const inMs = 40;
+        const t0 = Date.now();
+        commandFadeTimer = setInterval(() => {
+            const t = (Date.now() - t0) / inMs;
+            if (t >= 1) {
+                clearInterval(commandFadeTimer);
+                commandFadeTimer = null;
+                commandAudio.volume = COMMAND_VOL;
+            } else {
+                commandAudio.volume = COMMAND_VOL * t;
+            }
+        }, 8);
+    }
     const startAudio = new Audio('assets/sound/com-start.wav');
     startAudio.loop = false;
     const START_VOL = 0.15;
@@ -118,18 +157,27 @@ export function startBriefing(loadingScreen, onDismiss) {
 
     let i = 0;
     let timer = null;
+    let prevWasNewline = true; // 行頭判定（最初の文字も「行頭」扱いで再生開始）
     function step() {
         if (i < text.length) {
             const ch = text[i++];
             textEl.textContent += ch;
             // 古い行は自動的に上にスクロールアウト
             textEl.scrollTop = textEl.scrollHeight;
+            if (ch === '\n') {
+                // 改行：ブツ切りノイズを避けるためフェードアウトで停止
+                fadeOutCommand(120);
+                prevWasNewline = true;
+            } else if (prevWasNewline) {
+                // 行頭：command音を頭から再生し直す
+                startCommand();
+                prevWasNewline = false;
+            }
             const delay = (ch === '\n') ? 60 : 20;
             timer = setTimeout(step, delay);
         } else {
             briefingEl.classList.add('done');
-            commandAudio.pause();
-            commandAudio.currentTime = 0;
+            fadeOutCommand(120);
             // com-start.wav はタイピング完了後も鳴り続ける（ゲーム開始時にフェードで止める）
         }
     }
@@ -140,7 +188,10 @@ export function startBriefing(loadingScreen, onDismiss) {
         textEl.scrollTop = 0;
         briefingEl.classList.remove('done');
         i = 0;
-        try { commandAudio.currentTime = 0; commandAudio.play().catch(() => {}); } catch (e) {}
+        prevWasNewline = true;
+        // 進行中のフェードがあればキャンセルして即停止
+        if (commandFadeTimer) { clearInterval(commandFadeTimer); commandFadeTimer = null; }
+        try { commandAudio.pause(); commandAudio.currentTime = 0; commandAudio.volume = COMMAND_VOL; } catch (e) {}
         // 進行中のフェードがあればキャンセルしてリセット
         if (startFadeTimer) { clearInterval(startFadeTimer); startFadeTimer = null; }
         try { startAudio.currentTime = 0; startAudio.volume = START_VOL; startAudio.play().catch(() => {}); } catch (e) {}
@@ -154,9 +205,8 @@ export function startBriefing(loadingScreen, onDismiss) {
         advanced = true;
         if (timer) { clearTimeout(timer); timer = null; }
         document.removeEventListener('keydown', onKey);
-        // タイピング音を停止、開始SEは0.6秒でフェードアウト
-        commandAudio.pause();
-        commandAudio.currentTime = 0;
+        // タイピング音をフェードアウト、開始SEは0.6秒でフェードアウト
+        fadeOutCommand(150);
         fadeOutStart(600);
         // 同じENTER押下でゲーム開始まで進まないよう短時間ガードを立てる
         loadingScreen._briefingDismissedAt = Date.now();
