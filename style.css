@@ -46,7 +46,11 @@ body {
 
 .crt-overlay {
     position: absolute;
-    inset: 0;
+    /* canvas 1200x800 基準で固定 */
+    top: 0;
+    left: 0;
+    width: 1200px;
+    height: 800px;
     pointer-events: none;
 }
 
@@ -59,7 +63,8 @@ body {
         transparent 2px
     );
     mix-blend-mode: multiply;
-    z-index: 2;
+    /* loading-screen(z:10) より前面に置き、ズーム時もスキャンラインが拡大しないようにする */
+    z-index: 20;
 }
 
 .crt-subpixel {
@@ -73,7 +78,7 @@ body {
         rgba(120, 120, 255, 0.18) 3px
     );
     mix-blend-mode: soft-light;
-    z-index: 3;
+    z-index: 21;
 }
 
 body.no-crt #game-container canvas {
@@ -109,8 +114,15 @@ body.no-crt .crt-overlay {
     align-items: center;
     justify-content: center;
     z-index: 10;
-    transition: opacity 0.4s ease-out;
+    /* #game-container の line-height:0 が継承されると子要素のテキスト高が0になるためリセット */
+    line-height: normal;
+    transform: scale(1);
+    transform-origin: 50% 50%;
+    will-change: transform;
+    transition: opacity 0.4s ease-out, transform 0.7s ease-out;
 }
+/* タイトルから ENTER でブリーフィング以降ズーム＋固定 */
+#loading-screen.briefing { transform: scale(1.18); }
 /* 初期は黒80%オーバーレイ → ロード完了で .lit でフェード解除 */
 #loading-screen::before {
     content: "";
@@ -126,21 +138,8 @@ body.no-crt .crt-overlay {
     opacity: 0;
 }
 /* ゲーム中と同じ走査線 */
-#loading-screen::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: repeating-linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0.28) 0,
-        rgba(0, 0, 0, 0.28) 1px,
-        transparent 1px,
-        transparent 2px
-    );
-    mix-blend-mode: multiply;
-    pointer-events: none;
-    z-index: 3;
-}
+/* ローディング画面側のスキャンラインは廃止：ズーム時に走査線まで拡大されてしまうため、
+   グローバルの .crt-scanlines（z-index:20）を loading-screen より前面に出して使う */
 .loading-frame {
     z-index: 2;
 }
@@ -223,16 +222,24 @@ body.no-crt .crt-overlay {
 }
 #loading-screen.title .title-screen {
     display: flex;
-    animation: title-crt-on 1s cubic-bezier(0.18, 1.0, 0.3, 1.05) both;
+    /* 昔のダイアルアップ画像読み込み風：10段で上から徐々に出現 */
+    animation: title-dialup-on 1.2s steps(10, end) both;
     transform-origin: 50% 50%;
 }
-@keyframes title-crt-on {
-    /* モニター中心の横一線から、ブーンと上下に展開 */
-    0%   { transform: translate(-50%, -50%) scaleY(0.005) scaleX(1.05); filter: brightness(2.6); opacity: 0; }
-    14%  { transform: translate(-50%, -50%) scaleY(0.02)  scaleX(1.04); filter: brightness(2.2); opacity: 1; }
-    55%  { transform: translate(-50%, -50%) scaleY(1.02)  scaleX(1.0);  filter: brightness(1.3); }
-    78%  { transform: translate(-50%, -50%) scaleY(0.995) scaleX(1.0);  filter: brightness(1.08); }
-    100% { transform: translate(-50%, -50%) scaleY(1)     scaleX(1);    filter: brightness(1); opacity: 1; }
+@keyframes title-dialup-on {
+    /* 上から下へ8段で出現（昔のダイアルアップ画像読み込み風） */
+    0%   { clip-path: inset(0 0 100% 0); opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { clip-path: inset(0 0 0 0);    opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+/* ENTERでブリーフィングへ遷移する際：中心の横一線へ潰れて消える（出現の逆） */
+#loading-screen.title .title-screen.off {
+    animation: title-crt-off 0.5s cubic-bezier(0.7, 0, 0.84, 0) both;
+}
+@keyframes title-crt-off {
+    0%   { transform: translate(-50%, -50%) scaleY(1)     scaleX(1);    filter: brightness(1);    opacity: 1; }
+    40%  { transform: translate(-50%, -50%) scaleY(0.98)  scaleX(1.0);  filter: brightness(1.3);  opacity: 1; }
+    80%  { transform: translate(-50%, -50%) scaleY(0.02)  scaleX(1.04); filter: brightness(2.2);  opacity: 1; }
+    100% { transform: translate(-50%, -50%) scaleY(0.005) scaleX(1.05); filter: brightness(2.6);  opacity: 0; }
 }
 .title-image {
     width: 100%;
@@ -247,6 +254,7 @@ body.no-crt .crt-overlay {
 }
 .title-press {
     margin-top: 18px;
+    line-height: 1.2;
     color: #c8ffd8;
     font-family: "Courier New", Menlo, monospace;
     font-size: 18px;
@@ -274,12 +282,14 @@ body.no-crt .crt-overlay {
 /* 死亡後のリスタートプロンプト */
 #restart-prompt {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    /* canvas 1200x800 基準で位置を固定（親 #game-container が縮んでもズレない） */
+    top: 400px;
+    left: 600px;
     transform: translate(-50%, -50%);
     color: #c8ffd8;
     font-family: "Courier New", Menlo, monospace;
     font-size: 22px;
+    line-height: 1.2;
     letter-spacing: 0.18em;
     z-index: 11;
     pointer-events: none;
@@ -294,14 +304,17 @@ body.no-crt .crt-overlay {
     animation: title-press-blink 1.8s steps(2, end) infinite;
 }
 #restart-prompt.show { display: block; }
-/* タイトルロゴ下に表示するときの位置 */
+/* タイトルロゴ下に表示するときの位置（canvas 800px の 78% ≈ 624px） */
 #restart-prompt.below-logo {
-    top: 78%;
+    top: 624px;
 }
-/* スタート時の黒フェード切替 */
+/* スタート時の黒フェード切替（canvas 1200x800 基準で固定） */
 #fade-overlay {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    width: 1200px;
+    height: 800px;
     background: #000;
     opacity: 0;
     pointer-events: none;

@@ -201,7 +201,7 @@ if (scene.astronautMode && scene.astronaut) {
             const glow = scene.add.rectangle(startX, startY, glowLen, 1, 0xffffff);
             glow.setDepth(10);
             const power = ratio >= 0.67 ? 3 : ratio >= 0.34 ? 2 : 1;
-            scene.lasers.push({ beam, glow, dir, speed: 500, born: scene.time.now, life: 1200, power });
+            scene.lasers.push({ beam, glow, dir, speed: 620, born: scene.time.now, life: 1200, power });
             scene.beamSound.play();
             scene.beamEnergy = Math.max(0, scene.beamEnergy - 22);
         }
@@ -286,7 +286,22 @@ if (scene.astronautMode && scene.astronaut) {
                         if (scene.enemyKills % 5 === 0) scene.bossesDue++;
                         return false;
                     }
-                    scene.tweens.add({ targets: e, alpha: 0.3, duration: 80, yoyo: true });
+                    // 連続ヒット時に半透明のまま固まらないよう、ヒットフラッシュ専用tweenだけ
+                    // 個別管理する（emerge等の他tweenはキルしない）
+                    const prev = e._hitFlashTween;
+                    e._hitFlashTween = null;
+                    if (prev) {
+                        prev.stop();
+                        if (prev.remove) prev.remove();
+                    }
+                    e._hitFlashTween = scene.tweens.add({
+                        targets: e,
+                        alpha: 0.3,
+                        duration: 80,
+                        yoyo: true,
+                        onComplete: () => { if (e.active) e.alpha = 1; e._hitFlashTween = null; },
+                        onStop: () => { if (e.active) e.alpha = 1; }
+                    });
                     return true;
                 });
             }

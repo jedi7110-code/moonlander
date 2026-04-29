@@ -1,6 +1,6 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=2';
         import { create as createScene } from './create.js';
         import { update as updateScene } from './update.js';
 
@@ -63,6 +63,7 @@
 
         const GlitchOverlay = createGlitchOverlay(game);
         window.GlitchOverlay = GlitchOverlay;
+
 
 
         function showTitle(scene) {
@@ -193,7 +194,7 @@
                     startBriefing(loadingScreen, () => startGame());
                     return;
                 }
-                startGame();
+                // ローディング中（lit のみ／title 前）はゲーム開始を許可しない
             });
         }
 

@@ -1,12 +1,29 @@
 // ミッションブリーフィング（タイトル後にターミナル風タイピング表示）
 // onDismiss: ENTER で抜けた時に呼ばれるコールバック
 export function startBriefing(loadingScreen, onDismiss) {
+    // ENTER 連打で多重起動するのを防ぐガード
+    if (loadingScreen._briefingStarted) return;
+    loadingScreen._briefingStarted = true;
     const briefingEl = loadingScreen.querySelector('.briefing-screen');
     const textEl = loadingScreen.querySelector('.briefing-text');
+    const titleScreen = loadingScreen.querySelector('.title-screen');
     if (!briefingEl || !textEl) {
         if (onDismiss) onDismiss();
         return;
     }
+    // タイトル表示中なら、まずロゴを中心に潰れて消える演出を再生
+    if (titleScreen && loadingScreen.classList.contains('title')) {
+        const TITLE_OFF_MS = 500;
+        titleScreen.classList.add('off');
+        setTimeout(() => {
+            titleScreen.classList.remove('off');
+            run();
+        }, TITLE_OFF_MS);
+        return;
+    }
+    run();
+
+    function run() {
     loadingScreen.classList.remove('title');
     loadingScreen.classList.add('briefing');
     textEl.textContent = '';
@@ -17,6 +34,8 @@ export function startBriefing(loadingScreen, onDismiss) {
             '> SECURE LINK ESTABLISHED',
             '> SIGNAL: UAC-7710-A3',
             '> AUTH: PAX',
+            '> FROM: PERCIVAL',
+            '> TO:   BARRAMUNDI',
             '',
             'CLASSIFIED MEMO TO LANDER COMMANDER:',
             '',
@@ -25,10 +44,10 @@ export function startBriefing(loadingScreen, onDismiss) {
             'ALL CONTACT LOST 47 HOURS AGO.',
             '',
             'MISSION OBJECTIVES:',
-            '- LAND THE POD ON THE MARKED ZONE',
+            '- PERFORM A SOFT LANDING ON THE MARKED ZONE',
             '- LOCATE AND RETRIEVE SURVIVING CREW',
             '- NEUTRALIZE HOSTILE ENTITIES IF ENGAGED',
-            '- RETURN TO ORBIT BEFORE OXYGEN DEPLETION',
+            '- RETURN TO ORBIT BEFORE ENERGY DEPLETION',
             '',
             'WARNING: SUBSURFACE BIO-SIGNATURES DETECTED.',
             'ASSUME ALL CONTACT IS HOSTILE.',
@@ -37,25 +56,26 @@ export function startBriefing(loadingScreen, onDismiss) {
         ].join('\n'),
         J: [
             '> セキュアリンク確立',
-            '> シグナル: UAC-7710-A3',
-            '> 認証: PAX',
+            '> シグナル：UAC-7710-A3',
+            '> 認証：PAX',
+            '> 発信：パーシヴァル',
+            '> 宛先：バラマンディ号',
             '',
-            '機密通信 着陸船コマンダーへ:',
+            '機密通信 着陸船指揮官へ：',
             '',
-            '月面に未確認の人工物を検出。',
-            '調査のため科学班を派遣。',
-            '47時間前から音信不通。',
+            '月面にて未確認の遺物を検出。',
+            '調査のため科学チームを派遣したが、47時間前に全通信が途絶した。',
             '',
-            'ミッション目標:',
-            '- マーク地点にポッドを着陸せよ',
-            '- 生存クルーを発見し回収せよ',
-            '- 敵性体は遭遇時に排除せよ',
-            '- 酸素欠乏前に軌道へ帰還せよ',
+            '作戦目標：',
+            '・指定ゾーンへポッドを軟着陸（ソフトランディング）させよ',
+            '・生存しているクルーを捜索、および回収せよ',
+            '・交戦時には、敵対存在を排除せよ',
+            '・エネルギーが尽きる前に軌道上へ帰還せよ',
             '',
-            '警告: 地下に生体反応を検出。',
-            '接触対象はすべて敵性とみなせ。',
+            '警告：地表下に生体反応を検知。',
+            '接触するものはすべて敵対存在と見なせ。',
             '',
-            '武運を祈る、コマンダー。'
+            '武運を祈る、指揮官。'
         ].join('\n')
     };
     let text = texts.E;
@@ -128,7 +148,10 @@ export function startBriefing(loadingScreen, onDismiss) {
     }
     step();
 
+    let advanced = false;
     function advance() {
+        if (advanced) return;
+        advanced = true;
         if (timer) { clearTimeout(timer); timer = null; }
         document.removeEventListener('keydown', onKey);
         // タイピング音を停止、開始SEは0.6秒でフェードアウト
@@ -157,6 +180,7 @@ export function startBriefing(loadingScreen, onDismiss) {
         }
     }
     document.addEventListener('keydown', onKey);
+    }
 }
 
 // アセットロード（Phaser scene の preload フックから呼ぶ）
