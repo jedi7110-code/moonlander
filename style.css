@@ -144,13 +144,16 @@ body.no-crt .crt-overlay {
     z-index: 1;
 }
 #loading-screen.lit::before {
-    animation: fluorescent-on 1.0s ease-out forwards;
+    animation: fluorescent-on 1.3s ease-out forwards;
 }
 @keyframes fluorescent-on {
       0% { opacity: 1;    }   /* 真っ暗 */
-     20% { opacity: 0.5;  }   /* カッ（前兆） */
-     32% { opacity: 0.9;  }   /* 一瞬また暗く */
-     55% { opacity: 0;    }   /* カン → 点灯 */
+     10% { opacity: 0.35; }   /* かん（1発目・しっかり光る） */
+     20% { opacity: 0.55; }   /* タメ突入（薄暗い） */
+     33% { opacity: 0.55; }   /* タメ終わり（0.26s〜0.43s ≒ 0.17s） */
+     41% { opacity: 0.15; }   /* か（2発目・前半） */
+     48% { opacity: 0.55; }   /* 一瞬暗く */
+     57% { opacity: 0;    }   /* かん（2発目・後半 → 完全点灯） */
     100% { opacity: 0;    }
 }
 /* ゲーム中と同じ走査線 */
