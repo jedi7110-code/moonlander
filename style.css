@@ -7,6 +7,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: flex-start;
+    overflow: hidden; /* transform: scale で縮小した #game-container の元サイズによるはみ出しをカット */
 
     -webkit-touch-callout:none; /* リンク長押しのポップアップを無効化 */
     -webkit-user-select:none; /* テキスト長押しの選択ボックスを無効化 */
@@ -20,11 +21,21 @@ body {
 
 #game-container {
     position: relative;
-    display: inline-block;
+    /* レイアウトサイズを 1200x800 に固定。内部 canvas (max 1200x800) と CRT
+       オーバーレイ (1200x800) の想定基準を揃える。inline-block + flex 親では
+       明示幅がないと viewport 幅で押し潰されて canvas が overflow し、
+       見かけのアスペクトが崩れるため。 */
+    width: 1200px;
+    height: 800px;
+    flex: 0 0 auto;
     margin-top: 30px;
     line-height: 0;
     border-radius: 18px;
     overflow: hidden;
+    /* JS が --game-scale を更新。ビューポートに収まる比率（最大 1）でスケール。
+       内部の CRT/ローディング画面/ブリーフィングも一緒に縮小される。 */
+    transform: scale(var(--game-scale, 1));
+    transform-origin: 50% 50%;
 }
 
 /* PC/タブレット（769px以上）はブラウザ中央に配置 */
@@ -408,6 +419,7 @@ body.no-crt .crt-overlay {
     top: 900px;
     left: 50%;
     transform: translateX(-50%);
+    display: none; /* スマホ用コントロールは一旦非表示（タッチ対応の touchstart/touchend は残す） */
 }
 
 .button-row {
@@ -447,10 +459,10 @@ body.no-crt .crt-overlay {
     margin: 0 0 0 30px;
 }
 
-/* 769px以上の場合 */
+/* スマホ用コントロールは現状すべてのサイズで非表示 */
 @media screen and (min-width: 769px) {
     .button-container {
-        display: block;
+        display: none;
     }
 }
 

@@ -4,6 +4,18 @@
         import { create as createScene } from './create.js';
         import { update as updateScene } from './update.js';
 
+        // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
+        // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、
+        // CSS の transform: scale(var(--game-scale)) で全体を同率に縮める。
+        const GAME_BASE_W = 1200;
+        const GAME_BASE_H = 800;
+        function fitGameContainer() {
+            const s = Math.min(window.innerWidth / GAME_BASE_W, window.innerHeight / GAME_BASE_H, 1);
+            document.documentElement.style.setProperty('--game-scale', s);
+        }
+        fitGameContainer();
+        window.addEventListener('resize', fitGameContainer);
+
         // 8bitエフェクト用PostFXパイプライン（ピクセル化・減色・スキャンライン）
         const PixelArtPipeline = new Phaser.Class({
             Extends: Phaser.Renderer.WebGL.Pipelines.PostFXPipeline,
