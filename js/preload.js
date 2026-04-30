@@ -244,7 +244,6 @@ scene.load.on('progress', (value) => {
 scene.load.on('complete', () => {
     if (loadingFill) loadingFill.style.width = '100%';
     if (loadingScreen) {
-        // 黒80%オーバーレイを外して明るい状態へフェード → タイトル
         loadingScreen.classList.add('lit');
         setTimeout(() => loadingScreen.classList.add('title'), 800);
     }

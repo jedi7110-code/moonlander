@@ -21,12 +21,9 @@ body {
 
 #game-container {
     position: relative;
-    /* レイアウトサイズを 1200x800 に固定。内部 canvas (max 1200x800) と CRT
-       オーバーレイ (1200x800) の想定基準を揃える。inline-block + flex 親では
-       明示幅がないと viewport 幅で押し潰されて canvas が overflow し、
-       見かけのアスペクトが崩れるため。 */
-    width: 1200px;
-    height: 800px;
+    display: inline-block;
+    /* body flex 親に潰されないように shrink を切る（width 自体は内部 canvas
+       のサイズに従って自然に決まる）。 */
     flex: 0 0 auto;
     margin-top: 30px;
     line-height: 0;
@@ -134,19 +131,27 @@ body.no-crt .crt-overlay {
 }
 /* タイトルから ENTER でブリーフィング以降ズーム＋固定 */
 #loading-screen.briefing { transform: scale(1.18); }
-/* 初期は黒80%オーバーレイ → ロード完了で .lit でフェード解除 */
+/* ロード中は cockpit を完全な黒で覆い隠す（背景画像はその間に CSS 経由で
+   ロードされる）。完了で .lit が付くと古い蛍光灯のように「カッ…カン」と
+   2 段階で点灯する */
 #loading-screen::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: #000;
     pointer-events: none;
-    transition: opacity 0.8s ease-out;
     opacity: 1;
     z-index: 1;
 }
 #loading-screen.lit::before {
-    opacity: 0;
+    animation: fluorescent-on 1.0s ease-out forwards;
+}
+@keyframes fluorescent-on {
+      0% { opacity: 1;    }   /* 真っ暗 */
+     20% { opacity: 0.5;  }   /* カッ（前兆） */
+     32% { opacity: 0.9;  }   /* 一瞬また暗く */
+     55% { opacity: 0;    }   /* カン → 点灯 */
+    100% { opacity: 0;    }
 }
 /* ゲーム中と同じ走査線 */
 /* ローディング画面側のスキャンラインは廃止：ズーム時に走査線まで拡大されてしまうため、
