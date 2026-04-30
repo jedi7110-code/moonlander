@@ -131,14 +131,14 @@ body.no-crt .crt-overlay {
 }
 /* タイトルから ENTER でブリーフィング以降ズーム＋固定 */
 #loading-screen.briefing { transform: scale(1.18); }
-/* ロード中は cockpit を完全な黒で覆い隠す（背景画像はその間に CSS 経由で
-   ロードされる）。完了で .lit が付くと古い蛍光灯のように「カッ…カン」と
-   2 段階で点灯する */
+/* ロード中は cockpit を opening-title-dark.png（暗闇でグロー光るニコちゃん
+   マーク）で覆い隠す。完了で .lit が付くと古い蛍光灯のように「かん、かかん」
+   と 2 段階で点灯する */
 #loading-screen::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: #000;
+    background: #000 url('assets/opening-title-dark.png') center center / cover no-repeat;
     pointer-events: none;
     opacity: 1;
     z-index: 1;
