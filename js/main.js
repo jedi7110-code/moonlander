@@ -240,16 +240,22 @@
                 });
             }
 
-            // HTMLタイトル画面のクリックでもブリーフィングへ遷移（ゲームは直接開始しない）
+            // HTMLタイトル画面のクリック/タップでもブリーフィングへ遷移（ゲームは直接開始しない）
+            // iOS Safari は cursor:pointer のない非ボタン要素で click が発火しないことがあるため touchend も併用
             if (loadingScreen) {
-                loadingScreen.addEventListener('click', () => {
-                    if (loadingScreen.classList.contains('title')) {
-                        startBriefing(loadingScreen, () => startGame());
-                    }
-                });
+                let titleAdvanced = false;
+                const onTitleTap = (e) => {
+                    if (titleAdvanced) return;
+                    if (!loadingScreen.classList.contains('title')) return;
+                    titleAdvanced = true;
+                    if (e && e.cancelable) e.preventDefault();
+                    startBriefing(loadingScreen, () => startGame());
+                };
+                loadingScreen.addEventListener('click', onTitleTap);
+                loadingScreen.addEventListener('touchend', onTitleTap, { passive: false });
             }
             // ENTER 状態遷移：title → briefing → game
-            scene.input.keyboard.on('keydown-ENTER', () => {
+            const enterAdvance = () => {
                 if (!loadingScreen) {
                     // 死亡後リスタート / クリア後周回：そのまま開始
                     startGame();
@@ -265,6 +271,12 @@
                     return;
                 }
                 // ローディング中（lit のみ／title 前）はゲーム開始を許可しない
+            };
+            scene.input.keyboard.on('keydown-ENTER', enterAdvance);
+            // 死亡後リスタート / クリア後周回：Phaser キャンバスへのタップでも開始
+            // (HTML タイトル画面のタップは loadingScreen のリスナーで処理済み)
+            scene.input.on('pointerdown', () => {
+                if (!loadingScreen) startGame();
             });
         }
 

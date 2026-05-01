@@ -228,16 +228,27 @@ body.no-crt .crt-overlay {
 .briefing-lang {
     color: rgba(200, 255, 216, 0.85);
     cursor: default;
+    /* タップ領域を拡張 */
+    padding: 14px 18px;
+    margin: -14px -18px;
 }
 .briefing-skip {
     opacity: 0;
     animation: title-press-blink 1.8s steps(2, end) infinite;
+    /* タップ領域を拡張 */
+    padding: 14px 18px;
+    margin: -14px -18px;
 }
 .briefing-screen.done .briefing-skip { opacity: 1; }
 .briefing-screen.done .briefing-text::after { display: none; }
 @keyframes briefing-cursor {
     0%, 49% { opacity: 1; }
     50%, 100% { opacity: 0; }
+}
+#loading-screen.title {
+    /* iOS Safari でタップ／クリックイベントが安定して発火するよう
+       タイトル画面はクリッカブル扱いにする */
+    cursor: pointer;
 }
 #loading-screen.title .title-screen {
     display: flex;
@@ -438,21 +449,23 @@ body.no-crt .crt-overlay {
 }
 .touch-dpad {
     position: absolute;
-    left: 2vh;
-    bottom: 2vh;
-    width: 24vh;
-    height: 24vh;
+    left: calc(2vh + 10px);
+    /* 画面下端は親指が届きにくいため上寄りに配置 */
+    top: calc(2vh + 10px);
+    width: 30vh;
+    height: 30vh;
     pointer-events: none;
 }
 .touch-actions {
     position: absolute;
-    right: 2vh;
-    /* D-pad の左右ボタン（◀▶）と同じ高さに揃える
-       D-pad 全体 bottom:2vh + 中段ボタン top:8vh の中心 → bottom 中心 14vh */
-    bottom: 9vh;
+    right: calc(2vh + 10px);
+    /* D-pad と垂直中心を揃える（D-pad top:2vh+10px、高さ 30vh → 中心 17vh+10px）
+       縦並び 2 ボタン分（高さ 10vh × 2 + gap 4vh = 24vh）→ top = 17vh+10px - 12vh = 5vh+10px */
+    top: calc(5vh + 10px);
     display: flex;
-    gap: 2vh;
-    align-items: center;
+    flex-direction: column;
+    gap: 4vh;
+    align-items: stretch;
     pointer-events: none;
 }
 .touch-btn {
@@ -481,23 +494,23 @@ body.no-crt .crt-overlay {
 /* D-pad の十字配置 */
 .touch-dpad .touch-btn {
     position: absolute;
-    width: 8vh;
-    height: 8vh;
-    font-size: 3.6vh;
+    width: 10vh;
+    height: 10vh;
+    font-size: 4.4vh;
     line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.dpad-up    { top: 0;             left: 8vh; }
-.dpad-down  { bottom: 0;          left: 8vh; }
-.dpad-left  { top: 8vh;           left: 0; }
-.dpad-right { top: 8vh;           right: 0; }
-/* アクションボタン（BEAM/JUMP） */
+.dpad-up    { top: 0;             left: 10vh; }
+.dpad-down  { bottom: 0;          left: 10vh; }
+.dpad-left  { top: 10vh;          left: 0; }
+.dpad-right { top: 10vh;          right: 0; }
+/* アクションボタン（BEAM/JUMP） 横長で縦並び */
 .touch-actions .touch-btn {
-    width: 13vh;
+    width: 24vh;
     height: 10vh;
-    font-size: 2.4vh;
+    font-size: 2.7vh;
     letter-spacing: 0.12em;
 }
 .act-beam {
