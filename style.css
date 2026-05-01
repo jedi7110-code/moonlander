@@ -117,7 +117,7 @@ body.no-crt .crt-overlay {
     height: 800px;
     max-width: 1200px;
     max-height: 800px;
-    background: #000 url('assets/opening-title.jpg') center center / cover no-repeat;
+    background: #000 url('assets/opening-title.webp') center center / 100% 100% no-repeat;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -138,7 +138,7 @@ body.no-crt .crt-overlay {
     content: "";
     position: absolute;
     inset: 0;
-    background: #000 url('assets/opening-title-dark.png') center center / cover no-repeat;
+    background: #000 url('assets/opening-title-dark.webp') center center / 100% 100% no-repeat;
     pointer-events: none;
     opacity: 1;
     z-index: 1;
@@ -247,8 +247,8 @@ body.no-crt .crt-overlay {
 }
 @keyframes title-dialup-on {
     /* 上から下へ8段で出現（昔のダイアルアップ画像読み込み風） */
-    0%   { clip-path: inset(0 0 100% 0); opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    100% { clip-path: inset(0 0 0 0);    opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    0%   { clip-path: inset(-40px -40px 100% -40px); opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { clip-path: inset(-40px -40px -40px -40px); opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 /* ENTERでブリーフィングへ遷移する際：中心の横一線へ潰れて消える（出現の逆） */
 #loading-screen.title .title-screen.off {
