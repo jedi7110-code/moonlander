@@ -158,6 +158,7 @@ export function startBriefing(loadingScreen, onDismiss) {
     let i = 0;
     let timer = null;
     let prevWasNewline = true; // 行頭判定（最初の文字も「行頭」扱いで再生開始）
+    let currentLang = 'E';
     function step() {
         if (i < text.length) {
             const ch = text[i++];
@@ -182,6 +183,7 @@ export function startBriefing(loadingScreen, onDismiss) {
         }
     }
     function restartTyping(lang) {
+        currentLang = lang;
         text = texts[lang];
         if (timer) { clearTimeout(timer); timer = null; }
         textEl.textContent = '';
@@ -198,6 +200,28 @@ export function startBriefing(loadingScreen, onDismiss) {
         step();
     }
     step();
+
+    // ブリーフィング画面の左下 [J/E] と右下 [PRESS ENTER] のクリックでも操作可能
+    const langEl = loadingScreen.querySelector('.briefing-lang');
+    const skipEl = loadingScreen.querySelector('.briefing-skip');
+    if (langEl && !langEl._wired) {
+        langEl._wired = true;
+        langEl.style.pointerEvents = 'auto';
+        langEl.style.cursor = 'pointer';
+        langEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            restartTyping(currentLang === 'E' ? 'J' : 'E');
+        });
+    }
+    if (skipEl && !skipEl._wired) {
+        skipEl._wired = true;
+        skipEl.style.pointerEvents = 'auto';
+        skipEl.style.cursor = 'pointer';
+        skipEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            advance();
+        });
+    }
 
     let advanced = false;
     function advance() {

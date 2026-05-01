@@ -19,6 +19,12 @@
     <meta property="og:site_name" content="Moon Lander" />
     <meta property="og:image" content="https://moonlander-two.vercel.app/assets/ogp.png" />
     <link rel="icon" href="assets/favi.ico">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+    <!-- iOS：ホーム画面に追加されたとき URL バーなしで起動 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Moonlander">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
     <link rel="stylesheet" href="style.css?v=36">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
@@ -95,12 +101,17 @@
 
     <script type="module" src="js/main.js?v=4"></script>
 
-    <div class="button-container">
-        <div class="button-row">
-            <div class="button" id="left">　◁　</div>
-            <div class="button" id="right">　▷　</div>
-            <div class="button" id="up">　△　</div>
-            <div class="button" id="down">　▽　</div>
+    <!-- 横画面スマホ用オンスクリーンコントロール -->
+    <div class="touch-controls" id="touch-controls">
+        <div class="touch-dpad">
+            <button class="touch-btn dpad-up"    id="btn-up"   data-key="ArrowUp">▲</button>
+            <button class="touch-btn dpad-left"  id="btn-left" data-key="ArrowLeft">◀</button>
+            <button class="touch-btn dpad-right" id="btn-right" data-key="ArrowRight">▶</button>
+            <button class="touch-btn dpad-down"  id="btn-down" data-key="ArrowDown">▼</button>
+        </div>
+        <div class="touch-actions">
+            <button class="touch-btn act-beam" id="btn-beam" data-key="Space">BEAM</button>
+            <button class="touch-btn act-jump" id="btn-jump" data-key="ArrowUp">JUMP</button>
         </div>
     </div>
 

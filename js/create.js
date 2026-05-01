@@ -341,13 +341,8 @@ scene.beamChargeEmitter.alpha.onUpdate = (particle, key, t) => {
 
 registerAnimations(scene);
 
-// コントローラーの作成
-const arrows = ['left', 'up', 'down', 'right']
-const buttons = arrows.map((cursor) => document.getElementById(cursor))
-buttons.forEach((v, i) => {
-    v.addEventListener('touchstart', () => scene.cursors[arrows[i]].isDown = true);
-    v.addEventListener('touchend', () => scene.cursors[arrows[i]].isDown = false);
-})
+// 旧オンスクリーンコントロール（#left/#up/#down/#right）は廃止。
+// 新コントロール（.touch-btn）は main.js 側で KeyboardEvent ディスパッチして処理。
 
 // カメラの初期位置とズームを設定（タイトル中は固定・宇宙船の最終位置付近）
 scene.cameras.main.centerOn(scene.spaceship.x, 150);

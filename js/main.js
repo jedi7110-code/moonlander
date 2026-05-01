@@ -10,11 +10,69 @@
         const GAME_BASE_W = 1200;
         const GAME_BASE_H = 800;
         function fitGameContainer() {
-            const s = Math.min(window.innerWidth / GAME_BASE_W, window.innerHeight / GAME_BASE_H, 1);
+            // 横画面タッチデバイスではオンスクリーンコントロール分の幅を確保
+            const isTouchLandscape = window.matchMedia('(orientation: landscape) and (pointer: coarse)').matches;
+            // D-pad/アクション含めて両端それぞれ約 18vh ぶんの余白を確保（vhベース換算）
+            const reservedW = isTouchLandscape ? Math.round(window.innerHeight * 0.36) : 0;
+            const availW = Math.max(320, window.innerWidth - reservedW);
+            const s = Math.min(availW / GAME_BASE_W, window.innerHeight / GAME_BASE_H, 1);
             document.documentElement.style.setProperty('--game-scale', s);
         }
         fitGameContainer();
         window.addEventListener('resize', fitGameContainer);
+
+        // 横画面スマホ用オンスクリーンコントロール：ボタン押下をキーイベントに変換
+        (function setupTouchControls() {
+            const buttons = document.querySelectorAll('.touch-btn');
+            // data-key 属性に対応する KeyboardEvent.code / key
+            const keyCodeMap = {
+                ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Space: 32
+            };
+            const keyMap = {
+                ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Space: ' '
+            };
+            const pressed = new Map(); // code -> count（複数ボタンが同じキーを送る場合の参照カウント）
+            function dispatch(type, code) {
+                const ev = new KeyboardEvent(type, {
+                    key: keyMap[code] || code,
+                    code: code === 'Space' ? 'Space' : code,
+                    keyCode: keyCodeMap[code] || 0,
+                    which: keyCodeMap[code] || 0,
+                    bubbles: true,
+                    cancelable: true
+                });
+                window.dispatchEvent(ev);
+                document.dispatchEvent(ev);
+            }
+            function press(code) {
+                const c = (pressed.get(code) || 0) + 1;
+                pressed.set(code, c);
+                if (c === 1) dispatch('keydown', code);
+            }
+            function release(code) {
+                const c = (pressed.get(code) || 0) - 1;
+                if (c <= 0) {
+                    pressed.delete(code);
+                    dispatch('keyup', code);
+                } else {
+                    pressed.set(code, c);
+                }
+            }
+            buttons.forEach((b) => {
+                const code = b.getAttribute('data-key');
+                if (!code) return;
+                let down = false;
+                const onDown = (e) => { e.preventDefault(); if (down) return; down = true; press(code); };
+                const onUp   = (e) => { e.preventDefault(); if (!down) return; down = false; release(code); };
+                b.addEventListener('touchstart', onDown, { passive: false });
+                b.addEventListener('touchend',   onUp,   { passive: false });
+                b.addEventListener('touchcancel', onUp,  { passive: false });
+                // PCでも動作確認できるようマウスでも反応
+                b.addEventListener('mousedown', onDown);
+                b.addEventListener('mouseup',   onUp);
+                b.addEventListener('mouseleave', onUp);
+            });
+        })();
 
         // 8bitエフェクト用PostFXパイプライン（ピクセル化・減色・スキャンライン）
         const PixelArtPipeline = new Phaser.Class({
