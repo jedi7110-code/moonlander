@@ -1,8 +1,8 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js?v=8';
-        import { create as createScene } from './create.js';
-        import { update as updateScene } from './update.js';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=9';
+        import { create as createScene } from './create.js?v=24';
+        import { update as updateScene } from './update.js?v=30';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
         // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、
@@ -224,6 +224,7 @@
             }
 
             scene.spaceshipShadow.setAlpha(0);
+            if (scene.spaceshipShadowGround) scene.spaceshipShadowGround.setAlpha(0);
 
             // iOS Safari 対策：WebAudio context が suspended のままだと
             // Phaser の SE が無音になる。canvas 以外（HTMLタイトル/ブリーフィング）で
@@ -291,6 +292,7 @@
                 }
 
                 scene.spaceshipShadow.setAlpha(1);
+                if (scene.spaceshipShadowGround) scene.spaceshipShadowGround.setAlpha(1);
                 // ENTER 開始時の SE：landing.wav（goal キーと共用、開始音 0.075）
                 if (scene.goalSound) scene.goalSound.play({ volume: 0.075 });
 

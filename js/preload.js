@@ -281,8 +281,8 @@ scene.load.image('player_L1', 'assets/player-l1.png');
 scene.load.image('player_L2', 'assets/player-l2.png');
 scene.load.image('player_R1', 'assets/player-r1.png');
 scene.load.image('player_R2', 'assets/player-r2.png');
-scene.load.image('flag', 'assets/flag.png');
-scene.load.image('flag-flash', 'assets/flag-flash.png');
+scene.load.image('flag', 'assets/flag.webp');
+scene.load.image('flag-flash', 'assets/flag-flash.webp');
 scene.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
 scene.load.image('title', 'assets/title.png?v=2');
 scene.load.audio('command', 'assets/sound/command.wav'); // ブリーフィングのタイピング音

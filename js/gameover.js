@@ -28,6 +28,7 @@ export function gameOver(scene, message) {
         // 宇宙船・影・ゲージを非表示にする
         scene.spaceship.setVisible(false);
         scene.spaceshipShadow.setVisible(false);
+        if (scene.spaceshipShadowGround) scene.spaceshipShadowGround.setVisible(false);
         scene.fuelGaugeBorder.setVisible(false);
         scene.fuelGauge.setVisible(false);
 

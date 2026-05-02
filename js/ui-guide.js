@@ -40,7 +40,7 @@ export function attachUiGuide(scene) {
         g.y = cy;
         g.setDepth(depth);
         // 背景：線と同じ色を 10% 透過で塗りつぶし
-        g.fillStyle(color, 0.1);
+        g.fillStyle(color, 0.2);
         g.fillRect(lx, typ, bw, bh);
         g.lineStyle(stroke, color, 1);
         // 左右は全長で繋ぐ

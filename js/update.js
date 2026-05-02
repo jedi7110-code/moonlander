@@ -546,6 +546,7 @@ if (scene.astronautMode && scene.astronaut) {
                     scene.crewFollowing = false;
                     scene.beamGaugeBg.setVisible(false);
                     scene.beamGaugeFill.setVisible(false);
+                    if (scene.beamGaugeEmpty) scene.beamGaugeEmpty.setVisible(false);
                     if (scene.astronaut && scene.astronaut.anims && scene.astronaut.anims.isPlaying) scene.astronaut.anims.stop();
                     // 進行中の人間tweenを全停止（捕獲された仲間のtweenは下で新規作成）
                     scene.tweens.killTweensOf(scene.astronaut);
@@ -664,6 +665,7 @@ if (scene.astronautMode && scene.astronaut) {
                     scene.crewFollowing = false;
                     scene.beamGaugeBg.setVisible(false);
                     scene.beamGaugeFill.setVisible(false);
+                    if (scene.beamGaugeEmpty) scene.beamGaugeEmpty.setVisible(false);
                     if (scene.astronaut.anims && scene.astronaut.anims.isPlaying) scene.astronaut.anims.stop();
                     // 進行中の人間tweenを全停止（捕獲演出は下で新規作成）
                     scene.tweens.killTweensOf(scene.astronaut);
@@ -989,6 +991,7 @@ if (scene.astronautMode && scene.astronaut) {
             scene.playerClimbing = true;
             scene.beamGaugeBg.setVisible(false);
             scene.beamGaugeFill.setVisible(false);
+                    if (scene.beamGaugeEmpty) scene.beamGaugeEmpty.setVisible(false);
             scene.beamHoldStart = null;
             scene.chargeAllowed = false;
             if (scene.beamTameSound.isPlaying) scene.beamTameSound.stop();
@@ -1347,7 +1350,7 @@ if (scene.gameStarted) {
     let zoomTarget;
 
     if (scene.spaceship.y > lowerThirdBoundary) {
-        zoomTarget = 1.8;
+        zoomTarget = 2.0;
     } else {
         zoomTarget = 0.8;
     }
@@ -1439,25 +1442,52 @@ if (scene.gameStarted) {
     scene.jetParticles.left.on = scene.cursors.left.isDown && hasFuel;
     scene.jetParticles.right.on = scene.cursors.right.isDown && hasFuel;
 
-    // 宇宙船の影の位置を更新（宇宙船の真下、地面の高さ）
+    // 宇宙船の影：着陸台用と月面用を別々に配置し、マスクで自然に段差を表現
+    // 宇宙船の脚がパッドに乗っている部分はパッド上面、はみ出している部分は月面に影が落ちる
+    const groundLineY = scene.game.config.height - 63;
+    const padSurfaceY = scene.moon.y + scene.moon.displayHeight / 2;
     scene.spaceshipShadow.x = scene.spaceship.x;
-    scene.spaceshipShadow.y = scene.moon.y + 35; // 地面ライン
+    scene.spaceshipShadow.y = padSurfaceY;
+    if (scene.spaceshipShadowGround) {
+        scene.spaceshipShadowGround.x = scene.spaceship.x;
+        scene.spaceshipShadowGround.y = groundLineY;
+    }
 
-    // ゴールエリアからの高さを計算
-    const heightAboveGoal = Math.max(scene.spaceship.y - (scene.moon.y - 260), 0);
+    // 影が落ちる面からの高さを計算（透明度・サイズ用 — 月面基準）
+    const heightAboveGoal = Math.max(scene.spaceship.y - (groundLineY - 260), 0);
 
     // 透明度を計算（高さに応じて0〜1の範囲）
     const shadowAlpha = heightAboveGoal / 260;
     scene.spaceshipShadow.alpha = shadowAlpha;
+    if (scene.spaceshipShadowGround) scene.spaceshipShadowGround.alpha = shadowAlpha;
 
     // 影のサイズを計算（高さに応じて50〜100の範囲）
     const shadowSize = 110 - (heightAboveGoal / 4.6);
     scene.spaceshipShadow.setScale(shadowSize / 100); // ベース直径 100 を縮尺
+    if (scene.spaceshipShadowGround) scene.spaceshipShadowGround.setScale(shadowSize / 100);
+
+    // デバッグ：当たり判定の枠を描画（赤=台座範囲, 黄=着陸ゾーン, 緑=宇宙船 bounds）
+    if (scene.debugBounds) {
+        scene.debugBounds.clear();
+        // 着陸台の水平範囲（fullyOnPad 判定）
+        scene.debugBounds.lineStyle(2, 0xff0000, 1);
+        scene.debugBounds.strokeRect(scene.moon.x - 50, padSurfaceY - 30, 100, 60);
+        // 着陸ゾーン（landingZone — RectangleToRectangle 用、5px の薄い帯。赤枠と同じ幅）
+        scene.debugBounds.lineStyle(2, 0xffff00, 1);
+        scene.debugBounds.strokeRect(scene.moon.x - 50, padSurfaceY, 100, 5);
+        // 宇宙船 bounds（4本足の外側より少し内側に縮めた当たり判定）
+        scene.debugBounds.lineStyle(2, 0x00ff00, 1);
+        const sb = scene.spaceship.getBounds();
+        const SHIP_FOOT_INSET = 7;
+        scene.debugBounds.strokeRect(sb.x + SHIP_FOOT_INSET, sb.y, sb.width - SHIP_FOOT_INSET * 2, sb.height);
+    }
 
     // 地面に近い＋ジェット噴射中の時だけ粉塵を左右に舞い上がらせる
+    // 着陸台の真上は月面ではないので粉塵は出さない
     const groundDistance = (scene.game.config.height - 63) - (scene.spaceship.y + 25);
     const isThrusting = scene.cursors.up.isDown || scene.cursors.down.isDown || scene.cursors.left.isDown || scene.cursors.right.isDown;
-    if (groundDistance < 150 && groundDistance > 0 && isThrusting && scene.fuel > 0) {
+    const overPadForDust = Math.abs(scene.spaceship.x - scene.moon.x) < 50;
+    if (groundDistance < 150 && groundDistance > 0 && isThrusting && scene.fuel > 0 && !overPadForDust) {
         const dustY = scene.game.config.height - 65;
         const intensity = 1 - (groundDistance / 150); // 0(遠い)〜1(地面すれすれ)
         const freq = Math.max(5, 30 - intensity * 25);
@@ -1477,26 +1507,31 @@ if (scene.gameStarted) {
     }
 }
 
-// 着陸エリアに接触した時にクリア
+// 着陸台の水平範囲（赤デバッグ枠と一致させる）
+const PAD_LANDING_HALF_WIDTH = 50;
+// パッド上面の Y 座標（着陸の Y 基準）
+const padSurfaceY = scene.moon.y + scene.moon.displayHeight / 2;
+
+// 着陸エリアに接触した時にクリア（赤枠＝台座の幅と一致）
 const landingZone = new Phaser.Geom.Rectangle(
-    scene.moon.x - scene.moon.displayWidth / 2,
-    scene.moon.y + scene.moon.displayHeight / 2 - 5 + 5,
-    scene.moon.displayWidth,
+    scene.moon.x - PAD_LANDING_HALF_WIDTH,
+    scene.moon.y + scene.moon.displayHeight / 2,
+    PAD_LANDING_HALF_WIDTH * 2,
     5
 );
 
-// ターゲットマークの色フェード（ゴール上空に近づくほど緑→オレンジ）
-const inGoalX = Math.abs(scene.spaceship.x - scene.moon.x) < scene.moon.displayWidth / 2;
+// ターゲットマークの色フェード（ゴール上空に近づくほど緑→黄）
+const inGoalX = Math.abs(scene.spaceship.x - scene.moon.x) < PAD_LANDING_HALF_WIDTH;
 const distY = scene.moon.y - scene.spaceship.y;
-let markerT = 0; // 0=緑, 1=オレンジ
+let markerT = 0; // 0=緑, 1=黄
 if (inGoalX && distY < 300 && distY > 0) {
     markerT = 1 - (distY / 300); // 近いほど1に
 } else if (inGoalX && distY <= 0) {
     markerT = 1;
 }
-// 緑(0x00ff00)→オレンジ(0xff8800)を補間
+// 緑(0x00ff00)→黄(0xffff00)を補間
 const r = Math.round(0x00 + (0xff - 0x00) * markerT);
-const g = Math.round(0xff + (0x88 - 0xff) * markerT);
+const g = 0xff;
 const b = Math.round(0x00 + (0x00 - 0x00) * markerT);
 const newColor = (r << 16) | (g << 8) | b;
 if (newColor !== scene.currentMarkerColor) {
@@ -1511,12 +1546,74 @@ const speed = Math.sqrt(
 );
 const isSlow = speed < 85; // ゆっくり降下中のみ
 
-if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.spaceship.getBounds(), landingZone)) {
-    // コトンと着地：即座に停止して接地感を出す
+// 着陸台の水平範囲。宇宙船の4本足分（getBounds から数px縮めた範囲）がこの範囲に収まっていないと「片足はずれ」で転倒・爆発
+const SHIP_FOOT_INSET = 7;
+const sbRaw = scene.spaceship.getBounds();
+const shipLandingBounds = new Phaser.Geom.Rectangle(
+    sbRaw.x + SHIP_FOOT_INSET,
+    sbRaw.y,
+    sbRaw.width - SHIP_FOOT_INSET * 2,
+    sbRaw.height
+);
+const padLeftX = scene.moon.x - PAD_LANDING_HALF_WIDTH;
+const padRightX = scene.moon.x + PAD_LANDING_HALF_WIDTH;
+const fullyOnPad = shipLandingBounds.left >= padLeftX && shipLandingBounds.right <= padRightX;
+
+// パッド上面に到達したか（高速降下による landingZone のすり抜け対策：
+// 矩形交差ではなく宇宙船下端が padSurfaceY を越えたかで判定）
+const shipReachedPadY = shipLandingBounds.bottom >= padSurfaceY;
+const overPadHorizontal = shipLandingBounds.right > padLeftX && shipLandingBounds.left < padRightX;
+const padTouchdown = shipReachedPadY && overPadHorizontal;
+
+if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameStarted) {
+    // 勢いよく/傾きすぎで着陸台に衝突：すり抜けずに即爆発
+    gameOver(scene, '');
+} else if (isLevel && isSlow && padTouchdown && !fullyOnPad && !scene.tippingOver) {
+    // 片足が着陸台からはみ出している：バランスを崩して月面に倒れる演出 → 爆発
+    scene.tippingOver = true;
+    scene.gameStarted = false;
+    if (scene.spaceship.body) {
+        scene.spaceship.body.allowGravity = false;
+        scene.spaceship.setVelocity(0);
+        scene.spaceship.setAcceleration(0);
+    }
+
+    // 着陸台のどちら側にはみ出しているかで倒れる方向を決める
+    const overhangRight = shipLandingBounds.right - padRightX;
+    const overhangLeft = padLeftX - shipLandingBounds.left;
+    const fallDirection = overhangRight > overhangLeft ? 1 : -1;
+    const fallAngle = 92 * fallDirection;
+    const groundLineY = scene.game.config.height - 63;
+
+    // ジェット噴射・粉塵を停止
+    fadeStopSound(scene, scene.jetSound, 0.3);
+    if (scene.emptySound.isPlaying) scene.emptySound.stop();
+    scene.jetParticles.up.on = false;
+    scene.jetParticles.down.on = false;
+    scene.jetParticles.left.on = false;
+    scene.jetParticles.right.on = false;
+    scene.dustEmitters.forEach(e => e.on = false);
+
+    // 倒れる演出（傾く → 月面に倒れる）— 月重力なのでゆっくりめ
+    scene.tweens.add({
+        targets: scene.spaceship,
+        angle: fallAngle,
+        x: scene.spaceship.x + 30 * fallDirection,
+        y: groundLineY - 10,
+        duration: 1200,
+        ease: 'Sine.easeIn',
+        onComplete: () => {
+            scene.tippingOver = false;
+            gameOver(scene, '');
+        }
+    });
+} else if (isLevel && isSlow && padTouchdown && fullyOnPad) {
+    // コトンと着地：即座に停止し、足元を pad 上面にスナップして接地感を出す
     scene.spaceship.setVelocity(0);
     scene.spaceship.setAcceleration(0);
     scene.spaceship.setGravityY(0);
     scene.spaceship.angle = 0;
+    scene.spaceship.y = padSurfaceY - scene.spaceship.displayHeight / 2;
 
     scene.goalSound.play();
 
@@ -1820,14 +1917,17 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
                         // ズームはハシゴが伸び始める時から既に進行中
 
                         // 大破車の方向を >>> で表示＋上に英語ラベル（1週目のみ）
+                        // 宇宙船のトップに合わせて配置し、車のある側へ左右に出す
                         if (scene.moonCar && scene.playthroughCount === 0) {
-                            const arrow = scene.moonCar.x > astronaut.x ? '>' : '<';
+                            const isRight = scene.moonCar.x > scene.spaceship.x;
+                            const arrow = isRight ? '>' : '<';
                             const arrows = [arrow, arrow + arrow, arrow + arrow + arrow];
-                            const isRight = scene.moonCar.x > astronaut.x;
-                            const offsetX = (isRight ? 1 : -1) * 25;
+                            const shipHalfW = scene.spaceship.displayWidth / 2;
+                            const offsetX = (isRight ? 1 : -1) * (shipHalfW + 6);
                             const originX = isRight ? 0 : 1; // 右向き=左揃え、左向き=右揃え
-                            const labelY = astronaut.y - 34;
-                            const arrowY = astronaut.y - 26;
+                            // メッセージ枠の上端を宇宙船の上端に揃える（bubble.top = labelY - labelH/2 - padY を相殺）
+                            const labelY = scene.spaceship.y - scene.spaceship.displayHeight / 2 + 18;
+                            const arrowY = labelY + 8;
                             const ARROW_LOOPS = 1; // STAGES=7 で 7 steps × 440ms = 3080ms（4秒以内）
                             const STAGES = 10;
                             const STEP_DUR = 160; // フェードイン
@@ -1836,8 +1936,8 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
                             const totalSteps = ARROW_LOOPS * STAGES;
                             const totalDuration = STEP_TOTAL * totalSteps;
 
-                            // ラベル＆矢印は同じアンカー位置で固定（プレイヤー移動に追従しない）
-                            const fixedAnchorX = astronaut.x + offsetX;
+                            // ラベル＆矢印は同じアンカー位置で固定（宇宙船基準）
+                            const fixedAnchorX = scene.spaceship.x + offsetX;
                             // 0.5秒だけ遅らせて出す（操作開始の直後すぎないように）
                             scene.time.delayedCall(500, () => {
                                 const label = scene.add.image(
@@ -1903,44 +2003,9 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
     scene.goalTimer = 0; // 触れていない場合、タイマーをリセットする
 }
 
-// 宇宙船が地面に達したかどうかを確認（ゴール成功時は除外）
+// 宇宙船が月面に達した：着陸台の上ではないのでバランスを崩して爆発
 if (scene.gameStarted && scene.spaceship.y + scene.spaceship.displayHeight / 2 >= scene.game.config.height - 63) {
-    const groundSpeed = Math.sqrt(
-        scene.spaceship.body.velocity.x * scene.spaceship.body.velocity.x +
-        scene.spaceship.body.velocity.y * scene.spaceship.body.velocity.y
-    );
-    const groundLevel = Math.abs(scene.spaceship.angle) <= 5;
-
-    if (groundLevel && groundSpeed < 80) {
-        // ゆっくり水平着地：爆発せずコトンと停止、ミッション失敗
-        scene.spaceship.setVelocity(0);
-        scene.spaceship.setAcceleration(0);
-        scene.spaceship.setGravityY(0);
-        scene.spaceship.angle = 0;
-
-        fadeStopSound(scene, scene.jetSound, 0.5);
-        if (scene.emptySound.isPlaying) { scene.emptySound.stop(); }
-        scene.jetParticles.up.on = false;
-        scene.jetParticles.down.on = false;
-        scene.jetParticles.left.on = false;
-        scene.jetParticles.right.on = false;
-        scene.dustEmitters.forEach(e => e.on = false);
-
-        // 成功着地と同様に船にカメラを寄せる
-        scene.cameras.main.pan(scene.spaceship.x, scene.spaceship.y + 30, 1500, 'Sine.easeInOut');
-        scene.cameras.main.zoomTo(4.5, 1500, 'Sine.easeInOut');
-
-        scene.add.image(scene.spaceship.x, scene.spaceship.y - 30, 'label_offtarget').setOrigin(0.5, 0.5).setDepth(11).setScale(scene._labelDisplayScale || 0.25);
-        scene.endSound.play();
-        scene.gameStarted = false;
-
-        scene.time.delayedCall(3000, () => {
-            restartGame(scene);
-        });
-    } else {
-        // 速すぎるor傾いている：爆発
-        gameOver(scene, '');
-    }
+    gameOver(scene, '');
 }
 
 // デブリの移動

@@ -1,6 +1,6 @@
 // Phaser scene の create フック本体。
 import { generateLabels, SVG_SCALE } from './ui-text.js';
-import { attachUiGuide } from './ui-guide.js';
+import { attachUiGuide } from './ui-guide.js?v=2';
 import { registerAnimations } from './animations.js';
 
 export function create(scene) {
@@ -96,8 +96,28 @@ scene.fuelGauge.setAlpha(0);
 scene.fuelGauge.setScale(0);
 
 
+// 着陸台ビジュアルのサイズ（俯瞰イメージ）
+const PAD_DISPLAY_WIDTH = 120;
+const PAD_DISPLAY_HEIGHT = 96;
+// 画像内のパッド上面（楕円の着陸面）の位置 — 画像下端から測ったオフセット
+const PAD_SURFACE_OFFSET_FROM_BOTTOM = 57;
+// 月面と着陸面の段差
+const PAD_SURFACE_STEP = 22;
+
+// 月面のグランドレベル
+const groundLineY = scene.game.config.height - 63;
+// 着陸台の上面（ロケットが着地する高さ）
+const padSurfaceY = groundLineY - PAD_SURFACE_STEP;
+// 画像の楕円着陸面が padSurfaceY と一致するよう、台座画像を下げて配置
+// （台座は月面に半分埋まったような俯瞰表現になる）
+// PAD_IMAGE_VISUAL_LIFT は画像だけ更に上に持ち上げる量（着陸判定は変更しない）
+const PAD_IMAGE_VISUAL_LIFT = 7;
+const flagBottomY = padSurfaceY + PAD_SURFACE_OFFSET_FROM_BOTTOM - PAD_IMAGE_VISUAL_LIFT;
+
 // 着陸エリアのスプライトを作成（当たり判定用、描画は別スプライトへ）
-scene.moon = scene.add.sprite(Phaser.Math.Between(100, scene.game.config.width - 100), scene.game.config.height - 98, 'flag');
+// scene.moon は着陸台の上面を基準にした衝突判定用の不可視スプライト
+// scene.moon.y + displayHeight/2 = padSurfaceY となるように配置
+scene.moon = scene.add.sprite(Phaser.Math.Between(100, scene.game.config.width - 100), padSurfaceY - 35, 'flag');
 scene.physics.add.existing(scene.moon, true);
 scene.moon.body.allowGravity = false;
 scene.moon.displayWidth = 80;
@@ -105,16 +125,15 @@ scene.moon.displayHeight = 70;
 scene.moon.body.setSize(30, 5, false).setOffset(0, scene.moon.displayHeight - 5 + 5);
 scene.moon.setVisible(false);
 
-// 旗の見た目（着陸地点の足元を基準に2倍サイズで上に伸ばす）
-const flagGroundY = scene.moon.y + scene.moon.displayHeight / 2;
-scene.flagVisual = scene.add.image(scene.moon.x, flagGroundY, 'flag');
+// 着陸台の見た目（持ち上げた位置に bottom-center 基準で配置）
+scene.flagVisual = scene.add.image(scene.moon.x, flagBottomY, 'flag');
 scene.flagVisual.setOrigin(0.5, 1);
-scene.flagVisual.setDisplaySize(160, 140);
+scene.flagVisual.setDisplaySize(PAD_DISPLAY_WIDTH, PAD_DISPLAY_HEIGHT);
 
 // 点滅エフェクト（同位置・同サイズで重ね、ふんわりON/OFF）
-scene.flagFlash = scene.add.image(scene.moon.x, flagGroundY, 'flag-flash');
+scene.flagFlash = scene.add.image(scene.moon.x, flagBottomY, 'flag-flash');
 scene.flagFlash.setOrigin(0.5, 1);
-scene.flagFlash.setDisplaySize(160, 140);
+scene.flagFlash.setDisplaySize(PAD_DISPLAY_WIDTH, PAD_DISPLAY_HEIGHT);
 scene.flagFlash.setDepth(scene.flagVisual.depth + 1);
 scene.flagFlash.setAlpha(0);
 scene.tweens.add({
@@ -126,9 +145,9 @@ scene.tweens.add({
     repeat: -1
 });
 
-// ゴール地面の的（楕円＋十字線）を作成して点滅させる
-scene.markerX = scene.moon.x + 6;
-scene.markerY = scene.moon.y + scene.moon.displayHeight / 2 + 5;
+// ゴール地面の的（楕円＋十字線）を着陸台の上面中央に配置して点滅させる
+scene.markerX = scene.moon.x;
+scene.markerY = padSurfaceY + 2;
 scene.landingMarker = scene.add.graphics();
 scene.drawLandingMarker(0x00ff00);
 scene.tweens.add({
@@ -158,21 +177,41 @@ scene.spaceship.defaultTextureName = 'spaceship';
 
 // 着陸の影を作成（Graphics で 5 段階の多重楕円ソフトシャドウを描く）
 // ベース横幅 110 で描き、setScale で実サイズに合わせる
-scene.spaceshipShadow = scene.add.graphics();
-// 中心が一番濃く (0.06)、外側に向かって薄く。中心は広めで外側のリング間隔は狭い。
-scene.spaceshipShadow.fillStyle(0x000000, 0.03);
-scene.spaceshipShadow.fillEllipse(0, 0, 110, 30); // outer (一番薄い)
-scene.spaceshipShadow.fillStyle(0x000000, 0.035);
-scene.spaceshipShadow.fillEllipse(0, 0, 106, 29);
-scene.spaceshipShadow.fillStyle(0x000000, 0.04);
-scene.spaceshipShadow.fillEllipse(0, 0, 100, 27);
-scene.spaceshipShadow.fillStyle(0x000000, 0.05);
-scene.spaceshipShadow.fillEllipse(0, 0, 92, 25);
-scene.spaceshipShadow.fillStyle(0x000000, 0.06);
-scene.spaceshipShadow.fillEllipse(0, 0, 72, 20);  // 中心（広めで一番濃い）
-scene.spaceshipShadow.x = scene.spaceship.x;
-scene.spaceshipShadow.y = scene.moon.y + 35; // 地面ライン（宇宙船の足元）
-scene.spaceshipShadow.setScale(50 / 100); // 初期表示横幅 50px
+// パッドの上に乗っている部分はパッド上面、はみ出した部分は月面に落ちるよう
+// 同じ形の影を2つ用意し、パッドの水平範囲でマスクで切り分ける
+const buildShadowGfx = () => {
+    const g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.03);
+    g.fillEllipse(0, 0, 110, 30);
+    g.fillStyle(0x000000, 0.035);
+    g.fillEllipse(0, 0, 106, 29);
+    g.fillStyle(0x000000, 0.04);
+    g.fillEllipse(0, 0, 100, 27);
+    g.fillStyle(0x000000, 0.05);
+    g.fillEllipse(0, 0, 92, 25);
+    g.fillStyle(0x000000, 0.06);
+    g.fillEllipse(0, 0, 72, 20);
+    g.x = scene.spaceship.x;
+    g.y = scene.game.config.height - 63;
+    g.setScale(50 / 100);
+    return g;
+};
+scene.spaceshipShadow = buildShadowGfx();       // 着陸台に落ちる用（パッド範囲のみ表示）
+scene.spaceshipShadowGround = buildShadowGfx(); // 月面に落ちる用（パッド範囲外のみ表示）
+
+// 当たり判定デバッグ用の枠（毎フレーム update で再描画）
+// 有効にするには setVisible(true) で表示、または scene.debugBoundsEnabled = true
+scene.debugBounds = scene.add.graphics();
+scene.debugBounds.setDepth(20);
+scene.debugBounds.setVisible(false);
+
+// 台座画像の形そのものをマスクとして使う（ビットマップマスク）
+// → 矩形カットではなく、画像の輪郭・透明度に沿って影が切り替わる
+const padBitmapMask = scene.flagVisual.createBitmapMask();
+scene.spaceshipShadow.setMask(padBitmapMask);
+const groundBitmapMask = scene.flagVisual.createBitmapMask();
+groundBitmapMask.invertAlpha = true;
+scene.spaceshipShadowGround.setMask(groundBitmapMask);
 
 scene.cursors = scene.input.keyboard.createCursorKeys();
 // WASD でも上下左右と同じ挙動。W/A/S/D の keydown/keyup を矢印キーの内部状態に
