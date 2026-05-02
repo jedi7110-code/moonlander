@@ -158,10 +158,43 @@
 
             scene.spaceshipShadow.setAlpha(0);
 
+            // iOS Safari 対策：WebAudio context が suspended のままだと
+            // Phaser の SE（jet / goal 等）が無音になる。ユーザー操作のタイミングで
+            // 明示的に resume＋無音バッファ再生で完全に unlock する。
+            // canvas 以外（HTMLタイトル/ブリーフィング）でタップが発生した場合 Phaser
+            // の自動 unlock が効かないことがあるため、DOM 側で確実に unlock する。
+            const resumeAudioContext = () => {
+                try {
+                    const sm = scene.sound;
+                    if (!sm) return;
+                    const ctx = sm.context;
+                    if (ctx && ctx.state === 'suspended') {
+                        const p = ctx.resume();
+                        if (p && p.catch) p.catch(() => {});
+                    }
+                    // 無音バッファを再生して iOS の出力を完全に開放
+                    if (ctx && ctx.createBuffer) {
+                        const buffer = ctx.createBuffer(1, 1, 22050);
+                        const src = ctx.createBufferSource();
+                        src.buffer = buffer;
+                        src.connect(ctx.destination);
+                        if (src.start) src.start(0); else src.noteOn(0);
+                    }
+                    // Phaser 内部の locked フラグ解除（pendingPlayBacks のフラッシュ）
+                    if (sm.unlock && sm.locked) sm.unlock();
+                } catch (e) {}
+            };
+            // どんなユーザー操作でも保険として AudioContext を resume
+            // （iOS Safari では HTML5 Audio 再生後に suspended に戻ることがある）
+            ['touchend', 'touchstart', 'mousedown', 'click'].forEach((ev) => {
+                document.addEventListener(ev, resumeAudioContext, { capture: true, passive: true });
+            });
+
             let started = false;
             function startGame() {
                 if (started) return;
                 started = true;
+                resumeAudioContext();
 
                 const fadeOverlay = document.getElementById('fade-overlay');
                 const FADE_MS = 400;
@@ -245,6 +278,7 @@
             if (loadingScreen) {
                 let titleAdvanced = false;
                 const onTitleTap = (e) => {
+                    resumeAudioContext();
                     if (titleAdvanced) return;
                     if (!loadingScreen.classList.contains('title')) return;
                     titleAdvanced = true;
@@ -256,6 +290,7 @@
             }
             // ENTER 状態遷移：title → briefing → game
             const enterAdvance = () => {
+                resumeAudioContext();
                 if (!loadingScreen) {
                     // 死亡後リスタート / クリア後周回：そのまま開始
                     startGame();
