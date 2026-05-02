@@ -380,17 +380,21 @@
                 if (!loadingScreen) startGame();
             });
             // モバイル：レターボックス領域（canvas 外）のタップでも再スタートできるよう
-            // document へも touchend ハンドラを張る。タッチコントロール（D-pad / BEAM / JUMP）の
-            // 上では .touch-btn が stopPropagation 相当に消費するため誤発火しない。
+            // document へも touchend ハンドラを張る。
+            // ※ once:true だとタッチコントロール (D-pad/BEAM/JUMP) を誤タップした瞬間に
+            //    「対象外なので何もしない」状態でリスナーが消費されてしまうので、
+            //    startGame が実際に呼ばれた時だけ removeEventListener する。
             if (!loadingScreen) {
+                const opts = { capture: true, passive: true };
                 const docRestartTap = (e) => {
                     // タッチコントロールのボタン上のタップは無視（pointer-events:auto で別途処理される）
                     if (e.target && e.target.closest && e.target.closest('.touch-btn')) return;
+                    document.removeEventListener('touchend', docRestartTap, true);
+                    document.removeEventListener('mousedown', docRestartTap, true);
                     startGame();
                 };
-                const optsOnce = { capture: true, passive: true, once: true };
-                document.addEventListener('touchend', docRestartTap, optsOnce);
-                document.addEventListener('mousedown', docRestartTap, optsOnce);
+                document.addEventListener('touchend', docRestartTap, opts);
+                document.addEventListener('mousedown', docRestartTap, opts);
             }
         }
 
