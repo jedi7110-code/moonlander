@@ -1,6 +1,7 @@
 // ミッションブリーフィング（タイトル後にターミナル風タイピング表示）
 // onDismiss: ENTER で抜けた時に呼ばれるコールバック
-export function startBriefing(loadingScreen, onDismiss) {
+// scene: Phaser scene（command/comstart 音を Phaser sound 経由で再生するため必要）
+export function startBriefing(loadingScreen, onDismiss, scene) {
     // ENTER 連打で多重起動するのを防ぐガード
     if (loadingScreen._briefingStarted) return;
     loadingScreen._briefingStarted = true;
@@ -80,80 +81,67 @@ export function startBriefing(loadingScreen, onDismiss) {
     };
     let text = texts.E;
 
-    // タイピング中はコマンド音をループ再生＋開始SE（単発、小音量）
-    const commandAudio = new Audio('assets/sound/command.wav');
-    // 行ごとに再生し直し、改行（空白時間）では音を出さない
-    commandAudio.loop = false;
+    // タイピング中はコマンド音を行ごとに再生＋開始SE（単発、小音量）
+    // iOS のサイレントスイッチ尊重のため Phaser sound（WebAudio）に統一
     const COMMAND_VOL = 0.2;
-    commandAudio.volume = COMMAND_VOL;
-    // ブツ切りノイズ対策：停止時はクイックフェードアウト
-    let commandFadeTimer = null;
+    const START_VOL = 0.15;
+    const commandSound = scene && scene.sound ? scene.sound.add('command', { loop: false, volume: COMMAND_VOL }) : null;
+    const startSound   = scene && scene.sound ? scene.sound.add('comstart', { loop: false, volume: START_VOL }) : null;
+
+    let commandFadeTween = null;
     function fadeOutCommand(ms = 120) {
-        if (commandFadeTimer) return;
-        const startVol = commandAudio.volume;
-        const t0 = Date.now();
-        commandFadeTimer = setInterval(() => {
-            const t = (Date.now() - t0) / ms;
-            if (t >= 1) {
-                clearInterval(commandFadeTimer);
-                commandFadeTimer = null;
-                commandAudio.pause();
-                commandAudio.currentTime = 0;
-                commandAudio.volume = COMMAND_VOL;
-            } else {
-                commandAudio.volume = startVol * (1 - t);
-            }
-        }, 16);
+        try {
+            if (!commandSound || !commandSound.isPlaying) return;
+            if (commandFadeTween) return;
+            commandFadeTween = scene.tweens.add({
+                targets: commandSound,
+                volume: 0,
+                duration: ms,
+                onComplete: () => {
+                    try { commandSound.stop(); commandSound.setVolume(COMMAND_VOL); } catch (e) {}
+                    commandFadeTween = null;
+                }
+            });
+        } catch (e) { /* 音声不能でもタイピングは続行 */ }
     }
     function startCommand() {
-        if (commandFadeTimer) { clearInterval(commandFadeTimer); commandFadeTimer = null; }
-        // ポップノイズ対策：0からクイックフェードインで再生
-        commandAudio.volume = 0;
-        commandAudio.currentTime = 0;
-        commandAudio.play().catch(() => {});
-        const inMs = 40;
-        const t0 = Date.now();
-        commandFadeTimer = setInterval(() => {
-            const t = (Date.now() - t0) / inMs;
-            if (t >= 1) {
-                clearInterval(commandFadeTimer);
-                commandFadeTimer = null;
-                commandAudio.volume = COMMAND_VOL;
-            } else {
-                commandAudio.volume = COMMAND_VOL * t;
-            }
-        }, 8);
+        try {
+            if (!commandSound) return;
+            if (commandFadeTween) { commandFadeTween.stop(); commandFadeTween = null; }
+            try { commandSound.stop(); } catch (e) {}
+            try { commandSound.setVolume(0); } catch (e) {}
+            try { commandSound.play(); } catch (e) {}
+            // ポップノイズ対策：0からクイックフェードイン
+            scene.tweens.add({ targets: commandSound, volume: COMMAND_VOL, duration: 40 });
+        } catch (e) { /* 音声不能でもタイピングは続行 */ }
     }
-    const startAudio = new Audio('assets/sound/com-start.wav');
-    startAudio.loop = false;
-    const START_VOL = 0.15;
-    startAudio.volume = START_VOL;
-    startAudio.play().catch(() => {});
 
-    // 共通フェードアウトヘルパー
-    let startFadeTimer = null;
+    let startFadeTween = null;
     function fadeOutStart(ms) {
-        if (startFadeTimer) return;
-        const startVol = startAudio.volume;
-        const fadeStart = Date.now();
-        startFadeTimer = setInterval(() => {
-            const t = (Date.now() - fadeStart) / ms;
-            if (t >= 1) {
-                clearInterval(startFadeTimer);
-                startFadeTimer = null;
-                startAudio.pause();
-                startAudio.currentTime = 0;
-                startAudio.volume = START_VOL;
-            } else {
-                startAudio.volume = startVol * (1 - t);
-            }
-        }, 30);
+        try {
+            if (!startSound || !startSound.isPlaying) return;
+            if (startFadeTween) return;
+            startFadeTween = scene.tweens.add({
+                targets: startSound,
+                volume: 0,
+                duration: ms,
+                onComplete: () => {
+                    try { startSound.stop(); startSound.setVolume(START_VOL); } catch (e) {}
+                    startFadeTween = null;
+                }
+            });
+        } catch (e) {}
     }
-    // 自然再生の終わり際にフェードアウト
-    startAudio.addEventListener('timeupdate', () => {
-        if (!startAudio.duration) return;
-        if (startAudio.duration - startAudio.currentTime < 0.6) fadeOutStart(600);
-    });
+    try {
+        if (startSound) {
+            try { startSound.play(); } catch (e) {}
+            if (scene && scene.time) {
+                scene.time.delayedCall(Math.max(0, ((startSound.duration || 1.2) - 0.6) * 1000), () => {
+                    if (startSound.isPlaying) fadeOutStart(600);
+                });
+            }
+        }
+    } catch (e) {}
 
     let i = 0;
     let timer = null;
@@ -192,11 +180,13 @@ export function startBriefing(loadingScreen, onDismiss) {
         i = 0;
         prevWasNewline = true;
         // 進行中のフェードがあればキャンセルして即停止
-        if (commandFadeTimer) { clearInterval(commandFadeTimer); commandFadeTimer = null; }
-        try { commandAudio.pause(); commandAudio.currentTime = 0; commandAudio.volume = COMMAND_VOL; } catch (e) {}
+        if (commandFadeTween) { commandFadeTween.stop(); commandFadeTween = null; }
+        if (commandSound) { try { commandSound.stop(); commandSound.setVolume(COMMAND_VOL); } catch (e) {} }
         // 進行中のフェードがあればキャンセルしてリセット
-        if (startFadeTimer) { clearInterval(startFadeTimer); startFadeTimer = null; }
-        try { startAudio.currentTime = 0; startAudio.volume = START_VOL; startAudio.play().catch(() => {}); } catch (e) {}
+        if (startFadeTween) { startFadeTween.stop(); startFadeTween = null; }
+        if (startSound) {
+            try { startSound.stop(); startSound.setVolume(START_VOL); startSound.play(); } catch (e) {}
+        }
         step();
     }
     step();
@@ -274,7 +264,7 @@ scene.load.on('complete', () => {
 });
 
 scene.load.image('background', 'assets/background.jpg');
-scene.load.image('arrow_unit', 'assets/arrow.svg'); // 右向き矢印1個分（左向きは flipX）
+scene.load.image('arrow_unit', 'assets/arrow.svg?v=2'); // 右向き矢印1個分（左向きは flipX）
 scene.load.image('pod', 'assets/pod.png');
 scene.load.image('spaceship', 'assets/spaceship.png');
 scene.load.image('spacemy', 'assets/spacemy.png');
@@ -295,6 +285,8 @@ scene.load.image('flag', 'assets/flag.png');
 scene.load.image('flag-flash', 'assets/flag-flash.png');
 scene.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
 scene.load.image('title', 'assets/title.png?v=2');
+scene.load.audio('command', 'assets/sound/command.wav'); // ブリーフィングのタイピング音
+scene.load.audio('comstart', 'assets/sound/com-start.wav'); // ブリーフィング開始SE
 scene.load.audio('goal', 'assets/sound/landing.wav'); // ランディング音
 scene.load.audio('explosion', 'assets/sound/explosion.wav'); // 爆発音
 scene.load.audio('jet', 'assets/sound/jet.wav'); // ジェット音

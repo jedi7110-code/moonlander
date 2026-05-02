@@ -1,6 +1,6 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js?v=4';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=8';
         import { create as createScene } from './create.js';
         import { update as updateScene } from './update.js';
 
@@ -134,6 +134,73 @@
         const GlitchOverlay = createGlitchOverlay(game);
         window.GlitchOverlay = GlitchOverlay;
 
+        // ─────────────────────────────────────────────────────────────
+        // iOS サイレントスイッチ回避トリック
+        // 隠し <audio> 要素で無音 WAV をループ再生することで iOS の
+        // audio session を「playback」カテゴリへ昇格させ、WebAudio が
+        // サイレントスイッチを無視してメディア音声系で鳴るようにする。
+        // 動作要件：
+        //  - playsinline / webkit-playsinline 属性必須（インライン再生）
+        //  - 必ずユーザー操作の中で .play() を呼ぶ
+        //  - loop=true で常時鳴らし続ける（停止すると session が戻る）
+        // ─────────────────────────────────────────────────────────────
+        (function setupSilentAudioBypass() {
+            // 1秒の無音 WAV を Blob として生成
+            const sampleRate = 22050;
+            const duration = 1;
+            const numSamples = sampleRate * duration;
+            const buf = new ArrayBuffer(44 + numSamples * 2);
+            const view = new DataView(buf);
+            const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+            writeStr(0, 'RIFF');
+            view.setUint32(4, 36 + numSamples * 2, true);
+            writeStr(8, 'WAVE');
+            writeStr(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);   // PCM
+            view.setUint16(22, 1, true);   // mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);  // 16bit
+            writeStr(36, 'data');
+            view.setUint32(40, numSamples * 2, true);
+            const blob = new Blob([buf], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+
+            const silent = document.createElement('audio');
+            silent.src = url;
+            silent.loop = true;
+            silent.preload = 'auto';
+            silent.setAttribute('playsinline', '');
+            silent.setAttribute('webkit-playsinline', '');
+            silent.style.display = 'none';
+            // ボリュームは0にすると一部 iOS で session 昇格が起きないので極小値
+            silent.volume = 0.001;
+            document.body.appendChild(silent);
+
+            let primed = false;
+            const prime = () => {
+                if (primed) return;
+                const p = silent.play();
+                if (p && p.then) {
+                    p.then(() => { primed = true; }).catch(() => { /* 次のタップで再試行 */ });
+                } else {
+                    primed = true;
+                }
+            };
+            // 最初のユーザー操作で必ず再生開始（capture phase で取りこぼし防止）
+            ['touchstart', 'touchend', 'mousedown', 'click'].forEach((ev) => {
+                document.addEventListener(ev, prime, { capture: true, passive: true });
+            });
+            // ページ復帰時にも再開（背景タブから戻ったとき等）
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && primed && silent.paused) {
+                    silent.play().catch(() => {});
+                }
+            });
+        })();
+
 
 
         function showTitle(scene) {
@@ -159,33 +226,32 @@
             scene.spaceshipShadow.setAlpha(0);
 
             // iOS Safari 対策：WebAudio context が suspended のままだと
-            // Phaser の SE（jet / goal 等）が無音になる。ユーザー操作のタイミングで
-            // 明示的に resume＋無音バッファ再生で完全に unlock する。
-            // canvas 以外（HTMLタイトル/ブリーフィング）でタップが発生した場合 Phaser
-            // の自動 unlock が効かないことがあるため、DOM 側で確実に unlock する。
+            // Phaser の SE が無音になる。canvas 以外（HTMLタイトル/ブリーフィング）で
+            // タップが発生した場合 Phaser の自動 unlock が効かないことがあるため、
+            // document へ張ったハンドラで context.resume + 無音バッファ再生で確実に
+            // unlock する。
+            // 注：iPhone 本体のサイレントスイッチが ON だと WebAudio は OS 側で
+            // ミュートされるため、本コードでは復旧不可（サイレント解除で鳴る）。
             const resumeAudioContext = () => {
                 try {
                     const sm = scene.sound;
                     if (!sm) return;
                     const ctx = sm.context;
-                    if (ctx && ctx.state === 'suspended') {
+                    if (!ctx) return;
+                    if (ctx.state === 'suspended') {
                         const p = ctx.resume();
                         if (p && p.catch) p.catch(() => {});
                     }
-                    // 無音バッファを再生して iOS の出力を完全に開放
-                    if (ctx && ctx.createBuffer) {
+                    if (ctx.createBuffer) {
                         const buffer = ctx.createBuffer(1, 1, 22050);
                         const src = ctx.createBufferSource();
                         src.buffer = buffer;
                         src.connect(ctx.destination);
                         if (src.start) src.start(0); else src.noteOn(0);
                     }
-                    // Phaser 内部の locked フラグ解除（pendingPlayBacks のフラッシュ）
                     if (sm.unlock && sm.locked) sm.unlock();
                 } catch (e) {}
             };
-            // どんなユーザー操作でも保険として AudioContext を resume
-            // （iOS Safari では HTML5 Audio 再生後に suspended に戻ることがある）
             ['touchend', 'touchstart', 'mousedown', 'click'].forEach((ev) => {
                 document.addEventListener(ev, resumeAudioContext, { capture: true, passive: true });
             });
@@ -225,8 +291,8 @@
                 }
 
                 scene.spaceshipShadow.setAlpha(1);
-                // ENTER 開始時の SE：landing.wav（goal キーと共用、開始音 0.15）
-                if (scene.goalSound) scene.goalSound.play({ volume: 0.15 });
+                // ENTER 開始時の SE：landing.wav（goal キーと共用、開始音 0.075）
+                if (scene.goalSound) scene.goalSound.play({ volume: 0.075 });
 
                 // Phase 1: 母艦から降下（中心を少し行き過ぎて上に戻るビヨーン挙動。スラスター噴射しながら）
                 scene.tweens.add({
@@ -283,7 +349,7 @@
                     if (!loadingScreen.classList.contains('title')) return;
                     titleAdvanced = true;
                     if (e && e.cancelable) e.preventDefault();
-                    startBriefing(loadingScreen, () => startGame());
+                    startBriefing(loadingScreen, () => startGame(), scene);
                 };
                 loadingScreen.addEventListener('click', onTitleTap);
                 loadingScreen.addEventListener('touchend', onTitleTap, { passive: false });
@@ -302,7 +368,7 @@
                 if (Date.now() - dismissedAt < 300) return; // ブリーフィング離脱直後の同一ENTER無視
                 if (cls.contains('title')) {
                     // タイトル → ブリーフィングへ遷移
-                    startBriefing(loadingScreen, () => startGame());
+                    startBriefing(loadingScreen, () => startGame(), scene);
                     return;
                 }
                 // ローディング中（lit のみ／title 前）はゲーム開始を許可しない
@@ -313,6 +379,19 @@
             scene.input.on('pointerdown', () => {
                 if (!loadingScreen) startGame();
             });
+            // モバイル：レターボックス領域（canvas 外）のタップでも再スタートできるよう
+            // document へも touchend ハンドラを張る。タッチコントロール（D-pad / BEAM / JUMP）の
+            // 上では .touch-btn が stopPropagation 相当に消費するため誤発火しない。
+            if (!loadingScreen) {
+                const docRestartTap = (e) => {
+                    // タッチコントロールのボタン上のタップは無視（pointer-events:auto で別途処理される）
+                    if (e.target && e.target.closest && e.target.closest('.touch-btn')) return;
+                    startGame();
+                };
+                const optsOnce = { capture: true, passive: true, once: true };
+                document.addEventListener('touchend', docRestartTap, optsOnce);
+                document.addEventListener('mousedown', docRestartTap, optsOnce);
+            }
         }
 
         function preload() {

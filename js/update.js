@@ -3,6 +3,15 @@ import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js';
 
+// ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
+// IS_LOCAL=true の時はテスト用無敵モード（プレイヤー捕獲・デブリ衝突を無効化）
+const IS_LOCAL = (() => {
+    try {
+        const h = window.location.hostname;
+        return h === 'localhost' || h === '127.0.0.1' || /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(h);
+    } catch (e) { return false; }
+})();
+
 function restartGame(scene) {
     scene.gameStarted = false;
     scene.spaceship.setVisible(true);
@@ -45,10 +54,22 @@ if (scene.astronautMode && scene.astronaut) {
     }
 
     // 左右移動（捕獲後は操作不可）
-    const isMoving = !scene.astronautGameOver && !scene.playerClimbing && (scene.cursors.left.isDown || scene.cursors.right.isDown);
+    // 地上：入力中は即時に最大速度、キー離し時は摩擦減速（惰性モード）
+    // 空中：同方向キーは向きの切替のみで vx 維持、逆方向キーは減速ブレーキ（0までで止まる、逆方向には加速しない）
+    const frictionRate = 600;   // 地上のキー離し減速度 (px/s²)
+    const airBrakeRate = 178;   // 空中の逆方向ブレーキ減速度 (px/s²) — 飛びすぎ調整用（最高速 80 → 0 まで約 0.45 秒）
+    if (scene.astronautVX === undefined) scene.astronautVX = 0;
+    const leftDown = !scene.astronautGameOver && !scene.playerClimbing && scene.cursors.left.isDown;
+    const rightDown = !scene.astronautGameOver && !scene.playerClimbing && scene.cursors.right.isDown;
+    const isMoving = leftDown || rightDown;
     const prevFacing = scene.astronautFacing;
-    if (!scene.astronautGameOver && !scene.playerClimbing && scene.cursors.left.isDown) {
-        scene.astronaut.x -= moveSpeed * dt;
+    if (leftDown) {
+        if (onGround) {
+            scene.astronautVX = -moveSpeed; // 地上は即時最大速度
+        } else if (scene.astronautVX > 0) {
+            // 空中で右へ進んでいるとき左キー：ブレーキ（0 までで止まる、逆向きには加速しない）
+            scene.astronautVX = Math.max(0, scene.astronautVX - airBrakeRate * dt);
+        }
         scene.astronaut.setFlipX(false); // 元画像は左向き
         scene.astronautFacing = 'left';
         // 切替時のアニメ
@@ -57,8 +78,13 @@ if (scene.astronautMode && scene.astronaut) {
         } else if (prevFacing === 'front' && onGround) {
             scene.astronaut.anims.play('astronaut_turn_front_to_L');
         }
-    } else if (!scene.astronautGameOver && !scene.playerClimbing && scene.cursors.right.isDown) {
-        scene.astronaut.x += moveSpeed * dt;
+    } else if (rightDown) {
+        if (onGround) {
+            scene.astronautVX = moveSpeed; // 地上は即時最大速度
+        } else if (scene.astronautVX < 0) {
+            // 空中で左へ進んでいるとき右キー：ブレーキ
+            scene.astronautVX = Math.min(0, scene.astronautVX + airBrakeRate * dt);
+        }
         scene.astronaut.setFlipX(true); // 右向きは左右反転
         scene.astronautFacing = 'right';
         // 切替時のアニメ
@@ -67,7 +93,16 @@ if (scene.astronautMode && scene.astronaut) {
         } else if (prevFacing === 'front' && onGround) {
             scene.astronaut.anims.play('astronaut_turn_front_to_R');
         }
+    } else if (!scene.astronautGameOver && !scene.playerClimbing && onGround) {
+        // 接地中・キー離し時：摩擦で 0 に減速（惰性モード）
+        if (scene.astronautVX > 0) scene.astronautVX = Math.max(0, scene.astronautVX - frictionRate * dt);
+        else if (scene.astronautVX < 0) scene.astronautVX = Math.min(0, scene.astronautVX + frictionRate * dt);
+    } else if (scene.astronautGameOver || scene.playerClimbing) {
+        scene.astronautVX = 0; // 捕獲・ハシゴ中は即停止
     }
+    // 空中で入力なしの時はジャンプ時の速度をそのまま維持（friction 適用しない）
+    // 速度から位置を更新
+    scene.astronaut.x += scene.astronautVX * dt;
 
     // 初回の移動で通常ズームへ戻す（ハシゴ降り時のアップからゲームプレイ用ズームへ）
     if (isMoving && scene.astronautHasMoved === false) {
@@ -201,7 +236,7 @@ if (scene.astronautMode && scene.astronaut) {
             const glow = scene.add.rectangle(startX, startY, glowLen, 1, 0xffffff);
             glow.setDepth(10);
             const power = ratio >= 0.67 ? 3 : ratio >= 0.34 ? 2 : 1;
-            scene.lasers.push({ beam, glow, dir, speed: 620, born: scene.time.now, life: 1200, power });
+            scene.lasers.push({ beam, glow, dir, speed: 620, born: scene.time.now, life: 1200, power, beamColor });
             scene.beamSound.play();
             scene.beamEnergy = Math.max(0, scene.beamEnergy - 22);
         }
@@ -274,6 +309,71 @@ if (scene.astronautMode && scene.astronaut) {
                     e.hp -= l.power;
                     scene.beamHitSound.play();
                     hit = true;
+
+                    // ヒット時の 1px ドット弾けエフェクト（溶接火花風：放物線で飛び、地面で跳ね返る）
+                    {
+                        // ヒット位置 X：敵中心からビーム侵入方向（プレイヤー側）へ寄せる。
+                        // displayWidth/3 だけプレイヤー寄り、奥（敵中心側）への戻し量を雑魚/ボスで微調整
+                        const inset = e.isBoss ? 3 : 4; // 雑魚はさらに 1px 奥
+                        const hx = e.x - l.dir * (e.displayWidth / 3 - inset);
+                        // ビーム（=プレイヤーが撃った高さ）でヒット位置 Y を取る。
+                        // 敵中心だとボスは大きいので火花が高く出てしまうため。
+                        const hy = l.beam.y;
+                        const burstCount = l.charged ? 28 : 16;
+                        // 火花の色はビームの色に追従（残量低 → 赤、満タン → 緑、チャージ → シアン）
+                        const lighten = (c, t) => {
+                            const cr = (c >> 16) & 0xff, cg = (c >> 8) & 0xff, cb = c & 0xff;
+                            const nr = Math.round(cr + (255 - cr) * t);
+                            const ng = Math.round(cg + (255 - cg) * t);
+                            const nb = Math.round(cb + (255 - cb) * t);
+                            return (nr << 16) | (ng << 8) | nb;
+                        };
+                        const colors = l.charged
+                            ? [0xffffff, 0xc8ffd8, 0x88ffaa, 0xaaffff]
+                            : [0xffffff, lighten(l.beamColor || 0xffffff, 0.6), l.beamColor || 0xffffff, lighten(l.beamColor || 0xffffff, 0.3)];
+                        const groundY = scene.groundFeetY;
+                        const sparkGravity = 320;   // 重力 (px/s²)
+                        const bounceDamp = 0.55;    // 跳ね返りエネルギー保持率
+                        const frictionDamp = 0.7;   // 跳ねた時の横速度減衰
+                        for (let bi = 0; bi < burstCount; bi++) {
+                            // 逆方向中心に ±約 86° の扇状（ビーム進行と逆向きを基本）
+                            const baseAng = l.dir > 0 ? Math.PI : 0;
+                            const ang = baseAng + Phaser.Math.FloatBetween(-1.5, 1.5);
+                            const speed = Phaser.Math.FloatBetween(60, 160);
+                            const life = Phaser.Math.Between(180, 360);
+                            const c = Phaser.Math.RND.pick(colors);
+                            const dot = scene.add.rectangle(hx, hy, 1, 1, c);
+                            dot.setDepth(11);
+                            // 物理パラメータ
+                            let vx = Math.cos(ang) * speed;
+                            let vy = Math.sin(ang) * speed;
+                            let elapsed = 0;
+                            const onTick = (time, delta) => {
+                                if (!dot.active) {
+                                    scene.events.off('update', onTick);
+                                    return;
+                                }
+                                const dt = delta / 1000;
+                                elapsed += delta;
+                                vy += sparkGravity * dt;
+                                let ny = dot.y + vy * dt;
+                                if (ny >= groundY && vy > 0) {
+                                    // 地面に当たったら火花のように跳ねる
+                                    ny = groundY;
+                                    vy = -Math.abs(vy) * bounceDamp;
+                                    vx *= frictionDamp;
+                                }
+                                dot.x += vx * dt;
+                                dot.y = ny;
+                                dot.alpha = Math.max(0, 1 - elapsed / life);
+                                if (elapsed >= life) {
+                                    scene.events.off('update', onTick);
+                                    dot.destroy();
+                                }
+                            };
+                            scene.events.on('update', onTick);
+                        }
+                    }
                     if (e.hp <= 0) {
                         const abSize = e.isBoss ? 90 : 45;
                         const ab = scene.add.sprite(e.x, e.y - 5, 'bloodAlien');
@@ -549,7 +649,7 @@ if (scene.astronautMode && scene.astronaut) {
                 startCaptureAnim();
                 break; // このフレームで以降の処理は不要
             }
-            if (!e.capturing && !scene.astronaut.captured && scene.astronaut.visible && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
+            if (!IS_LOCAL && !e.capturing && !scene.astronaut.captured && scene.astronaut.visible && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
                 const isFirstCapture = !scene.astronautGameOver;
                 scene.astronaut.captured = true;
                 e.capturing = true;
@@ -762,8 +862,8 @@ if (scene.astronautMode && scene.astronaut) {
                 const bubble2 = scene.makeGuideBubble(
                     baseAstro.x + offsetX, labelY, arrowY, labelImg, isRight, 0x88ffaa, 11.5
                 ).setScale(0, 1);
-                scene.tweens.add({ targets: labelImg, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
-                scene.tweens.add({ targets: bubble2, scaleX: 1, duration: 300, ease: 'Sine.easeOut' });
+                scene.tweens.add({ targets: labelImg, alpha: 1, duration: 250, ease: 'Sine.easeInOut' });
+                scene.tweens.add({ targets: bubble2, scaleX: 1, duration: 300, ease: 'Sine.easeInOut' });
 
                 // >, >>, >>> サイクルは残す。ただし位置は固定（プレイヤー移動に追従しない）
                 const fixedAnchorX2 = baseAstro.x + offsetX;
@@ -793,12 +893,12 @@ if (scene.astronautMode && scene.astronaut) {
 
                 scene.time.delayedCall(totalDuration + 100, () => {
                     scene.tweens.add({
-                        targets: labelImg, alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                        targets: labelImg, alpha: 0, duration: 300, ease: 'Sine.easeInOut',
                         onComplete: () => labelImg.destroy()
                     });
                     // 枠は中心へ閉じる
                     scene.tweens.add({
-                        targets: bubble2, scaleX: 0, duration: 300, ease: 'Sine.easeIn',
+                        targets: bubble2, scaleX: 0, duration: 300, ease: 'Sine.easeInOut',
                         onComplete: () => bubble2.destroy()
                     });
                     // ラベル消えるのと同時に元のズームへ戻す
@@ -1456,8 +1556,8 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
         // ハシゴが出てくるタイミングで、宇宙船の足元（ハシゴ付近）にカメラをパン＋ズーム
         const targetPanX = scene.spaceship.x;
         const targetPanY = scene.spaceship.y + 30; // ハシゴ中央あたり
-        scene.cameras.main.pan(targetPanX, targetPanY, 1500, 'Sine.easeInOut');
-        scene.cameras.main.zoomTo(4.5, 1500, 'Sine.easeInOut');
+        scene.cameras.main.pan(targetPanX, targetPanY, 2000, 'Sine.easeInOut');
+        scene.cameras.main.zoomTo(4.5, 2000, 'Sine.easeInOut');
 
         // ハシゴがスッと伸びるアニメーション
         let ladderProgress = 0;
@@ -1465,7 +1565,7 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
             from: 0,
             to: 1,
             duration: 800,
-            ease: 'Sine.easeOut',
+            ease: 'Sine.easeInOut',
             onUpdate: (tween) => {
                 ladderProgress = tween.getValue();
                 const currentBottom = ladderTop + (ladderBottom - ladderTop) * ladderProgress;
@@ -1746,15 +1846,15 @@ if (isLevel && isSlow && Phaser.Geom.Intersects.RectangleToRectangle(scene.space
                                 const bubble = scene.makeGuideBubble(
                                     fixedAnchorX, labelY, arrowY, label, isRight, 0x88ffaa, 11.5
                                 ).setScale(0, 1);
-                                scene.tweens.add({ targets: label, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
-                                scene.tweens.add({ targets: bubble, scaleX: 1, duration: 300, ease: 'Sine.easeOut' });
+                                scene.tweens.add({ targets: label, alpha: 1, duration: 250, ease: 'Sine.easeInOut' });
+                                scene.tweens.add({ targets: bubble, scaleX: 1, duration: 300, ease: 'Sine.easeInOut' });
                                 scene.time.delayedCall(totalDuration + 100, () => {
                                     scene.tweens.add({
-                                        targets: label, alpha: 0, duration: 300, ease: 'Sine.easeIn',
+                                        targets: label, alpha: 0, duration: 300, ease: 'Sine.easeInOut',
                                         onComplete: () => label.destroy()
                                     });
                                     scene.tweens.add({
-                                        targets: bubble, scaleX: 0, duration: 300, ease: 'Sine.easeIn',
+                                        targets: bubble, scaleX: 0, duration: 300, ease: 'Sine.easeInOut',
                                         onComplete: () => bubble.destroy()
                                     });
                                 });
@@ -1864,9 +1964,11 @@ scene.debrisGroup.getChildren().forEach((debris) => {
     debris.angle += debris.getData('rotationSpeed');
 });
 
-// 宇宙船とデブリとの衝突をチェック
-scene.physics.overlap(scene.spaceship, scene.debrisGroup, () => {
-    gameOver(scene, '');
-});
+// 宇宙船とデブリとの衝突をチェック（ローカル開発時は無効化＝無敵）
+if (!IS_LOCAL) {
+    scene.physics.overlap(scene.spaceship, scene.debrisGroup, () => {
+        gameOver(scene, '');
+    });
+}
 
 }

@@ -35,6 +35,7 @@ scene.beamEnergy = 100;
 scene.chargeAllowed = false; // 押下時のエネルギーで判定（>=50でtrue）
 scene.astronautFacing = null;
 scene.astronautVY = 0;
+scene.astronautVX = 0;
 scene.escapeJetSound = null;
 
 // キーボード入力の設定
@@ -181,7 +182,7 @@ for (const [letter, arrowKey] of Object.entries(wasdMap)) {
     scene.input.keyboard.on(`keydown-${letter}`, (e) => arrowKey.onDown(e));
     scene.input.keyboard.on(`keyup-${letter}`, (e) => arrowKey.onUp(e));
 }
-scene.goalSound = scene.sound.add('goal', { loop: false, volume: 0.05 });
+scene.goalSound = scene.sound.add('goal', { loop: false, volume: 0.025 });
 scene.goalTimer = 0;
 scene.explosionSound = scene.sound.add('explosion', { loop: false, volume: 1 });
 scene.emptySound = scene.sound.add('empty', { loop: true, volume: 0.1 });
