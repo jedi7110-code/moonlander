@@ -190,8 +190,10 @@ body.no-crt .crt-overlay {
     max-width: 440px;
     z-index: 2;
     color: #c8ffd8;
-    font-family: "Courier New", Menlo, monospace;
+    /* 英文は Courier 系、日本語は Zen Kaku Gothic New（Google Fonts） */
+    font-family: "Courier New", Menlo, "Zen Kaku Gothic New", monospace;
     font-size: 14px;
+    font-weight: 300;
     line-height: 1.4;
     text-shadow:
         0 0 2px rgba(200, 255, 216, 0.55),
