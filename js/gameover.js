@@ -20,7 +20,8 @@ export function gameOver(scene, message) {
 
         // ジェット噴射・粉塵パーティクルを停止
         scene.jetParticles.up.on = false;
-        scene.jetParticles.down.on = false;
+        if (scene.jetParticles.downLeft) scene.jetParticles.downLeft.on = false;
+        if (scene.jetParticles.downRight) scene.jetParticles.downRight.on = false;
         scene.jetParticles.left.on = false;
         scene.jetParticles.right.on = false;
         scene.dustEmitters.forEach(e => e.on = false);
