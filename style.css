@@ -2,6 +2,8 @@ html,
 body {
     width: 100%;
     height: 100%;
+    /* iOS Chrome の address bar 分を含まない可視範囲に揃える（Safari と挙動を統一） */
+    height: 100dvh;
     background-color: #1a1a1e;
     font-family: Helvetica, Arial, sans-serif;
     display: flex;
@@ -451,15 +453,15 @@ body.no-crt .crt-overlay {
 }
 .touch-dpad {
     position: absolute;
-    /* D-pad（幅 36vh）の 2/3 はゲーム外、1/3 はゲーム内に被るよう配置
+    /* D-pad（幅 36vh + 6px）の 2/3 はゲーム外、1/3 はゲーム内に被るよう配置
        ゲーム左端 = 50vw - 600px*scale。D-pad 右端 = ゲーム左端 + 12vh（1/3被り）。
        D-pad 左端 = ゲーム左端 - 24vh（2/3が外）
        max() でレターボックスが狭い端末では viewport 端から 0 で頭打ち。 */
     left: max(0px, calc(50vw - 600px * var(--game-scale, 1) - 28vh));
     /* 画面下端は親指が届きにくいため上寄りに配置 */
     top: calc(2vh + 10px);
-    width: 36vh;
-    height: 36vh;
+    width: calc(36vh + 6px);
+    height: calc(36vh + 6px);
     pointer-events: none;
 }
 .touch-actions {
@@ -504,18 +506,18 @@ body.no-crt .crt-overlay {
 /* D-pad の十字配置 */
 .touch-dpad .touch-btn {
     position: absolute;
-    width: 12vh;
-    height: 12vh;
+    width: calc(12vh + 2px);
+    height: calc(12vh + 2px);
     font-size: 5.2vh;
     line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.dpad-up    { top: 0;             left: 12vh; }
-.dpad-down  { bottom: 0;          left: 12vh; }
-.dpad-left  { top: 12vh;          left: 0; }
-.dpad-right { top: 12vh;          right: 0; }
+.dpad-up    { top: 0;                  left: calc(12vh + 2px); }
+.dpad-down  { bottom: 0;               left: calc(12vh + 2px); }
+.dpad-left  { top: calc(12vh + 2px);   left: 0; }
+.dpad-right { top: calc(12vh + 2px);   right: 0; }
 /* アクションボタン（BEAM/JUMP） 横長で縦並び */
 .touch-actions .touch-btn {
     width: 34vh;
@@ -535,6 +537,23 @@ body.no-crt .crt-overlay {
 }
 .act-beam:active {
     background: rgba(255, 200, 80, 0.3);
+}
+/* ENTER ボタン（タイトル/クリア/失敗画面でのタイトル戻り用、BEAM/JUMP の右端ラインに揃える） */
+.act-enter {
+    position: absolute;
+    bottom: 2vh;
+    /* .touch-actions と同じ right 値で右端を揃える */
+    right: max(0px, calc(50vw - 600px * var(--game-scale, 1) - 28vh));
+    width: 16vh;
+    height: 8vh;
+    padding: 1.2vh 2vh;
+    font-size: 2.8vh;
+    letter-spacing: 0.18em;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
 }
 
 

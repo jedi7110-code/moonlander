@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=39">
+    <link rel="stylesheet" href="style.css?v=42">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 </head>
@@ -103,7 +103,7 @@
     <!-- 捕獲時のグリッチ用：ブラウザ最前面の WebGL オーバーレイ -->
     <canvas id="glitch-overlay"></canvas>
 
-    <script type="module" src="js/main.js?v=10"></script>
+    <script type="module" src="js/main.js?v=11"></script>
 
     <!-- 横画面スマホ用オンスクリーンコントロール -->
     <div class="touch-controls" id="touch-controls">
@@ -117,6 +117,7 @@
             <button class="touch-btn act-beam" id="btn-beam" data-key="Space">BEAM</button>
             <button class="touch-btn act-jump" id="btn-jump" data-key="ArrowUp">JUMP</button>
         </div>
+        <button class="touch-btn act-enter" id="btn-enter" data-key="Enter">ENTER</button>
     </div>
 
 </body>

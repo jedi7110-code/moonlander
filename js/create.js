@@ -332,9 +332,11 @@ const emitterConfig = (angle) => ({
     on: false
 });
 
+// 下降スラスターは左右の足の付け根から斜め上に噴射する（左=up-left ~225°, 右=up-right ~315°）
 scene.jetParticles = {
     up: scene.add.particles('jetParticle').createEmitter(emitterConfig({ min: 75, max: 105 })),
-    down: scene.add.particles('jetParticle').createEmitter(emitterConfig({ min: 255, max: 285 })),
+    downLeft: scene.add.particles('jetParticle').createEmitter(emitterConfig({ min: 210, max: 240 })),
+    downRight: scene.add.particles('jetParticle').createEmitter(emitterConfig({ min: 300, max: 330 })),
     left: scene.add.particles('jetParticle').createEmitter(emitterConfig({ min: -15, max: 15 })),
     right: scene.add.particles('jetParticle').createEmitter(emitterConfig({ min: 165, max: 195 }))
 };

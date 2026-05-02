@@ -1,8 +1,8 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
         import { preload as preloadAssets, startBriefing } from './preload.js?v=9';
-        import { create as createScene } from './create.js?v=24';
-        import { update as updateScene } from './update.js?v=30';
+        import { create as createScene } from './create.js?v=25';
+        import { update as updateScene } from './update.js?v=34';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
         // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、
@@ -26,10 +26,10 @@
             const buttons = document.querySelectorAll('.touch-btn');
             // data-key 属性に対応する KeyboardEvent.code / key
             const keyCodeMap = {
-                ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Space: 32
+                ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Space: 32, Enter: 13
             };
             const keyMap = {
-                ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Space: ' '
+                ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Space: ' ', Enter: 'Enter'
             };
             const pressed = new Map(); // code -> count（複数ボタンが同じキーを送る場合の参照カウント）
             function dispatch(type, code) {

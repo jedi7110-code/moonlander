@@ -1180,10 +1180,21 @@ if (scene.astronautMode && scene.astronaut) {
                                                     duration: 1500,
                                                     ease: 'Sine.easeIn',
                                                     onComplete: () => {
-                                                        scene.input.keyboard.once('keydown-ENTER', () => {
+                                                        const advance = () => {
+                                                            scene.input.keyboard.off('keydown-ENTER', advance);
+                                                            scene.input.off('pointerdown', advance);
+                                                            document.removeEventListener('touchend', docAdvance, true);
                                                             scene.playthroughCount++;
                                                             scene.scene.restart();
-                                                        });
+                                                        };
+                                                        const docAdvance = (e) => {
+                                                            // タッチコントロール上のタップは無視
+                                                            if (e.target && e.target.closest && e.target.closest('.touch-btn')) return;
+                                                            advance();
+                                                        };
+                                                        scene.input.keyboard.once('keydown-ENTER', advance);
+                                                        scene.input.once('pointerdown', advance);
+                                                        document.addEventListener('touchend', docAdvance, { capture: true, passive: true });
                                                     }
                                                 });
                                             }
@@ -1380,7 +1391,8 @@ if (scene.gameStarted) {
         scene.input.keyboard.createCursorKeys().down.isDown ||
         scene.input.keyboard.createCursorKeys().left.isDown ||
         scene.input.keyboard.createCursorKeys().right.isDown) && scene.fuel > 0) {
-        scene.fuel -= 1;
+        // ローカル開発時は燃料無限（IS_LOCAL=true ならジェットを消費しない）
+        if (!IS_LOCAL) scene.fuel -= 1;
     }
 
     // 燃料がなくなったら操作を無効にする
@@ -1433,14 +1445,30 @@ if (scene.gameStarted) {
     const hasFuel = scene.fuel > 0;
 
     scene.jetParticles.up.setPosition(sx, sy + 25);
-    scene.jetParticles.down.setPosition(sx, sy - 25);
+    // 下降スラスター：左右の足の付け根から斜め上に噴射
+    scene.jetParticles.downLeft.setPosition(sx - 15, sy + 5);
+    scene.jetParticles.downRight.setPosition(sx + 15, sy + 5);
     scene.jetParticles.left.setPosition(sx + 25, sy);
     scene.jetParticles.right.setPosition(sx - 25, sy);
 
     scene.jetParticles.up.on = scene.cursors.up.isDown && hasFuel;
-    scene.jetParticles.down.on = scene.cursors.down.isDown && hasFuel;
-    scene.jetParticles.left.on = scene.cursors.left.isDown && hasFuel;
-    scene.jetParticles.right.on = scene.cursors.right.isDown && hasFuel;
+    const downFiring = scene.cursors.down.isDown && hasFuel;
+    const leftFiring = scene.cursors.left.isDown && hasFuel;
+    const rightFiring = scene.cursors.right.isDown && hasFuel;
+    // 下降スラスターは通常は左右両方を噴射するが、横移動と組み合わせ時は
+    // 動きの方向に逆らう側を消し、見た目上「同じ側のスラスターのみ噴射」にする
+    // 右下移動 → 左側 (downLeft) のみ、左下移動 → 右側 (downRight) のみ
+    let downLeftOn = downFiring;
+    let downRightOn = downFiring;
+    if (downFiring && rightFiring && !leftFiring) {
+        downRightOn = false;
+    } else if (downFiring && leftFiring && !rightFiring) {
+        downLeftOn = false;
+    }
+    scene.jetParticles.downLeft.on = downLeftOn;
+    scene.jetParticles.downRight.on = downRightOn;
+    scene.jetParticles.left.on = leftFiring;
+    scene.jetParticles.right.on = rightFiring;
 
     // 宇宙船の影：着陸台用と月面用を別々に配置し、マスクで自然に段差を表現
     // 宇宙船の脚がパッドに乗っている部分はパッド上面、はみ出している部分は月面に影が落ちる
@@ -1589,7 +1617,7 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
     fadeStopSound(scene, scene.jetSound, 0.3);
     if (scene.emptySound.isPlaying) scene.emptySound.stop();
     scene.jetParticles.up.on = false;
-    scene.jetParticles.down.on = false;
+    scene.jetParticles.downLeft.on = false; scene.jetParticles.downRight.on = false;
     scene.jetParticles.left.on = false;
     scene.jetParticles.right.on = false;
     scene.dustEmitters.forEach(e => e.on = false);
@@ -1627,7 +1655,7 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
 
     // ジェット噴射・粉塵パーティクルを停止
     scene.jetParticles.up.on = false;
-    scene.jetParticles.down.on = false;
+    scene.jetParticles.downLeft.on = false; scene.jetParticles.downRight.on = false;
     scene.jetParticles.left.on = false;
     scene.jetParticles.right.on = false;
     scene.dustEmitters.forEach(e => e.on = false);
