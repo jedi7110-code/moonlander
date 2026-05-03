@@ -443,7 +443,8 @@ body.no-crt .crt-overlay {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 9000;
+    /* glitch-overlay (z-index:9999) より前面に出す */
+    z-index: 10000;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
