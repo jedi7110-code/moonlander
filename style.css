@@ -360,6 +360,267 @@ body.no-crt .crt-overlay {
     opacity: 0;
     pointer-events: none;
 }
+/* ─── 着陸コックピット視点（briefing と同じ scale 1.4、同じ opening-title 背景） ─── */
+/* イージングなしで即 scale 1.4。transition は無効化 */
+#loading-screen.cockpit-mode {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1.4);
+    transition: none !important;
+}
+#loading-screen.cockpit-mode .loading-frame,
+#loading-screen.cockpit-mode .title-screen,
+#loading-screen.cockpit-mode .briefing-screen { display: none; }
+/* lit 後は ::before の opening-title-dark が消えているので、ベース背景の opening-title が見える */
+#loading-screen.cockpit-mode::before { display: none; }
+.cockpit-monitor {
+    position: absolute;
+    /* briefing-screen と同じ位置。サイズは land-point.jpg と同じ 4:3 */
+    top: calc(40% + 15px);
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44%;
+    max-width: 440px;
+    aspect-ratio: 4 / 3;
+    z-index: 3;
+    display: none;
+    pointer-events: none;
+}
+#loading-screen.cockpit-mode .cockpit-monitor { display: block; }
+.cockpit-monitor-inner {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #05140a;
+    box-shadow:
+        inset 0 0 0 1px rgba(136, 255, 170, 0.35),
+        inset 0 0 12px rgba(0, 0, 0, 0.85);
+}
+.cockpit-image {
+    position: absolute;
+    /* JS で width/height/left/top を上書き（setCrop 相当のズーム＋パン） */
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    user-select: none;
+    /* 緑モニター風 */
+    filter: hue-rotate(40deg) saturate(1.8) brightness(0.95) contrast(1.15);
+    will-change: width, height, transform;
+}
+.cockpit-shadow {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 16px; height: 16px;
+    /* 中心固定。傾きパースは JS で transform 上書き */
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transform-style: preserve-3d;
+    will-change: width, height, transform;
+}
+.cockpit-shadow .sh-layer {
+    position: absolute;
+    left: 50%; top: 50%;
+    border-radius: 50%;
+    background: #000000;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+/* 対地速度表示（タコメーター風）— 十字マークの上 */
+.cockpit-vsi {
+    position: absolute;
+    left: 50%; top: calc(50% - 30px);
+    transform: translate(-50%, -100%);
+    pointer-events: none;
+    text-align: center;
+    z-index: 5;
+    width: 90px;
+}
+.cockpit-vsi .vsi-gauge {
+    display: block;
+    width: 90px;
+    height: 54px;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.85));
+}
+.cockpit-vsi .vsi-needle {
+    transform-origin: 50px 55px;
+    transition: transform 0.06s linear;
+    filter: drop-shadow(0 0 2px rgba(200,255,216,0.85));
+}
+.cockpit-vsi .vsi-num {
+    color: #c8ffd8;
+    font-family: "Courier New", Menlo, monospace;
+    font-weight: bold;
+    font-size: 10px;
+    line-height: 1;
+    margin-top: 1px;
+    text-shadow: 0 0 3px rgba(136,255,170,0.85), 0 0 2px rgba(0,0,0,0.85);
+}
+.cockpit-vsi .vsi-unit { font-size: 7px; color: #88ffaa; margin-left: 1px; }
+.cockpit-monitor.spd-fast .cockpit-vsi .vsi-needle { stroke: #ff5566; filter: drop-shadow(0 0 2px rgba(255,85,102,0.9)); }
+.cockpit-monitor.spd-slow .cockpit-vsi .vsi-needle { stroke: #ffcc66; filter: drop-shadow(0 0 2px rgba(255,204,102,0.9)); }
+.cockpit-monitor.spd-fast .cockpit-vsi .vsi-num { color: #ff5566; text-shadow: 0 0 3px rgba(255,85,102,0.9), 0 0 2px rgba(0,0,0,0.85); }
+.cockpit-monitor.spd-slow .cockpit-vsi .vsi-num { color: #ffcc66; text-shadow: 0 0 3px rgba(255,204,102,0.9), 0 0 2px rgba(0,0,0,0.85); }
+.cockpit-monitor.blink.spd-safe .cockpit-vsi .vsi-needle { opacity: 0.45; }
+.cockpit-monitor.blink.spd-safe .cockpit-vsi .vsi-num { opacity: 0.45; }
+.cockpit-crosshair {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 44px; height: 44px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+.cockpit-crosshair .ch-h, .cockpit-crosshair .ch-v {
+    position: absolute;
+    background: #ffffff;
+    box-shadow: 0 0 3px rgba(255,255,255,0.6);
+}
+.cockpit-crosshair .ch-h {
+    left: 0; top: 50%;
+    width: 100%; height: 1.5px;
+    transform: translateY(-50%);
+}
+.cockpit-crosshair .ch-v {
+    left: 50%; top: 0;
+    width: 1.5px; height: 100%;
+    transform: translateX(-50%);
+}
+.cockpit-crosshair .ch-c {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 6px; height: 6px;
+    border: 1px solid #ffffff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: transparent;
+}
+.cockpit-monitor.on-target .cockpit-crosshair .ch-h,
+.cockpit-monitor.on-target .cockpit-crosshair .ch-v { background: #88ffaa; box-shadow: 0 0 5px rgba(136,255,170,0.9); }
+.cockpit-monitor.on-target .cockpit-crosshair .ch-c { border-color: #88ffaa; }
+.cockpit-ok {
+    position: absolute;
+    left: 50%; top: calc(50% + 36px);
+    transform: translate(-50%, 0);
+    color: #88ffaa;
+    font-family: "Courier New", Menlo, monospace;
+    font-weight: bold;
+    font-size: 14px;
+    text-shadow: 0 0 6px rgba(136,255,170,0.8);
+    display: none;
+    pointer-events: none;
+    z-index: 6;
+}
+.cockpit-monitor.on-target .cockpit-ok { display: block; }
+.cockpit-monitor.blink .cockpit-ok { opacity: 0.35; }
+/* ─── 水平儀 + 高度計（合体）：十字の上、中央。単色 CRT 緑線画 ─── */
+.cockpit-attitude {
+    position: absolute;
+    left: 50%;
+    top: calc(50% - 80px);
+    transform: translate(-50%, -100%);
+    pointer-events: none;
+    z-index: 5;
+    font-family: "Courier New", Menlo, monospace;
+    text-align: center;
+    color: #88ffaa;
+}
+.cockpit-attitude .att-alt {
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+    color: #c8ffd8;
+    text-shadow: 0 0 4px rgba(136,255,170,0.85), 0 0 2px rgba(0,0,0,0.85);
+    letter-spacing: 0.5px;
+}
+.cockpit-attitude .att-alt .att-alt-unit {
+    font-size: 9px;
+    color: #88ffaa;
+    margin-left: 2px;
+}
+/* 水平ライン：十字と同じ中心。単独要素として overlay */
+.cockpit-horizon {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 0; height: 0;
+    pointer-events: none;
+    z-index: 4;
+}
+.cockpit-horizon .att-horizon {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 130px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transform-origin: 50% 50%;
+}
+.cockpit-horizon .att-horizon::before,
+.cockpit-horizon .att-horizon::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 50px;
+    height: 1px;
+    background: #88ffaa;
+    box-shadow: 0 0 3px rgba(136,255,170,0.7);
+    transform: translateY(-50%);
+}
+.cockpit-horizon .att-horizon::before { left: 0; }
+.cockpit-horizon .att-horizon::after { right: 0; }
+/* ─── 燃料計：右側縦ゲージ ─── */
+.cockpit-fuel {
+    position: absolute;
+    right: 8px; top: 8px;
+    bottom: 8px;
+    width: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    color: #88ffaa;
+    font-family: "Courier New", Menlo, monospace;
+    pointer-events: none;
+    z-index: 5;
+}
+.cockpit-fuel .fuel-bar {
+    width: 9px;
+    flex: 1;
+    border: 1px solid rgba(136, 255, 170, 0.65);
+    position: relative;
+    background: rgba(0,0,0,0.55);
+    margin-top: 2px;
+}
+.cockpit-fuel .fuel-bar::before {
+    /* 25/50/75 の目盛 */
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to bottom, transparent 24%, rgba(136,255,170,0.45) 25%, rgba(136,255,170,0.45) 25.6%, transparent 26%) no-repeat,
+        linear-gradient(to bottom, transparent 49%, rgba(136,255,170,0.45) 50%, rgba(136,255,170,0.45) 50.6%, transparent 51%) no-repeat,
+        linear-gradient(to bottom, transparent 74%, rgba(136,255,170,0.45) 75%, rgba(136,255,170,0.45) 75.6%, transparent 76%) no-repeat;
+    pointer-events: none;
+}
+.cockpit-fuel .fuel-fill {
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 100%;
+    background: #88ffaa;
+    box-shadow: 0 0 4px rgba(136, 255, 170, 0.8);
+    height: 100%;
+    transition: background 0.2s;
+}
+.cockpit-monitor.fuel-low .fuel-fill { background: #ffcc66; box-shadow: 0 0 4px rgba(255,204,102,0.8); }
+.cockpit-monitor.fuel-crit .fuel-fill { background: #ff5566; box-shadow: 0 0 4px rgba(255,85,102,0.9); }
+.cockpit-monitor.fuel-crit.blink .fuel-fill { opacity: 0.35; }
+.cockpit-fuel .fuel-lbl {
+    font-size: 7px;
+    margin-top: 1px;
+    text-shadow: 0 0 2px rgba(0,0,0,0.8);
+    order: -1;
+}
+/* シェイクはモニター枠（cockpit-monitor-inner）には適用しない。
+   image だけを JS で揺らす（マスク枠は固定）。 */
 .loading-frame {
     position: absolute;
     /* opening-title.jpg の黒モニター中央に合わせる */

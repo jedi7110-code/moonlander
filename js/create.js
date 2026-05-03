@@ -2,6 +2,7 @@
 import { generateLabels, SVG_SCALE } from './ui-text.js';
 import { attachUiGuide } from './ui-guide.js?v=2';
 import { registerAnimations } from './animations.js';
+import { createCockpitObjects } from './cockpit.js?v=30';
 
 export function create(scene) {
 // Helvetica はシステムフォントなので待機不要
@@ -396,5 +397,8 @@ scene.cameras.main.setZoom(1.2);
 scene.cameras.main.addListener('zoomchange', (cam, newZoom) => {
     title.setScale(1 / newZoom);
 });
+
+// コックピット視点（着陸時）用のオーバーレイ要素を初期化（全て非表示で待機）
+createCockpitObjects(scene);
 
 }

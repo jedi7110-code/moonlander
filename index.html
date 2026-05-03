@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=53">
+    <link rel="stylesheet" href="style.css?v=65">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 </head>
@@ -93,6 +93,44 @@
                     <div class="briefing-skip">[ PRESS ENTER ]</div>
                 </div>
             </div>
+            <!-- 着陸時のコックピット視点モニター（briefing と同位置・同スケールで表示） -->
+            <div class="cockpit-monitor">
+                <div class="cockpit-monitor-inner">
+                    <img class="cockpit-image" src="assets/land-point.jpg" alt="">
+                    <div class="cockpit-shadow"></div>
+                    <div class="cockpit-crosshair">
+                        <span class="ch-h"></span><span class="ch-v"></span>
+                        <span class="ch-c"></span>
+                    </div>
+                    <!-- 対地速度：タコメーター風半円ダイヤル（十字の上） -->
+                    <div class="cockpit-vsi">
+                        <svg class="vsi-gauge" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                            <!-- 外周アーク -->
+                            <path d="M 10 55 A 40 40 0 0 1 90 55" stroke="#88ffaa" stroke-width="1.5" fill="none" opacity="0.7"/>
+                            <!-- 安全帯アーク（descent 0.5〜1.8 範囲） -->
+                            <path class="vsi-safe-arc" d="" stroke="#88ffaa" stroke-width="3" fill="none" opacity="0.85"/>
+                            <!-- 目盛 -->
+                            <g class="vsi-ticks" stroke="#88ffaa" stroke-width="1" opacity="0.85"></g>
+                            <!-- 針 -->
+                            <line class="vsi-needle" x1="50" y1="55" x2="50" y2="22" stroke="#c8ffd8" stroke-width="2" stroke-linecap="round"/>
+                            <!-- センターキャップ -->
+                            <circle cx="50" cy="55" r="2.5" fill="#88ffaa"/>
+                        </svg>
+                        <div class="vsi-num"><span class="vsi-val">0.0</span> <span class="vsi-unit">FT/S</span></div>
+                    </div>
+                    <div class="cockpit-ok">OK</div>
+                </div>
+                <!-- 高度計：十字の上、中央 -->
+                <div class="cockpit-attitude">
+                    <div class="att-alt"><span class="att-alt-val">0</span> <span class="att-alt-unit">FT</span></div>
+                </div>
+                <!-- 水平ライン：十字と同じ中心（独立要素） -->
+                <div class="cockpit-horizon"><div class="att-horizon"></div></div>
+                <div class="cockpit-fuel">
+                    <div class="fuel-bar"><div class="fuel-fill"></div></div>
+                    <div class="fuel-lbl">FUEL</div>
+                </div>
+            </div>
         </div>
         <!-- 死亡後のリスタート待機プロンプト -->
         <div id="restart-prompt">PRESS ENTER TO RESTART</div>
@@ -103,7 +141,7 @@
     <!-- 捕獲時のグリッチ用：ブラウザ最前面の WebGL オーバーレイ -->
     <canvas id="glitch-overlay"></canvas>
 
-    <script type="module" src="js/main.js?v=11"></script>
+    <script type="module" src="js/main.js?v=34"></script>
 
     <!-- 横画面スマホ用オンスクリーンコントロール -->
     <div class="touch-controls" id="touch-controls">

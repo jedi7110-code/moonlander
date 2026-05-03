@@ -2,6 +2,7 @@
 import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js';
+import { enterCockpitMode, updateCockpit } from './cockpit.js?v=30';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // IS_LOCAL=true の時はテスト用無敵モード（プレイヤー捕獲・デブリ衝突を無効化）
@@ -25,6 +26,12 @@ function restartGame(scene) {
 }
 
 export function update(scene, time, delta) {
+// コックピット視点モード中は専用ループを回し、通常の物理処理はスキップ
+if (scene.cockpitMode) {
+    updateCockpit(scene, delta);
+    return;
+}
+
 // 手動降下：下キーで一段ずつ降りる、上キーで一段戻る。
 // 各ステップ位置はハシゴの段に正確に対応（足が rung に乗る）。
 // 影は step index の進捗に応じて 0→1 に変化
@@ -1719,6 +1726,41 @@ const landingZone = new Phaser.Geom.Rectangle(
 // ターゲットマークの色フェード（ゴール上空に近づくほど緑→黄）
 const inGoalX = Math.abs(scene.spaceship.x - scene.moon.x) < PAD_LANDING_HALF_WIDTH;
 const distY = scene.moon.y - scene.spaceship.y;
+
+// コックピット視点への自動切替：パッド上空 200px 以内・水平範囲内・降下中で一度だけ発火
+if (
+    scene.gameStarted &&
+    !scene.cockpitMode &&
+    !scene._cockpitTriggered &&
+    !scene.tippingOver &&
+    inGoalX &&
+    distY > 0 && distY < 200 &&
+    scene.spaceship.body && scene.spaceship.body.velocity.y > -10
+) {
+    scene._cockpitTriggered = true;
+    enterCockpitMode(scene);
+    return; // 残りの物理判定はスキップ。次フレームから updateCockpit が走る
+}
+
+// デバッグ：URL に ?cockpit を付けると起動直後にコックピット視点へ直行
+if (
+    !scene._cockpitTriggered &&
+    !scene.cockpitMode &&
+    typeof window !== 'undefined' &&
+    window.location && window.location.search.includes('cockpit')
+) {
+    scene.gameStarted = true;
+    scene._cockpitTriggered = true;
+    scene.spaceship.x = scene.moon.x;
+    scene.spaceship.y = scene.moon.y - 150;
+    if (scene.spaceship.body) {
+        scene.spaceship.body.allowGravity = false;
+        scene.spaceship.setVelocity(0, 30);
+    }
+    enterCockpitMode(scene);
+    return;
+}
+
 let markerT = 0; // 0=緑, 1=黄
 if (inGoalX && distY < 300 && distY > 0) {
     markerT = 1 - (distY / 300); // 近いほど1に

@@ -1,8 +1,8 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js?v=9';
-        import { create as createScene } from './create.js?v=25';
-        import { update as updateScene } from './update.js?v=54';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=12';
+        import { create as createScene } from './create.js?v=47';
+        import { update as updateScene } from './update.js?v=76';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
         // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、
@@ -205,7 +205,11 @@
 
         function showTitle(scene) {
             // 状態判定：初回（HTML側） / クリア後の周回 or 死亡後リスタート（Phaserロゴ + HTMLプロンプト）
-            const loadingScreen = document.getElementById('loading-screen');
+            // 着陸シーケンスで loading-screen を再利用するため remove ではなく hidden 化している。
+            // hidden 状態は「初回のローディング画面ではない」=「リスタート/周回」として扱う
+            const loadingScreenEl = document.getElementById('loading-screen');
+            const loadingScreen = (loadingScreenEl && !loadingScreenEl.classList.contains('hidden') && !loadingScreenEl.classList.contains('cockpit-mode'))
+                ? loadingScreenEl : null;
             const restartPrompt = document.getElementById('restart-prompt');
             let oldTitle = null;
 
@@ -271,7 +275,8 @@
                 if (useFade) {
                     if (fadeOverlay) fadeOverlay.classList.add('fade-in');
                     setTimeout(() => {
-                        if (loadingScreen) loadingScreen.remove();
+                        // 着陸時のコックピット視点で再利用するため、remove せず hidden 化
+                        if (loadingScreen) loadingScreen.classList.add('hidden');
                         if (restartPrompt) restartPrompt.classList.remove('show');
                         if (fadeOverlay) fadeOverlay.classList.remove('fade-in');
                     }, FADE_MS);
@@ -356,6 +361,17 @@
                 loadingScreen.addEventListener('click', onTitleTap);
                 loadingScreen.addEventListener('touchend', onTitleTap, { passive: false });
             }
+            // デバッグ：?cockpit 付きで起動した場合、title/briefing をスキップして即ゲーム開始
+            try {
+                if (window.location && window.location.search.includes('cockpit')) {
+                    if (loadingScreen) {
+                        loadingScreen.classList.remove('title', 'briefing');
+                        loadingScreen.classList.add('hidden');
+                    }
+                    setTimeout(() => startGame(), 50);
+                }
+            } catch (e) {}
+
             // ENTER 状態遷移：title → briefing → game
             const enterAdvance = () => {
                 resumeAudioContext();
