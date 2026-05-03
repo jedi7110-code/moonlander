@@ -25,6 +25,47 @@ function restartGame(scene) {
 }
 
 export function update(scene, time, delta) {
+// 手動降下：下キーで一段ずつ降りる、上キーで一段戻る。
+// 各ステップ位置はハシゴの段に正確に対応（足が rung に乗る）。
+// 影は step index の進捗に応じて 0→1 に変化
+if (scene.playerDescendingManual && scene.astronautDescending && scene.descendStepPositions) {
+    const positions = scene.descendStepPositions;
+    const totalIdx = positions.length - 1;
+    if (scene.astronautDescending.shadow && totalIdx > 0) {
+        const progress = scene.descendStepIndex / totalIdx;
+        scene.astronautDescending.shadow.alpha = Math.max(0, Math.min(1, progress));
+    }
+    if (!scene.descendStepInProgress) {
+        let nextIdx = scene.descendStepIndex;
+        if (scene.cursors.down.isDown) nextIdx = Math.min(totalIdx, nextIdx + 1);
+        else if (scene.cursors.up.isDown) nextIdx = Math.max(0, nextIdx - 1);
+        if (nextIdx !== scene.descendStepIndex) {
+            scene.descendStepIndex = nextIdx;
+            scene.descendStepInProgress = true;
+            scene.tweens.add({
+                targets: scene.astronautDescending,
+                y: positions[nextIdx],
+                duration: 100,
+                ease: 'Sine.easeOut',
+                onComplete: () => {
+                    if (nextIdx === totalIdx) {
+                        // 地面に到達 → コールバック起動
+                        const cb = scene.descendCallback;
+                        scene.playerDescendingManual = false;
+                        scene.descendCallback = null;
+                        scene.astronautDescending = null;
+                        scene.descendStepInProgress = false;
+                        scene.descendStepPositions = null;
+                        if (cb) cb();
+                    } else {
+                        scene.time.delayedCall(70, () => { scene.descendStepInProgress = false; });
+                    }
+                }
+            });
+        }
+    }
+}
+
 // 宇宙飛行士操作モード（手動制御、物理エンジン不使用）
 if (scene.astronautMode && scene.astronaut) {
     const dt = delta / 1000;
@@ -50,6 +91,45 @@ if (scene.astronautMode && scene.astronaut) {
                 }
                 return true;
             });
+        }
+    }
+
+    // 手動登り：上下キーで一段ずつ進む。各ステップ位置はハシゴの段に正確に対応
+    // 影は step index の進捗に応じて 1→0 に変化（地面で標準、登るほど薄く）
+    if (scene.playerClimbingManual && !scene.astronautGameOver && scene.climbStepPositions) {
+        const positions = scene.climbStepPositions;
+        const totalIdx = positions.length - 1;
+        if (scene.astronaut && scene.astronaut.shadow && totalIdx > 0) {
+            const progress = 1 - (scene.climbStepIndex / totalIdx);
+            scene.astronaut.shadow.alpha = Math.max(0, Math.min(1, progress));
+        }
+        if (!scene.climbStepInProgress) {
+            let nextIdx = scene.climbStepIndex;
+            if (scene.cursors.up.isDown) nextIdx = Math.min(totalIdx, nextIdx + 1);
+            else if (scene.cursors.down.isDown) nextIdx = Math.max(0, nextIdx - 1);
+            if (nextIdx !== scene.climbStepIndex) {
+                scene.climbStepIndex = nextIdx;
+                scene.climbStepInProgress = true;
+                scene.tweens.add({
+                    targets: scene.astronaut,
+                    y: positions[nextIdx],
+                    duration: 100,
+                    ease: 'Sine.easeOut',
+                    onComplete: () => {
+                        if (nextIdx === totalIdx) {
+                            // ハッチ内に到達 → コールバック起動
+                            const cb = scene.playerClimbCallback;
+                            scene.playerClimbingManual = false;
+                            scene.playerClimbCallback = null;
+                            scene.climbStepInProgress = false;
+                            scene.climbStepPositions = null;
+                            if (cb) cb();
+                        } else {
+                            scene.time.delayedCall(70, () => { scene.climbStepInProgress = false; });
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -417,7 +497,7 @@ if (scene.astronautMode && scene.astronaut) {
     }
 
     // ジャンプ（押し始めで初速、離したら上昇を切って強弱をつける）
-    if (Phaser.Input.Keyboard.JustDown(scene.cursors.up) && onGround && !scene.astronautGameOver) {
+    if (Phaser.Input.Keyboard.JustDown(scene.cursors.up) && onGround && !scene.astronautGameOver && !scene.playerClimbing) {
         scene.astronautVY = jumpPower;
         // 追従中の仲間も同じ初速でジャンプ（chain感のため段階的にdelay）
         if (scene.crewFollowing && scene.crews) {
@@ -440,8 +520,8 @@ if (scene.astronautMode && scene.astronaut) {
         }
     }
 
-    // 重力＋位置更新（帰還時・捕獲後はtween任せで物理停止）
-    if (!scene.returningToShip && !scene.astronautGameOver) {
+    // 重力＋位置更新（帰還時・捕獲後・手動登り中はtween/手動操作任せで物理停止）
+    if (!scene.returningToShip && !scene.astronautGameOver && !scene.playerClimbingManual) {
         scene.astronautVY += gravity * dt;
         scene.astronaut.y += scene.astronautVY * dt;
 
@@ -458,6 +538,22 @@ if (scene.astronautMode && scene.astronaut) {
 
     // 影は X方向のみ追従（Yは地面に固定済み）
     if (scene.astronaut.shadow) scene.astronaut.shadow.x = scene.astronaut.x;
+    // ジャンプ中は高さに応じて影を薄くする（地面で標準、高く跳ぶほど薄く）
+    // playerClimbingManual / playerDescendingManual 中は専用ロジックがあるためスキップ
+    if (scene.astronaut.shadow && !scene.playerClimbingManual && !scene.playerDescendingManual && scene.astronautGroundY != null) {
+        const heightAboveGround = Math.max(0, scene.astronautGroundY - scene.astronaut.y);
+        const maxJumpH = 60;
+        scene.astronaut.shadow.alpha = Math.max(0.1, 1 - heightAboveGround / maxJumpH);
+    }
+    // 仲間も同様にジャンプ中は影が薄くなる
+    if (scene.crews && scene.crews.length && scene.groundFeetY != null) {
+        scene.crews.forEach(c => {
+            if (!c.shadow || c.captured || !c.visible) return;
+            const heightAboveGround = Math.max(0, scene.groundFeetY - c.y);
+            const maxJumpH = 60;
+            c.shadow.alpha = Math.max(0.1, 1 - heightAboveGround / maxJumpH);
+        });
+    }
 
     // 地底人の移動＋宇宙飛行士との衝突
     if (scene.enemies && scene.enemies.length) {
@@ -918,7 +1014,7 @@ if (scene.astronautMode && scene.astronaut) {
         scene.crewFollowing = false;
         // 「早く登れ」の指示音（仲間がハシゴを登り始める前）
         if (scene.climbSound) scene.climbSound.play();
-        const ladderX = scene.spaceship.x - 5;
+        const ladderX = scene.spaceship.x - 3;
         const ladderTop = scene.spaceship.y + 10; // 宇宙船の内部から伸ばす
         const ladderBottom = scene.spaceship.y + 56; // プレイヤー足元の少し上まで
         const crews = scene.crews.slice();
@@ -956,7 +1052,18 @@ if (scene.astronautMode && scene.astronaut) {
                                 c.shadow = null;
                                 scene.tweens.add({ targets: sh, alpha: 0, duration: 1500, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
                             }
-                            steppedClimb(scene, c, ladderTop, 8, 100, 70, () => c.setVisible(false), 1);
+                            // ハッチ下端より上の部分（船内に入った部分）を非表示にするマスク
+                            const crewHatchBottomY = scene.spaceship.y + 7;
+                            const crewMask = scene.make.graphics({ x: 0, y: 0, add: false });
+                            crewMask.fillStyle(0xffffff);
+                            crewMask.fillRect(-5000, crewHatchBottomY, 10000, 10000);
+                            c.setMask(crewMask.createGeometryMask());
+                            // 登る目標：足元がハッチ下端 → 全身が船内に消える
+                            const crewTopY = crewHatchBottomY - c.displayHeight / 2;
+                            steppedClimb(scene, c, crewTopY, 8, 100, 70, () => {
+                                if (c.mask) c.clearMask(true);
+                                c.setVisible(false);
+                            }, 1);
                         });
                     }
                 });
@@ -998,13 +1105,17 @@ if (scene.astronautMode && scene.astronaut) {
             scene.astronaut.anims.stop();
             scene.astronaut.setFlipX(false);
             // ハシゴまで歩いて移動（横向き歩行アニメ）
+            // 移動スピードは最大でも通常移動の 1.2 倍に制限（遠くにいる時に不自然に速くならない）
             const face = ladderX < scene.astronaut.x ? 'L' : 'R';
             scene.astronaut.setFlipX(face === 'R');
             scene.astronaut.anims.play('astronaut_walk');
+            const walkDist = Math.abs(scene.astronaut.x - ladderX);
+            const maxWalkSpeed = 80 * 1.2; // px/sec
+            const walkDuration = Math.max(200, (walkDist / maxWalkSpeed) * 1000);
             scene.tweens.add({
                 targets: scene.astronaut,
                 x: ladderX,
-                duration: 400,
+                duration: walkDuration,
                 ease: 'Sine.easeInOut',
                 onComplete: () => {
                     scene.astronaut.anims.stop();
@@ -1016,14 +1127,51 @@ if (scene.astronautMode && scene.astronaut) {
                     // 振り向き完了後に登り開始
                     scene.astronaut.once('animationcomplete-astronaut_turn_to_back_' + turnDir, () => {
                         scene.astronaut.setTexture('spaceman_B');
-                        // 影を登りに合わせてフェードアウト（上に行くほど薄く）
-                        if (scene.astronaut.shadow) {
-                            const sh = scene.astronaut.shadow;
-                            scene.astronaut.shadow = null;
-                            scene.tweens.add({ targets: sh, alpha: 0, duration: 1500, ease: 'Sine.easeInOut', onComplete: () => sh.destroy() });
+                        // 影は Y 座標進捗に応じて update ループで動的にアルファを更新
+                        // （地面で標準、ハシゴの上ほど薄く）
+                        // ハッチ下端より上の部分（船内に入った部分）は非表示にするマスクを設定
+                        // → 登るに従って体が下から徐々に船内に消えていく演出
+                        const climbHatchBottomY = scene.spaceship.y + 7;
+                        const climbVisMask = scene.make.graphics({ x: 0, y: 0, add: false });
+                        climbVisMask.fillStyle(0xffffff);
+                        climbVisMask.fillRect(-5000, climbHatchBottomY, 10000, 10000);
+                        scene.astronaut.setMask(climbVisMask.createGeometryMask());
+                        // ハッチは降下時から開いたまま。万が一閉じている場合のみ作成（下から上へ開く）
+                        if (!scene.shipHatch) {
+                            const hatchW = 8;
+                            const hatchH = 6;
+                            const hatchBottomY = scene.spaceship.y + 7;
+                            scene.shipHatch = scene.add.rectangle(ladderX, hatchBottomY, hatchW, 0, 0x000000)
+                                .setOrigin(0.5, 1)
+                                .setDepth(6);
+                            scene.tweens.add({
+                                targets: scene.shipHatch,
+                                height: hatchH,
+                                duration: 400,
+                                ease: 'Sine.easeInOut'
+                            });
                         }
-                        steppedClimb(scene, scene.astronaut, ladderTop, 8, 100, 70, () => {
+                        // 手動登り：上下キーで操作。ladderTop に到達で onClimbComplete 起動
+                        const onClimbComplete = () => {
+                            // マスクを解除してから非表示に
+                            if (scene.astronaut.mask) scene.astronaut.clearMask(true);
                             scene.astronaut.setVisible(false);
+                            // 影は完全消去（登りきって船内に入ったので不要）
+                            if (scene.astronaut.shadow) {
+                                scene.astronaut.shadow.destroy();
+                                scene.astronaut.shadow = null;
+                            }
+                            // ハッチを閉じる：下から上へ黒い穴が縮んで消える
+                            if (scene.shipHatch) {
+                                const hatchRef = scene.shipHatch;
+                                scene.tweens.add({
+                                    targets: hatchRef,
+                                    height: 0,
+                                    duration: 400,
+                                    ease: 'Sine.easeInOut',
+                                    onComplete: () => { hatchRef.destroy(); if (scene.shipHatch === hatchRef) scene.shipHatch = null; }
+                                });
+                            }
                             // 登り終えたら徐々にズームアウト（ポッド上昇中も続く）
                             scene.tweens.add({
                                 targets: scene.cameras.main,
@@ -1215,7 +1363,27 @@ if (scene.astronautMode && scene.astronaut) {
                                     }
                                 });
                             });
-                    }, 1);
+                        };
+                        scene.playerClimbingManual = true;
+                        scene.playerClimbStartY = scene.astronaut.y;
+                        // 登りきった位置：宇宙飛行士の足元がハッチ下端 → 体が完全に船内に隠れる
+                        const astroDispH = scene.astronaut.displayHeight;
+                        scene.playerClimbTopY = climbHatchBottomY - astroDispH / 2;
+                        scene.playerClimbCallback = onClimbComplete;
+                        // 登りのステップ位置を「ハシゴの段」と一致させる：
+                        //   index 0: 地面（開始位置）
+                        //   index 1〜8: 8 段の各 rung に足が乗る位置（下から rung 8 → rung 1 へ）
+                        //   index 9: ハッチ内（playerClimbTopY）
+                        const climbNumRungs = 8;
+                        const climbLadderLen = ladderBottom - ladderTop;
+                        const climbPositions = [scene.astronaut.y]; // index 0: ground
+                        for (let k = climbNumRungs; k >= 1; k--) {
+                            const rungFootY = ladderTop + (k / (climbNumRungs + 1)) * climbLadderLen;
+                            climbPositions.push(rungFootY - astroDispH / 2);
+                        }
+                        climbPositions.push(scene.playerClimbTopY); // index 9: in hatch
+                        scene.climbStepPositions = climbPositions;
+                        scene.climbStepIndex = 0;
                     });
                 }
             });
@@ -1660,23 +1828,52 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
     scene.jetParticles.right.on = false;
     scene.dustEmitters.forEach(e => e.on = false);
 
-    // 燃料ゲージ・ターゲットマーク・デブリを非表示
+    // 燃料ゲージ・ターゲットマーク・デブリを非表示（マーク・デブリはふんわりフェードアウト）
     scene.fuelGaugeBorder.setVisible(false);
     scene.fuelGauge.setVisible(false);
-    scene.landingMarker.setVisible(false);
-    scene.debrisGroup.getChildren().forEach(d => d.setVisible(false));
+    scene.tweens.add({
+        targets: scene.landingMarker,
+        alpha: 0,
+        duration: 800,
+        ease: 'Sine.easeInOut',
+        onComplete: () => scene.landingMarker.setVisible(false)
+    });
+    scene.debrisGroup.getChildren().forEach(d => {
+        scene.tweens.add({
+            targets: d,
+            alpha: 0,
+            duration: 800,
+            ease: 'Sine.easeInOut',
+            onComplete: () => d.setVisible(false)
+        });
+    });
 
     scene.gameStarted = false; // 操作を無効化
 
     // ハシゴが出てきて、宇宙飛行士が降りてくる演出
     scene.time.delayedCall(1000, () => {
         // ハシゴを描画（宇宙船の下から伸びる）
-        const ladderX = scene.spaceship.x - 5;
+        const ladderX = scene.spaceship.x - 3;
         const ladderTop = scene.spaceship.y + 10; // 宇宙船の内部から伸ばす
         const ladderBottom = scene.spaceship.y + 56; // プレイヤー足元の少し上まで
         const astronautDestY = scene.spaceship.y + 50; // 着地中心位置（地面）は据え置き
         const ladder = scene.add.graphics({ lineStyle: { width: 1, color: 0xcccccc } });
         ladder.setDepth(7);
+
+        // ハッチ（出入り口の黒い四角）を作成。下から上へ広がる開き方
+        const hatchW = 8;
+        const hatchH = 6;
+        const hatchBottomY = scene.spaceship.y + 7; // ハッチ下端
+        scene.shipHatch = scene.add.rectangle(ladderX, hatchBottomY, hatchW, 0, 0x000000)
+            .setOrigin(0.5, 1) // 下端固定
+            .setDepth(6);
+        // 開く：下から上へ黒い穴が広がる
+        scene.tweens.add({
+            targets: scene.shipHatch,
+            height: hatchH,
+            duration: 400,
+            ease: 'Sine.easeInOut'
+        });
 
         // ハシゴが出てくるタイミングで、宇宙船の足元（ハシゴ付近）にカメラをパン＋ズーム
         const targetPanX = scene.spaceship.x;
@@ -1684,12 +1881,13 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
         scene.cameras.main.pan(targetPanX, targetPanY, 2000, 'Sine.easeInOut');
         scene.cameras.main.zoomTo(4.5, 2000, 'Sine.easeInOut');
 
-        // ハシゴがスッと伸びるアニメーション
+        // ハシゴがスッと伸びるアニメーション（ハッチが完全に開いてから開始）
         let ladderProgress = 0;
         const ladderTween = scene.tweens.addCounter({
             from: 0,
             to: 1,
             duration: 800,
+            delay: 400, // ハッチオープン (400ms) 完了後にハシゴ伸展を開始
             ease: 'Sine.easeInOut',
             onUpdate: (tween) => {
                 ladderProgress = tween.getValue();
@@ -1709,23 +1907,36 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
                 }
             },
             onComplete: () => {
-                // ハシゴが伸びきったら宇宙飛行士が降りてくる（後ろ向き）
-                const astronaut = scene.add.sprite(
-                    ladderX,
-                    ladderTop,
-                    'spaceman_B'
-                );
+                // ハシゴが伸びきったら宇宙飛行士が降りてくる（後ろ向き、足から）
+                // ハッチ下端から足が出てきて、降下するに従って体が現れる
+                const hatchTopY = scene.spaceship.y + 1;
+                const hatchBottomY = hatchTopY + 6;
+                const astroH = 19;
+                // 初期位置：足元がハッチ下端に揃うよう上にオフセット（頭は船内 = ハッチで隠れる）
+                const initialY = hatchBottomY - astroH / 2;
+                const astronaut = scene.add.sprite(ladderX, initialY, 'spaceman_B');
                 // 元画像は 725x904（縦長、アスペクト比 ~0.8）。アスペクト維持
-                astronaut.setDisplaySize(15, 19);
+                astronaut.setDisplaySize(15, astroH);
                 astronaut.setDepth(8);
 
-                // 影を先に作成し、降下中にフェードイン（着地予定位置に）
-                const destFootY = astronautDestY + 19 / 2;
+                // ハッチ下端より上の部分（船内に居る部分）を非表示にするマスクを設定
+                // → 降下するに従って足から体が見えてくる「足から出てくる」演出
+                const visMask = scene.make.graphics({ x: 0, y: 0, add: false });
+                visMask.fillStyle(0xffffff);
+                visMask.fillRect(-5000, hatchBottomY, 10000, 10000);
+                astronaut.setMask(visMask.createGeometryMask());
+
+                // 影を先に作成。降下のY座標進捗に応じて update ループで動的にアルファを更新
+                // （ハシゴの上では薄く、地面に近づくにつれて濃くなる）
+                const destFootY = astronautDestY + astroH / 2;
                 astronaut.shadow = createGroundShadow(scene, astronaut.x, destFootY, 14);
                 astronaut.shadow.alpha = 0;
-                scene.tweens.add({ targets: astronaut.shadow, alpha: 1, duration: 1500, ease: 'Sine.easeInOut' });
 
-                steppedClimb(scene, astronaut, astronautDestY, 8, 100, 70, () => {
+                // 手動降下：下キーで降りる、上キーで戻る。astronautDestY 到達で onDescendComplete 起動
+                const onDescendComplete = () => {
+                        // 完全に降りきったので「足から出てくる」マスクを解除
+                        if (astronaut.mask) astronaut.clearMask(true);
+                        // ハッチは開けっぱなし（クルーが救出後に入るため、脱出シーケンス完了まで開いたまま）
                         // 故障車の方向を先に決める。振り向きは車と逆方向（自然な視線の動き）
                         const carDirEarly = Phaser.Math.Between(0, 1) ? 1 : -1;
                         scene.astronautCarDir = carDirEarly;
@@ -2023,7 +2234,40 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
                             };
                             scene.time.delayedCall(500, showArrow);
                         }
-                }, 1);
+                };
+                // 降下のステップ位置を「ハシゴの段」と一致させる：
+                //   index 0: 初期スポーン位置（ハッチ内）
+                //   index 1〜8: 8 段の各 rung に足が乗る位置
+                //   index 9: 月面（ladderBottom より少し下、astronautDestY）
+                const numRungs = 8;
+                const ladderLen = ladderBottom - ladderTop;
+                const stepPositions = [astronaut.y]; // index 0: spawn
+                for (let k = 1; k <= numRungs; k++) {
+                    const rungFootY = ladderTop + (k / (numRungs + 1)) * ladderLen;
+                    stepPositions.push(rungFootY - astroH / 2);
+                }
+                stepPositions.push(astronautDestY); // index 9: 地面
+                scene.descendStepPositions = stepPositions;
+                scene.descendStepIndex = 0;
+                scene.descendStartY = astronaut.y;
+                scene.descendDestY = astronautDestY;
+                scene.descendCallback = onDescendComplete;
+                // 1段目は自動：index 0 → 1（最初の rung へ）
+                scene.descendStepInProgress = true;
+                scene.descendStepIndex = 1;
+                scene.tweens.add({
+                    targets: astronaut,
+                    y: stepPositions[1],
+                    duration: 100,
+                    ease: 'Sine.easeOut',
+                    onComplete: () => {
+                        scene.time.delayedCall(70, () => {
+                            scene.descendStepInProgress = false;
+                            scene.astronautDescending = astronaut;
+                            scene.playerDescendingManual = true;
+                        });
+                    }
+                });
             }
         });
     });

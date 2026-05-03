@@ -2,7 +2,7 @@
         import { createGlitchOverlay } from './glitch-overlay.js';
         import { preload as preloadAssets, startBriefing } from './preload.js?v=9';
         import { create as createScene } from './create.js?v=25';
-        import { update as updateScene } from './update.js?v=34';
+        import { update as updateScene } from './update.js?v=54';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
         // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、
