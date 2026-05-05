@@ -12,14 +12,38 @@ export function startBriefing(loadingScreen, onDismiss, scene) {
         if (onDismiss) onDismiss();
         return;
     }
+    // テストモード（コナミコマンドで起動）：通常のブリーフィング前に
+    // テストモード起動メッセージを 2 秒表示してから run() に入る
+    const testModeActive = (typeof window !== 'undefined' && window.__testMode === true);
+    const startWithTestModeOverlay = () => {
+        loadingScreen.classList.remove('title');
+        loadingScreen.classList.add('briefing');
+        textEl.textContent = [
+            '> SIMULATION ACTIVE',
+            '> DEBUG SESSION ONLINE',
+            '> SECRET INPUT DETECTED',
+            '> INVINCIBILITY ENABLED'
+        ].join('\n');
+        briefingEl.classList.remove('done');
+        setTimeout(() => {
+            textEl.textContent = '';
+            run();
+        }, 2000);
+    };
+
     // タイトル表示中なら、まずロゴを中心に潰れて消える演出を再生
     if (titleScreen && loadingScreen.classList.contains('title')) {
         const TITLE_OFF_MS = 500;
         titleScreen.classList.add('off');
         setTimeout(() => {
             titleScreen.classList.remove('off');
-            run();
+            if (testModeActive) startWithTestModeOverlay();
+            else run();
         }, TITLE_OFF_MS);
+        return;
+    }
+    if (testModeActive) {
+        startWithTestModeOverlay();
         return;
     }
     run();
@@ -309,6 +333,7 @@ scene.load.audio('rescue4', 'assets/sound/rescue-4.wav');
 scene.load.audio('climb', 'assets/sound/climb.wav'); // 登れと指示する声
 scene.load.audio('cockpit', 'assets/sound/cockpit.mp3'); // コックピット視点モード中の環境音（ループ）
 scene.load.audio('cockpitLanding', 'assets/sound/cockpit-landing.mp3'); // コックピット着陸成功時の効果音（1回）
+scene.load.audio('testmode', 'assets/sound/testmode.mp3'); // テストモード（コナミコマンド）起動 SE
 // 地底人 6コマアニメ（全コマ左向き。右向きは flipX で反転）
 scene.load.image('alien_1', 'assets/alien-s-1.png');
 scene.load.image('alien_2', 'assets/alien-s-2.png');

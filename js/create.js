@@ -241,6 +241,7 @@ scene.rescueIntroSound = scene.sound.add('rescue1', { loop: false, volume: 0.15 
 scene.climbSound = scene.sound.add('climb', { loop: false, volume: 0.075 });
 scene.cockpitSound = scene.sound.add('cockpit', { loop: true, volume: 0.4 });
 scene.cockpitLandingSound = scene.sound.add('cockpitLanding', { loop: false, volume: 0.6 });
+scene.testModeSound = scene.sound.add('testmode', { loop: false, volume: 0.7 });
 scene.rescueLandSounds = [
     scene.sound.add('rescue2', { loop: false, volume: 0.15 }),
     scene.sound.add('rescue3', { loop: false, volume: 0.15 }),

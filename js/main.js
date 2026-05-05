@@ -1,8 +1,8 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js?v=13';
-        import { create as createScene } from './create.js?v=71';
-        import { update as updateScene } from './update.js?v=103';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=15';
+        import { create as createScene } from './create.js?v=72';
+        import { update as updateScene } from './update.js?v=104';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
         // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、
@@ -392,6 +392,33 @@
                 // ローディング中（lit のみ／title 前）はゲーム開始を許可しない
             };
             scene.input.keyboard.on('keydown-ENTER', enterAdvance);
+
+            // ─── コナミコマンド：タイトル画面で ↑↑↓↓←→←→ + Enter でテストモード起動 ───
+            // 起動後は本番でも無敵モード（プレイヤー捕獲・デブリ衝突無効）になり、
+            // ブリーフィング前に "> TEST MODE" を 2 秒表示してから通常 briefing が始まる。
+            (() => {
+                const KONAMI_SEQ = [
+                    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+                    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight'
+                ];
+                let buf = [];
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'Enter') {
+                        // タイトル画面でだけ判定。バッファの末尾が KONAMI と一致したら発動
+                        const onTitle = loadingScreen && loadingScreen.classList.contains('title');
+                        if (onTitle && buf.length >= KONAMI_SEQ.length &&
+                            KONAMI_SEQ.every((k, i) => buf[buf.length - KONAMI_SEQ.length + i] === k)) {
+                            window.__testMode = true;
+                            try { if (scene.testModeSound) scene.testModeSound.play(); } catch (err) {}
+                            buf = [];
+                        }
+                        // 通常の Enter ハンドラは別途 enterAdvance が処理するのでここでは何もしない
+                    } else {
+                        buf.push(e.code);
+                        if (buf.length > KONAMI_SEQ.length * 2) buf.shift();
+                    }
+                });
+            })();
             // 死亡後リスタート / クリア後周回：Phaser キャンバスへのタップでも開始
             // (HTML タイトル画面のタップは loadingScreen のリスナーで処理済み)
             scene.input.on('pointerdown', () => {

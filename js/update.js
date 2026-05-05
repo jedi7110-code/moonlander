@@ -5,13 +5,15 @@ import { gameOver } from './gameover.js';
 import { enterCockpitMode, updateCockpit } from './cockpit.js?v=83';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
-// IS_LOCAL=true の時はテスト用無敵モード（プレイヤー捕獲・デブリ衝突を無効化）
-const IS_LOCAL = (() => {
+// または本番環境でコナミコマンド (window.__testMode) で起動したテストモードでも
+// 無敵モード（プレイヤー捕獲・デブリ衝突を無効化）が有効になる。
+const IS_LOCAL_HOST = (() => {
     try {
         const h = window.location.hostname;
         return h === 'localhost' || h === '127.0.0.1' || /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(h);
     } catch (e) { return false; }
 })();
+const isInvincible = () => IS_LOCAL_HOST || (typeof window !== 'undefined' && window.__testMode === true);
 
 function restartGame(scene) {
     scene.gameStarted = false;
@@ -753,7 +755,7 @@ if (scene.astronautMode && scene.astronaut) {
                 startCaptureAnim();
                 break; // このフレームで以降の処理は不要
             }
-            if (!IS_LOCAL && !e.capturing && !scene.astronaut.captured && scene.astronaut.visible && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
+            if (!isInvincible() && !e.capturing && !scene.astronaut.captured && scene.astronaut.visible && Phaser.Geom.Intersects.RectangleToRectangle(astroBox, enemyBox)) {
                 const isFirstCapture = !scene.astronautGameOver;
                 scene.astronaut.captured = true;
                 e.capturing = true;
@@ -2389,7 +2391,7 @@ scene.debrisGroup.getChildren().forEach((debris) => {
 });
 
 // 宇宙船とデブリとの衝突をチェック（ローカル開発時は無効化＝無敵）
-if (!IS_LOCAL) {
+if (!isInvincible()) {
     scene.physics.overlap(scene.spaceship, scene.debrisGroup, () => {
         gameOver(scene, '');
     });
