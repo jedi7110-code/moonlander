@@ -375,9 +375,10 @@ body.no-crt .crt-overlay {
 #loading-screen.cockpit-mode::before { display: none; }
 .cockpit-monitor {
     position: absolute;
-    /* briefing-screen と同じ位置。サイズは land-point.jpg と同じ 4:3 */
+    /* briefing-screen と同じ位置。サイズは land-point.jpg と同じ 4:3。
+       コックピット内装の viewport hole に合わせて -2px 左寄せ */
     top: calc(40% + 15px);
-    left: 50%;
+    left: calc(50% - 2px);
     transform: translate(-50%, -50%);
     width: 44%;
     max-width: 440px;
@@ -395,6 +396,11 @@ body.no-crt .crt-overlay {
     box-shadow:
         inset 0 0 0 1px rgba(136, 255, 170, 0.35),
         inset 0 0 12px rgba(0, 0, 0, 0.85);
+    /* 陸地（cockpit-image）と影（cockpit-shadow）が同じ 3D 平面に乗って
+       見えるように、共通の透視点を親で提供する。子側で perspective() 関数を
+       使わず rotateY だけにすることで、両者が同じ vanishing point に向かう */
+    perspective: 900px;
+    transform-style: preserve-3d;
 }
 .cockpit-image {
     position: absolute;
@@ -412,19 +418,17 @@ body.no-crt .crt-overlay {
     position: absolute;
     left: 50%; top: 50%;
     width: 16px; height: 16px;
-    /* 中心固定。傾きパースは JS で transform 上書き */
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    transform-style: preserve-3d;
-    will-change: width, height, transform;
-}
-.cockpit-shadow .sh-layer {
-    position: absolute;
-    left: 50%; top: 50%;
     border-radius: 50%;
-    background: #000000;
+    /* 中心ほど濃く外周ほど薄い radial-gradient（滑らかなグラデーション） */
+    background: radial-gradient(circle,
+        rgba(0,0,0,0.95) 0%,
+        rgba(0,0,0,0.78) 22%,
+        rgba(0,0,0,0.45) 50%,
+        rgba(0,0,0,0.18) 75%,
+        rgba(0,0,0,0) 100%);
     transform: translate(-50%, -50%);
     pointer-events: none;
+    will-change: width, height, transform, opacity;
 }
 /* 対地速度表示（タコメーター風）— 十字マークの上 */
 .cockpit-vsi {
@@ -457,9 +461,9 @@ body.no-crt .crt-overlay {
     text-shadow: 0 0 3px rgba(136,255,170,0.85), 0 0 2px rgba(0,0,0,0.85);
 }
 .cockpit-vsi .vsi-unit { font-size: 7px; color: #88ffaa; margin-left: 1px; }
-.cockpit-monitor.spd-fast .cockpit-vsi .vsi-needle { stroke: #ff5566; filter: drop-shadow(0 0 2px rgba(255,85,102,0.9)); }
+/* 速度オーバー時も針／数字は赤くしない（基本緑表示のまま）。
+   spd-slow（遅すぎ）のみオレンジで注意喚起 */
 .cockpit-monitor.spd-slow .cockpit-vsi .vsi-needle { stroke: #ffcc66; filter: drop-shadow(0 0 2px rgba(255,204,102,0.9)); }
-.cockpit-monitor.spd-fast .cockpit-vsi .vsi-num { color: #ff5566; text-shadow: 0 0 3px rgba(255,85,102,0.9), 0 0 2px rgba(0,0,0,0.85); }
 .cockpit-monitor.spd-slow .cockpit-vsi .vsi-num { color: #ffcc66; text-shadow: 0 0 3px rgba(255,204,102,0.9), 0 0 2px rgba(0,0,0,0.85); }
 .cockpit-monitor.blink.spd-safe .cockpit-vsi .vsi-needle { opacity: 0.45; }
 .cockpit-monitor.blink.spd-safe .cockpit-vsi .vsi-num { opacity: 0.45; }
@@ -510,19 +514,13 @@ body.no-crt .crt-overlay {
     pointer-events: none;
     z-index: 6;
 }
-.cockpit-monitor.on-target .cockpit-ok { display: block; }
-.cockpit-monitor.blink .cockpit-ok { opacity: 0.35; }
+/* OK バッジ：landable（速度＋角度が着陸可能） */
+.cockpit-monitor.landable .cockpit-ok { display: block; }
+.cockpit-monitor.blink.landable .cockpit-ok { opacity: 0.35; }
 /* ─── 水平儀 + 高度計（合体）：十字の上、中央。単色 CRT 緑線画 ─── */
+/* 高度ラダーで重複する数値表示を廃止 */
 .cockpit-attitude {
-    position: absolute;
-    left: 50%;
-    top: calc(50% - 80px);
-    transform: translate(-50%, -100%);
-    pointer-events: none;
-    z-index: 5;
-    font-family: "Courier New", Menlo, monospace;
-    text-align: center;
-    color: #88ffaa;
+    display: none;
 }
 .cockpit-attitude .att-alt {
     font-size: 14px;
@@ -537,6 +535,45 @@ body.no-crt .crt-overlay {
     color: #88ffaa;
     margin-left: 2px;
 }
+/* 高度ラダー：100m おきの赤線。0m は太い着地ライン */
+.cockpit-altladder {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 3;
+}
+.cockpit-altladder .alt-line {
+    position: absolute;
+    left: 50%;
+    width: 18%;
+    height: 1px;
+    background: #88ffaa;
+    box-shadow: 0 0 2px rgba(136,255,170,0.7);
+    /* 線の中心が top 位置に来るよう垂直方向も中央寄せ */
+    transform: translate(-50%, -50%);
+    will-change: top;
+}
+.cockpit-altladder .alt-line.alt-zero {
+    height: 2.5px;
+    width: 26%;
+    background: #88ffaa;
+    box-shadow: 0 0 4px rgba(136,255,170,0.95);
+}
+.cockpit-altladder .alt-label {
+    position: absolute;
+    left: calc(100% + 4px);
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: "Courier New", Menlo, monospace;
+    font-size: 8px;
+    color: #88ffaa;
+    text-shadow: 0 0 2px rgba(0,0,0,0.85);
+    white-space: nowrap;
+    pointer-events: none;
+}
+.cockpit-altladder .alt-line.alt-zero .alt-label { font-weight: bold; font-size: 9px; }
+
 /* 水平ライン：十字と同じ中心。単独要素として overlay */
 .cockpit-horizon {
     position: absolute;
@@ -621,6 +658,208 @@ body.no-crt .crt-overlay {
 }
 /* シェイクはモニター枠（cockpit-monitor-inner）には適用しない。
    image だけを JS で揺らす（マスク枠は固定）。 */
+
+/* 爆発と同時にコックピット内を暗転させる（爆破スプライトより下のレイヤー） */
+#cockpit-fade-dark {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    z-index: 40;
+    pointer-events: none;
+    transition: opacity 1.4s ease-in;
+}
+#loading-screen.cockpit-fading #cockpit-fade-dark { opacity: 1; }
+
+/* 着陸成功の瞬間：機体が沈むようにモニター映像を一瞬ズームしてから戻す。
+   着地時のパン位置（プレイヤーが横に滑り込んで止まった位置）を保つために、
+   --land-pan-x を JS から渡してすべての keyframe で同じ X オフセットを適用する。
+   これで「中央へワープしてから沈む」現象が起きず、着陸視点のまま沈み込む。 */
+.cockpit-image.landing-settle {
+    animation: landingSettle 900ms cubic-bezier(0.16, 1.0, 0.3, 1.0) forwards;
+}
+@keyframes landingSettle {
+    0%   { transform: translate(calc(-50% + var(--land-pan-x, 0px)), -50%) scale(1); }
+    28%  { transform: translate(calc(-50% + var(--land-pan-x, 0px)), calc(-50% + 8px)) scale(1.07); }
+    100% { transform: translate(calc(-50% + var(--land-pan-x, 0px)), -50%) scale(1); }
+}
+/* 成功時のふんわりフェードアウト：コックピット全体を opacity で消してハシゴ降下シーンへ
+   （cockpit-mode は transition: none !important のため CSS transition は効かない。
+     CSS animation （keyframe）を使ってフェードアウトする） */
+#loading-screen.cockpit-mode.cockpit-fade-out {
+    animation: cockpitFadeOut 700ms ease-out forwards;
+}
+@keyframes cockpitFadeOut {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* 宇宙空間 → コックピット切替：ふんわり fade-in（cockpit-mode 切替時に
+   一瞬で被さるのではなく、600ms かけて opacity 0 → 1 で被さる） */
+#loading-screen.cockpit-mode.cockpit-fade-in {
+    animation: cockpitFadeIn 600ms ease-out forwards;
+}
+@keyframes cockpitFadeIn {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+/* コックピット切替可能ゾーン内のヒント。canvas に重ねた DOM オーバーレイで、
+   Phaser カメラの zoom/scroll に影響されない確実な位置（画面下中央）に出る。
+   普段は非表示、`show` クラスでふんわりフェードイン。 */
+#cockpit-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%);
+    padding: 11px 22px;
+    font-family: "Courier New", Menlo, monospace;
+    font-size: 13px;
+    letter-spacing: 2px;
+    line-height: 1.2;
+    color: #88ffaa;
+    background: rgba(0, 24, 12, 0.55);
+    border: 1px solid rgba(136, 255, 170, 0.45);
+    border-radius: 5px;
+    text-shadow: 0 0 4px rgba(136, 255, 170, 0.65);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 220ms ease-out;
+    z-index: 60;
+    white-space: nowrap;
+}
+#cockpit-hint.show {
+    opacity: 0.78;
+}
+
+/* 着陸失敗の瞬間：コックピットモニターを CRT 信号断 風にグリッチさせ、最後は黒画面に固定。
+   - 内側 (.cockpit-monitor-inner) を steps() で離散ジャンプ：水平ホールド外れ＋RGB チャンネル割れ＋輝度跳ね＋ブラックアウト
+   - ::before：細かい走査線ノイズ（混ざる方向は screen）
+   - ::after：たまに走る大きな水平カットライン（黒帯／白帯ランダム）
+   - 終端は内側の輝度を 0 に落とし forwards で黒画面を維持 → JS が .monitor-dead を追加して以降も黒のまま */
+.cockpit-monitor.monitor-glitch .cockpit-monitor-inner {
+    animation: cockpitInnerGlitch 560ms steps(1, end) forwards;
+}
+.cockpit-monitor.monitor-glitch .cockpit-monitor-inner::before,
+.cockpit-monitor.monitor-glitch .cockpit-monitor-inner::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    pointer-events: none;
+    z-index: 45;
+}
+.cockpit-monitor.monitor-glitch .cockpit-monitor-inner::before {
+    /* 細かい走査線・ノイズ（mix-blend で本体と混ざる） */
+    top: 0; bottom: 0;
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(255,255,255,0.05) 0px,
+            rgba(255,255,255,0.05) 1px,
+            rgba(0,0,0,0.18) 1px,
+            rgba(0,0,0,0.18) 2px),
+        repeating-linear-gradient(90deg,
+            rgba(0,0,0,0.0) 0px,
+            rgba(0,0,0,0.0) 3px,
+            rgba(0,255,80,0.06) 3px,
+            rgba(0,255,80,0.06) 4px);
+    mix-blend-mode: screen;
+    animation: cockpitInnerScan 560ms steps(1, end) forwards;
+    opacity: 0;
+}
+.cockpit-monitor.monitor-glitch .cockpit-monitor-inner::after {
+    /* 細い水平カットライン：場所と色が高速に切り替わる */
+    height: 3px;
+    animation: cockpitInnerSliceLine 560ms steps(1, end) forwards;
+    opacity: 0;
+}
+
+@keyframes cockpitInnerGlitch {
+    /* 1: ごく短い水平ホールド外れ（左へガクッ） */
+    0%, 6%   { transform: translateX(-12px); filter: hue-rotate(-110deg) saturate(2.6) contrast(1.4) brightness(1.15); }
+    /* 2: RGB 割れ＋逆向きずれ */
+    7%, 13%  { transform: translateX(9px) skewX(-2deg); filter: contrast(1.6) brightness(1.6) drop-shadow(-3px 0 0 rgba(255,0,0,0.85)) drop-shadow(3px 0 0 rgba(0,180,255,0.85)); }
+    /* 3: ブラックアウト一瞬 */
+    14%, 18% { transform: translateX(0); filter: brightness(0); }
+    /* 4: ハイライト爆ぜ（ホワイトクラッシュ） */
+    19%, 24% { transform: translateX(-4px); filter: brightness(2.4) contrast(0.6) saturate(0.2); }
+    /* 5: 縦同期外れ：上に大きく跳ねる */
+    25%, 32% { transform: translate(7px, -22px); filter: hue-rotate(60deg) saturate(0.2) contrast(2.0); }
+    /* 6: 縦同期外れ：下に跳ねる＋RGB 反転 */
+    33%, 40% { transform: translate(-6px, 18px) skewX(3deg); filter: invert(1) hue-rotate(180deg) brightness(1.1); }
+    /* 7: 短い静止＋ノイズ強め（ベース近く） */
+    41%, 48% { transform: translateX(2px); filter: contrast(1.2) brightness(0.8) saturate(0.4); }
+    /* 8: 強烈な左ずれ＋暗転手前 */
+    49%, 56% { transform: translateX(-18px) skewX(-4deg); filter: brightness(0.18) contrast(2.2) hue-rotate(-40deg); }
+    /* 9: 一瞬戻ってハイコントラスト */
+    57%, 64% { transform: translateX(3px); filter: contrast(2.4) brightness(1.4) saturate(2); }
+    /* 10: クラッシュ：暗転＋微細振動 */
+    65%, 72% { transform: translate(-1px, 1px); filter: brightness(0.06) contrast(1.5); }
+    /* 11: 最後の短い火花 */
+    73%, 80% { transform: translateX(-5px); filter: brightness(1.6) hue-rotate(-160deg) drop-shadow(-2px 0 0 rgba(255,40,40,0.9)); }
+    /* 12: 完全暗転へ収束（forwards で固定） */
+    81%, 100% { transform: translateX(0); filter: brightness(0) contrast(0); }
+}
+
+@keyframes cockpitInnerScan {
+    0%, 6%   { opacity: 0.55; transform: translateY(0); }
+    7%, 18%  { opacity: 0.85; transform: translateY(-4px); }
+    19%, 24% { opacity: 0.25; transform: translateY(2px); }
+    25%, 40% { opacity: 0.95; transform: translateY(6px); }
+    41%, 56% { opacity: 0.65; transform: translateY(-3px); }
+    57%, 72% { opacity: 0.9; transform: translateY(1px); }
+    73%, 80% { opacity: 0.7; transform: translateY(-2px); }
+    81%, 100% { opacity: 0; transform: translateY(0); }
+}
+
+@keyframes cockpitInnerSliceLine {
+    0%, 6%   { top: 18%; height: 2px; background: rgba(255,255,255,0.6); opacity: 0.9; }
+    7%, 13%  { top: 62%; height: 4px; background: rgba(255,40,40,0.7); opacity: 0.95; }
+    14%, 18% { opacity: 0; }
+    19%, 24% { top: 30%; height: 6px; background: rgba(255,255,255,0.95); opacity: 1; }
+    25%, 32% { top: 78%; height: 2px; background: rgba(0,180,255,0.7); opacity: 0.85; }
+    33%, 40% { top: 12%; height: 8px; background: rgba(0,0,0,0.85); opacity: 1; }
+    41%, 48% { top: 48%; height: 1px; background: rgba(255,255,255,0.5); opacity: 0.7; }
+    49%, 56% { opacity: 0; }
+    57%, 64% { top: 22%; height: 3px; background: rgba(255,180,40,0.65); opacity: 0.85; }
+    65%, 80% { opacity: 0; }
+    81%, 100% { opacity: 0; }
+}
+
+/* グリッチ後の黒画面状態：JS が .monitor-dead を付与して維持。
+   コックピット内装はそのまま、モニター範囲（inner + サイドの HUD すべて）を真っ黒にする */
+.cockpit-monitor.monitor-dead .cockpit-monitor-inner {
+    background: #000 !important;
+    animation: none !important;
+}
+.cockpit-monitor.monitor-dead .cockpit-monitor-inner > *,
+.cockpit-monitor.monitor-dead > .cockpit-attitude,
+.cockpit-monitor.monitor-dead > .cockpit-horizon,
+.cockpit-monitor.monitor-dead > .cockpit-fuel {
+    visibility: hidden !important;
+}
+.cockpit-monitor.monitor-dead .cockpit-monitor-inner::before,
+.cockpit-monitor.monitor-dead .cockpit-monitor-inner::after {
+    display: none;
+}
+
+/* 失敗時の爆破：コックピット画像の上にランダム位置で複数表示
+   コンテナは loading-screen 全体、各 sprite は中央付近にランダム配置 */
+#cockpit-blast {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: none;
+    z-index: 50;
+}
+#cockpit-blast.active { display: block; }
+#cockpit-blast .blast-sprite {
+    position: absolute;
+    background-image: url('assets/explosion.png');
+    background-size: 800% 800%;
+    background-repeat: no-repeat;
+    background-position: 0% 0%;
+    transform: translate(-50%, -50%);
+}
 .loading-frame {
     position: absolute;
     /* opening-title.jpg の黒モニター中央に合わせる */
