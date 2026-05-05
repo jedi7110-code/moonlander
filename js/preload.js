@@ -283,6 +283,8 @@ scene.load.image('player_R1', 'assets/player-r1.png');
 scene.load.image('player_R2', 'assets/player-r2.png');
 scene.load.image('flag', 'assets/flag.webp');
 scene.load.image('flag-flash', 'assets/flag-flash.webp');
+scene.load.image('landPointG', 'assets/land-point.jpg'); // 着陸時のコックピットモニター映像（俯瞰、4:3 = 1120x840）
+scene.load.image('cockpitTitle', 'assets/opening-title.webp'); // コックピット内装（モニター周囲）
 scene.load.spritesheet('explosion', 'assets/explosion.png', { frameWidth: 256, frameHeight: 256 });
 scene.load.image('title', 'assets/title.png?v=2');
 scene.load.audio('command', 'assets/sound/command.wav'); // ブリーフィングのタイピング音

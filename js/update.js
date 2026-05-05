@@ -2,6 +2,7 @@
 import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js';
+import { enterCockpitMode, updateCockpit } from './cockpit.js?v=82';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // IS_LOCAL=true の時はテスト用無敵モード（プレイヤー捕獲・デブリ衝突を無効化）
@@ -25,6 +26,12 @@ function restartGame(scene) {
 }
 
 export function update(scene, time, delta) {
+// コックピット視点モード中は専用ループを回し、通常の物理処理はスキップ
+if (scene.cockpitMode) {
+    updateCockpit(scene, delta);
+    return;
+}
+
 // 手動降下：下キーで一段ずつ降りる、上キーで一段戻る。
 // 各ステップ位置はハシゴの段に正確に対応（足が rung に乗る）。
 // 影は step index の進捗に応じて 0→1 に変化
@@ -1506,35 +1513,40 @@ if (!scene.gameStarted) {
 }
 
 if (scene.gameStarted) {
-    // 宇宙船の速度に基づいてカメラの位置を調整（パララックス効果）
-    const maxCameraOffset = 100;
-    const offsetX = Phaser.Math.Clamp(-scene.spaceship.body.velocity.x / 50, -maxCameraOffset, maxCameraOffset);
-    const offsetY = Phaser.Math.Clamp(-scene.spaceship.body.velocity.y / 50, -maxCameraOffset, maxCameraOffset);
+    // コックピット成功直後（着陸→ハシゴ降下シーンに切り替わる直前）は、
+    // 自動ズーム/ラープがフェード後の宇宙船アップを上書きしてしまうため、
+    // _cockpitJustExited フラグが立っている間はカメラ操作をスキップする。
+    if (!scene._cockpitJustExited) {
+        // 宇宙船の速度に基づいてカメラの位置を調整（パララックス効果）
+        const maxCameraOffset = 100;
+        const offsetX = Phaser.Math.Clamp(-scene.spaceship.body.velocity.x / 50, -maxCameraOffset, maxCameraOffset);
+        const offsetY = Phaser.Math.Clamp(-scene.spaceship.body.velocity.y / 50, -maxCameraOffset, maxCameraOffset);
 
-    // カメラの遅延追従（宇宙船が中心からズレ、カメラが遅れてついてくる）
-    const targetX = scene.spaceship.x + offsetX;
-    const targetY = scene.spaceship.y + offsetY;
-    const cam = scene.cameras.main;
-    const currentX = cam.scrollX + cam.width / 2;
-    const currentY = cam.scrollY + cam.height / 2;
-    const lerpSpeed = 0.04;
-    cam.centerOn(
-        Phaser.Math.Linear(currentX, targetX, lerpSpeed),
-        Phaser.Math.Linear(currentY, targetY, lerpSpeed)
-    );
+        // カメラの遅延追従（宇宙船が中心からズレ、カメラが遅れてついてくる）
+        const targetX = scene.spaceship.x + offsetX;
+        const targetY = scene.spaceship.y + offsetY;
+        const cam = scene.cameras.main;
+        const currentX = cam.scrollX + cam.width / 2;
+        const currentY = cam.scrollY + cam.height / 2;
+        const lerpSpeed = 0.04;
+        cam.centerOn(
+            Phaser.Math.Linear(currentX, targetX, lerpSpeed),
+            Phaser.Math.Linear(currentY, targetY, lerpSpeed)
+        );
 
-    // ズーム効果を設定
-    const zoomSpeed = 0.0003 * delta;
-    const lowerThirdBoundary = scene.game.config.height * (2 / 3);
-    let zoomTarget;
+        // ズーム効果を設定
+        const zoomSpeed = 0.0003 * delta;
+        const lowerThirdBoundary = scene.game.config.height * (2 / 3);
+        let zoomTarget;
 
-    if (scene.spaceship.y > lowerThirdBoundary) {
-        zoomTarget = 2.0;
-    } else {
-        zoomTarget = 0.8;
+        if (scene.spaceship.y > lowerThirdBoundary) {
+            zoomTarget = 2.0;
+        } else {
+            zoomTarget = 0.8;
+        }
+
+        scene.cameras.main.setZoom(Phaser.Math.Linear(scene.cameras.main.zoom, zoomTarget, zoomSpeed));
     }
-
-    scene.cameras.main.setZoom(Phaser.Math.Linear(scene.cameras.main.zoom, zoomTarget, zoomSpeed));
 
     // 燃料ゲージを宇宙船の右側に追従させる
     const gaugeX = scene.spaceship.x + 35;
@@ -1559,8 +1571,8 @@ if (scene.gameStarted) {
         scene.input.keyboard.createCursorKeys().down.isDown ||
         scene.input.keyboard.createCursorKeys().left.isDown ||
         scene.input.keyboard.createCursorKeys().right.isDown) && scene.fuel > 0) {
-        // ローカル開発時は燃料無限（IS_LOCAL=true ならジェットを消費しない）
-        if (!IS_LOCAL) scene.fuel -= 1;
+        // 燃料を消費（無限モードは一旦解除）
+        scene.fuel -= 1;
     }
 
     // 燃料がなくなったら操作を無効にする
@@ -1719,6 +1731,69 @@ const landingZone = new Phaser.Geom.Rectangle(
 // ターゲットマークの色フェード（ゴール上空に近づくほど緑→黄）
 const inGoalX = Math.abs(scene.spaceship.x - scene.moon.x) < PAD_LANDING_HALF_WIDTH;
 const distY = scene.moon.y - scene.spaceship.y;
+
+// コックピット視点への切替：パッド上空 200px 以内・水平範囲内・降下中で SPACE キー
+// が押された瞬間だけ発火（押さなければ従来通り自力で着陸できる）。
+const cockpitConditionsMet =
+    scene.gameStarted &&
+    !scene.cockpitMode &&
+    !scene._cockpitTriggered &&
+    !scene.tippingOver &&
+    inGoalX &&
+    distY > 0 && distY < 200 &&
+    scene.spaceship.body && scene.spaceship.body.velocity.y > -10;
+
+// 切替可能ゾーン内なら DOM オーバーレイで画面下中央に控えめなヒントを表示。
+// Phaser テキストはカメラ zoom/scroll の影響を受けて位置がずれるため、
+// canvas に被せた DOM 要素のほうが確実かつ邪魔にならない位置に出せる。
+{
+    let hintEl = document.getElementById('cockpit-hint');
+    if (!hintEl) {
+        hintEl = document.createElement('div');
+        hintEl.id = 'cockpit-hint';
+        hintEl.textContent = '[SPACE]  COCKPIT VIEW';
+        const container = document.getElementById('game-container') || document.body;
+        container.appendChild(hintEl);
+    }
+    if (cockpitConditionsMet) {
+        hintEl.classList.add('show');
+    } else {
+        hintEl.classList.remove('show');
+    }
+}
+
+if (
+    cockpitConditionsMet &&
+    scene.cursors && scene.cursors.space &&
+    Phaser.Input.Keyboard.JustDown(scene.cursors.space)
+) {
+    scene._cockpitTriggered = true;
+    // ヒントを即座にフェードアウト
+    const hintEl = document.getElementById('cockpit-hint');
+    if (hintEl) hintEl.classList.remove('show');
+    enterCockpitMode(scene);
+    return; // 残りの物理判定はスキップ。次フレームから updateCockpit が走る
+}
+
+// デバッグ：URL に ?cockpit を付けると起動直後にコックピット視点へ直行
+if (
+    !scene._cockpitTriggered &&
+    !scene.cockpitMode &&
+    typeof window !== 'undefined' &&
+    window.location && window.location.search.includes('cockpit')
+) {
+    scene.gameStarted = true;
+    scene._cockpitTriggered = true;
+    scene.spaceship.x = scene.moon.x;
+    scene.spaceship.y = scene.moon.y - 150;
+    if (scene.spaceship.body) {
+        scene.spaceship.body.allowGravity = false;
+        scene.spaceship.setVelocity(0, 30);
+    }
+    enterCockpitMode(scene);
+    return;
+}
+
 let markerT = 0; // 0=緑, 1=黄
 if (inGoalX && distY < 300 && distY > 0) {
     markerT = 1 - (distY / 300); // 近いほど1に
@@ -1849,6 +1924,18 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
     });
 
     scene.gameStarted = false; // 操作を無効化
+
+    // コックピット視点を経由してきた場合は、フェード明けの瞬間に必ず close-up
+    // で出ているよう、後段の 1秒待ち pan/zoomTo（line 1928）を待たずに即スナップ。
+    // 宇宙空間から自力で着陸した場合は、後段の pan/zoomTo（2 秒）でゆっくり
+    // ズームインしていく従来の演出を残す。
+    if (scene._cockpitTriggered) {
+        const cam = scene.cameras.main;
+        if (cam.panEffect && cam.panEffect.isRunning) cam.panEffect.reset();
+        if (cam.zoomEffect && cam.zoomEffect.isRunning) cam.zoomEffect.reset();
+        cam.setZoom(4.5);
+        cam.centerOn(scene.spaceship.x, scene.spaceship.y + 30);
+    }
 
     // ハシゴが出てきて、宇宙飛行士が降りてくる演出
     scene.time.delayedCall(1000, () => {
