@@ -1,6 +1,6 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js?v=15';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=18';
         import { create as createScene } from './create.js?v=72';
         import { update as updateScene } from './update.js?v=104';
 

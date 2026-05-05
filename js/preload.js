@@ -13,22 +13,37 @@ export function startBriefing(loadingScreen, onDismiss, scene) {
         return;
     }
     // テストモード（コナミコマンドで起動）：通常のブリーフィング前に
-    // テストモード起動メッセージを 2 秒表示してから run() に入る
+    // テストモード起動メッセージを 1 文字ずつタイプアニメーションで表示してから run() へ
     const testModeActive = (typeof window !== 'undefined' && window.__testMode === true);
     const startWithTestModeOverlay = () => {
         loadingScreen.classList.remove('title');
         loadingScreen.classList.add('briefing');
-        textEl.textContent = [
+        textEl.textContent = '';
+        briefingEl.classList.remove('done');
+        const overlayText = [
             '> SIMULATION ACTIVE',
             '> DEBUG SESSION ONLINE',
             '> SECRET INPUT DETECTED',
             '> INVINCIBILITY ENABLED'
         ].join('\n');
-        briefingEl.classList.remove('done');
-        setTimeout(() => {
-            textEl.textContent = '';
-            run();
-        }, 2000);
+        const CHAR_MS = 22;
+        const NL_MS = 70;
+        const HOLD_MS = 2000; // タイピング完了後の読ませ時間（タイプ約2秒 + ホールド2秒 = 約4秒）
+        let oi = 0;
+        const overlayStep = () => {
+            if (oi < overlayText.length) {
+                const ch = overlayText[oi++];
+                textEl.textContent += ch;
+                textEl.scrollTop = textEl.scrollHeight;
+                setTimeout(overlayStep, ch === '\n' ? NL_MS : CHAR_MS);
+            } else {
+                setTimeout(() => {
+                    textEl.textContent = '';
+                    run();
+                }, HOLD_MS);
+            }
+        };
+        overlayStep();
     };
 
     // タイトル表示中なら、まずロゴを中心に潰れて消える演出を再生
