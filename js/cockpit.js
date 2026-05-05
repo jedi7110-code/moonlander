@@ -214,6 +214,11 @@ export function enterCockpitMode(scene) {
         ck.ls.classList.add('cockpit-mode', 'cockpit-fade-in');
     }
 
+    // コックピット環境音をループ再生（着陸成功 / 爆発で停止）
+    if (scene.cockpitSound && !scene.cockpitSound.isPlaying) {
+        try { scene.cockpitSound.play({ loop: true }); } catch (e) {}
+    }
+
     const FADE_IN_MS = 600;
     setTimeout(() => {
         // fade-in 完了：cockpit が完全不透明になったので、隠れている canvas 上で
@@ -502,7 +507,16 @@ export function exitCockpitMode(scene, success) {
     // ジェット音停止
     if (scene.jetSound && scene.jetSound.isPlaying) fadeStopSound(scene, scene.jetSound, 0.2);
 
+    // コックピット環境音はここで停止（成功でも失敗でも cockpit を抜けるので）
+    if (scene.cockpitSound && scene.cockpitSound.isPlaying) {
+        try { scene.cockpitSound.stop(); } catch (e) {}
+    }
+
     if (success) {
+        // 着陸成功 SE を 1 度だけ再生
+        if (scene.cockpitLandingSound) {
+            try { scene.cockpitLandingSound.play(); } catch (e) {}
+        }
         // 成功：機体が沈むように一瞬ズームして戻すアニメ → 1秒固定 → ふんわりフェード → ハシゴ降下シーンへ
         const img = ck.image;
         if (img && ck.monitor) {

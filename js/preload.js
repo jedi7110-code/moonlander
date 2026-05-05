@@ -307,6 +307,8 @@ scene.load.audio('rescue2', 'assets/sound/rescue-2.wav'); // 仲間着地時(ラ
 scene.load.audio('rescue3', 'assets/sound/rescue-3.wav');
 scene.load.audio('rescue4', 'assets/sound/rescue-4.wav');
 scene.load.audio('climb', 'assets/sound/climb.wav'); // 登れと指示する声
+scene.load.audio('cockpit', 'assets/sound/cockpit.mp3'); // コックピット視点モード中の環境音（ループ）
+scene.load.audio('cockpitLanding', 'assets/sound/cockpit-landing.mp3'); // コックピット着陸成功時の効果音（1回）
 // 地底人 6コマアニメ（全コマ左向き。右向きは flipX で反転）
 scene.load.image('alien_1', 'assets/alien-s-1.png');
 scene.load.image('alien_2', 'assets/alien-s-2.png');

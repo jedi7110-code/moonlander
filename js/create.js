@@ -2,7 +2,7 @@
 import { generateLabels, SVG_SCALE } from './ui-text.js';
 import { attachUiGuide } from './ui-guide.js?v=2';
 import { registerAnimations } from './animations.js';
-import { createCockpitObjects } from './cockpit.js?v=82';
+import { createCockpitObjects } from './cockpit.js?v=83';
 
 export function create(scene) {
 // Helvetica はシステムフォントなので待機不要
@@ -239,6 +239,8 @@ scene.bloodSound = scene.sound.add('blood', { loop: false, volume: 0.5 });
 scene.deadSound = scene.sound.add('dead', { loop: false, volume: 0.15 });
 scene.rescueIntroSound = scene.sound.add('rescue1', { loop: false, volume: 0.15 });
 scene.climbSound = scene.sound.add('climb', { loop: false, volume: 0.075 });
+scene.cockpitSound = scene.sound.add('cockpit', { loop: true, volume: 0.4 });
+scene.cockpitLandingSound = scene.sound.add('cockpitLanding', { loop: false, volume: 0.6 });
 scene.rescueLandSounds = [
     scene.sound.add('rescue2', { loop: false, volume: 0.15 }),
     scene.sound.add('rescue3', { loop: false, volume: 0.15 }),

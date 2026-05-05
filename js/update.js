@@ -2,7 +2,7 @@
 import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js';
-import { enterCockpitMode, updateCockpit } from './cockpit.js?v=82';
+import { enterCockpitMode, updateCockpit } from './cockpit.js?v=83';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // IS_LOCAL=true の時はテスト用無敵モード（プレイヤー捕獲・デブリ衝突を無効化）

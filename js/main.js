@@ -1,7 +1,7 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js?v=12';
-        import { create as createScene } from './create.js?v=70';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=13';
+        import { create as createScene } from './create.js?v=71';
         import { update as updateScene } from './update.js?v=103';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
