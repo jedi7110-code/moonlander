@@ -414,8 +414,9 @@ body.no-crt .crt-overlay {
     filter: hue-rotate(40deg) saturate(0.82) brightness(0.93) contrast(1.02);
     will-change: width, height, transform;
 }
-/* 着陸 OK ゾーン可視化（着陸台の左右端を示す赤い縦線、陸地と一緒にパン＆傾く）。
-   OK_X_BUFFER の値を調整しながら確認するためのデバッグ表示。 */
+/* HUD：着陸ゾーン左右端ガイドライン。
+   地面と一緒にパン＆傾きに追従する 1px 縦線で、十字（クロスヘア）との相対位置で
+   着陸 OK 範囲内かどうかを示すパイロットアシスト要素。 */
 .cockpit-okzone {
     position: absolute;
     inset: 0;

@@ -399,8 +399,8 @@ export function updateCockpit(scene, delta) {
             `translate(calc(-50% + ${(panX + sx).toFixed(2)}px), calc(-50% + ${sy.toFixed(2)}px)) ${persp}`;
     }
 
-    // OK ゾーン可視化：陸地と同じ panRate で地面に貼り付く赤い縦線。
-    // 地面 x = ±OK_X_BUFFER の位置を screen pixel に変換、機体の傾きにも追従。
+    // HUD：着陸ゾーン左右端ガイドライン（緑）。陸地と同じ panRate で地面に貼り付き、
+    // 機体の傾きにも追従。地面 x = ±OK_X_BUFFER の位置を screen pixel に変換。
     if (ck.okzoneLeft && ck.okzoneRight) {
         const panRate = SOURCE_SHIFT_PER_PX * (imgW / IMG_NATIVE_W);
         const leftPx = (-OK_X_BUFFER - st.xOffset) * panRate;
