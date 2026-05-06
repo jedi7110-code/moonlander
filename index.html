@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=102">
+    <link rel="stylesheet" href="style.css?v=113">
     <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 </head>
@@ -98,6 +98,11 @@
                 <div class="cockpit-monitor-inner">
                     <img class="cockpit-image" src="assets/land-point.jpg" alt="">
                     <div class="cockpit-shadow"></div>
+                    <!-- 着陸 OK ゾーン可視化（陸地と一緒にパン）。調整・確認用デバッグ表示 -->
+                    <div class="cockpit-okzone">
+                        <span class="okzone-line okzone-line-l"></span>
+                        <span class="okzone-line okzone-line-r"></span>
+                    </div>
                     <!-- 高度ラダー：100m おきの赤線。0m が太い着地ライン -->
                     <div class="cockpit-altladder"></div>
                     <div class="cockpit-crosshair">
@@ -120,7 +125,16 @@
                         </svg>
                         <div class="vsi-num"><span class="vsi-val">0.0</span> <span class="vsi-unit">KM/H</span></div>
                     </div>
-                    <div class="cockpit-ok">OK</div>
+                    <!-- モニター上端：手動操縦中バナー（常時表示） -->
+                    <div class="cockpit-mancl">&gt; MAN CTRL &lt;</div>
+                    <!-- モニター下端：ANG / SPD 個別状態（OK ↔ -- 切替） -->
+                    <div class="cockpit-status">
+                        <span class="cs-ang-lbl">ANG:</span>
+                        <span class="cs-ang-val">OK</span>
+                        <span class="cs-sep">|</span>
+                        <span class="cs-spd-lbl">SPD:</span>
+                        <span class="cs-spd-val">OK</span>
+                    </div>
                 </div>
                 <!-- 高度計：十字の上、中央 -->
                 <div class="cockpit-attitude">

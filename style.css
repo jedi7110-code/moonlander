@@ -410,9 +410,29 @@ body.no-crt .crt-overlay {
     transform: translate(-50%, -50%);
     pointer-events: none;
     user-select: none;
-    /* 緑モニター風 */
-    filter: hue-rotate(40deg) saturate(1.8) brightness(0.95) contrast(1.15);
+    /* 緑モニター風（若干色褪せたフェード気味の緑） */
+    filter: hue-rotate(40deg) saturate(0.82) brightness(0.93) contrast(1.02);
     will-change: width, height, transform;
+}
+/* 着陸 OK ゾーン可視化（着陸台の左右端を示す赤い縦線、陸地と一緒にパン＆傾く）。
+   OK_X_BUFFER の値を調整しながら確認するためのデバッグ表示。 */
+.cockpit-okzone {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+    overflow: hidden;
+}
+.cockpit-okzone .okzone-line {
+    position: absolute;
+    left: 50%;
+    top: 5%;
+    width: 1px;
+    height: 90%;
+    background: rgba(136, 255, 170, 0.85);
+    box-shadow: 0 0 4px rgba(136, 255, 170, 0.7);
+    transform: translate(-50%, 0);
+    transform-origin: 50% 50%;
 }
 .cockpit-shadow {
     position: absolute;
@@ -501,22 +521,47 @@ body.no-crt .crt-overlay {
 .cockpit-monitor.on-target .cockpit-crosshair .ch-h,
 .cockpit-monitor.on-target .cockpit-crosshair .ch-v { background: #88ffaa; box-shadow: 0 0 5px rgba(136,255,170,0.9); }
 .cockpit-monitor.on-target .cockpit-crosshair .ch-c { border-color: #88ffaa; }
-.cockpit-ok {
+/* モニター上端の手動操縦バナー（常時表示） */
+.cockpit-mancl {
     position: absolute;
-    left: 50%; top: calc(50% + 36px);
+    left: 50%;
+    top: 8px;
     transform: translate(-50%, 0);
     color: #88ffaa;
     font-family: "Courier New", Menlo, monospace;
     font-weight: bold;
-    font-size: 14px;
+    font-size: 11px;
+    letter-spacing: 2px;
     text-shadow: 0 0 6px rgba(136,255,170,0.8);
-    display: none;
     pointer-events: none;
     z-index: 6;
+    white-space: nowrap;
+    opacity: 0.85;
 }
-/* OK バッジ：landable（速度＋角度が着陸可能） */
-.cockpit-monitor.landable .cockpit-ok { display: block; }
-.cockpit-monitor.blink.landable .cockpit-ok { opacity: 0.35; }
+/* 十字（44x44）の 20px 下に ANG / SPD ステータス（OK ↔ -- 切替、緑単色）。
+   位置: モニター中心 + 22（十字下端）+ 20 = +42px */
+.cockpit-status {
+    position: absolute;
+    left: 50%;
+    top: calc(50% + 42px);
+    transform: translate(-50%, 0);
+    color: #88ffaa;
+    font-family: "Courier New", Menlo, monospace;
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 6;
+    text-shadow: 0 0 6px rgba(136,255,170,0.8);
+    white-space: nowrap;
+}
+.cockpit-status .cs-sep { margin: 0 6px; opacity: 0.6; }
+/* 個別 NG 時：blink でその値だけ点滅（"-- " 表示は JS で切替） */
+.cockpit-monitor.blink.ang-ng .cockpit-status .cs-ang-val,
+.cockpit-monitor.blink.spd-ng .cockpit-status .cs-spd-val {
+    opacity: 0.25;
+}
 /* ─── 水平儀 + 高度計（合体）：十字の上、中央。単色 CRT 緑線画 ─── */
 /* 高度ラダーで重複する数値表示を廃止 */
 .cockpit-attitude {
@@ -647,9 +692,24 @@ body.no-crt .crt-overlay {
     height: 100%;
     transition: background 0.2s;
 }
-.cockpit-monitor.fuel-low .fuel-fill { background: #ffcc66; box-shadow: 0 0 4px rgba(255,204,102,0.8); }
-.cockpit-monitor.fuel-crit .fuel-fill { background: #ff5566; box-shadow: 0 0 4px rgba(255,85,102,0.9); }
-.cockpit-monitor.fuel-crit.blink .fuel-fill { opacity: 0.35; }
+/* 燃料警告：緑モニター内なので色は変えず、ハッキリした ON/OFF 点滅で表現。
+   低燃料はゆっくり、危険燃料は速く点滅。step-end で fade なしの矩形点滅。 */
+.cockpit-monitor.fuel-low .fuel-fill {
+    animation: fuelBlinkSlow 1.1s step-end infinite;
+}
+.cockpit-monitor.fuel-crit .fuel-fill {
+    animation: fuelBlinkFast 0.36s step-end infinite;
+}
+@keyframes fuelBlinkSlow {
+    0%   { opacity: 1; }
+    50%  { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes fuelBlinkFast {
+    0%   { opacity: 1; }
+    50%  { opacity: 0; }
+    100% { opacity: 1; }
+}
 .cockpit-fuel .fuel-lbl {
     font-size: 7px;
     margin-top: 1px;
