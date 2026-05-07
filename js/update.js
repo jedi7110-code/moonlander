@@ -2,7 +2,7 @@
 import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js';
-import { enterCockpitMode, updateCockpit } from './cockpit.js?v=97';
+import { enterCockpitMode, updateCockpit } from './cockpit.js?v=98';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // または本番環境でコナミコマンド (window.__testMode) で起動したテストモードでも
@@ -1018,7 +1018,10 @@ if (scene.astronautMode && scene.astronaut) {
     // 仲間：P→C1→C2 と鎖状に追従（各自が前走者を追う＝自然な時差）
     // 仲間を連れて宇宙船に戻ったら、2人が先に乗り込み、プレイヤーは最後
     if (!scene.returningToShip && scene.crewFollowing && scene.crews.length > 0
-        && scene.spaceship && Math.abs(scene.astronaut.x - scene.spaceship.x) < 20) {
+        && scene.spaceship && Math.abs(scene.astronaut.x - scene.spaceship.x) < 20
+        && onGround) {
+        // 着地している時のみ帰還シーケンス起動。ジャンプ中に発火すると重力停止
+        // で空中固定 → 横滑り → 敵に捕まるバグになるため。
         scene.returningToShip = true;
         scene.crewFollowing = false;
         // 「早く登れ」の指示音（仲間がハシゴを登り始める前）
