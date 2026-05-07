@@ -413,13 +413,16 @@ export function updateCockpit(scene, delta) {
     }
 
     // 影（モニター中央、高度低下で大きく濃く、傾きで perspective 変形）
-    const shadowMaxR = Math.min(mW, mH) * 0.55;
-    const shadowR = lerp(8, shadowMaxR, tProg);
+    const shadowMaxR = Math.min(mW, mH) * 0.72;
+    const shadowR = lerp(10, shadowMaxR, tProg);
     const shadowAlpha = lerp(0.15, 0.55, tProg);
+    // ぼかし量も高度連動：上空ではぼけて、着地が近づくほどシャープに
+    const shadowBlur = lerp(8, 3, tProg);
     if (ck.shadow) {
         ck.shadow.style.width = (shadowR * 2) + 'px';
         ck.shadow.style.height = (shadowR * 2) + 'px';
         ck.shadow.style.opacity = shadowAlpha.toFixed(2);
+        ck.shadow.style.filter = `blur(${shadowBlur.toFixed(1)}px)`;
         // 陸地（cockpit-image）と完全に同じ rotateY を影にも適用。
         // 親 .cockpit-monitor-inner の共有 perspective に乗ることで、
         // 影と陸地が同じ vanishing point の同一 3D 平面に貼り付いて見える

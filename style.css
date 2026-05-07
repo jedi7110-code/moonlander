@@ -442,14 +442,16 @@ body.no-crt .crt-overlay {
     border-radius: 50%;
     /* 中心ほど濃く外周ほど薄い radial-gradient（滑らかなグラデーション） */
     background: radial-gradient(circle,
-        rgba(0,0,0,0.95) 0%,
-        rgba(0,0,0,0.78) 22%,
-        rgba(0,0,0,0.45) 50%,
-        rgba(0,0,0,0.18) 75%,
+        rgba(0,0,0,1.0) 0%,
+        rgba(0,0,0,0.9) 22%,
+        rgba(0,0,0,0.6) 50%,
+        rgba(0,0,0,0.28) 75%,
         rgba(0,0,0,0) 100%);
     transform: translate(-50%, -50%);
     pointer-events: none;
-    will-change: width, height, transform, opacity;
+    /* 縁にガウシアンぼかしを追加してエッジを馴染ませる */
+    filter: blur(8px); /* JS 側で高度連動 8→3px に上書き */
+    will-change: width, height, transform, opacity, filter;
 }
 /* 対地速度表示（タコメーター風）— 十字マークの上 */
 .cockpit-vsi {

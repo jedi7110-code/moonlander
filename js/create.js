@@ -2,7 +2,7 @@
 import { generateLabels, SVG_SCALE } from './ui-text.js';
 import { attachUiGuide } from './ui-guide.js?v=2';
 import { registerAnimations } from './animations.js';
-import { createCockpitObjects } from './cockpit.js?v=88';
+import { createCockpitObjects } from './cockpit.js?v=90';
 
 export function create(scene) {
 // Helvetica はシステムフォントなので待機不要
@@ -182,15 +182,15 @@ scene.spaceship.defaultTextureName = 'spaceship';
 // 同じ形の影を2つ用意し、パッドの水平範囲でマスクで切り分ける
 const buildShadowGfx = () => {
     const g = scene.add.graphics();
-    g.fillStyle(0x000000, 0.03);
-    g.fillEllipse(0, 0, 110, 30);
-    g.fillStyle(0x000000, 0.035);
-    g.fillEllipse(0, 0, 106, 29);
-    g.fillStyle(0x000000, 0.04);
-    g.fillEllipse(0, 0, 100, 27);
     g.fillStyle(0x000000, 0.05);
-    g.fillEllipse(0, 0, 92, 25);
+    g.fillEllipse(0, 0, 110, 30);
     g.fillStyle(0x000000, 0.06);
+    g.fillEllipse(0, 0, 106, 29);
+    g.fillStyle(0x000000, 0.075);
+    g.fillEllipse(0, 0, 100, 27);
+    g.fillStyle(0x000000, 0.09);
+    g.fillEllipse(0, 0, 92, 25);
+    g.fillStyle(0x000000, 0.12);
     g.fillEllipse(0, 0, 72, 20);
     g.x = scene.spaceship.x;
     g.y = scene.game.config.height - 63;
