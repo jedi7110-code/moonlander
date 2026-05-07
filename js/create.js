@@ -2,7 +2,7 @@
 import { generateLabels, SVG_SCALE } from './ui-text.js';
 import { attachUiGuide } from './ui-guide.js?v=2';
 import { registerAnimations } from './animations.js';
-import { createCockpitObjects } from './cockpit.js?v=88';
+import { createCockpitObjects } from './cockpit.js?v=97';
 
 export function create(scene) {
 // Helvetica はシステムフォントなので待機不要

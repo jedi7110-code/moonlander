@@ -61,11 +61,33 @@ const IMG_ASPECT = IMG_NATIVE_W / IMG_NATIVE_H; // 12/7 ≒ 1.714
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// VSI（タコメーター）：descent=0 → 9時方向(180°)、descent=DESCENT_MAX → 3時方向(0°)
+// VSI（タコメーター）：3 区間ピースワイズ・マッピング。
+// 着陸 OK ゾーン（降下側）だけを拡大、上昇は圧縮（上昇しながら着陸は不可）。
+//   ascent  : 42° / 3 m/s   = 14.0°/m/s（圧縮、粗い目盛）
+//   safe    : 60° / 1.4 m/s ≈ 42.9°/m/s（拡大、精密目盛 = 着陸 OK 範囲）
+//   excess  : 78° / 5.6 m/s ≈ 13.9°/m/s（圧縮、粗い目盛 = 過剰降下警告）
+//
+// 上昇と過剰降下の針スピードはほぼ同じ（14°/m/s）に揃えている。
+//
+//   DESCENT_MIN（上昇上限）  → 180°（9時、左）
+//   0 m/s（水平）             → 222°
+//   SAFE_DESCENT_MAX (1.4)    → 282°
+//   DESCENT_MAX（降下上限）   → 360°（3時、右）
 const VSI_CX = 50, VSI_CY = 55, VSI_R = 40;
+const VSI_ASCENT_DEG = 42;       // 上昇圧縮区間
+const VSI_SAFE_DEG = 60;         // 安全帯拡大区間（OK 範囲の白アーク幅）
+// 過剰降下: 180 - 42 - 60 = 78°
 function vsiAngleDeg(d) {
-    // 0 → 180°、DESCENT_MAX → 360°
-    return 180 + clamp(d / DESCENT_MAX, 0, 1) * 180;
+    if (d <= 0) {
+        const n = clamp((d - DESCENT_MIN) / (0 - DESCENT_MIN), 0, 1);
+        return 180 + n * VSI_ASCENT_DEG;
+    }
+    if (d <= SAFE_DESCENT_MAX) {
+        const n = clamp(d / SAFE_DESCENT_MAX, 0, 1);
+        return (180 + VSI_ASCENT_DEG) + n * VSI_SAFE_DEG;
+    }
+    const n = clamp((d - SAFE_DESCENT_MAX) / (DESCENT_MAX - SAFE_DESCENT_MAX), 0, 1);
+    return (180 + VSI_ASCENT_DEG + VSI_SAFE_DEG) + n * (180 - VSI_ASCENT_DEG - VSI_SAFE_DEG);
 }
 function vsiPoint(d, r) {
     const a = vsiAngleDeg(d) * Math.PI / 180;
@@ -73,14 +95,14 @@ function vsiPoint(d, r) {
 }
 function setupVsiGauge(ck) {
     if (!ck.vsiSafeArc || !ck.vsiTicks) return;
-    // 安全帯アーク
+    // 安全帯アーク（0 → SAFE_DESCENT_MAX、12時のすぐ右の細い帯）
     const p1 = vsiPoint(SAFE_DESCENT_MIN, VSI_R);
     const p2 = vsiPoint(SAFE_DESCENT_MAX, VSI_R);
     const path = `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${VSI_R} ${VSI_R} 0 0 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
     ck.vsiSafeArc.setAttribute('d', path);
-    // 目盛：0、SAFE_MIN、SAFE_MAX、MAX の 4 つ
+    // 目盛：上昇上限・0・SAFE_MAX・降下上限の 4 つ。両端は太線。
     ck.vsiTicks.innerHTML = '';
-    const tickVals = [0, SAFE_DESCENT_MIN, SAFE_DESCENT_MAX, DESCENT_MAX];
+    const tickVals = [DESCENT_MIN, 0, SAFE_DESCENT_MAX, DESCENT_MAX];
     tickVals.forEach((d, i) => {
         const inner = vsiPoint(d, VSI_R - 4);
         const outer = vsiPoint(d, VSI_R + 2);
@@ -104,7 +126,7 @@ export function createCockpitObjects(scene) {
     const shadowEl = document.querySelector('.cockpit-shadow');
     if (shadowEl) shadowEl.innerHTML = '';
 
-    // 高度ラダー：0m〜700m の 100m 刻みの赤線。0m は太い着地ライン
+    // 高度ラダー：0m〜700m の 100m 刻みの線。0m は太い着地ライン
     const ladderEl = document.querySelector('.cockpit-altladder');
     if (ladderEl && !ladderEl.dataset.built) {
         ladderEl.innerHTML = '';
@@ -456,7 +478,9 @@ export function updateCockpit(scene, delta) {
     if (ck.vsiVal) ck.vsiVal.textContent = (st.descentRate * SPEED_KMH_FACTOR).toFixed(1);
     if (ck.vsiNeedle) {
         // 針は 12時方向に伸びている → -90° で 9時、+90° で 3時
-        const needleDeg = -90 + clamp(st.descentRate / DESCENT_MAX, 0, 1) * 180;
+        // ゲージ角度（180°〜360°）→ CSS rotate（-90°〜+90°）
+        // d=DESCENT_MIN → -90°（9時）、d=0 → 0°（12時）、d=DESCENT_MAX → +90°（3時）
+        const needleDeg = vsiAngleDeg(st.descentRate) - 270;
         ck.vsiNeedle.style.transform = `rotate(${needleDeg.toFixed(2)}deg)`;
     }
 
