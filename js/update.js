@@ -45,32 +45,61 @@ if (scene.playerDescendingManual && scene.astronautDescending && scene.descendSt
         scene.astronautDescending.shadow.alpha = Math.max(0, Math.min(1, progress));
     }
     if (!scene.descendStepInProgress) {
-        let nextIdx = scene.descendStepIndex;
-        if (scene.cursors.down.isDown) nextIdx = Math.min(totalIdx, nextIdx + 1);
-        else if (scene.cursors.up.isDown) nextIdx = Math.max(0, nextIdx - 1);
-        if (nextIdx !== scene.descendStepIndex) {
-            scene.descendStepIndex = nextIdx;
+        // SPACE 押下 → 残りの段を一気に滑り降りる。地面到達後の振り向きは
+        // descendCallback (onDescendComplete) 側で車両方向に応じて行われる。
+        if (scene.cursors.space && Phaser.Input.Keyboard.JustDown(scene.cursors.space) &&
+            scene.descendStepIndex < totalIdx) {
             scene.descendStepInProgress = true;
+            const remain = totalIdx - scene.descendStepIndex;
+            scene.descendStepIndex = totalIdx;
             scene.tweens.add({
                 targets: scene.astronautDescending,
-                y: positions[nextIdx],
-                duration: 100,
-                ease: 'Sine.easeOut',
+                y: positions[totalIdx],
+                duration: Math.max(150, remain * 60),
+                ease: 'Sine.easeIn', // 落下感
                 onComplete: () => {
-                    if (nextIdx === totalIdx) {
-                        // 地面に到達 → コールバック起動
-                        const cb = scene.descendCallback;
-                        scene.playerDescendingManual = false;
-                        scene.descendCallback = null;
-                        scene.astronautDescending = null;
-                        scene.descendStepInProgress = false;
-                        scene.descendStepPositions = null;
-                        if (cb) cb();
-                    } else {
-                        scene.time.delayedCall(70, () => { scene.descendStepInProgress = false; });
-                    }
+                    const ast = scene.astronautDescending;
+                    if (!ast) return;
+                    if (ast.shadow) ast.shadow.alpha = 1;
+                    // descendCallback が車両方向の振り向きを担当する
+                    const cb = scene.descendCallback;
+                    scene.playerDescendingManual = false;
+                    scene.descendCallback = null;
+                    scene.astronautDescending = null;
+                    scene.descendStepInProgress = false;
+                    scene.descendStepPositions = null;
+                    if (cb) cb();
                 }
             });
+        } else {
+            // 既存：上下キーで一段ずつ
+            let nextIdx = scene.descendStepIndex;
+            if (scene.cursors.down.isDown) nextIdx = Math.min(totalIdx, nextIdx + 1);
+            else if (scene.cursors.up.isDown) nextIdx = Math.max(0, nextIdx - 1);
+            if (nextIdx !== scene.descendStepIndex) {
+                scene.descendStepIndex = nextIdx;
+                scene.descendStepInProgress = true;
+                scene.tweens.add({
+                    targets: scene.astronautDescending,
+                    y: positions[nextIdx],
+                    duration: 100,
+                    ease: 'Sine.easeOut',
+                    onComplete: () => {
+                        if (nextIdx === totalIdx) {
+                            // 地面に到達 → コールバック起動
+                            const cb = scene.descendCallback;
+                            scene.playerDescendingManual = false;
+                            scene.descendCallback = null;
+                            scene.astronautDescending = null;
+                            scene.descendStepInProgress = false;
+                            scene.descendStepPositions = null;
+                            if (cb) cb();
+                        } else {
+                            scene.time.delayedCall(70, () => { scene.descendStepInProgress = false; });
+                        }
+                    }
+                });
+            }
         }
     }
 }
@@ -113,31 +142,74 @@ if (scene.astronautMode && scene.astronaut) {
             scene.astronaut.shadow.alpha = Math.max(0, Math.min(1, progress));
         }
         if (!scene.climbStepInProgress) {
-            let nextIdx = scene.climbStepIndex;
-            if (scene.cursors.up.isDown) nextIdx = Math.min(totalIdx, nextIdx + 1);
-            else if (scene.cursors.down.isDown) nextIdx = Math.max(0, nextIdx - 1);
-            if (nextIdx !== scene.climbStepIndex) {
-                scene.climbStepIndex = nextIdx;
+            // SPACE 押下 → 一気に下まで滑り降りて正面に向き直す（登り中断）。
+            // 鎧降下後に戻る場合の re-trigger 用に returnClimbReady を再アーム。
+            if (scene.cursors.space && Phaser.Input.Keyboard.JustDown(scene.cursors.space) &&
+                scene.climbStepIndex > 0) {
                 scene.climbStepInProgress = true;
+                const remain = scene.climbStepIndex;
+                scene.climbStepIndex = 0;
                 scene.tweens.add({
                     targets: scene.astronaut,
-                    y: positions[nextIdx],
-                    duration: 100,
-                    ease: 'Sine.easeOut',
+                    y: positions[0],
+                    duration: Math.max(150, remain * 60),
+                    ease: 'Sine.easeIn',
                     onComplete: () => {
-                        if (nextIdx === totalIdx) {
-                            // ハッチ内に到達 → コールバック起動
-                            const cb = scene.playerClimbCallback;
+                        if (scene.astronaut.shadow) scene.astronaut.shadow.alpha = 1;
+                        const turnDir = scene.astronautTurnDir || 'L';
+                        const turnAnim = 'astronaut_turn_to_front_' + turnDir;
+                        scene.astronaut.anims.play(turnAnim);
+                        scene.astronaut.once('animationcomplete-' + turnAnim, () => {
+                            scene.astronaut.setTexture('spaceman');
+                            scene.astronaut.anims.stop();
+                            // 登り中断：状態リセット＆プレイヤー操作再開
                             scene.playerClimbingManual = false;
                             scene.playerClimbCallback = null;
                             scene.climbStepInProgress = false;
                             scene.climbStepPositions = null;
-                            if (cb) cb();
-                        } else {
-                            scene.time.delayedCall(70, () => { scene.climbStepInProgress = false; });
-                        }
+                            scene.playerClimbing = false;
+                            // ビーム UI を再表示（戻ってきた直後から撃てる）
+                            if (scene.beamGaugeBg) scene.beamGaugeBg.setVisible(true);
+                            if (scene.beamGaugeFill) scene.beamGaugeFill.setVisible(true);
+                            if (scene.beamGaugeEmpty) scene.beamGaugeEmpty.setVisible(true);
+                            // 再度ハシゴに近づけば登り直せるようにフラグ復活させるが、
+                            // 中断直後はハシゴ x 位置に張り付いているので、まず一度離れて
+                            // から再接近した時にだけ発火するようゾーンアウト待ちフラグも立てる。
+                            if (typeof scene.returnClimbLadderX === 'number') {
+                                scene.returnClimbReady = true;
+                                scene.returnClimbAwaitExit = true;
+                            }
+                        });
                     }
                 });
+            } else {
+                // 既存：上下キーで一段ずつ
+                let nextIdx = scene.climbStepIndex;
+                if (scene.cursors.up.isDown) nextIdx = Math.min(totalIdx, nextIdx + 1);
+                else if (scene.cursors.down.isDown) nextIdx = Math.max(0, nextIdx - 1);
+                if (nextIdx !== scene.climbStepIndex) {
+                    scene.climbStepIndex = nextIdx;
+                    scene.climbStepInProgress = true;
+                    scene.tweens.add({
+                        targets: scene.astronaut,
+                        y: positions[nextIdx],
+                        duration: 100,
+                        ease: 'Sine.easeOut',
+                        onComplete: () => {
+                            if (nextIdx === totalIdx) {
+                                // ハッチ内に到達 → コールバック起動
+                                const cb = scene.playerClimbCallback;
+                                scene.playerClimbingManual = false;
+                                scene.playerClimbCallback = null;
+                                scene.climbStepInProgress = false;
+                                scene.climbStepPositions = null;
+                                if (cb) cb();
+                            } else {
+                                scene.time.delayedCall(70, () => { scene.climbStepInProgress = false; });
+                            }
+                        }
+                    });
+                }
             }
         }
     }
@@ -192,6 +264,23 @@ if (scene.astronautMode && scene.astronaut) {
     // 空中で入力なしの時はジャンプ時の速度をそのまま維持（friction 適用しない）
     // 速度から位置を更新
     scene.astronaut.x += scene.astronautVX * dt;
+
+    // 仲間救出後の帰還：ハシゴ ±5px に到達したら自動で吸い付いて登りシーケンス起動。
+    // returnClimbReady 中は通常移動・射撃が使えるので、敵を蹴散らしながら戻れる。
+    // 登り中に SPACE で滑り降りて中断した場合も returnClimbReady が再アームされるが、
+    // 中断直後はハシゴ位置に張り付いているので、一度ゾーン外（>10px）に離れるまで
+    // 発火を抑止（そうしないと連続して再トリガーされて二重くるりになる）。
+    if (scene.returnClimbReady && !scene.astronautGameOver && onGround &&
+        typeof scene.returnClimbLadderX === 'number') {
+        const dx = Math.abs(scene.astronaut.x - scene.returnClimbLadderX);
+        if (scene.returnClimbAwaitExit) {
+            // ゾーン外に十分離れたら再アーム解除
+            if (dx > 10) scene.returnClimbAwaitExit = false;
+        } else if (dx <= 5) {
+            scene.returnClimbReady = false;
+            if (typeof scene.returnClimbStart === 'function') scene.returnClimbStart();
+        }
+    }
 
     // 初回の移動で通常ズームへ戻す（ハシゴ降り時のアップからゲームプレイ用ズームへ）
     if (isMoving && scene.astronautHasMoved === false) {
@@ -1107,37 +1196,31 @@ if (scene.astronautMode && scene.astronaut) {
         scene.time.delayedCall(playerStart, () => {
             // 捕獲されている場合は登らない（地中から復活してしまうバグ対策）
             if (scene.astronautGameOver) return;
-            scene.playerClimbing = true;
-            scene.beamGaugeBg.setVisible(false);
-            scene.beamGaugeFill.setVisible(false);
-                    if (scene.beamGaugeEmpty) scene.beamGaugeEmpty.setVisible(false);
-            scene.beamHoldStart = null;
-            scene.chargeAllowed = false;
-            if (scene.beamTameSound.isPlaying) scene.beamTameSound.stop();
-            scene.astronaut.anims.stop();
-            scene.astronaut.setFlipX(false);
-            // ハシゴまで歩いて移動（横向き歩行アニメ）
-            // 移動スピードは最大でも通常移動の 1.2 倍に制限（遠くにいる時に不自然に速くならない）
-            const face = ladderX < scene.astronaut.x ? 'L' : 'R';
-            scene.astronaut.setFlipX(face === 'R');
-            scene.astronaut.anims.play('astronaut_walk');
-            const walkDist = Math.abs(scene.astronaut.x - ladderX);
-            const maxWalkSpeed = 80 * 1.2; // px/sec
-            const walkDuration = Math.max(200, (walkDist / maxWalkSpeed) * 1000);
-            scene.tweens.add({
-                targets: scene.astronaut,
-                x: ladderX,
-                duration: walkDuration,
-                ease: 'Sine.easeInOut',
-                onComplete: () => {
-                    scene.astronaut.anims.stop();
-                    scene.astronaut.setFlipX(false);
-                    // 振り向きアニメ：正面→(L or R)→後ろ、降りた時と同じ方向
-                    scene.astronaut.setTexture('spaceman');
-                    const turnDir = scene.astronautTurnDir || 'L';
-                    scene.astronaut.anims.play('astronaut_turn_to_back_' + turnDir);
-                    // 振り向き完了後に登り開始
-                    scene.astronaut.once('animationcomplete-astronaut_turn_to_back_' + turnDir, () => {
+            // 自動歩行はやめて、プレイヤー操作でハシゴまで戻ってもらう。
+            // ハシゴ x ±5px に到達したら自動で吸い付いて登りシーケンス開始。
+            // returnClimbReady の間も通常のプレイヤー操作（移動・射撃）が
+            // 維持されるので敵を撃ち返しながら戻れる。
+            scene.returnClimbReady = true;
+            scene.returnClimbLadderX = ladderX;
+            scene.returnClimbStart = () => {
+                if (scene.astronautGameOver) return;
+                scene.playerClimbing = true;
+                scene.beamGaugeBg.setVisible(false);
+                scene.beamGaugeFill.setVisible(false);
+                if (scene.beamGaugeEmpty) scene.beamGaugeEmpty.setVisible(false);
+                scene.beamHoldStart = null;
+                scene.chargeAllowed = false;
+                if (scene.beamTameSound.isPlaying) scene.beamTameSound.stop();
+                scene.astronaut.anims.stop();
+                scene.astronautVX = 0;
+                scene.astronaut.x = ladderX;  // ハシゴに吸い付き
+                scene.astronaut.setFlipX(false);
+                // 振り向きアニメ：正面→(L or R)→後ろ、降りた時と同じ方向
+                scene.astronaut.setTexture('spaceman');
+                const turnDir = scene.astronautTurnDir || 'L';
+                scene.astronaut.anims.play('astronaut_turn_to_back_' + turnDir);
+                // 振り向き完了後に登り開始
+                scene.astronaut.once('animationcomplete-astronaut_turn_to_back_' + turnDir, () => {
                         scene.astronaut.setTexture('spaceman_B');
                         // 影は Y 座標進捗に応じて update ループで動的にアルファを更新
                         // （地面で標準、ハシゴの上ほど薄く）
@@ -1397,8 +1480,7 @@ if (scene.astronautMode && scene.astronaut) {
                         scene.climbStepPositions = climbPositions;
                         scene.climbStepIndex = 0;
                     });
-                }
-            });
+                };
         });
     }
 
