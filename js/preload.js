@@ -607,8 +607,13 @@ export function startCredits(loadingScreen, onDismiss, scene) {
         document.removeEventListener('keydown', onKey);
         if (langEl) langEl.removeEventListener('click', langClick);
         if (skipEl) skipEl.removeEventListener('click', skipClick);
-        fadeOutCommand(150);
-        fadeOutStart(600);
+        // onDismiss が scene.scene.restart() を呼ぶと進行中の fade tween が
+        // 中断されて onComplete の stop() が走らず com-start が鳴り続けるので、
+        // ここで明示的に stop する。
+        if (commandFadeTween) { commandFadeTween.stop(); commandFadeTween = null; }
+        if (startFadeTween) { startFadeTween.stop(); startFadeTween = null; }
+        try { if (commandSound && commandSound.isPlaying) commandSound.stop(); } catch (e) {}
+        try { if (startSound && startSound.isPlaying) startSound.stop(); } catch (e) {}
         // クレジットを畳んで loading-screen を再び hidden に戻す
         loadingScreen.classList.remove('briefing');
         loadingScreen.classList.add('hidden');
