@@ -286,6 +286,355 @@ export function startBriefing(loadingScreen, onDismiss, scene) {
     }
 }
 
+// クレジット画面（クリア後 SPACE で起動するスタッフロール）
+// onDismiss: 末尾までタイプ完了後の ENTER（または [PRESS ENTER] クリック / 画面タップ）で呼ばれる
+// scene: Phaser scene（command/comstart 音を Phaser sound 経由で再生するため必要）
+export function startCredits(loadingScreen, onDismiss, scene) {
+    if (loadingScreen._creditsStarted) return;
+    loadingScreen._creditsStarted = true;
+    const briefingEl = loadingScreen.querySelector('.briefing-screen');
+    const textEl = loadingScreen.querySelector('.briefing-text');
+    if (!briefingEl || !textEl) {
+        if (onDismiss) onDismiss();
+        return;
+    }
+
+    // 旧ブリーフィング時に [J/E] / [PRESS ENTER] にバインドされた click ハンドラを
+    // 切り離すため要素ごと差し替える（クローンで子孫含めてリスナー無効化）
+    let langEl = loadingScreen.querySelector('.briefing-lang');
+    let skipEl = loadingScreen.querySelector('.briefing-skip');
+    if (langEl) {
+        const fresh = langEl.cloneNode(true);
+        langEl.parentNode.replaceChild(fresh, langEl);
+        langEl = fresh;
+    }
+    if (skipEl) {
+        const fresh = skipEl.cloneNode(true);
+        skipEl.parentNode.replaceChild(fresh, skipEl);
+        skipEl = fresh;
+    }
+
+    // ゲーム中は loading-screen が hidden 化されているので戻して briefing 用 CSS を有効化
+    loadingScreen.classList.remove('hidden', 'title', 'cockpit-mode');
+    loadingScreen.classList.add('briefing');
+    textEl.textContent = '';
+    textEl.scrollTop = 0;
+    briefingEl.classList.remove('done');
+
+    const texts = {
+        E: [
+            '> CREDITS',
+            '',
+            '> Executive Producer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Game Director',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Lead Designer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Lead Programmer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Gameplay Programmer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Graphics & VFX Programmer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Physics Programmer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> UI / HUD Programmer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Lead Artist',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Pixel Artist',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Environment Artist',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Lead Animator',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> VFX Artist',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Lead Sound Designer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Composer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Audio Engineer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Narrative Designer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Level Designer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Quality Assurance Lead',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Localization',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Build & Release Engineer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Marketing',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Late-Night Debugging Specialist',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Coffee Procurement Officer',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> Special Thanks',
+            '> ............................ DAISUKE ABE',
+            '',
+            '> THE END'
+        ].join('\n'),
+        J: [
+            '> クレジット',
+            '',
+            '> エグゼクティブ・プロデューサー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> ゲームディレクター',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> リードデザイナー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> リードプログラマー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> ゲームプレイ・プログラマー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> グラフィックス & VFX プログラマー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> 物理プログラマー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> UI / HUD プログラマー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> リードアーティスト',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> ピクセルアーティスト',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> 背景アーティスト',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> リードアニメーター',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> VFX アーティスト',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> リードサウンドデザイナー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> コンポーザー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> オーディオエンジニア',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> ナラティブデザイナー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> レベルデザイナー',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> QA リード',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> ローカライゼーション',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> ビルド & リリース エンジニア',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> マーケティング',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> 深夜デバッグ担当',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> コーヒー調達担当',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> スペシャルサンクス',
+            '> ............................ アベ ダイスケ',
+            '',
+            '> THE END'
+        ].join('\n')
+    };
+    let text = texts.E;
+    let currentLang = 'E';
+
+    const COMMAND_VOL = 0.2;
+    const START_VOL = 0.15;
+    const commandSound = scene && scene.sound ? scene.sound.add('command', { loop: false, volume: COMMAND_VOL }) : null;
+    const startSound   = scene && scene.sound ? scene.sound.add('comstart', { loop: false, volume: START_VOL }) : null;
+
+    let commandFadeTween = null;
+    function fadeOutCommand(ms = 120) {
+        try {
+            if (!commandSound || !commandSound.isPlaying) return;
+            if (commandFadeTween) return;
+            commandFadeTween = scene.tweens.add({
+                targets: commandSound,
+                volume: 0,
+                duration: ms,
+                onComplete: () => {
+                    try { commandSound.stop(); commandSound.setVolume(COMMAND_VOL); } catch (e) {}
+                    commandFadeTween = null;
+                }
+            });
+        } catch (e) {}
+    }
+    function startCommand() {
+        try {
+            if (!commandSound) return;
+            if (commandFadeTween) { commandFadeTween.stop(); commandFadeTween = null; }
+            try { commandSound.stop(); } catch (e) {}
+            try { commandSound.setVolume(0); } catch (e) {}
+            try { commandSound.play(); } catch (e) {}
+            scene.tweens.add({ targets: commandSound, volume: COMMAND_VOL, duration: 40 });
+        } catch (e) {}
+    }
+
+    let startFadeTween = null;
+    function fadeOutStart(ms) {
+        try {
+            if (!startSound || !startSound.isPlaying) return;
+            if (startFadeTween) return;
+            startFadeTween = scene.tweens.add({
+                targets: startSound,
+                volume: 0,
+                duration: ms,
+                onComplete: () => {
+                    try { startSound.stop(); startSound.setVolume(START_VOL); } catch (e) {}
+                    startFadeTween = null;
+                }
+            });
+        } catch (e) {}
+    }
+    try {
+        if (startSound) {
+            try { startSound.play(); } catch (e) {}
+            if (scene && scene.time) {
+                scene.time.delayedCall(Math.max(0, ((startSound.duration || 1.2) - 0.6) * 1000), () => {
+                    if (startSound.isPlaying) fadeOutStart(600);
+                });
+            }
+        }
+    } catch (e) {}
+
+    let i = 0;
+    let timer = null;
+    let prevWasNewline = true;
+    function step() {
+        if (i < text.length) {
+            const ch = text[i++];
+            textEl.textContent += ch;
+            textEl.scrollTop = textEl.scrollHeight;
+            if (ch === '\n') {
+                fadeOutCommand(120);
+                prevWasNewline = true;
+            } else if (prevWasNewline) {
+                startCommand();
+                prevWasNewline = false;
+            }
+            const delay = (ch === '\n') ? 60 : 20;
+            timer = setTimeout(step, delay);
+        } else {
+            briefingEl.classList.add('done');
+            fadeOutCommand(120);
+        }
+    }
+    function restartTyping(lang) {
+        currentLang = lang;
+        text = texts[lang];
+        if (timer) { clearTimeout(timer); timer = null; }
+        textEl.textContent = '';
+        textEl.scrollTop = 0;
+        briefingEl.classList.remove('done');
+        i = 0;
+        prevWasNewline = true;
+        if (commandFadeTween) { commandFadeTween.stop(); commandFadeTween = null; }
+        if (commandSound) { try { commandSound.stop(); commandSound.setVolume(COMMAND_VOL); } catch (e) {} }
+        if (startFadeTween) { startFadeTween.stop(); startFadeTween = null; }
+        if (startSound) {
+            try { startSound.stop(); startSound.setVolume(START_VOL); startSound.play(); } catch (e) {}
+        }
+        step();
+    }
+    step();
+
+    const langClick = (e) => { e.stopPropagation(); restartTyping(currentLang === 'E' ? 'J' : 'E'); };
+    const skipClick = (e) => { e.stopPropagation(); advance(); };
+    if (langEl) {
+        langEl.style.pointerEvents = 'auto';
+        langEl.style.cursor = 'pointer';
+        langEl.addEventListener('click', langClick);
+    }
+    if (skipEl) {
+        skipEl.style.pointerEvents = 'auto';
+        skipEl.style.cursor = 'pointer';
+        skipEl.addEventListener('click', skipClick);
+    }
+
+    let advanced = false;
+    function advance() {
+        if (advanced) return;
+        advanced = true;
+        if (timer) { clearTimeout(timer); timer = null; }
+        document.removeEventListener('keydown', onKey);
+        if (langEl) langEl.removeEventListener('click', langClick);
+        if (skipEl) skipEl.removeEventListener('click', skipClick);
+        fadeOutCommand(150);
+        fadeOutStart(600);
+        // クレジットを畳んで loading-screen を再び hidden に戻す
+        loadingScreen.classList.remove('briefing');
+        loadingScreen.classList.add('hidden');
+        textEl.textContent = '';
+        briefingEl.classList.remove('done');
+        loadingScreen._creditsStarted = false;
+        if (onDismiss) onDismiss();
+    }
+    function onKey(e) {
+        if (e.code === 'Enter') {
+            advance();
+        } else if (e.code === 'KeyJ') {
+            restartTyping('J');
+        } else if (e.code === 'KeyE') {
+            restartTyping('E');
+        } else if (e.code === 'ArrowUp') {
+            e.preventDefault();
+            textEl.scrollTop -= 24;
+        } else if (e.code === 'ArrowDown') {
+            e.preventDefault();
+            textEl.scrollTop += 24;
+        }
+    }
+    document.addEventListener('keydown', onKey);
+}
+
 // アセットロード（Phaser scene の preload フックから呼ぶ）
 export function preload(scene) {
 // ロード進捗をローディング画面のゲージに反映

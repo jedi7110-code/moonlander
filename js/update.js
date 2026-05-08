@@ -3,6 +3,7 @@ import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js';
 import { enterCockpitMode, updateCockpit } from './cockpit.js?v=98';
+import { startCredits } from './preload.js?v=19';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // または本番環境でコナミコマンド (window.__testMode) で起動したテストモードでも
@@ -168,6 +169,10 @@ if (scene.astronautMode && scene.astronaut) {
                             scene.climbStepInProgress = false;
                             scene.climbStepPositions = null;
                             scene.playerClimbing = false;
+                            scene.returningToShip = false;
+                            // ハッチ下のクリッピングマスクを解除しないと、ジャンプ時に
+                            // ハッチ高に達した瞬間に体がマスクで切れて見えなくなる
+                            if (scene.astronaut.mask) scene.astronaut.clearMask(true);
                             // ビーム UI を再表示（戻ってきた直後から撃てる）
                             if (scene.beamGaugeBg) scene.beamGaugeBg.setVisible(true);
                             if (scene.beamGaugeFill) scene.beamGaugeFill.setVisible(true);
@@ -618,8 +623,11 @@ if (scene.astronautMode && scene.astronaut) {
         }
     }
 
-    // 重力＋位置更新（帰還時・捕獲後・手動登り中はtween/手動操作任せで物理停止）
-    if (!scene.returningToShip && !scene.astronautGameOver && !scene.playerClimbingManual) {
+    // 重力＋位置更新（捕獲後・登り中はtween/手動操作任せで物理停止）。
+    // returningToShip は仲間が登り始めた時点で true になるが、その間プレイヤーは
+    // 通常通り動けるべきなので物理ゲートには含めない（playerClimbing が turn-to-back
+    // と step climb の両方をカバーしている）。
+    if (!scene.astronautGameOver && !scene.playerClimbing && !scene.playerClimbingManual) {
         scene.astronautVY += gravity * dt;
         scene.astronaut.y += scene.astronautVY * dt;
 
@@ -719,7 +727,7 @@ if (scene.astronautMode && scene.astronaut) {
             const enemyBox = e.isBoss ? shrink(e, 6, 5) : shrink(e, 2, 3);
             // 仲間が捕まった場合もゲームオーバー（救出失敗）。ハシゴ登り中も対象
             // 既に捕獲済みの仲間と、既に捕獲動作中の敵は対象外
-            const hitCrew = !e.capturing && scene.crews && scene.crews.length
+            const hitCrew = !isInvincible() && !e.capturing && scene.crews && scene.crews.length
                 ? scene.crews.find(c => c.visible && !c.captured && c.landed && Phaser.Geom.Intersects.RectangleToRectangle(shrink(c, 3, 2), enemyBox))
                 : null;
             if (hitCrew) {
@@ -1417,18 +1425,41 @@ if (scene.astronautMode && scene.astronaut) {
                                                     fill: '#AAA',
                                                     fontFamily: "Courier New, Menlo, monospace"
                                                 }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
+                                                const pressSpace = scene.add.text(camW / 2, camH / 2 + 80, spaceText('Press SPACE for credits'), {
+                                                    fontSize: '18px',
+                                                    fill: '#AAA',
+                                                    fontFamily: "Courier New, Menlo, monospace"
+                                                }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
                                                 scene.tweens.add({
-                                                    targets: [toBeContinued, pressEnter],
+                                                    targets: [toBeContinued, pressEnter, pressSpace],
                                                     alpha: 1,
                                                     duration: 1500,
                                                     ease: 'Sine.easeIn',
                                                     onComplete: () => {
-                                                        const advance = () => {
+                                                        const cleanup = () => {
                                                             scene.input.keyboard.off('keydown-ENTER', advance);
+                                                            scene.input.keyboard.off('keydown-SPACE', toCredits);
                                                             scene.input.off('pointerdown', advance);
                                                             document.removeEventListener('touchend', docAdvance, true);
+                                                        };
+                                                        const advance = () => {
+                                                            cleanup();
                                                             scene.playthroughCount++;
                                                             scene.scene.restart();
+                                                        };
+                                                        const toCredits = () => {
+                                                            cleanup();
+                                                            const loadingScreen = document.getElementById('loading-screen');
+                                                            if (!loadingScreen) {
+                                                                // フォールバック：DOM が無ければそのままタイトルへ
+                                                                scene.playthroughCount++;
+                                                                scene.scene.restart();
+                                                                return;
+                                                            }
+                                                            startCredits(loadingScreen, () => {
+                                                                scene.playthroughCount++;
+                                                                scene.scene.restart();
+                                                            }, scene);
                                                         };
                                                         const docAdvance = (e) => {
                                                             // タッチコントロール上のタップは無視
@@ -1436,6 +1467,7 @@ if (scene.astronautMode && scene.astronaut) {
                                                             advance();
                                                         };
                                                         scene.input.keyboard.once('keydown-ENTER', advance);
+                                                        scene.input.keyboard.once('keydown-SPACE', toCredits);
                                                         scene.input.once('pointerdown', advance);
                                                         document.addEventListener('touchend', docAdvance, { capture: true, passive: true });
                                                     }
