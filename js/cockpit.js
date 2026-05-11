@@ -200,7 +200,7 @@ export function enterCockpitMode(scene) {
     }
     if (scene.dustEmitters) scene.dustEmitters.forEach(e => e.on = false);
     if (scene.jetSound && scene.jetSound.isPlaying) fadeStopSound(scene, scene.jetSound, 0.3);
-    if (scene.emptySound && scene.emptySound.isPlaying) scene.emptySound.stop();
+    // empty 音は止めない：宇宙空間と同じくコックピット中も燃料 90 以下で鳴り続ける
 
     if (scene.landingMarker) scene.landingMarker.setVisible(false);
     if (scene.fuelGaugeBorder) scene.fuelGaugeBorder.setVisible(false);
@@ -341,6 +341,12 @@ export function updateCockpit(scene, delta) {
         if (scene.jetSound && scene.jetSound.isPlaying) {
             fadeStopSound(scene, scene.jetSound, 0.15);
         }
+    }
+
+    // 残燃料 90 以下で empty 音を再生（宇宙空間モードの挙動に合わせる）。
+    // 着地成功・爆破時は exitCockpitMode 側で停止する。
+    if (scene.fuel <= 90 && scene.emptySound && !scene.emptySound.isPlaying) {
+        try { scene.emptySound.play(); } catch (e) {}
     }
 
     // 水平軸のゆらぎ：driftTarget が ±TILT_DRIFT_TARGET_HALF のランダム値で切り替わり、
@@ -556,6 +562,10 @@ export function exitCockpitMode(scene, success) {
 
     // ジェット音停止
     if (scene.jetSound && scene.jetSound.isPlaying) fadeStopSound(scene, scene.jetSound, 0.2);
+    // 残燃料アラート音停止（成功・失敗どちらでも）
+    if (scene.emptySound && scene.emptySound.isPlaying) {
+        try { scene.emptySound.stop(); } catch (e) {}
+    }
 
     // コックピット環境音は exit の瞬間には止めない：
     //   - 成功時: cockpit-landing.mp3 と重ねて鳴り続け、フェード明け（cockpitMode=false）で停止
