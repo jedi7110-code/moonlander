@@ -2,7 +2,7 @@
 // 既存の loading-screen DOM を briefing と同じ scale 1.4 で再表示し、
 // .cockpit-monitor 内に俯瞰映像 + HUD をオーバーレイする。
 
-import { gameOver } from './gameover.js';
+import { gameOver } from './gameover.js?v=2';
 import { fadeStopSound } from './audio.js';
 
 // ─────────── 物理パラメータ ───────────

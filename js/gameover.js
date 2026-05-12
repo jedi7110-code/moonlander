@@ -32,6 +32,9 @@ export function gameOver(scene, message) {
         if (scene.spaceshipShadowGround) scene.spaceshipShadowGround.setVisible(false);
         scene.fuelGaugeBorder.setVisible(false);
         scene.fuelGauge.setVisible(false);
+        // コックピット視点ヒント（DOM オーバーレイ）を即座に消す
+        const hintEl = document.getElementById('cockpit-hint');
+        if (hintEl) hintEl.classList.remove('show');
 
         explosion.on('animationcomplete', () => {
             explosionPlaying = false;
