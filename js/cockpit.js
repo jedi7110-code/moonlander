@@ -343,9 +343,10 @@ export function updateCockpit(scene, delta) {
         }
     }
 
-    // 残燃料 90 以下で empty 音を再生（宇宙空間モードの挙動に合わせる）。
+    // 残燃料が低い時の empty 音：コックピットの燃料計が点滅し始めるタイミング
+    // （fuelPct < 35 = fuel < 70）に合わせて鳴らす。
     // 着地成功・爆破時は exitCockpitMode 側で停止する。
-    if (scene.fuel <= 90 && scene.emptySound && !scene.emptySound.isPlaying) {
+    if (scene.fuel < 70 && scene.emptySound && !scene.emptySound.isPlaying) {
         try { scene.emptySound.play(); } catch (e) {}
     }
 

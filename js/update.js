@@ -2,8 +2,8 @@
 import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js?v=2';
-import { enterCockpitMode, updateCockpit } from './cockpit.js?v=100';
-import { startCredits } from './preload.js?v=20';
+import { enterCockpitMode, updateCockpit } from './cockpit.js?v=101';
+import { startCredits } from './preload.js?v=22';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // または本番環境でコナミコマンド (window.__testMode) で起動したテストモードでも
@@ -330,7 +330,17 @@ if (scene.astronautMode && scene.astronaut) {
             || scene.astronaut.x >= scene.astronautMaxX - 0.5;
         if (atMonolith) {
             scene.beamEnergy = 100;
+            // 接触の立ち上がりエッジで mono1 / mono2 を同時に 1 回鳴らす
+            if (!scene.atMonolithPrev) {
+                if (scene.monoSound1 && !scene.monoSound1.isPlaying) {
+                    try { scene.monoSound1.play(); } catch (e) {}
+                }
+                if (scene.monoSound2 && !scene.monoSound2.isPlaying) {
+                    try { scene.monoSound2.play(); } catch (e) {}
+                }
+            }
         }
+        scene.atMonolithPrev = atMonolith;
     }
 
     // 足音（移動中かつ接地時、ランダムで間隔再生）

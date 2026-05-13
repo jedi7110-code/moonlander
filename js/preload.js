@@ -703,6 +703,8 @@ scene.load.audio('climb', 'assets/sound/climb.wav'); // 登れと指示する声
 scene.load.audio('cockpit', 'assets/sound/cockpit.mp3'); // コックピット視点モード中の環境音（ループ）
 scene.load.audio('cockpitLanding', 'assets/sound/cockpit-landing.mp3'); // コックピット着陸成功時の効果音（1回）
 scene.load.audio('testmode', 'assets/sound/testmode.mp3'); // テストモード（コナミコマンド）起動 SE
+scene.load.audio('mono1', 'assets/sound/mono1.mp3'); // 突き当たりモノリス接触 SE（同時再生1）
+scene.load.audio('mono2', 'assets/sound/mono2.mp3'); // 突き当たりモノリス接触 SE（同時再生2）
 // 地底人 6コマアニメ（全コマ左向き。右向きは flipX で反転）
 scene.load.image('alien_1', 'assets/alien-s-1.png');
 scene.load.image('alien_2', 'assets/alien-s-2.png');
