@@ -6,8 +6,8 @@
 """
 import re, html, pathlib
 
-SRC = pathlib.Path(__file__).with_name("物語-長編版.md")
-OUT = pathlib.Path(__file__).with_name("物語-長編版.html")
+SRC = pathlib.Path(__file__).with_name("saga.md")
+OUT = pathlib.Path(__file__).with_name("saga.html")
 
 lines = SRC.read_text(encoding="utf-8").splitlines()
 

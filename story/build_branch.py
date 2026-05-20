@@ -13,8 +13,8 @@
 """
 import re, html, pathlib
 
-SRC = pathlib.Path(__file__).with_name("月面のモノリス-分岐譚.md")
-OUT = pathlib.Path(__file__).with_name("月面のモノリス-分岐譚.html")
+SRC = pathlib.Path(__file__).with_name("monolith.md")
+OUT = pathlib.Path(__file__).with_name("monolith.html")
 raw_lines = SRC.read_text(encoding="utf-8").splitlines()
 
 
