@@ -294,6 +294,16 @@ DOC = f"""<!DOCTYPE html>
     .progress{{right:3px;width:12px}}
     .progress .pct{{right:4px}}
   }}
+
+  /* しおりトースト */
+  .resume{{position:fixed;right:24px;bottom:34px;z-index:18;display:none;
+    background:var(--bg2);color:var(--ink);
+    border:1px solid var(--accent);border-radius:8px;
+    padding:8px 12px;cursor:pointer;text-decoration:none;
+    font:13px/1.6 system-ui,-apple-system,sans-serif;
+    letter-spacing:.06em;box-shadow:0 6px 18px rgba(0,0,0,.35)}}
+  .resume.show{{display:inline-block}}
+  .resume small{{color:var(--dim);margin-left:.6em;font-size:11px}}
 </style>
 </head>
 <body>
@@ -305,6 +315,7 @@ DOC = f"""<!DOCTYPE html>
     <button id="othbtn" class="hide">もう一方を読む</button>
     <a class="xlink" href="saga.html" title="本編『水惑星ターラ』へ">▷ 本編</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
+    <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
     <button id="thbtn">夜 / 紙</button>
   </div>
 
@@ -365,6 +376,7 @@ DOC = f"""<!DOCTYPE html>
     <div class="fill" id="fill"></div>
     <div class="pct" id="pct">0%</div>
   </aside>
+  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
   <div class="hint">↓ 上から下へスクロールして読み進めます</div>
 
 <script>
@@ -487,6 +499,66 @@ DOC = f"""<!DOCTYPE html>
       requestAnimationFrame(function(){{
         rebuildTicks(); updateProgress();
       }});
+    }});
+  }};
+
+  // しおり（序章／A／B 独立に localStorage に保存）
+  function bmKey(){{
+    var s = activeScroll();
+    return s ? 'mira-bm-mono-' + s.id.replace('sc-','') : null;
+  }}
+  function bmGet(k){{
+    try {{ return parseInt(localStorage.getItem(k)||'0',10); }}
+    catch(e) {{ return 0; }}
+  }}
+  function bmSet(k,v){{
+    try {{ localStorage.setItem(k, String(v)); }} catch(e) {{}}
+  }}
+  var _bmReady = false;
+  setTimeout(function(){{ _bmReady = true; }}, 1500);
+  var _bmT = 0;
+  document.querySelectorAll('.scroll').forEach(function(s){{
+    s.addEventListener('scroll', function(){{
+      if (!_bmReady) return;
+      if (!s.classList.contains('on')) return;
+      var k = bmKey(); if (!k) return;
+      clearTimeout(_bmT);
+      _bmT = setTimeout(function(){{ bmSet(k, s.scrollTop); }}, 500);
+    }}, {{passive:true}});
+  }});
+
+  document.getElementById('bmBtn').addEventListener('click', function(){{
+    var sc = activeScroll(); var k = bmKey();
+    if (!sc || !k) return;
+    var p = bmGet(k);
+    if (p > 0) sc.scrollTo({{top:p, behavior:'smooth'}});
+  }});
+
+  function _maybeResume(){{
+    var sc = activeScroll(); var k = bmKey();
+    if (!sc || !k) return;
+    var p = bmGet(k);
+    var max = sc.scrollHeight - sc.clientHeight;
+    var t = document.getElementById('resume');
+    if (max <= 0 || p < Math.max(80, max * 0.05)) {{
+      t.classList.remove('show'); return;
+    }}
+    t.querySelector('.pct').textContent = Math.round(p/max*100) + '%';
+    t.classList.add('show');
+    t.onclick = function(e){{
+      e.preventDefault();
+      sc.scrollTo({{top:p, behavior:'smooth'}});
+      t.classList.remove('show');
+    }};
+    setTimeout(function(){{ t.classList.remove('show'); }}, 8000);
+  }}
+
+  // gotoState のたびにしおり提示も再評価
+  var _goto2 = gotoState;
+  gotoState = function(st, keepPos){{
+    _goto2(st, keepPos);
+    requestAnimationFrame(function(){{
+      requestAnimationFrame(function(){{ _maybeResume(); }});
     }});
   }};
 

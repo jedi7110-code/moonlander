@@ -161,6 +161,18 @@
     .progress .pct { right:4px; }
   }
 
+  /* しおりトースト（前回の続き案内） */
+  .resume {
+    position:fixed; right:24px; bottom:34px; z-index:18; display:none;
+    background:var(--bg2); color:var(--ink);
+    border:1px solid var(--accent); border-radius:8px;
+    padding:8px 12px; cursor:pointer; text-decoration:none;
+    font:13px/1.6 system-ui,-apple-system,sans-serif;
+    letter-spacing:.06em; box-shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+  .resume.show { display:inline-block; }
+  .resume small { color:var(--dim); margin-left:.6em; font-size:11px; }
+
   /* スクロールヒント */
   .hint {
     position:fixed; left:14px; bottom:12px; z-index:10;
@@ -175,6 +187,7 @@
     <nav><a href="#c1">プロローグ</a><a href="#c2">第一章　失踪した少女と、狭間の異星人</a><a href="#c3">第二章　インプラントと、自分への問い</a><a href="#c4">第三章　神とされること</a><a href="#c5">第四章　PAX と、反融合思想主義者</a><a href="#c6">第五章　ライラ、留まることを選ぶ者</a><a href="#c7">第六章　千年後、継承</a><a href="#c8">エピローグ</a><a href="#c9">外伝　月面のモノリス</a><a href="#c10">主要登場人物</a><a href="#c11">主題とモチーフ</a></nav>
     <a class="xlink" href="monolith.html" title="別冊『月面のモノリス』へ">▷ 別冊</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
+    <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
     <button id="themeBtn" title="配色切替">夜 / 紙</button>
   </div>
   <div class="scroll" id="scroll">
@@ -196,6 +209,7 @@
     <div class="fill" id="fill"></div>
     <div class="pct" id="pct">0%</div>
   </aside>
+  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
   <div class="hint">↓ 上から下へスクロールして読み進めます</div>
 <script>
   var sc = document.getElementById('scroll');
@@ -246,6 +260,45 @@
   window.addEventListener('resize', function(){ rebuildTicks(); updateProgress(); });
   window.addEventListener('load', function(){ rebuildTicks(); updateProgress(); });
   rebuildTicks(); updateProgress();
+
+  // しおり：localStorage に現在位置を自動保存し、起動時に復帰を提示
+  var BMKEY = 'mira-bm-saga';
+  function bmGet(){
+    try { return parseInt(localStorage.getItem(BMKEY)||'0', 10); }
+    catch(e) { return 0; }
+  }
+  function bmSet(v){
+    try { localStorage.setItem(BMKEY, String(v)); } catch(e) {}
+  }
+  var _bmReady = false;
+  setTimeout(function(){ _bmReady = true; }, 1500);
+  var _bmT = 0;
+  sc.addEventListener('scroll', function(){
+    if (!_bmReady) return;
+    clearTimeout(_bmT);
+    _bmT = setTimeout(function(){ bmSet(sc.scrollTop); }, 500);
+  }, {passive:true});
+
+  document.getElementById('bmBtn').addEventListener('click', function(){
+    var p = bmGet();
+    if (p > 0) sc.scrollTo({top:p, behavior:'smooth'});
+  });
+
+  function _maybeResume(){
+    var p = bmGet();
+    var max = sc.scrollHeight - sc.clientHeight;
+    if (max <= 0 || p < Math.max(80, max * 0.05)) return;
+    var t = document.getElementById('resume');
+    t.querySelector('.pct').textContent = Math.round(p / max * 100) + '%';
+    t.classList.add('show');
+    t.onclick = function(e){
+      e.preventDefault();
+      sc.scrollTo({top:p, behavior:'smooth'});
+      t.classList.remove('show');
+    };
+    setTimeout(function(){ t.classList.remove('show'); }, 8000);
+  }
+  window.addEventListener('load', _maybeResume);
 
   // 先頭（最上部＝冒頭）から開始
   sc.scrollTop = 0;
