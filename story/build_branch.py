@@ -182,10 +182,11 @@ DOC = f"""<!DOCTYPE html>
   .bar nav a{{color:var(--dim);cursor:pointer;padding:4px 7px;
              border-radius:6px;text-decoration:none}}
   .bar nav a:hover{{color:var(--ink);background:var(--quote)}}
-  .bar button{{background:transparent;color:var(--dim);
+  .bar button, .bar a.xlink{{background:transparent;color:var(--dim);
     border:1px solid var(--rule);border-radius:6px;padding:5px 9px;
-    cursor:pointer;font:inherit;white-space:nowrap}}
-  .bar button:hover{{color:var(--ink);border-color:var(--accent)}}
+    cursor:pointer;font:inherit;white-space:nowrap;text-decoration:none}}
+  .bar button:hover, .bar a.xlink:hover{{color:var(--ink);
+    border-color:var(--accent)}}
   .bar button.hide{{display:none}}
 
   .scroll{{position:fixed;inset:46px 0 0 0;overflow-y:auto;
@@ -251,6 +252,28 @@ DOC = f"""<!DOCTYPE html>
     padding:8px 14px;cursor:pointer;font:inherit}}
   .spoiler.open .sp-body{{display:block}}
   .spoiler .sp-body{{display:none}}
+
+  /* 本編／別冊 往来案内 */
+  .next-read{{margin:3.5em auto 0;padding-top:2em;max-width:42rem;
+    border-top:1px solid var(--rule)}}
+  .next-read .nr-label{{color:var(--accent);font-size:12px;
+    letter-spacing:.18em;text-align:center;margin-bottom:1em;
+    font-family:system-ui,-apple-system,sans-serif}}
+  .next-read .nr-card{{display:block;text-decoration:none;color:inherit;
+    border:1px solid var(--rule);border-radius:12px;padding:18px 20px;
+    background:var(--bg2);transition:.18s}}
+  .next-read .nr-card:hover{{transform:translateY(-2px);
+    border-color:var(--accent)}}
+  .next-read.dead .nr-card:hover{{border-color:var(--warn)}}
+  .next-read .nr-card h3{{margin:0 0 .4em;font-size:18px;
+    letter-spacing:.06em;color:var(--ink)}}
+  .next-read .nr-card p{{margin:0;color:var(--dim);font-size:14px;
+    line-height:1.85}}
+  .next-read .nr-back{{display:block;text-align:center;margin-top:1.4em;
+    color:var(--dim);font-size:12px;letter-spacing:.12em;
+    text-decoration:none;
+    font-family:system-ui,-apple-system,sans-serif}}
+  .next-read .nr-back:hover{{color:var(--accent)}}
 </style>
 </head>
 <body>
@@ -260,6 +283,8 @@ DOC = f"""<!DOCTYPE html>
     <nav id="nav"></nav>
     <button id="rebtn" class="hide">分岐をやり直す</button>
     <button id="othbtn" class="hide">もう一方を読む</button>
+    <a class="xlink" href="saga.html" title="本編『水惑星ターラ』へ">▷ 本編</a>
+    <a class="xlink" href="index.html" title="入口へ">⌂</a>
     <button id="thbtn">夜 / 紙</button>
   </div>
 
@@ -288,6 +313,14 @@ DOC = f"""<!DOCTYPE html>
   <div class="scroll" id="sc-A">
     <div class="book">
       {A_html}
+      <aside class="next-read">
+        <div class="nr-label">▷ この〈手〉が千年後どう書き写されたか</div>
+        <a class="nr-card" href="saga.html">
+          <h3>水惑星ターラ ── 電脳の継承（本編）</h3>
+          <p>先行者の〈退ける手つき〉が、雨の都市の潜行者ミラ、淀みの層に留まったライラ、そして千年後の子孫カイへと、名を変えながら書き写されていく。本編サーガへ。</p>
+        </a>
+        <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
+      </aside>
       <div class="spoiler"><button>▸ 二つの結末について（ネタバレ）</button>
         <div class="sp-body">{post_html}</div></div>
     </div>
@@ -297,6 +330,10 @@ DOC = f"""<!DOCTYPE html>
   <div class="scroll" id="sc-B">
     <div class="book">
       {B_html}
+      <aside class="next-read dead">
+        <div class="nr-label">（袋小路。本編とは交わらない）</div>
+        <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
+      </aside>
       <div class="spoiler"><button>▸ 二つの結末について（ネタバレ）</button>
         <div class="sp-body">{post_html}</div></div>
     </div>

@@ -142,11 +142,14 @@ DOC = f"""<!DOCTYPE html>
     border-radius:6px;
   }}
   .bar nav a:hover {{ color:var(--ink); background:var(--quote); }}
-  .bar button {{
+  .bar button, .bar a.xlink {{
     background:transparent; color:var(--dim); border:1px solid var(--rule);
     border-radius:6px; padding:5px 10px; cursor:pointer; font:inherit;
+    text-decoration:none; white-space:nowrap;
   }}
-  .bar button:hover {{ color:var(--ink); border-color:var(--accent); }}
+  .bar button:hover, .bar a.xlink:hover {{
+    color:var(--ink); border-color:var(--accent);
+  }}
 
   /* 横書き本文（通常レイアウト・上から下へ読む） */
   .scroll {{
@@ -199,6 +202,38 @@ DOC = f"""<!DOCTYPE html>
   /* 縦書き用の縦中横ラッパは横書きでは無効化（素のテキスト表示） */
   .tcy, .upr {{ all:unset; }}
 
+  /* 本文末尾「次に読む」案内 */
+  .next-read {{
+    margin:4em auto 0; padding-top:2em; max-width:42rem;
+    border-top:1px solid var(--rule);
+  }}
+  .next-read .nr-label {{
+    color:var(--accent); font-size:12px; letter-spacing:.18em;
+    text-align:center; margin-bottom:1em;
+    font-family:system-ui,-apple-system,sans-serif;
+  }}
+  .next-read .nr-card {{
+    display:block; text-decoration:none; color:inherit;
+    border:1px solid var(--rule); border-radius:12px;
+    padding:18px 20px; background:var(--bg2); transition:.18s;
+  }}
+  .next-read .nr-card:hover {{
+    transform:translateY(-2px); border-color:#a99fe0;
+  }}
+  .next-read .nr-card h3 {{
+    margin:0 0 .4em; font-size:18px; letter-spacing:.06em; color:var(--ink);
+  }}
+  .next-read .nr-card p {{
+    margin:0; color:var(--dim); font-size:14px; line-height:1.85;
+  }}
+  .next-read .nr-back {{
+    display:block; text-align:center; margin-top:1.4em;
+    color:var(--dim); font-size:12px; letter-spacing:.12em;
+    text-decoration:none;
+    font-family:system-ui,-apple-system,sans-serif;
+  }}
+  .next-read .nr-back:hover {{ color:var(--accent); }}
+
   /* スクロールヒント */
   .hint {{
     position:fixed; left:14px; bottom:12px; z-index:10;
@@ -211,11 +246,21 @@ DOC = f"""<!DOCTYPE html>
   <div class="bar">
     <span class="nm">{html.escape(title)}</span>
     <nav>{nav_html}</nav>
+    <a class="xlink" href="monolith.html" title="別冊『月面のモノリス』へ">▷ 別冊</a>
+    <a class="xlink" href="index.html" title="入口へ">⌂</a>
     <button id="themeBtn" title="配色切替">夜 / 紙</button>
   </div>
   <div class="scroll" id="scroll">
     <div class="book">
       {''.join(body)}
+      <aside class="next-read">
+        <div class="nr-label">▷ 次に読む（別冊）</div>
+        <a class="nr-card" href="monolith.html">
+          <h3>月面のモノリス ── 分岐譚</h3>
+          <p>本編の前史にあたる外伝。月面で「触れる／触れない」を選ぶと、物語は二つに裂け、二度と交わらない。ルートAの〈退ける手つき〉が、本編のミラたちの背中に書き写されていく前史として接続する。</p>
+        </a>
+        <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
+      </aside>
     </div>
   </div>
   <div class="hint">↓ 上から下へスクロールして読み進めます</div>
