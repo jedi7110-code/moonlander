@@ -274,6 +274,26 @@ DOC = f"""<!DOCTYPE html>
     text-decoration:none;
     font-family:system-ui,-apple-system,sans-serif}}
   .next-read .nr-back:hover{{color:var(--accent)}}
+
+  /* 右端の進捗ゲージ（現在表示中のペインのみ反映） */
+  .progress{{position:fixed;top:54px;right:6px;bottom:24px;width:14px;
+    z-index:9;pointer-events:none;
+    font-family:system-ui,-apple-system,sans-serif}}
+  .progress .track{{position:absolute;right:6px;top:0;bottom:0;width:1px;
+    background:var(--rule)}}
+  .progress .fill{{position:absolute;right:4px;top:0;width:3px;
+    background:var(--accent);opacity:.6;border-radius:2px;
+    height:0;transition:height .12s linear}}
+  .progress .ticks{{position:absolute;inset:0}}
+  .progress .ticks i{{position:absolute;right:0;width:10px;height:1px;
+    background:var(--dim);opacity:.5}}
+  .progress .pct{{position:fixed;right:6px;bottom:6px;color:var(--dim);
+    font-size:10px;letter-spacing:.08em;
+    font-family:system-ui,-apple-system,sans-serif}}
+  @media (max-width:640px){{
+    .progress{{right:3px;width:12px}}
+    .progress .pct{{right:4px}}
+  }}
 </style>
 </head>
 <body>
@@ -339,6 +359,12 @@ DOC = f"""<!DOCTYPE html>
     </div>
   </div>
 
+  <aside class="progress" aria-hidden="true">
+    <div class="track"></div>
+    <div class="ticks" id="ticks"></div>
+    <div class="fill" id="fill"></div>
+    <div class="pct" id="pct">0%</div>
+  </aside>
   <div class="hint">↓ 上から下へスクロールして読み進めます</div>
 
 <script>
@@ -419,8 +445,60 @@ DOC = f"""<!DOCTYPE html>
       document.documentElement.classList.contains('paper')?'1':'0');}}catch(e){{}}
   }});
 
+  // 進捗ゲージ：表示中のペインを監視し、見出し位置に目盛
+  var pgFill = document.getElementById('fill');
+  var pgTicks = document.getElementById('ticks');
+  var pgPct = document.getElementById('pct');
+  function activeScroll(){{ return document.querySelector('.scroll.on'); }}
+  function rebuildTicks(){{
+    pgTicks.innerHTML = '';
+    var sc = activeScroll(); if(!sc) return;
+    var book = sc.querySelector('.book'); if(!book) return;
+    var hs = book.querySelectorAll('h2');
+    var total = sc.scrollHeight;
+    if (total <= 0) return;
+    hs.forEach(function(h){{
+      var i = document.createElement('i');
+      i.style.top = (h.offsetTop / total * 100) + '%';
+      pgTicks.appendChild(i);
+    }});
+  }}
+  function updateProgress(){{
+    var sc = activeScroll();
+    if (!sc){{ pgFill.style.height='0%'; pgPct.textContent='0%'; return; }}
+    var max = sc.scrollHeight - sc.clientHeight;
+    if (max <= 0){{ pgFill.style.height='0%'; pgPct.textContent='0%'; return; }}
+    var r = Math.min(1, Math.max(0, sc.scrollTop / max));
+    pgFill.style.height = (r * 100) + '%';
+    pgPct.textContent = Math.round(r * 100) + '%';
+  }}
+  document.querySelectorAll('.scroll').forEach(function(s){{
+    s.addEventListener('scroll', updateProgress, {{passive:true}});
+  }});
+  window.addEventListener('resize', function(){{
+    rebuildTicks(); updateProgress();
+  }});
+
+  // ペイン切替時に再計算する gotoState のラッパ
+  var _goto = gotoState;
+  gotoState = function(st, keepPos){{
+    _goto(st, keepPos);
+    requestAnimationFrame(function(){{
+      requestAnimationFrame(function(){{
+        rebuildTicks(); updateProgress();
+      }});
+    }});
+  }};
+
   // 最初は序章から（毎回選び直せる）
-  window.addEventListener('load', function(){{ gotoState('head'); }});
+  window.addEventListener('load', function(){{
+    gotoState('head');
+    requestAnimationFrame(function(){{
+      requestAnimationFrame(function(){{
+        rebuildTicks(); updateProgress();
+      }});
+    }});
+  }});
   gotoState('head');
 </script>
 </body>
