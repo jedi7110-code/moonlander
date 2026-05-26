@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""月面のモノリス-分岐譚.md を「選択できる縦書きHTML」へ変換する。
+"""blackhexa.md（月面の黒筐 ── 分岐譚）を「選択できる縦書きHTML」へ変換する。
 
 マーカー:
   @@CHOICE            … ここに分岐選択画面を置く（直前までが共通の序章）
@@ -13,8 +13,8 @@
 """
 import re, html, pathlib
 
-SRC = pathlib.Path(__file__).with_name("monolith.md")
-OUT = pathlib.Path(__file__).with_name("monolith.html")
+SRC = pathlib.Path(__file__).with_name("blackhexa.md")
+OUT = pathlib.Path(__file__).with_name("blackhexa.html")
 raw_lines = SRC.read_text(encoding="utf-8").splitlines()
 
 
@@ -85,7 +85,7 @@ for raw in raw_lines:
         continue
     seg[cur].append(raw)
 
-title = "月面のモノリス"
+title = "月面の黒筐"
 head_blocks = parse_blocks(seg["head"])
 A_blocks = parse_blocks(seg["A"])
 B_blocks = parse_blocks(seg["B"])
@@ -225,9 +225,12 @@ DOC = f"""<!DOCTYPE html>
   #choice{{display:flex;flex-direction:column;align-items:center;
     gap:24px;margin:3.5em 0 1em;padding:2.4em 1em 1em;
     border-top:1px solid var(--rule)}}
-  #choice .mono{{width:44px;height:120px;background:#04060a;
-    border:1px solid var(--rule);
-    box-shadow:0 0 36px rgba(111,208,200,.16);}}
+  #choice .hexa{{display:block;max-width:560px;width:100%;height:auto;
+    border-radius:6px;
+    box-shadow:0 0 48px rgba(0,0,0,.6), 0 0 24px rgba(111,208,200,.12);}}
+  #choice .hexa-cap{{color:var(--dim);font-size:11px;letter-spacing:.18em;
+    text-align:center;margin-top:-12px;
+    font-family:system-ui,-apple-system,sans-serif}}
   #choice .ask{{color:var(--ink);font-size:18px;letter-spacing:.12em;
     text-align:center;line-height:2}}
   #choice .ask small{{display:block;color:var(--dim);font-size:13px;
@@ -324,12 +327,15 @@ DOC = f"""<!DOCTYPE html>
     <div class="book">
       {head_html}
       <div id="choice">
-        <div class="mono"></div>
+        <img class="hexa" src="img/blackhexa.webp"
+             alt="月面に立つ六角柱の黒い鏡面体──〈黒筐（こっきょう）〉。鏡面の奥に何層もの偏光膜が深く透けて見える"
+             loading="lazy">
+        <div class="hexa-cap">〈黒筐（こっきょう）〉</div>
         <div class="ask">触れるか。触れないか。<small>選んだ先で、物語は二度と交わらない</small></div>
         <div class="opts">
           <div class="card a" data-pick="A">
             <h3>触れる</h3>
-            <p>黒い面に、手をつく。<br>― ルートA「{html.escape(labelA)}」へ</p>
+            <p>鏡面に、手をつく。<br>― ルートA「{html.escape(labelA)}」へ</p>
           </div>
           <div class="card b" data-pick="B">
             <h3>触れない</h3>

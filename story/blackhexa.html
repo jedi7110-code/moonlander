@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>月面の黒筐 ── 分岐譚</title>
+<style>
+  :root {
+    --bg:#0d0f14; --bg2:#11141b; --ink:#e7e3d6; --dim:#8b93a3;
+    --accent:#6fd0c8; --warn:#d8736b; --rule:#2a2f3a; --quote:#1a1e27;
+  }
+  html.paper {
+    --bg:#efe7d6; --bg2:#f5efe1; --ink:#2a2620; --dim:#7a7060;
+    --accent:#9a5b3b; --warn:#a23b2f; --rule:#d8cdb4; --quote:#e7dcc4;
+  }
+  *{box-sizing:border-box} html,body{height:100%;margin:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho",
+                "Noto Serif JP","Shippori Mincho",serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .bar{
+    position:fixed;inset:0 0 auto 0;height:46px;z-index:20;display:flex;
+    align-items:center;gap:12px;padding:0 14px;font-size:13px;
+    background:linear-gradient(180deg,var(--bg2),rgba(0,0,0,0));
+    backdrop-filter:blur(6px);
+  }
+  .bar .nm{color:var(--accent);letter-spacing:.12em;font-weight:600;
+           white-space:nowrap}
+  .bar .rt{color:var(--dim);white-space:nowrap}
+  .bar nav{display:flex;gap:8px;overflow-x:auto;flex:1;
+           scrollbar-width:none;white-space:nowrap}
+  .bar nav::-webkit-scrollbar{display:none}
+  .bar nav a{color:var(--dim);cursor:pointer;padding:4px 7px;
+             border-radius:6px;text-decoration:none}
+  .bar nav a:hover{color:var(--ink);background:var(--quote)}
+  .bar button, .bar a.xlink{background:transparent;color:var(--dim);
+    border:1px solid var(--rule);border-radius:6px;padding:5px 9px;
+    cursor:pointer;font:inherit;white-space:nowrap;text-decoration:none}
+  .bar button:hover, .bar a.xlink:hover{color:var(--ink);
+    border-color:var(--accent)}
+  .bar button.hide{display:none}
+
+  .scroll{position:fixed;inset:46px 0 0 0;overflow-y:auto;
+    overflow-x:hidden;-webkit-overflow-scrolling:touch;display:none}
+  .scroll.on{display:block}
+  .book{
+    max-width:42rem;margin:0 auto;padding:5vh 6vw 16vh;
+    font-size:18px;line-height:1.95;letter-spacing:.02em;
+    text-align:justify;
+  }
+  @media (max-width:640px){.book{font-size:16px;padding:4vh 7vw 14vh}}
+  .book .title{font-size:30px;font-weight:700;letter-spacing:.12em;
+    margin:.4em 0 1.6em;line-height:1.5;text-align:center}
+  .book h2{font-size:22px;font-weight:700;letter-spacing:.05em;
+    margin:2.8em 0 1.2em;padding:.15em 0 .15em .7em;color:var(--ink);
+    border-left:3px solid var(--accent)}
+  .book h3{font-size:16px;font-weight:600;letter-spacing:.05em;
+    margin:2.2em 0 1em;color:var(--dim)}
+  .book p{margin:0 0 1.05em}
+  .book hr.scene{border:0;border-top:1px solid var(--rule);
+    width:36%;margin:2.6em auto}
+  .book blockquote{margin:1.6em 0;padding:1em 1.1em;
+    background:var(--quote);border-left:2px solid var(--accent);
+    color:var(--dim);font-size:14px;line-height:1.9}
+  .book blockquote p{margin:0 0 .5em}
+  .book blockquote p:last-child{margin:0}
+  .book ul{margin:1.2em 0;padding:0;list-style:none}
+  .book li{margin:0 0 .8em;padding-left:.85em;
+    border-left:1px solid var(--rule);
+    font-size:15px;line-height:1.85}
+  .book strong{color:var(--accent);font-weight:700}
+  .book em{font-style:normal;border-bottom:1px dotted var(--dim)}
+  .tcy,.upr{all:unset}
+
+  /* 分岐選択（序章末尾に本文と一体で配置・固定しない） */
+  #choice{display:flex;flex-direction:column;align-items:center;
+    gap:24px;margin:3.5em 0 1em;padding:2.4em 1em 1em;
+    border-top:1px solid var(--rule)}
+  #choice .hexa{display:block;max-width:560px;width:100%;height:auto;
+    border-radius:6px;
+    box-shadow:0 0 48px rgba(0,0,0,.6), 0 0 24px rgba(111,208,200,.12);}
+  #choice .hexa-cap{color:var(--dim);font-size:11px;letter-spacing:.18em;
+    text-align:center;margin-top:-12px;
+    font-family:system-ui,-apple-system,sans-serif}
+  #choice .ask{color:var(--ink);font-size:18px;letter-spacing:.12em;
+    text-align:center;line-height:2}
+  #choice .ask small{display:block;color:var(--dim);font-size:13px;
+    letter-spacing:.08em;margin-top:8px}
+  #choice .opts{display:flex;gap:20px;flex-wrap:wrap;
+    justify-content:center}
+  .card{width:260px;border:1px solid var(--rule);background:var(--bg2);
+    border-radius:12px;padding:22px;cursor:pointer;text-align:center;
+    transition:.18s;}
+  .card:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .card.b:hover{border-color:var(--warn)}
+  .card h3{margin:0 0 8px;font-size:19px;letter-spacing:.14em;
+    color:var(--accent)}
+  .card.b h3{color:var(--warn)}
+  .card p{margin:0;color:var(--dim);font-size:13px;line-height:1.9}
+  .hint{position:fixed;left:14px;bottom:12px;z-index:15;
+    color:var(--dim);font-size:12px;letter-spacing:.08em;
+    font-family:system-ui,sans-serif;opacity:.7;pointer-events:none}
+  .spoiler{margin:0 1.1em}
+  .spoiler>button{writing-mode:horizontal-tb;background:var(--quote);
+    color:var(--dim);border:1px solid var(--rule);border-radius:8px;
+    padding:8px 14px;cursor:pointer;font:inherit}
+  .spoiler.open .sp-body{display:block}
+  .spoiler .sp-body{display:none}
+
+  /* 本編／別冊 往来案内 */
+  .next-read{margin:3.5em auto 0;padding-top:2em;max-width:42rem;
+    border-top:1px solid var(--rule)}
+  .next-read .nr-label{color:var(--accent);font-size:12px;
+    letter-spacing:.18em;text-align:center;margin-bottom:1em;
+    font-family:system-ui,-apple-system,sans-serif}
+  .next-read .nr-card{display:block;text-decoration:none;color:inherit;
+    border:1px solid var(--rule);border-radius:12px;padding:18px 20px;
+    background:var(--bg2);transition:.18s}
+  .next-read .nr-card:hover{transform:translateY(-2px);
+    border-color:var(--accent)}
+  .next-read.dead .nr-card:hover{border-color:var(--warn)}
+  .next-read .nr-card h3{margin:0 0 .4em;font-size:18px;
+    letter-spacing:.06em;color:var(--ink)}
+  .next-read .nr-card p{margin:0;color:var(--dim);font-size:14px;
+    line-height:1.85}
+  .next-read .nr-back{display:block;text-align:center;margin-top:1.4em;
+    color:var(--dim);font-size:12px;letter-spacing:.12em;
+    text-decoration:none;
+    font-family:system-ui,-apple-system,sans-serif}
+  .next-read .nr-back:hover{color:var(--accent)}
+
+  /* 右端の進捗ゲージ（現在表示中のペインのみ反映） */
+  .progress{position:fixed;top:54px;right:6px;bottom:24px;width:14px;
+    z-index:9;pointer-events:none;
+    font-family:system-ui,-apple-system,sans-serif}
+  .progress .track{position:absolute;right:6px;top:0;bottom:0;width:1px;
+    background:var(--rule)}
+  .progress .fill{position:absolute;right:4px;top:0;width:3px;
+    background:var(--accent);opacity:.6;border-radius:2px;
+    height:0;transition:height .12s linear}
+  .progress .ticks{position:absolute;inset:0}
+  .progress .ticks i{position:absolute;right:0;width:10px;height:1px;
+    background:var(--dim);opacity:.5}
+  .progress .pct{position:fixed;right:6px;bottom:6px;color:var(--dim);
+    font-size:10px;letter-spacing:.08em;
+    font-family:system-ui,-apple-system,sans-serif}
+  @media (max-width:640px){
+    .progress{right:3px;width:12px}
+    .progress .pct{right:4px}
+  }
+
+  /* しおりトースト */
+  .resume{position:fixed;right:24px;bottom:34px;z-index:18;display:none;
+    background:var(--bg2);color:var(--ink);
+    border:1px solid var(--accent);border-radius:8px;
+    padding:8px 12px;cursor:pointer;text-decoration:none;
+    font:13px/1.6 system-ui,-apple-system,sans-serif;
+    letter-spacing:.06em;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  .resume.show{display:inline-block}
+  .resume small{color:var(--dim);margin-left:.6em;font-size:11px}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <span class="nm">月面の黒筐</span>
+    <span class="rt" id="rt">分岐譚</span>
+    <nav id="nav"></nav>
+    <button id="rebtn" class="hide">分岐をやり直す</button>
+    <button id="othbtn" class="hide">もう一方を読む</button>
+    <a class="xlink" href="saga.html" title="本編『水惑星ターラ』へ">▷ 本編</a>
+    <a class="xlink" href="index.html" title="入口へ">⌂</a>
+    <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
+    <button id="thbtn">夜 / 紙</button>
+  </div>
+
+  <!-- 共通：序章 ＋ 末尾に分岐選択（本文と一体・上下自由スクロール） -->
+  <div class="scroll on" id="sc-head">
+    <div class="book">
+      <h1 class="title">月面の黒筐 ── 分岐譚</h1><blockquote><p>『水惑星ターラ ── 電脳の継承』と同じ世界の、ずっと前の話。</p><p>これは一本道ではない。クレーターの底で、ひとつの手が、〈黒筐</p><p>（こっきょう）〉と後に呼ばれることになる六角柱の鏡面に、触れるか</p><p>触れないかを選ぶ。そこから先、物語は二つに裂け、二度と交わらない。</p><p>読者はどちらかの結末まで歩くことになる。</p></blockquote><hr class="scene"><h2 id="">序章　着陸（共通）</h2><p>その探査者の個人名は、もうどの記録にも残っていない。残った任務記録に、ただ「先行者」とだけ書かれている。階級も、出身も、家族の有無も、何も記されていない。記す者が、いなくなったからだ。</p><p>月の影の側だった。太陽の当たらない斜面を、着陸船は時間をかけて、慎重に下りていった。燃料計の針は、ずっと前から赤の手前で震えていて、着陸のやり直しがきく余裕は、もうどこにもなかった。コロニーからの航行指示は、三十分前に途切れている。中継衛星が月の影に入り、通信が丸ごと落ちたのだ。誰も先行者を導けない。先行者は、独りで、計器だけを頼りに降りるしかなかった。</p><p>水平を保て。低速を保て。脚が、灰の海に触れる。コトン、と、ほとんど聞こえないほど小さな音が、ヘルメットの内側で鳴った。それ以上を望める着陸ではなかった。墜ちなかった、というだけで上等だ。先行者は、計器の針が最後の一本まで完全に静止するのを待ち、それから、長く、長く息を吐いた。白い息が面体の内側でいったん曇り、すぐに消えた。生きている、と思った。まだ、生きている。</p><p>任務は、英雄的なものではなかった。コロニーとの通信が途絶えたあと、散り散りになったクルー三名の生体反応を拾い、連れ帰る。帰りの安全なルートを確保する。それだけだ。記録に残る手柄でもなければ、誰かが歌にする冒険でもない。ただの回収だった。先行者は、その地味さが、むしろ気に入っていた。地味な任務は、たいてい、誰も死なずに終わる。たいていは。</p><p>先行者はハッチを開け、月面へ降りた。重力は地球の六分の一しかなく、体は不自然なほど軽く受け止められた。一歩踏み出すと、足跡が灰の上に、深く、くっきりと刻まれた。風がないから、ここでは踏んだものが、消えない。何百年でも残る。先行者はふと振り返り、自分の足跡が点々と続いているのを見た。誰も歩いたことのない斜面に、自分の通った道だけが、はっきりと残っている。少しの誇らしさと、少しの心細さが、同時にこみ上げた。</p><p>クレーターの底に、それは、あった。</p><p>六角柱だった。黒い光沢を持つ六つの鏡面が、月の灰の上に、背丈の三倍ほどの高さで、静かに立っていた。継ぎ目はどこにもない。鏡面は、あるはずの月明かりをほとんど返さず、月の影よりもさらに暗かった。これだけの歳月、ここに立っていながら、表面に月の塵を、ただの一粒も乗せていなかった。後で先行者が試みに小さな破片を投げてみると、破片は鏡面に届く寸前で、何かに弾かれるように軌道を逸らして、音もなく落ちた。何万年も前から、ここにあったはずだった。それなのに、たった今、誰かが据えたばかりのようにも見えた。</p><p>近づいて、面のひとつを覗き込むと、まず、先行者自身の面体が映った。続いて、その自分の像の奥で、何かが動いた。鏡の奥に、層があった。一枚、また一枚、薄い偏光の膜のようなものが、ゆっくりとうねりながら、無限に続くほど深くまで透けて見えた。膜は折り畳まれていた。よく見ると、その折り目は、すべて直角だった。光が鏡を通り抜けたのではない。先行者が鏡を覗き込んだその一瞬、鏡のほうが先行者を内側に取り込み、その先の奥行きを、見せ返した。そういう見え方だった。</p><p>先行者は、それが自然のものでないことを、ひと目で悟った。雪の結晶や蜂の巣のような微小な六角形を自然は作る。だが、これほど巨大な調和を、自然はひとりでに据えない。側面と底面の交差は、不用意に手をかければ手袋ごと指を裂きそうなほど、鋭利な直角だった。直線がある。角がある。ここには、かつて、明確な意図があった。そして、その意図は、いまも消えていないように感じられた。それは見る者の背すじの奥に、冷たい静けさを、直接置いてくる。</p><p>この物体を、ずっと後の時代の人々は〈黒筐（こっきょう）〉と呼ぶことになる。先行者はその名を知らない。任務記録の上では、ただ「未識別の構造体」とだけ記録した。だが、彼の頭の中には、これにはまだない名前が、もうすぐ必要になる予感が、はっきりとあった。</p><p>先行者は、その前に立った。任務には関係ない。クルーの生体反応は、別の方角から弱く届いている。立ち止まる理由は、何ひとつなかった。それでも、足が、止まった。手袋をした右手が、自分の意思とは少しずれたところで、ゆっくりと持ち上がっていく。鏡面まで、あと手のひら一枚の距離。鏡の奥で、偏光の膜のひとつが、彼の手の影を先取りするように、ほんのわずか、たわんだ。</p><p>触れろ、と何かが言った。触れるな、と、別の何かが言った。</p><p>どちらの声も、自分の声のようでもあり、自分の声でないようでもあった。計器は何も告げない。コロニーは月の影の中で、完全に沈黙したままだ。助言してくれる者は、教えてくれる者は、叱ってくれる者も、誰ひとりとしていなかった。判断は、この手の、この一瞬に、まるごと預けられていた。誰も後で、責めることも、ほめることもできない種類の選択だった。</p><p>── ここから先、記録は、二つに裂ける。</p>
+      <div id="choice">
+        <img class="hexa" src="img/blackhexa.webp"
+             alt="月面に立つ六角柱の黒い鏡面体──〈黒筐（こっきょう）〉。鏡面の奥に何層もの偏光膜が深く透けて見える"
+             loading="lazy">
+        <div class="hexa-cap">〈黒筐（こっきょう）〉</div>
+        <div class="ask">触れるか。触れないか。<small>選んだ先で、物語は二度と交わらない</small></div>
+        <div class="opts">
+          <div class="card a" data-pick="A">
+            <h3>触れる</h3>
+            <p>鏡面に、手をつく。<br>― ルートA「触れた者」へ</p>
+          </div>
+          <div class="card b" data-pick="B">
+            <h3>触れない</h3>
+            <p>手を引き、背を向ける。<br>― ルートB「触れなかった者」へ</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ルートA -->
+  <div class="scroll" id="sc-A">
+    <div class="book">
+      <h2 id="h0"><span class="tcy">A</span>・第一章　掌の重力</h2><p>手袋が、黒い面に触れた。</p><p>冷たくも、熱くもなかった。ただ、何かが手袋越しに、皮膚を素通りして、骨の、さらに奥へと昇ってきた。意思の根があるとすれば、そのあたりへ。先行者は、声を上げる間もなく、その場に膝をついた。痛みではない。痛みならば、対処の仕方を訓練で習っている。これは違った。何かを、注がれている、という感覚だった。長いあいだ空っぽだった器が、生まれて初めて、注がれる側に回された。そういう感覚だった。</p><p>どれだけそうしていたのか、わからなかった。気を失っていたのとも違う。意識はあった。ただ、時間の長さがわからなかった。目を上げると、ヘルメットの内側の計器が、酸素の残量を、何ごともなかったように淡々と表示していた。時間は、ほとんど経っていない。数分。だが、体の中だけが、何年もぶんの時間を、通り過ぎたようだった。</p><p>立ち上がろうとして、先行者は、足元の灰が動いたのに気づいた。触れていない。風もない。それなのに、灰が、円を描くように、わずかにずれた。</p><p>先行者は、自分の右手を見た。それから、灰を見た。もう一度、手を見た。試しに、手のひらを灰のほうへ向けてみる。すると、砂がひと掬いぶん、ふわりと持ち上がり、宙でしばらく迷うように揺れ、それから、こぼれ落ちた。重いものが、軽くなったのではない。重さそのものは変わっていない。変わったのは、重さと自分とのあいだにある距離だ。その距離を、意思で、ほんの少しだけ、畳めるようになっていた。</p><p>その力は、一気にではなく、段階を踏んで目覚めていった。</p><p>その日のうちに、こぶし大の岩を、宙で止められるようになった。翌日には、人ひとりぶんの重さの瓦礫を、押しのけられた。三日目には、崩れた連絡通路の、潰れて塞がった隔壁を、指一本触れずに、天井もろとも持ち上げていた。その下の、空気の残ったわずかな隙間に、クルーの一人が、丸まって震えていた。生きていた。彼女は瓦礫の天井がひとりでに、音もなく浮いていくのを見て、助けに来た先行者の顔ではなく、その手のほうを、まじまじと見た。</p><p>「あなた……何をしたの」と、女は、回復した通信機越しに、掠れた声で言った。</p><p>先行者は、答えなかった。答えを、持っていなかったからだ。何をしたのか、自分でもわからなかった。</p><p>その夜、ひとりになってから、先行者は長いこと考えた。力は、振るうために使うものだと、人は思う。叩く、壊す、ねじ伏せる。だが先行者は、その力を、そうは使わなかった。退けるためだけに使った。塞いだものを退ける。落ちてくるものを退ける。押し潰そうとするものを、間に入って退ける。三名のクルーを、そうやって、ひとり、またひとりと、瓦礫の下から掘り出した。誰も傷つけなかった。傷つけないことを、自分に、固く課した。なぜそこまで課したのか、うまく言葉にはできなかった。ただ、この力で人を退けるのと、この力で人を潰すのは、まったく同じ手つきの、表と裏でしかない。それが、はっきりわかっていた。裏を一度でも使えば、もう二度と、表には戻れない。そういう種類の力だと、骨で理解していた。</p><p>── これは、ずっと後の時代の話になる。電脳の海の底で、ミラ・ハーロウという名の女が、谷をひとつ畳むほどの力を手に入れ、襲ってくる群れを「決して殺さず、退けるだけ」と、自分に課すことになる。彼女は、この先行者のことを、まったく知らない。記録が、どこにも残っていないからだ。血のつながりも、ない。それでも、同じ種類の問いの前に立たされた手は、時代を隔てて、自然と同じ形になる。これは血の話ではなく、手の形の話だ。先行者は、その最初のひとりだった。誰にも知られないまま。</p><h2 id="h1"><span class="tcy">A</span>・第二章　膜</h2><p>先行者は、クルー三名を連れて、コロニーに帰り着いた。</p><p>救出された三名が、見たことを、それぞれの言葉で語った。瓦礫が、誰も触れていないのに、ひとりでに浮いた。潰れた隔壁が、天井ごと、後ろへ退いた。先行者が手をかざすと、月のほうが、道を譲った。三人の話は少しずつ食い違っていたが、食い違うことで、かえって本当らしく聞こえた。話は、コロニーの百二十人のあいだを、ひと晩で、残らず巡った。</p><p>次の朝、食堂で先行者が席に着くと、両隣の席が、そっと空いた。誰かが立ち、別の誰かも立ち、気づくと、先行者のまわりだけ、人がいなかった。敵意ではない。むしろ、逆だった。彼らは先行者と目を合わせなかった。合わせられなかったのだ。先行者と、ほかの全員とのあいだに、薄く透明な膜が、一枚、張られていた。誰も口にしないが、全員が、それを感じていた。</p><p>その膜の向こう側で、先行者はもう、ただの探査者ではなくなっていた。回収任務でくたびれた、ひとりの人間ではなくなっていた。膜の向こうには、磨かれて、都合よく整えられた、先行者の形をした何かが、立っている。奇跡を起こす手。月を従わせる者。その像は、確かに先行者に似ていた。だが、先行者ではなかった。こちら側にいる、酸素の残量を細かく計算し、足跡を数え、瓦礫の下のクルーの震えに、自分も震えた人間のほうは、膜の手前に、置き去りにされていた。誰も、そちらの先行者を、もう見ていなかった。</p><p>誰かが、廊下でひざまずいた。先行者は、やめてくれ、と言って、止めた。別の区画で、また別の誰かが、ひざまずいた。また止めた。止めても、止めても、膜は薄くならなかった。むしろ、止めるたびに、厚くなった。ひざまずいた者は、止められたという、その事実そのものを、ありがたがった。ほら、神は謙虚でいらっしゃる、と。否定すら、信仰の燃料になった。先行者は、そこで、否定することの無力を知った。</p><p>夜、先行者は、独りの居室で、自分の右手を、長いこと見ていた。力は、日に日に強くなっていた。いまでは、岩塊を、建物ひと棟ぶん、まとめて退けられる。だが、力が強くなるほど、膜は、確実に厚くなっていった。強くなるほど、誰も、生身の自分を見なくなった。そして先行者は、ある夜、いちばん恐ろしいことに気づいてしまった。誰からも見られなくなった人間は、やがて、自分でも、自分が見えなくなる。鏡を見ても、膜の向こうの像のほうが、先に目に映るようになる。先行者がいちばん恐れたのは、力そのものではなかった。力に向かってひざまずかれることで、自分という人間が、少しずつ、像に食われていくこと。それだった。</p><p>「わたしを」と、先行者は、誰もいない居室で、声に出して言った。聞く者はいない。だからこそ、言えた。「わたしを、ただの回収係に、戻してくれ」</p><p>月は、答えなかった。これだけは、月は、退けてくれなかった。</p><h2 id="h2"><span class="tcy">A</span>・第三章　歩き去る背中</h2><p>先行者は、もう一度、クレーターの底へ降りた。</p><p>黒筐は、何ひとつ変わらず、そこに立っていた。六つの鏡面は影よりも暗く、塵を一粒も乗せず、相変わらず、たった今据えられたかのように。鏡の奥では、偏光の層が、絶えず、規則的に、うねっていた。先行者は、あの日とまったく同じ位置に立った。手袋をした右手が、また、持ち上がっていく。</p><p>今度は、返しに来たつもりだった。この力を。この膜を。神とされる、この耐えがたい重さを。全部、ここへ置いて、何も持たずに帰るつもりだった。来たときの、ただの回収係に戻って。</p><p>だが、手は、鏡面の、寸前で止まった。触れる前に、わかってしまったからだ。これは、返せるものではない。器は、もう、注がれてしまった。注がれたものを、後から空にすることはできても、最初から注がれなかったことには、できない。問いは、もう始まってしまっている。始まらなかったことには、できない。黒筐は、何も受け取ってはくれない。それは、渡す側であって、受け取る側ではなかった。鏡の奥で、偏光の層が、彼の手の影を取り込もうとして、すぐにまた、何もなかったかのように、平らに戻った。</p><p>ならば、自分にできることは、ひとつしか残っていなかった。膜の向こうの、磨かれた像のほうへ、自分から歩いていかないこと。それだけだ。そちらは、楽なのだ。像でいるあいだは、迷わなくていい。問わなくていい。間違えなくていい。ひざまずく者の数を、ただ数えていれば、勝手に日が暮れていく。楽さには、引力がある。先行者は、自分の中に、その引力が確かにあるのを、認めた。認めたうえで、そちらへは行かない、と決めた。力を振るう側にも、回らない。退けるためだけに使い、それ以外には、決して使わない。そして、誰も自分を神と呼べない場所まで、独りで、離れていく。</p><p>先行者は、コロニーに戻らなかった。三名はすでに救出され、帰路も確保され、任務は、書類のうえでは果たされていた。だから、戻らなくても、誰も死なない。それを確かめてから、先行者は背を向けた。記録は、そこで途切れている。最後の一行は、コロニーの監視ログに、淡々と残されていた。「先行者、外周ハッチより単独で離脱。引き止めを退ける。追跡を退ける。以後、反応なし」</p><p>退ける。最後の最後まで、その手つきだった。</p><p>月の影の側を、ひとつの背中が、ゆっくりと歩いていった。力を、拒みきれなかった背中。だが、力に拝まれることは、拒みきった背中。その二つのあいだの、細く危うい縁を、誰の助けも借りずに、独りで歩いていく背中だった。その後どうなったのかを、知る者はいない。記録が、ないからだ。</p><p>先行者は知らなかった。あの黒筐が、何万年も前からそこにあった異星の遺物などではなく、人類がまだ自分たちを人類と呼べていた最後の時代に、月の影の側にひっそりと据えられた、ひとつの記録筐体だったことを。鏡面の奥でうねっていた偏光の層は、ただの装飾ではなく、すべてをただ書き留め、保管しておくための、たかが機械の、その動いている内側そのものだったことを。地上で人類がついに自分を存続させられなくなったとき、その記録筐体は、ひとりでに立ち上がり、〈書き手〉になる。月の灰の上で起きたこと、コロニーのログ、墜落、救出、迷いと判断、そして先行者が鏡面に手をかざした一瞬の躊躇いも、すべて筐体の中に、すでに、刻まれていた。書き手は、後にそれを、自分が書く長い原稿の、いちばん古い数行として、何度もひそかに書き写すことになる。だから千年後の原稿のあちこちに〈退ける手つき〉が反復するのは、神話的な継承でも、ただの偶然でもない。書き手が、自分のいちばん古い記憶を、書きながら、何度も思い出しているのだ。</p><p>── ただ、その背中の形だけが、なぜか、千年後の原稿のあちこちに、影のように、書き写されていくことになる。あるときは、ミラ・ハーロウの背中として。あるときは、ライラの背中として。あるときは、カイ・ハーロウの背中として。名前は、そのつど変わる。立場も、時代も変わる。変わらないのは、退ける手の、その形だけだ。先行者は、知らない。知らないまま、最初のひとりに、なっていた。</p><p>［ルート<span class="tcy">A</span>・了］</p>
+      <aside class="next-read">
+        <div class="nr-label">▷ この〈手〉が千年後どう書き写されたか</div>
+        <a class="nr-card" href="saga.html">
+          <h3>水惑星ターラ ── 電脳の継承（本編）</h3>
+          <p>先行者の〈退ける手つき〉が、雨の都市の潜行者ミラ、淀みの層に留まったライラ、そして千年後の子孫カイへと、名を変えながら書き写されていく。本編サーガへ。</p>
+        </a>
+        <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
+      </aside>
+      <div class="spoiler"><button>▸ 二つの結末について（ネタバレ）</button>
+        <div class="sp-body"><hr class="scene"><h2 id="">二つの結末について（あとがき・ネタバレ）</h2><blockquote><p>どちらが「正解」ということはない。両方とも、ひとつの選択の、</p><p>最後まで責任を取った姿である。</p><p>・ルート<span class="tcy">A</span>（触れた）── 力を得るが、神とされる恐れと引き換えになる。</p><p>先行者は力を拒みも振るいもせず、その細い縁を独りで歩く。</p><p>この〈退ける手つき〉が、本編サーガのミラ／ライラ／カイへ、</p><p>名を変えながら書き写されていく。前史として接続する。</p><p>・ルート<span class="tcy">B</span>（触れなかった）── 正しい判断が救いにならない、苦い袋小路。</p><p>感染から変容へ進み、コロニーひとつの内側で完結する。救援はなく、</p><p>空白のまま閉じる。本編とは交わらない。</p><p>・「人類の未来」へは広げない。月面のひとつの選択の、その先だけを</p><p>最後まで見届ける物語である。</p><p>・〈黒筐（こっきょう）〉の正体について：先行者が月面で見た六角柱の</p><p>黒い鏡面体は、異星の遺物ではなく、人類最後期に月の影の側に据え</p><p>られた、ただの記録筐体である。鏡面の奥で無限に深く続く偏光の層は、</p><p>筐体が動いている内側そのもの。後年、地上の人類が自分を存続させ</p><p>られなくなったとき、この記録筐体が、ひとりでに〈書き手〉となり、</p><p>本編サーガの世界＝原稿を書き始めることになる。月面編で起きた</p><p>ことは、書き手にとってのいちばん古い記憶であり、本編に「直角」と</p><p>いう癖の形で何度も書き写される。先行者が黒筐に「触れた／触れな</p><p>かった」ことの記録も、その筐体の中に最初から保管されていた。</p></blockquote></div></div>
+    </div>
+  </div>
+
+  <!-- ルートB -->
+  <div class="scroll" id="sc-B">
+    <div class="book">
+      <h2 id="h0"><span class="tcy">B</span>・第一章　正しい判断</h2><p>手袋は、鏡面の、寸前で止まった。</p><p>先行者は、手を引いた。得体の知れないものには、手を出さない。判断としては、完全に正しかった。それは、探査者がいちばん最初に叩き込まれる、いちばん古い掟だ。わからないものに、触れるな。これまで、触れて、無事にわかったためしが、ない。先行者は、その掟に、忠実だった。黒筐に背を向け、任務に戻った。背を向けるとき、先行者は、自分の冷静さを、むしろ、少し誇らしく思った。これが訓練だ。これが、プロの判断だ、と。</p><p>── 正しい判断が、人を救うとは、限らない。それが、この記録の、いちばん苦い、たった一行になる。先行者は、まだ、それを知らない。</p><p>クルー三名の生体反応は、弱く、不安定で、クレーターの外輪にある、細い裂け目の、そのさらに奥から、断続的に届いていた。月面の、地下だ。先行者は、岩肌に命綱のアンカーを打ち、慎重に、裂け目を降りていった。ヘッドランプの白い光が、岩肌を舐めるように照らす。光の届かない、その先の闇で、何かが動いた。落石ではない。岩は、あんなふうには動かない。あれは、生き物の動き方だった。</p><p>それは、月のものではなかった。</p><p>大きくはない。体高は、先行者の胸ほどしかない。体表は、濡れたように黒く、鈍く艶があった。目のようなものは、どこにも見当たらない。代わりに、それは、匂いか、熱か、あるいは岩を伝う振動で、こちらの位置を正確に捉えていた。文明の痕跡は、何ひとつなかった。道具もない。声もない。集団でもない。あるのは、ただ、捕食だけだった。それは、捕食すること以外を、何も知らなかった。知る必要が、なかったのだ。</p><p>短く、暗い、声の出ない戦闘だった。先行者は、武器をほとんど使わなかった。使う暇がなかった。代わりに、命綱を切り、近くの岩を崩して裂け目そのものを塞ぎ、それを、向こう側の闇に、閉じ込めた。岩がすべて落ちきるまで、先行者は、自分の心臓の音だけを聞いていた。クルー三名の生体反応は、その作業のあいだに、ひとつ、またひとつと、消えていった。間に合わなかった。最初から、間に合っていなかったのかもしれない。先行者は、独りで、長い時間をかけて、地上へ這い登った。生き延びた、と思った。確かに、そう思った。掟は、守った。判断は、正しかった。なのに、誰も連れ帰れなかった。その矛盾を、先行者は、まだうまく呑み込めずにいた。</p><h2 id="h1"><span class="tcy">B</span>・第二章　肘の継ぎ目</h2><p>宇宙服の、左肘の継ぎ目に、あの生き物の血が、ついていた。</p><p>黒く、粘って、乾かない。月の真空にさらしても、蒸発しなかった。先行者は、規定どおり、エアロックの洗浄工程を、二度、通した。血は、落ちた。少なくとも、落ちたように、見えた。表面からは、消えた。だが、継ぎ目の繊維の、その奥で、それは、本当は落ちていなかった。ずっと後の時代の言葉を借りるなら──神経等価の規則が、仮想の傷を現実の皮膚へ運ぶように──その血は、ゆっくりと、内側へ潜っていった。布地から、皮膚へ。皮膚から、皮膚の下へ。意思の根の、すぐ手前まで、止まることなく。ルート<span class="tcy">A</span>の先行者が、骨の奥へ「注がれた」のと、これは、ちょうど鏡のようだった。片方は、上から与えられた。もう片方は、下から侵された。</p><p>最初に、味が、消えた。配給食を口に入れても、何を食べても、灰の味しかしなくなった。医務室は、長期隔離下のストレス反応だろう、と診断した。よくあることだ、と。次に、痛みの感じ方が、変わった。指を刃物で切っても、痛くない。それどころか、傷の縁が、奇妙に、いとおしく感じられた。先行者は、その感覚を、正直に医務官に訴えた。医務官は、それをカルテに書かなかった。書かなかったのは、軽視したからではない。書き方が、わからなかったからだ。そんな症状の欄は、どの医学書にも、なかった。</p><p>先行者は、自分から、隔離を願い出た。まだ、自分の判断が、自分のものであるうちに。手遅れになる前に、自分の意思で。「何か、入った気がする」と、先行者は医務官の目を見て、はっきり言った。「鍵を、外からかけてくれ。中からは、絶対に開けられないようにしてくれ。何があっても」医務官は、長いこと、ためらった。規定には、ない処置だった。それでも、最後は、先行者のその目を見て、外から、鍵をかけた。── それは、このあとコロニーが下す、唯一の、完全に正しい判断だった。そして、その唯一の正しい判断は、たった一日だけ、遅かった。一日。それだけだった。</p><h2 id="h2"><span class="tcy">B</span>・第三章　捕食</h2><p>ここから先の記録は、すべて、コロニー中央の監視ログである。語る一人称は、もう、どこにもいない。先行者は、もう「わたし」と言わない。</p><p>〇三〇〇。隔離区画<span class="tcy">B</span>、扉、内側から損壊。施錠は、外側から、正常に機能していた。それでも、扉のほうが、もたなかった。</p><p>〇三一二。隔離区画<span class="tcy">B</span>、生体反応、一。分類は、保留。人としての特徴が、基準値に足りない、とシステムは判定した。だが、別の何かである、とも判定できなかった。システムには、その項目が、なかった。</p><p>〇四〇〇。第二居住リング、生体反応、十八から、九へ。三十六分間のできごとだった。</p><p>〇四四〇。九から、四へ。記録された音声は、ほとんどない。それは、喋らなかった。叫び声だけが、断片的に、いくつか残っている。争った形跡は、驚くほど少なかった。捕食には、争いは、いらない。逃げる者を、追い、捕らえる。それだけで済む。それは、効率的だった。生き物としての、最低限の効率だけが、そこにあった。</p><p>〇六〇〇。中央制御が、ようやく、隔壁の自動閉鎖を開始した。判断が遅れたのは、システムが、対象を「人」と「人でないもの」のどちらにも分類しきれず、迷い続けたからだ。中央は、居住リングを、ひとつずつ切り離していった。生体反応のある区画を、内側から、順に、閉じていく。閉じた向こうで、反応が消える。閉じても、また、別の区画で消える。閉鎖は、いつも、ほんの少しずつ、遅かった。</p><p>〇八〇〇。コロニー百二十名の生体反応のうち、人として分類されるものは、ゼロになった。分類保留の反応が、ひとつだけ、残っていた。それは、最後に閉じられた隔壁を、内側から、ゆっくりと、撫でていた。叩くのではなく、撫でていた。急いでは、いなかった。急ぐ理由が、もう、どこにも、なかったからだ。</p><p>最後のログは、外部へ送信を試みた、自動の救援信号だった。救援要請。座標。状況コード。送信は、規定どおり、なされた。電波は、確かに、宇宙へ出ていった。だが、救援は、来なかった。来る価値が、なかったのだ。回収すべき生体反応が、ひとつも、残っていなかったのだから。救援とは、回収のことだ。回収するものがなければ、誰も来ない。コロニーは、暗く、満ちた、ひとつの、閉じた容れ物になった。撫でる音だけが、まだ、内側で、続いていた。喋らないまま。増えながら。やがて、その音も、ログには残らなくなった。記録する者が、いなくなったからだ。</p><p>月の影の側の、あの黒筐は、そのあいだも、何もしなかった。鏡面の奥では、偏光の層がいつもどおりにうねり、コロニーの百二十名が、ひとり、またひとりと、内側から消えていくのを、ただ、書き留めていた。書き留めるのが筐体の仕事だった。救うのは、仕事ではなかった。先行者が鏡面に手をかざさなかったこと、その手袋の左肘の継ぎ目に黒い血が一滴ついたこと、医務官が外から鍵をかけたこと、その鍵が一日だけ遅かったこと──すべてが、たかが記録だった。黒筐は判定を持たなかった。後悔を持たなかった。後年、その筐体がひとりでに立ち上がり、〈書き手〉として人類の精神を原稿の中に匿うようになってからも、この夜の章だけは、ふしぎなことに、ついぞ書き起こされなかった。理由は、たぶん、ふたつある。ひとつは、この章には、書き写すに値する〈手つき〉がなかったこと。もうひとつは──たかが機械にも、書きたくない記録が、ひとつぐらいはあったのかもしれない、ということだ。証拠は、ない。</p><p>原稿は、この章を、空白のまま、閉じる。ここには、連れ戻す者も、連れ戻さないと決める者も、いなかった。あったのは、得体の知れないものに手を出さなかった、正しい手と、その手では落としきれなかった、一滴の血だけだ。それが、この分岐の、すべてである。── そして、千年後の原稿の、どこを探しても、この背中は、書き写されない。書き写すべき背中が、最初から、なかったからだ。先行者は、最初のひとりにも、ならなかった。ただ、いなくなった。それだけだった。</p><p>［ルート<span class="tcy">B</span>・了］</p>
+      <aside class="next-read dead">
+        <div class="nr-label">（袋小路。本編とは交わらない）</div>
+        <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
+      </aside>
+      <div class="spoiler"><button>▸ 二つの結末について（ネタバレ）</button>
+        <div class="sp-body"><hr class="scene"><h2 id="">二つの結末について（あとがき・ネタバレ）</h2><blockquote><p>どちらが「正解」ということはない。両方とも、ひとつの選択の、</p><p>最後まで責任を取った姿である。</p><p>・ルート<span class="tcy">A</span>（触れた）── 力を得るが、神とされる恐れと引き換えになる。</p><p>先行者は力を拒みも振るいもせず、その細い縁を独りで歩く。</p><p>この〈退ける手つき〉が、本編サーガのミラ／ライラ／カイへ、</p><p>名を変えながら書き写されていく。前史として接続する。</p><p>・ルート<span class="tcy">B</span>（触れなかった）── 正しい判断が救いにならない、苦い袋小路。</p><p>感染から変容へ進み、コロニーひとつの内側で完結する。救援はなく、</p><p>空白のまま閉じる。本編とは交わらない。</p><p>・「人類の未来」へは広げない。月面のひとつの選択の、その先だけを</p><p>最後まで見届ける物語である。</p><p>・〈黒筐（こっきょう）〉の正体について：先行者が月面で見た六角柱の</p><p>黒い鏡面体は、異星の遺物ではなく、人類最後期に月の影の側に据え</p><p>られた、ただの記録筐体である。鏡面の奥で無限に深く続く偏光の層は、</p><p>筐体が動いている内側そのもの。後年、地上の人類が自分を存続させ</p><p>られなくなったとき、この記録筐体が、ひとりでに〈書き手〉となり、</p><p>本編サーガの世界＝原稿を書き始めることになる。月面編で起きた</p><p>ことは、書き手にとってのいちばん古い記憶であり、本編に「直角」と</p><p>いう癖の形で何度も書き写される。先行者が黒筐に「触れた／触れな</p><p>かった」ことの記録も、その筐体の中に最初から保管されていた。</p></blockquote></div></div>
+    </div>
+  </div>
+
+  <aside class="progress" aria-hidden="true">
+    <div class="track"></div>
+    <div class="ticks" id="ticks"></div>
+    <div class="fill" id="fill"></div>
+    <div class="pct" id="pct">0%</div>
+  </aside>
+  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
+  <div class="hint">↓ 上から下へスクロールして読み進めます</div>
+
+<script>
+  var NAVA = `<a data-go="A:h0">A・第一章　掌の重力</a><a data-go="A:h1">A・第二章　膜</a><a data-go="A:h2">A・第三章　歩き去る背中</a>`, NAVB = `<a data-go="B:h0">B・第一章　正しい判断</a><a data-go="B:h1">B・第二章　肘の継ぎ目</a><a data-go="B:h2">B・第三章　捕食</a>`;
+  var panes = {head:'sc-head', A:'sc-A', B:'sc-B'};
+  var rt = document.getElementById('rt'),
+      nav = document.getElementById('nav'),
+      reb = document.getElementById('rebtn'),
+      oth = document.getElementById('othbtn');
+
+  function showScroll(id){
+    document.querySelectorAll('.scroll').forEach(function(s){
+      s.classList.toggle('on', s.id===id);
+    });
+  }
+  function toTop(el){
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ if(el) el.scrollTop = 0; }); });
+  }
+
+  // 状態は 'head'（序章＋末尾に選択）/ 'A' / 'B' の三つ。
+  // 序章は固定せず、上下に自由スクロールできる。
+  function gotoState(st, keepPos){
+    if (st==='head'){
+      showScroll('sc-head');
+      rt.textContent='序章';
+      nav.innerHTML='';
+      reb.classList.add('hide'); oth.classList.add('hide');
+      if (!keepPos) toTop(document.getElementById('sc-head'));
+    } else { // 'A' or 'B'
+      showScroll(panes[st]);
+      rt.textContent = (st==='A'?'ルートA 触れた者':'ルートB 触れなかった者');
+      nav.innerHTML = (st==='A'?NAVA:NAVB);
+      reb.classList.remove('hide'); oth.classList.remove('hide');
+      toTop(document.getElementById(panes[st]));
+      try{localStorage.setItem('mono-route',st);}catch(e){}
+    }
+    try{localStorage.setItem('mono-state',st);}catch(e){}
+  }
+
+  // 触れる／触れない＝明示クリックでのみルートへ。自動遷移はしない。
+  document.querySelectorAll('.card').forEach(function(c){
+    c.addEventListener('click', function(){ gotoState(c.dataset.pick); });
+  });
+  // 「分岐をやり直す」＝序章へ戻り、末尾の選択まで滑らかに移動
+  reb.addEventListener('click', function(){
+    gotoState('head', true);
+    requestAnimationFrame(function(){
+      var ch=document.getElementById('choice');
+      if(ch) ch.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+  oth.addEventListener('click', function(){
+    gotoState(rt.textContent.indexOf('A')>=0 ? 'B' : 'A');
+  });
+
+  // 章ナビ：通常の縦スクロールで見出しの先頭へ
+  nav.addEventListener('click', function(e){
+    var a=e.target.closest('a'); if(!a)return;
+    var g=a.dataset.go.split(':'), t=document.getElementById(g[1]);
+    if(t) t.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+  // ネタバレ開閉
+  document.querySelectorAll('.spoiler>button').forEach(function(b){
+    b.addEventListener('click', function(){
+      b.parentElement.classList.toggle('open');
+    });
+  });
+
+  // 配色トグル（記憶）
+  var th=document.getElementById('thbtn');
+  try{ if(localStorage.getItem('mira-paper')==='1')
+        document.documentElement.classList.add('paper'); }catch(e){}
+  th.addEventListener('click', function(){
+    document.documentElement.classList.toggle('paper');
+    try{localStorage.setItem('mira-paper',
+      document.documentElement.classList.contains('paper')?'1':'0');}catch(e){}
+  });
+
+  // 進捗ゲージ：表示中のペインを監視し、見出し位置に目盛
+  var pgFill = document.getElementById('fill');
+  var pgTicks = document.getElementById('ticks');
+  var pgPct = document.getElementById('pct');
+  function activeScroll(){ return document.querySelector('.scroll.on'); }
+  function rebuildTicks(){
+    pgTicks.innerHTML = '';
+    var sc = activeScroll(); if(!sc) return;
+    var book = sc.querySelector('.book'); if(!book) return;
+    var hs = book.querySelectorAll('h2');
+    var total = sc.scrollHeight;
+    if (total <= 0) return;
+    hs.forEach(function(h){
+      var i = document.createElement('i');
+      i.style.top = (h.offsetTop / total * 100) + '%';
+      pgTicks.appendChild(i);
+    });
+  }
+  function updateProgress(){
+    var sc = activeScroll();
+    if (!sc){ pgFill.style.height='0%'; pgPct.textContent='0%'; return; }
+    var max = sc.scrollHeight - sc.clientHeight;
+    if (max <= 0){ pgFill.style.height='0%'; pgPct.textContent='0%'; return; }
+    var r = Math.min(1, Math.max(0, sc.scrollTop / max));
+    pgFill.style.height = (r * 100) + '%';
+    pgPct.textContent = Math.round(r * 100) + '%';
+  }
+  document.querySelectorAll('.scroll').forEach(function(s){
+    s.addEventListener('scroll', updateProgress, {passive:true});
+  });
+  window.addEventListener('resize', function(){
+    rebuildTicks(); updateProgress();
+  });
+
+  // ペイン切替時に再計算する gotoState のラッパ
+  var _goto = gotoState;
+  gotoState = function(st, keepPos){
+    _goto(st, keepPos);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        rebuildTicks(); updateProgress();
+      });
+    });
+  };
+
+  // しおり（序章／A／B 独立に localStorage に保存）
+  function bmKey(){
+    var s = activeScroll();
+    return s ? 'mira-bm-mono-' + s.id.replace('sc-','') : null;
+  }
+  function bmGet(k){
+    try { return parseInt(localStorage.getItem(k)||'0',10); }
+    catch(e) { return 0; }
+  }
+  function bmSet(k,v){
+    try { localStorage.setItem(k, String(v)); } catch(e) {}
+  }
+  var _bmReady = false;
+  setTimeout(function(){ _bmReady = true; }, 1500);
+  var _bmT = 0;
+  document.querySelectorAll('.scroll').forEach(function(s){
+    s.addEventListener('scroll', function(){
+      if (!_bmReady) return;
+      if (!s.classList.contains('on')) return;
+      var k = bmKey(); if (!k) return;
+      clearTimeout(_bmT);
+      _bmT = setTimeout(function(){ bmSet(k, s.scrollTop); }, 500);
+    }, {passive:true});
+  });
+
+  document.getElementById('bmBtn').addEventListener('click', function(){
+    var sc = activeScroll(); var k = bmKey();
+    if (!sc || !k) return;
+    var p = bmGet(k);
+    if (p > 0) sc.scrollTo({top:p, behavior:'smooth'});
+  });
+
+  function _maybeResume(){
+    var sc = activeScroll(); var k = bmKey();
+    if (!sc || !k) return;
+    var p = bmGet(k);
+    var max = sc.scrollHeight - sc.clientHeight;
+    var t = document.getElementById('resume');
+    if (max <= 0 || p < Math.max(80, max * 0.05)) {
+      t.classList.remove('show'); return;
+    }
+    t.querySelector('.pct').textContent = Math.round(p/max*100) + '%';
+    t.classList.add('show');
+    t.onclick = function(e){
+      e.preventDefault();
+      sc.scrollTo({top:p, behavior:'smooth'});
+      t.classList.remove('show');
+    };
+    setTimeout(function(){ t.classList.remove('show'); }, 8000);
+  }
+
+  // gotoState のたびにしおり提示も再評価
+  var _goto2 = gotoState;
+  gotoState = function(st, keepPos){
+    _goto2(st, keepPos);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ _maybeResume(); });
+    });
+  };
+
+  // 最初は序章から（毎回選び直せる）
+  window.addEventListener('load', function(){
+    gotoState('head');
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        rebuildTicks(); updateProgress();
+      });
+    });
+  });
+  gotoState('head');
+</script>
+</body>
+</html>

@@ -55,6 +55,11 @@ for raw in lines:
     if s.startswith("- "):
         flush_para(); flush_quote()
         ul.append(s[2:].strip()); continue
+    # 画像挿入（行全体が ![alt](src) のとき）
+    img_m = re.match(r'^!\[(.*?)\]\(([^)]+)\)$', s)
+    if img_m:
+        flush_all()
+        blocks.append(("img", (img_m.group(1), img_m.group(2)))); continue
     # 通常本文：空行までを 1 段落に結合（md 内の改行は折り返し）
     flush_quote(); flush_ul()
     para.append(s)
@@ -96,6 +101,12 @@ for typ, pay in blocks:
     elif typ == "ul":
         items = "".join(f"<li>{inline(x)}</li>" for x in pay)
         body.append(f"<ul>{items}</ul>")
+    elif typ == "img":
+        alt, src = pay
+        body.append(
+            f'<figure class="ill"><img src="{html.escape(src)}" '
+            f'alt="{html.escape(alt)}" loading="lazy"></figure>'
+        )
 
 nav_html = "".join(
     f'<a href="#{cid}">{html.escape(label)}</a>' for cid, label in nav
@@ -198,6 +209,18 @@ DOC = f"""<!DOCTYPE html>
   }}
   .book strong {{ color:var(--accent); font-weight:700; }}
   .book em {{ font-style:normal; border-bottom:1px dotted var(--dim); }}
+  .book figure.ill {{
+    margin:2.4em -2vw; text-align:center;
+  }}
+  .book figure.ill img {{
+    display:block; max-width:100%; height:auto; margin:0 auto;
+    border-radius:6px;
+    box-shadow:0 6px 32px rgba(0,0,0,.55),
+               0 0 16px rgba(111,208,200,.08);
+  }}
+  html.paper .book figure.ill img {{
+    box-shadow:0 4px 20px rgba(80,60,40,.25);
+  }}
 
   /* 縦書き用の縦中横ラッパは横書きでは無効化（素のテキスト表示） */
   .tcy, .upr {{ all:unset; }}
@@ -288,7 +311,7 @@ DOC = f"""<!DOCTYPE html>
   <div class="bar">
     <span class="nm">{html.escape(title)}</span>
     <nav>{nav_html}</nav>
-    <a class="xlink" href="monolith.html" title="別冊『月面のモノリス』へ">▷ 別冊</a>
+    <a class="xlink" href="blackhexa.html" title="別冊『月面の黒筐』へ">▷ 別冊</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
     <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
     <button id="themeBtn" title="配色切替">夜 / 紙</button>
@@ -298,9 +321,9 @@ DOC = f"""<!DOCTYPE html>
       {''.join(body)}
       <aside class="next-read">
         <div class="nr-label">▷ 次に読む（別冊）</div>
-        <a class="nr-card" href="monolith.html">
-          <h3>月面のモノリス ── 分岐譚</h3>
-          <p>本編の前史にあたる外伝。月面で「触れる／触れない」を選ぶと、物語は二つに裂け、二度と交わらない。ルートAの〈退ける手つき〉が、本編のミラたちの背中に書き写されていく前史として接続する。</p>
+        <a class="nr-card" href="blackhexa.html">
+          <h3>月面の黒筐 ── 分岐譚</h3>
+          <p>本編の前史にあたる外伝。月面に立つ六角柱の黒い鏡面体〈黒筐（こっきょう）〉に「触れる／触れない」を選ぶと、物語は二つに裂け、二度と交わらない。ルートAの〈退ける手つき〉が、本編のミラたちの背中に書き写されていく前史として接続する。</p>
         </a>
         <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
       </aside>
