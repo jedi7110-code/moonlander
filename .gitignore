@@ -3,7 +3,3 @@
 .vscode/
 .claude/settings.local.json
 .claude/launch.json.local
-
-# 公開しない原案（GPT草案ほか編集者向け素材）
-story/game-script.*
-
