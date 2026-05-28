@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""blackhexa.md（月面の黒筐 ── 分岐譚）を「選択できる縦書きHTML」へ変換する。
+"""blackhexa.md（FALL-LANDING ── フォールランディング）を「選択できる縦書きHTML」へ変換する。
 
 マーカー:
   @@CHOICE            … ここに分岐選択画面を置く（直前までが共通の序章）
@@ -85,7 +85,7 @@ for raw in raw_lines:
         continue
     seg[cur].append(raw)
 
-title = "月面の黒筐"
+title = "FALL-LANDING"
 head_blocks = parse_blocks(seg["head"])
 A_blocks = parse_blocks(seg["A"])
 B_blocks = parse_blocks(seg["B"])
@@ -109,7 +109,21 @@ def render(blocks, hids=None):
     out = []
     for typ, pay in blocks:
         if typ == "h1":
-            out.append(f'<h1 class="title">{inline(pay)}</h1>')
+            # 「英語 ── 日本語」を分割して2段表示
+            if "──" in pay:
+                en_part, jp_part = [p.strip() for p in pay.split("──", 1)]
+                out.append(
+                    '<div class="series">THE FALL</div>'
+                    '<h1 class="title">'
+                    f'<span class="ttl-en">{inline(en_part)}</span>'
+                    f'<span class="ttl-jp">{inline(jp_part)}</span>'
+                    '</h1>'
+                )
+            else:
+                out.append(
+                    '<div class="series">THE FALL</div>'
+                    f'<h1 class="title">{inline(pay)}</h1>'
+                )
         elif typ == "h2":
             hid = f"h{len(hids)}" if hids is not None else ""
             if hids is not None:
@@ -152,9 +166,26 @@ DOC = f"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} ── 分岐譚</title>
 <style>
+  /* ────────── Melete font family（THE FALL display 用） ────────── */
+  @font-face {{font-family:"Melete";font-weight:200;font-style:normal;
+    src:url("font/Melete-UltraLight.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:300;font-style:normal;
+    src:url("font/Melete-Light.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:400;font-style:normal;
+    src:url("font/Melete-Regular.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:500;font-style:normal;
+    src:url("font/Melete-Medium.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:700;font-style:normal;
+    src:url("font/Melete-Bold.otf") format("opentype");
+    font-display:swap}}
+
   :root {{
     --bg:#0d0f14; --bg2:#11141b; --ink:#e7e3d6; --dim:#8b93a3;
-    --accent:#6fd0c8; --warn:#d8736b; --rule:#2a2f3a; --quote:#1a1e27;
+    --accent:#E85A26; --warn:#d8736b; --rule:#2a2f3a; --quote:#1a1e27;
   }}
   html.paper {{
     --bg:#efe7d6; --bg2:#f5efe1; --ink:#2a2620; --dim:#7a7060;
@@ -198,8 +229,24 @@ DOC = f"""<!DOCTYPE html>
     text-align:justify;
   }}
   @media (max-width:640px){{.book{{font-size:16px;padding:4vh 7vw 14vh}}}}
-  .book .title{{font-size:30px;font-weight:700;letter-spacing:.12em;
-    margin:.4em 0 1.6em;line-height:1.5;text-align:center}}
+  .book .series{{color:var(--accent);font-size:12px;letter-spacing:.5em;
+    text-align:center;margin:1.4em 0 .4em;text-indent:.5em;
+    font-family:"Melete",system-ui,-apple-system,sans-serif;
+    font-weight:500}}
+  .book .title{{margin:.2em 0 1.8em;text-align:center;line-height:1.2}}
+  .book .title .ttl-en{{display:block;font-size:44px;font-weight:700;
+    letter-spacing:.16em;color:var(--ink);
+    font-family:"Melete","Bahnschrift","Eurostile",
+                "Helvetica Neue",system-ui,sans-serif}}
+  .book .title .ttl-jp{{display:block;font-size:17px;font-weight:400;
+    letter-spacing:.36em;color:var(--dim);
+    margin-top:1em;text-indent:.36em;
+    font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho",
+                "Noto Serif JP",serif}}
+  @media (max-width:640px){{
+    .book .title .ttl-en{{font-size:34px;letter-spacing:.12em}}
+    .book .title .ttl-jp{{font-size:14px;letter-spacing:.28em}}
+  }}
   .book h2{{font-size:22px;font-weight:700;letter-spacing:.05em;
     margin:2.8em 0 1.2em;padding:.15em 0 .15em .7em;color:var(--ink);
     border-left:3px solid var(--accent)}}
@@ -316,7 +363,7 @@ DOC = f"""<!DOCTYPE html>
     <nav id="nav"></nav>
     <button id="rebtn" class="hide">分岐をやり直す</button>
     <button id="othbtn" class="hide">もう一方を読む</button>
-    <a class="xlink" href="saga.html" title="本編『水惑星ターラ』へ">▷ 本編</a>
+    <a class="xlink" href="saga.html" title="本編『FALL-LINE』へ">▷ 本編</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
     <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
     <button id="thbtn">夜 / 紙</button>
@@ -353,7 +400,7 @@ DOC = f"""<!DOCTYPE html>
       <aside class="next-read">
         <div class="nr-label">▷ この〈手〉が千年後どう書き写されたか</div>
         <a class="nr-card" href="saga.html">
-          <h3>水惑星ターラ ── 電脳の継承（本編）</h3>
+          <h3>FALL-LINE ── フォールライン（本編）</h3>
           <p>先行者の〈退ける手つき〉が、雨の都市の潜行者ミラ、淀みの層に留まったライラ、そして千年後の子孫カイへと、名を変えながら書き写されていく。本編サーガへ。</p>
         </a>
         <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>

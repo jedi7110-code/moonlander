@@ -3,80 +3,281 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>水惑星ターラ ── 電脳の継承｜入口</title>
+<title>THE FALL ｜入口</title>
 <style>
+  /* ────────── Melete font family（THE FALL display 用） ────────── */
+  @font-face{font-family:"Melete";font-weight:200;font-style:normal;
+    src:url("font/Melete-UltraLight.otf") format("opentype");
+    font-display:swap}
+  @font-face{font-family:"Melete";font-weight:300;font-style:normal;
+    src:url("font/Melete-Light.otf") format("opentype");
+    font-display:swap}
+  @font-face{font-family:"Melete";font-weight:400;font-style:normal;
+    src:url("font/Melete-Regular.otf") format("opentype");
+    font-display:swap}
+  @font-face{font-family:"Melete";font-weight:500;font-style:normal;
+    src:url("font/Melete-Medium.otf") format("opentype");
+    font-display:swap}
+  @font-face{font-family:"Melete";font-weight:700;font-style:normal;
+    src:url("font/Melete-Bold.otf") format("opentype");
+    font-display:swap}
+
   :root{
-    --bg:#0d0f14; --bg2:#11141b; --ink:#e7e3d6; --dim:#8b93a3;
-    --accent:#6fd0c8; --warn:#d8736b; --rule:#2a2f3a; --quote:#1a1e27;
+    --bg:#0a0c10; --bg2:#11141a; --ink:#e7e3d6; --dim:#8b93a3;
+    --orange:#E85A26; --orange-dim:#a8421c;
+    --steel:#2A3239; --steel-deep:#1a1f25;
+    --rule:#2a2f3a;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);
     font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho",
                 "Noto Serif JP","Shippori Mincho",serif;
-    -webkit-font-smoothing:antialiased}
-  main{max-width:44rem;margin:0 auto;padding:8vh 6vw 14vh}
-  h1{font-size:30px;letter-spacing:.12em;margin:0 0 .25em;font-weight:700}
-  .sub{color:var(--dim);font-size:13px;letter-spacing:.16em;
-    margin:0 0 2.6em}
-  .lede{line-height:1.95;margin:0 0 1em;color:var(--ink)}
-  .order{color:var(--accent);font-size:12px;letter-spacing:.16em;
-    margin:2.8em 0 1em;text-align:center;
-    font-family:system-ui,-apple-system,sans-serif}
-  a.card{display:block;text-decoration:none;color:inherit;
-    border:1px solid var(--rule);border-radius:12px;
-    padding:22px 22px;margin:0 0 16px;transition:.18s;
-    background:var(--bg2)}
-  a.card:hover{transform:translateY(-2px);border-color:var(--accent)}
-  a.card.side:hover{border-color:#a99fe0}
-  .role{display:inline-block;font-size:11px;letter-spacing:.18em;
-    color:var(--accent);border:1px solid var(--accent);
-    padding:1px 9px;border-radius:99px;margin-bottom:.7em;
-    font-family:system-ui,-apple-system,sans-serif}
-  a.card.side .role{color:#a99fe0;border-color:#a99fe0}
-  a.card h2{margin:0 0 .4em;font-size:19px;letter-spacing:.06em}
-  a.card p{margin:0;color:var(--dim);font-size:14px;line-height:1.85}
-  .meta{margin-top:3em;color:var(--dim);font-size:12px;line-height:1.85;
-    border-top:1px solid var(--rule);padding-top:1.4em}
-  .meta b{color:var(--ink);font-weight:600}
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;
+    min-height:100%}
+  body{min-height:100vh}
+
+  /* ────────── DNA helix background（Three.js／斜め貫通） ────────── */
+  #helix-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;
+    width:100vw;height:100vh;display:block}
+
+  /* ────────── Page ────────── */
+  main{max-width:58rem;margin:0 auto;padding:5vh 5vw 14vh;
+    position:relative;z-index:1}
+
+  /* ────────── THE FALL logo（Illustrator SVG） ────────── */
+  .hero-logo{display:block;width:100%;max-width:860px;
+    margin:1em auto 2.4em}
+  .hero-logo img{display:block;width:100%;height:auto}
+
+  .tagline{color:var(--orange);font-size:12px;letter-spacing:.5em;
+    margin:0 auto 3em;text-align:center;text-indent:.5em;
+    font-family:"Melete","Helvetica Neue",system-ui,sans-serif;
+    text-transform:uppercase;font-weight:500}
+
+  .lede{line-height:2.05;margin:0 auto 3em;max-width:40rem;
+    color:var(--ink);font-size:15px;text-align:justify}
+  .lede p{margin:0 0 1.4em}
+  .lede p:last-child{margin:0}
+  .lede p.tail{margin-top:2em;text-align:center;color:var(--orange);
+    font-size:13px;letter-spacing:.18em;text-indent:.18em;
+    font-family:"Melete",system-ui,sans-serif;font-weight:500}
+  .lede strong{color:var(--orange);font-weight:600;letter-spacing:.04em}
+  .lede em{font-style:normal;border-bottom:1px dotted var(--dim)}
+
+
+  /* ────────── Cards: echo logo geometry ────────── */
+  a.card{display:grid;grid-template-columns:10px 1fr;
+    text-decoration:none;color:inherit;
+    border:1px solid var(--rule);
+    margin:0 0 22px;transition:transform .22s, border-color .22s,
+    background .22s;
+    background:var(--bg2);overflow:hidden;position:relative}
+  a.card .accent{background:var(--orange);height:100%;
+    transition:background .22s}
+  a.card.side .accent{background:var(--steel)}
+  a.card .body{padding:24px 28px 26px}
+  a.card:hover{transform:translateY(-2px);
+    border-color:var(--orange);background:var(--steel-deep)}
+  a.card.side:hover{border-color:var(--dim)}
+  a.card.side:hover .accent{background:var(--ink)}
+  .role{display:inline-block;font-size:10px;letter-spacing:.28em;
+    color:var(--orange);border:1px solid var(--orange);
+    padding:2px 10px;margin-bottom:.9em;
+    font-family:"Melete",system-ui,-apple-system,sans-serif;
+    font-weight:500;
+    text-transform:uppercase;text-indent:.28em}
+  a.card.side .role{color:var(--dim);border-color:var(--rule)}
+  a.card h2{margin:0 0 .15em;font-size:26px;letter-spacing:.14em;
+    font-family:"Melete","Bahnschrift","Eurostile","Helvetica Neue",
+                system-ui,-apple-system,sans-serif;
+    font-weight:700;color:var(--ink)}
+  a.card .ttl-jp{display:block;font-size:12px;color:var(--dim);
+    letter-spacing:.36em;margin:.2em 0 1em;font-weight:400;
+    font-family:"Helvetica Neue",system-ui,sans-serif}
+  a.card p{margin:0;color:#c8c5b9;font-size:14px;line-height:1.95}
+
+  /* footer accent */
+  .footer-mark{margin:3em auto 0;text-align:center;
+    font-family:"Melete",system-ui,-apple-system,sans-serif;
+    font-weight:400;
+    color:#a89c8a;font-size:11px;letter-spacing:.5em;text-indent:.5em}
 </style>
 </head>
 <body>
+
+<!-- ────────── DNA helix background（Three.js／斜めに画面を貫通） ────────── -->
+<canvas id="helix-canvas" aria-hidden="true"></canvas>
+
 <main>
-  <h1>水惑星ターラ ── 電脳の継承</h1>
-  <div class="sub">SF サーガ ／ 本編＋別冊（分岐譚）</div>
 
-  <p class="lede">
-    仮想空間で生計を立てる潜行者、千年を隔てて受け継がれる〈手の形〉、
-    そして月面で交わされた、ひとつの選択。本編と別冊の二作からなる
-    ハードSF＋サイバーパンクの物語です。
-  </p>
+  <!-- ────────── THE FALL ロゴ（Illustrator製SVG） ────────── -->
+  <div class="hero-logo">
+    <img src="img/title.svg"
+         alt="THE FALL ── FALL-LINE × FALL-LANDING">
+  </div>
 
-  <div class="order">▼ 読む順番 ▼</div>
+  <div class="tagline">A Saga of Descents</div>
+
+  <div class="lede">
+    <p>雨は四十年、やんでいなかった──。</p>
+
+    <p>仮想空間の潜行者ミラ・ハーロウは、失踪した少女を追って、
+    地図にない惑星〈ターラ〉に降りる。出口を断たれた水の世界で
+    彼女が知ったのは、世界そのものが誰かに書き続けられている
+    〈原稿〉だという事実、そして、掌をかざすだけで世界の動きを
+    退けてしまう、自分自身の手の形だった。</p>
+
+    <p>神とされることを拒んだその〈手の形〉は、千年を隔ててなお、
+    別の手へと書き写されていく。本編『<strong>FALL-LINE</strong>』。
+    月面に立つ六角柱の黒い鏡面体〈黒筐〉に触れるか触れないか──
+    そのひとつの選択から始まる前史『<strong>FALL-LANDING</strong>』。</p>
+
+    <p class="tail">― 〈潜降〉と〈継承〉、千年の途切れぬ連鎖 ―</p>
+  </div>
 
   <a class="card main" href="saga.html">
-    <span class="role">① まずはこちら ── 本編</span>
-    <h2>水惑星ターラ ── 電脳の継承</h2>
-    <p>雨の都市の潜行者ミラ・ハーロウから、千年後の子孫カイへ。
-    全六章＋エピローグの長編サーガ。物語の中心となる一作。</p>
+    <div class="accent"></div>
+    <div class="body">
+      <span class="role">① 本編</span>
+      <h2>FALL-LINE
+        <span class="ttl-jp">フォールライン</span>
+      </h2>
+      <p>雨の都市の潜行者ミラ・ハーロウから、千年後の子孫カイへ。
+      全六章＋エピローグの長編サーガ。物語の中心となる一作。</p>
+    </div>
   </a>
 
   <a class="card side" href="blackhexa.html">
-    <span class="role">② そのあとに ── 別冊（分岐小説）</span>
-    <h2>月面の黒筐 ── 分岐譚</h2>
-    <p>本編の前史にあたる外伝。月面に立つ六角柱の黒い鏡面体〈黒筐
-    （こっきょう）〉に「触れる／触れない」を選ぶと、物語が二つに裂け、
-    二度と交わらない。読者がルートA・Bを選んで最後まで歩く、分岐型の
-    中編。</p>
+    <div class="accent"></div>
+    <div class="body">
+      <span class="role">② 別冊（分岐小説）</span>
+      <h2>FALL-LANDING
+        <span class="ttl-jp">フォールランディング</span>
+      </h2>
+      <p>本編の前史にあたる外伝。月面に立つ六角柱の黒い鏡面体〈黒筐
+      （こっきょう）〉に「触れる／触れない」を選ぶと、物語が二つに
+      裂け、二度と交わらない。読者がルートA・Bを選んで最後まで歩く、
+      分岐型の中編。</p>
+    </div>
   </a>
 
-  <div class="meta">
-    <p><b>接続関係</b>　別冊のルートA（触れた）は、本編の〈退ける手つき〉
-    の最初のひとつ＝前史として接続します。ルートB（触れず）は本編と
-    交わらない袋小路です。先に本編を読み終えてから別冊へ進むと、
-    両作の重なりが立ち上がります。</p>
-    <p><b>キーワード</b>　仮想空間ダイブ／水惑星ターラ／PAX／反融合思想主義者／
-    神とされることへの拒絶／三世代の継承</p>
-  </div>
+  <div class="footer-mark">▷ THE FALL ◁</div>
+
 </main>
+
+<!-- ────────── Three.js: DNA double helix（斜めに画面を貫通／無限回転） ────────── -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(function(){
+  const canvas = document.getElementById('helix-canvas');
+  if (!canvas || typeof THREE === 'undefined') return;
+
+  // ─── Scene / Camera / Renderer ───
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(
+    44, window.innerWidth / window.innerHeight, 0.1, 200
+  );
+  camera.position.set(0, 0, 14);
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas, alpha: true, antialias: true,
+    powerPreference: 'high-performance'
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.setClearColor(0x000000, 0);
+
+  // ─── Helix geometry parameters ───
+  const HEIGHT  = 80;     // 螺旋の全長（画面外まで突き抜ける）
+  const RADIUS  = 1.6;    // 螺旋の半径
+  const TURNS   = 12;     // 巻き数
+  const SEGS    = 600;    // 鎖の頂点数
+  const TUBE_R  = 0.030;  // チューブの太さ（細めに）
+
+  // ─── Build a single strand as a tube along a helical curve ───
+  function buildStrand(phaseOffset, color, opacity) {
+    const points = [];
+    for (let i = 0; i <= SEGS; i++) {
+      const t = i / SEGS;
+      const angle = t * Math.PI * 2 * TURNS + phaseOffset;
+      const y = (t - 0.5) * HEIGHT;
+      const x = Math.cos(angle) * RADIUS;
+      const z = Math.sin(angle) * RADIUS;
+      points.push(new THREE.Vector3(x, y, z));
+    }
+    const curve = new THREE.CatmullRomCurve3(points);
+    const geom  = new THREE.TubeGeometry(curve, SEGS, TUBE_R, 8, false);
+    const mat   = new THREE.MeshBasicMaterial({
+      color: color, transparent: true, opacity: opacity
+    });
+    return new THREE.Mesh(geom, mat);
+  }
+
+  // ─── Build crossbar rungs（DNAのラング） ───
+  function buildRungs(count, opacity) {
+    const positions = [];
+    for (let i = 0; i < count; i++) {
+      const t = i / (count - 1);
+      const angle = t * Math.PI * 2 * TURNS;
+      const y = (t - 0.5) * HEIGHT;
+      positions.push(
+        Math.cos(angle) * RADIUS, y, Math.sin(angle) * RADIUS,
+        Math.cos(angle + Math.PI) * RADIUS, y, Math.sin(angle + Math.PI) * RADIUS
+      );
+    }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position',
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: opacity
+    });
+    return new THREE.LineSegments(geom, mat);
+  }
+
+  // ─── Compose ───
+  const helix = new THREE.Group();
+  helix.add(buildStrand(0,         0x3a1810, 0.35)); // orange strand（極暗赤）
+  helix.add(buildStrand(Math.PI,   0x2a3038, 0.35)); // steel strand（極暗グレー）
+  helix.add(buildRungs(60,         0.04));            // crossbars（ほぼ見えない）
+
+  // 斜めに画面を貫通：z軸まわりに約35度、x軸まわりに少し起こす
+  helix.rotation.z = Math.PI / 5;    // 36°
+  helix.rotation.x = -0.18;
+  scene.add(helix);
+
+  // ─── Animation loop ───
+  let lastFrame = performance.now();
+  let paused = false;
+
+  function animate(now) {
+    if (paused) { lastFrame = now; requestAnimationFrame(animate); return; }
+    const dt = Math.min((now - lastFrame) / 1000, 0.1);
+    lastFrame = now;
+
+    // 螺旋軸（ローカルY）周りに回転＝DNAらしいぐるぐる
+    helix.rotation.y += dt * 0.35;
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  // ─── Resize handler ───
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+  window.addEventListener('resize', resize);
+
+  // ─── Battery saving: pause when tab not visible ───
+  document.addEventListener('visibilitychange', function() {
+    paused = document.hidden;
+  });
+})();
+</script>
+
 </body>
 </html>

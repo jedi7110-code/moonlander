@@ -79,11 +79,26 @@ def inline(t: str) -> str:
     return t
 
 # ---- HTML 生成 ----
-body, nav, title, chap_i = [], [], "水惑星ターラ", 0
+body, nav, title, chap_i = [], [], "FALL-LINE", 0
 for typ, pay in blocks:
     if typ == "h1":
-        title = pay
-        body.append(f'<h1 class="title">{inline(pay)}</h1>')
+        # 「英語 ── 日本語」を分割して2段表示にする
+        if "──" in pay:
+            en_part, jp_part = [p.strip() for p in pay.split("──", 1)]
+            title = en_part  # <title>タグやナビバーには英語部のみ使用
+            body.append(
+                '<div class="series">THE FALL</div>'
+                '<h1 class="title">'
+                f'<span class="ttl-en">{inline(en_part)}</span>'
+                f'<span class="ttl-jp">{inline(jp_part)}</span>'
+                '</h1>'
+            )
+        else:
+            title = pay
+            body.append(
+                '<div class="series">THE FALL</div>'
+                f'<h1 class="title">{inline(pay)}</h1>'
+            )
     elif typ == "h2":
         chap_i += 1
         cid = f"c{chap_i}"
@@ -119,9 +134,26 @@ DOC = f"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} ── 長編小説版</title>
 <style>
+  /* ────────── Melete font family（THE FALL display 用） ────────── */
+  @font-face {{font-family:"Melete";font-weight:200;font-style:normal;
+    src:url("font/Melete-UltraLight.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:300;font-style:normal;
+    src:url("font/Melete-Light.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:400;font-style:normal;
+    src:url("font/Melete-Regular.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:500;font-style:normal;
+    src:url("font/Melete-Medium.otf") format("opentype");
+    font-display:swap}}
+  @font-face {{font-family:"Melete";font-weight:700;font-style:normal;
+    src:url("font/Melete-Bold.otf") format("opentype");
+    font-display:swap}}
+
   :root {{
     --bg:#0d0f14; --bg2:#11141b; --ink:#e7e3d6; --dim:#8b93a3;
-    --accent:#6fd0c8; --rule:#2a2f3a; --quote:#1a1e27;
+    --accent:#E85A26; --rule:#2a2f3a; --quote:#1a1e27;
   }}
   html.paper {{
     --bg:#efe7d6; --bg2:#f5efe1; --ink:#2a2620; --dim:#7a7060;
@@ -176,9 +208,31 @@ DOC = f"""<!DOCTYPE html>
   @media (max-width:640px){{
     .book{{ font-size:16px; padding:4vh 7vw 14vh; }}
   }}
+  .book .series {{
+    color:var(--accent); font-size:12px; letter-spacing:.5em;
+    text-align:center; margin:1.4em 0 .4em; text-indent:.5em;
+    font-family:"Melete",system-ui,-apple-system,sans-serif;
+    font-weight:500;
+  }}
   .book .title {{
-    font-size:30px; font-weight:700; letter-spacing:.12em;
-    margin:.4em 0 1.6em; line-height:1.5; text-align:center;
+    margin:.2em 0 1.8em; text-align:center; line-height:1.2;
+  }}
+  .book .title .ttl-en {{
+    display:block; font-size:44px; font-weight:700;
+    letter-spacing:.16em; color:var(--ink);
+    font-family:"Melete","Bahnschrift","Eurostile",
+                "Helvetica Neue",system-ui,sans-serif;
+  }}
+  .book .title .ttl-jp {{
+    display:block; font-size:17px; font-weight:400;
+    letter-spacing:.36em; color:var(--dim);
+    margin-top:1em; text-indent:.36em;
+    font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho",
+                "Noto Serif JP",serif;
+  }}
+  @media (max-width:640px){{
+    .book .title .ttl-en {{ font-size:34px; letter-spacing:.12em; }}
+    .book .title .ttl-jp {{ font-size:14px; letter-spacing:.28em; }}
   }}
   .book h2 {{
     font-size:22px; font-weight:700; letter-spacing:.05em;
@@ -311,7 +365,7 @@ DOC = f"""<!DOCTYPE html>
   <div class="bar">
     <span class="nm">{html.escape(title)}</span>
     <nav>{nav_html}</nav>
-    <a class="xlink" href="blackhexa.html" title="別冊『月面の黒筐』へ">▷ 別冊</a>
+    <a class="xlink" href="blackhexa.html" title="別冊『FALL-LANDING』へ">▷ 別冊</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
     <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
     <button id="themeBtn" title="配色切替">夜 / 紙</button>
@@ -322,7 +376,7 @@ DOC = f"""<!DOCTYPE html>
       <aside class="next-read">
         <div class="nr-label">▷ 次に読む（別冊）</div>
         <a class="nr-card" href="blackhexa.html">
-          <h3>月面の黒筐 ── 分岐譚</h3>
+          <h3>FALL-LANDING ── フォールランディング</h3>
           <p>本編の前史にあたる外伝。月面に立つ六角柱の黒い鏡面体〈黒筐（こっきょう）〉に「触れる／触れない」を選ぶと、物語は二つに裂け、二度と交わらない。ルートAの〈退ける手つき〉が、本編のミラたちの背中に書き写されていく前史として接続する。</p>
         </a>
         <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
