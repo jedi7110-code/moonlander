@@ -35,6 +35,36 @@ if (scene.cockpitMode) {
     return;
 }
 
+// 〈黒筐〉の偏光膜（うねるサイン波）を毎フレーム再描画
+if (scene.monoHighlights && scene.monoHighlights.length) {
+    const t = time / 1000;  // 秒
+    const SEG = 18;          // 縦方向の分割数
+    scene.monoHighlights.forEach(m => {
+        const g = m.gfx;
+        g.clear();
+        const h = m.bottomY - m.topY;
+        // 3 層の偏光膜を位相をずらして重ねる
+        for (let layer = 0; layer < 3; layer++) {
+            const phase = layer * (Math.PI * 2 / 3);
+            const amp = (m.halfW * 0.75) * (1 - layer * 0.18);
+            const alpha = 0.55 - layer * 0.13;
+            const color = [0x4a5868, 0x2a3848, 0x1a2532][layer];
+            g.lineStyle(0.8, color, alpha);
+            g.beginPath();
+            for (let i = 0; i <= SEG; i++) {
+                const ny = i / SEG;
+                const y = m.topY + h * ny;
+                // 縦方向の周波数を変えて、複数層が DNA らしくうねる
+                const wave = Math.sin(t * 1.4 + ny * 6 + phase) * amp;
+                const x = m.cx + wave;
+                if (i === 0) g.moveTo(x, y);
+                else g.lineTo(x, y);
+            }
+            g.strokePath();
+        }
+    });
+}
+
 // 手動降下：下キーで一段ずつ降りる、上キーで一段戻る。
 // 各ステップ位置はハシゴの段に正確に対応（足が rung に乗る）。
 // 影は step index の進捗に応じて 0→1 に変化
@@ -2178,45 +2208,61 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
                         const camHalfW = scene.scale.width / 2.75 / 2;
                         scene.astronautMinX = (bgCenterX - bgTex.width / 2) + camHalfW;
                         scene.astronautMaxX = (bgCenterX + bgTex.width / 2) - camHalfW;
-                        // 仮：移動限界の外側に2001モノリス（立体感あり）
+                        // 移動限界の外側に〈黒筐〉── 六角柱の黒い鏡面体（pointy-top・3面ファセット）
+                        // ボディは静的、内部の偏光膜（うねるサイン波）は update ループで毎フレーム再描画
                         const monoY = scene.astronautGroundY + scene.astronaut.displayHeight / 2;
-                        const monoW = 20;
+                        const monoW = 24;         // 全幅（左右の頂点間）
                         const monoH = 140;
-                        const depthX = 6;
-                        const depthY = -4;
+                        const sideW = 5;          // 側面（パース上の見かけ幅）
+                        const topD = 5;           // 上面の奥行き（楕円の縦半径）
                         const gap = monoW / 2 + scene.astronaut.displayWidth / 2;
+                        scene.monoHighlights = [];  // 偏光膜アニメ用 graphics 配列
                         [
-                            { x: scene.astronautMinX - gap, innerDir: 1 },
-                            { x: scene.astronautMaxX + gap, innerDir: -1 }
+                            { x: scene.astronautMinX - gap },
+                            { x: scene.astronautMaxX + gap }
                         ].forEach(p => {
                             const g = scene.add.graphics();
                             g.setDepth(7);
                             const topY = monoY - monoH;
-                            const innerX = p.x + p.innerDir * monoW / 2;
-                            // 側面（プレイヤー側に見える面・わずかに明るく）
-                            g.fillStyle(0x2a2a2a);
+                            const cx = p.x;
+                            const innerLeft = cx - monoW / 2 + sideW;
+                            const innerRight = cx + monoW / 2 - sideW;
+
+                            // 左側面（鏡の暗い面・側方ファセット）
+                            g.fillStyle(0x0c0e12);
+                            g.fillRect(cx - monoW / 2, topY, sideW, monoH);
+
+                            // 中央正面（鏡の主面・偏光膜が透ける）
+                            g.fillStyle(0x161a20);
+                            g.fillRect(innerLeft, topY,
+                                       monoW - sideW * 2, monoH);
+
+                            // 右側面（鏡の暗い面）
+                            g.fillStyle(0x0c0e12);
+                            g.fillRect(innerRight, topY, sideW, monoH);
+
+                            // 上面（六角形を斜めから見たもの・パースで潰した hex）
+                            g.fillStyle(0x252b35);
                             g.beginPath();
-                            g.moveTo(innerX, topY);
-                            g.lineTo(innerX + p.innerDir * depthX, topY + depthY);
-                            g.lineTo(innerX + p.innerDir * depthX, monoY + depthY);
-                            g.lineTo(innerX, monoY);
+                            g.moveTo(cx - monoW / 2, topY);                  // 左頂点
+                            g.lineTo(innerLeft, topY - topD);                // 左奥
+                            g.lineTo(innerRight, topY - topD);               // 右奥
+                            g.lineTo(cx + monoW / 2, topY);                  // 右頂点
+                            g.lineTo(innerRight, topY + topD * 0.5);         // 右手前
+                            g.lineTo(innerLeft, topY + topD * 0.5);          // 左手前
                             g.closePath();
                             g.fillPath();
-                            // 上面（蓋）：光が当たるので側面より明るめ
-                            g.fillStyle(0x3a3a3a);
-                            g.beginPath();
-                            g.moveTo(p.x - monoW / 2, topY);
-                            g.lineTo(p.x + monoW / 2, topY);
-                            g.lineTo(p.x + monoW / 2 + p.innerDir * depthX, topY + depthY);
-                            g.lineTo(p.x - monoW / 2 + p.innerDir * depthX, topY + depthY);
-                            g.closePath();
-                            g.fillPath();
-                            // 前面
-                            g.fillStyle(0x000000);
-                            g.fillRect(p.x - monoW / 2, topY, monoW, monoH);
-                            // アウトライン
-                            g.lineStyle(1, 0x111111);
-                            g.strokeRect(p.x - monoW / 2, topY, monoW, monoH);
+
+                            // うねる偏光膜：別 graphics、update ループで毎フレーム再描画
+                            const hg = scene.add.graphics();
+                            hg.setDepth(8);
+                            scene.monoHighlights.push({
+                                gfx: hg,
+                                cx: cx,
+                                topY: topY + topD + 2,
+                                bottomY: monoY - 2,
+                                halfW: (monoW - sideW * 2) / 2 - 1
+                            });
                         });
                         scene.astronautVY = 0; // 縦方向の速度
                         scene.astronautFacing = null; // 向き（左右移動後に確定、未確定時は発射不可）
