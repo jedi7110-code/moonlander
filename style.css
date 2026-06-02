@@ -308,6 +308,33 @@ body.no-crt .crt-overlay {
     73% { opacity: 0.85; }
     74% { opacity: 1; }
 }
+/* コックピット背景の STANDBY ボタンに重ねるクリック領域。
+   座標は opening-title.webp 内の STANDBY ボタン位置（#loading-screen 1200x800 基準の%）。
+   通常は透明・クリック不可。タイトル画面（.title）でのみ有効化する。 */
+.standby-link {
+    position: absolute;
+    left: 79.3%;
+    top: 19.8%;
+    width: 11.4%;
+    height: 5.4%;
+    z-index: 3;
+    pointer-events: none;
+    cursor: pointer;
+    border-radius: 4px;
+    text-decoration: none;
+    /* 既存の STANDBY 画像をそのまま見せるので通常は不可視 */
+    background: transparent;
+    transition: box-shadow 0.15s ease-out, background 0.15s ease-out;
+}
+#loading-screen.title .standby-link { pointer-events: auto; }
+/* ホバー／フォーカスでうっすら赤く発光させ、押せることを示す */
+#loading-screen.title .standby-link:hover,
+#loading-screen.title .standby-link:focus-visible {
+    background: rgba(255, 50, 50, 0.18);
+    box-shadow:
+        inset 0 0 8px 1px rgba(255, 70, 70, 0.55),
+        0 0 10px rgba(255, 80, 80, 0.45);
+}
 @keyframes title-press-blink {
     0%, 49% { opacity: 1; }
     50%, 99% { opacity: 0; }
