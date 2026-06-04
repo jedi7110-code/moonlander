@@ -360,6 +360,16 @@
                 };
                 loadingScreen.addEventListener('click', onTitleTap);
                 loadingScreen.addEventListener('touchend', onTitleTap, { passive: false });
+
+                // STANDBY ボタン（別タブで story を開く）はタイトル遷移を発火させない。
+                // anchor の既定動作（target="_blank" で別タブ）はそのまま通し、
+                // loadingScreen への伝播だけ止めて onTitleTap を抑止する。
+                const standbyLink = loadingScreen.querySelector('.standby-link');
+                if (standbyLink) {
+                    const stopTitleAdvance = (e) => { e.stopPropagation(); };
+                    standbyLink.addEventListener('click', stopTitleAdvance);
+                    standbyLink.addEventListener('touchend', stopTitleAdvance, { passive: true });
+                }
             }
             // デバッグ：?cockpit 付きで起動した場合、title/briefing をスキップして即ゲーム開始
             try {
