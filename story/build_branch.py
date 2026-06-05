@@ -101,7 +101,13 @@ def inline(t):
         w = m.group(0)
         return f'<span class="{"tcy" if len(w) <= 4 else "upr"}">{w}</span>'
 
-    return re.sub(r"[0-9A-Za-z]+", tcy, t)
+    # HTMLタグ内の strong/em などを巻き込まないよう、タグとテキストを
+    # 分離してテキスト部分にだけ縦中横/正立を適用
+    parts = re.split(r"(<[^>]+>)", t)
+    for i, part in enumerate(parts):
+        if not part.startswith("<"):
+            parts[i] = re.sub(r"[0-9A-Za-z]+", tcy, part)
+    return "".join(parts)
 
 
 def render(blocks, hids=None):

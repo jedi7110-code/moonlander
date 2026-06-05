@@ -75,8 +75,13 @@ def inline(t: str) -> str:
         w = m.group(0)
         cls = "tcy" if len(w) <= 4 else "upr"
         return f'<span class="{cls}">{w}</span>'
-    t = re.sub(r"[0-9A-Za-z]+", tcy, t)
-    return t
+    # HTMLタグ内の strong/em などを巻き込まないよう、タグとテキストを
+    # 分離してテキスト部分にだけ適用する
+    parts = re.split(r"(<[^>]+>)", t)
+    for i, part in enumerate(parts):
+        if not part.startswith("<"):
+            parts[i] = re.sub(r"[0-9A-Za-z]+", tcy, part)
+    return "".join(parts)
 
 # ---- HTML 生成 ----
 body, nav, title, chap_i = [], [], "FALL-LINE", 0
