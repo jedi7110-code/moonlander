@@ -11,11 +11,29 @@
 本文を直すときは .md を編集して再実行する:
   $ python3 build_branch.py
 """
-import re, html, pathlib
+import re, html, json, pathlib
 
 SRC = pathlib.Path(__file__).with_name("blackhexa.md")
 OUT = pathlib.Path(__file__).with_name("blackhexa.html")
+GLOSS = pathlib.Path(__file__).with_name("glossary.json")
 raw_lines = SRC.read_text(encoding="utf-8").splitlines()
+
+# ---- 用語辞書（saga と共有） ----
+gloss_data = {}
+if GLOSS.exists():
+    try:
+        raw = json.loads(GLOSS.read_text(encoding="utf-8"))
+        gloss_data = {k: v for k, v in raw.items() if not k.startswith("_")}
+    except Exception as e:
+        print(f"warning: failed to parse {GLOSS}: {e}")
+
+gloss_patterns = []
+for k, v in gloss_data.items():
+    for pat in v.get("patterns", [k]):
+        gloss_patterns.append((pat, k))
+gloss_patterns.sort(key=lambda x: -len(x[0]))
+
+gloss_seen_in_chapter = set()
 
 
 def parse_blocks(lines):
@@ -110,6 +128,55 @@ def inline(t):
     return "".join(parts)
 
 
+def gloss_wrap(text_segment):
+    """text_segment（HTMLタグ非含有）内で、未リンクの用語の初出を一回だけ
+    ラップする。長いパターンから貪欲に試す。"""
+    if not gloss_patterns:
+        return text_segment
+    out, i = "", 0
+    while i < len(text_segment):
+        best = None
+        for pat, key in gloss_patterns:
+            if key in gloss_seen_in_chapter:
+                continue
+            idx = text_segment.find(pat, i)
+            if idx == -1:
+                continue
+            if (best is None) or (idx < best[0]) or \
+               (idx == best[0] and len(pat) > len(best[1])):
+                best = (idx, pat, key)
+        if best is None:
+            out += text_segment[i:]
+            break
+        start, pat, key = best
+        out += text_segment[i:start]
+        out += f'<a class="gloss" data-gloss="{html.escape(key)}">{pat}</a>'
+        gloss_seen_in_chapter.add(key)
+        i = start + len(pat)
+    return out
+
+
+def render_text(pay):
+    """inline() を適用した上で、テキスト部分にのみ用語辞書リンクを張る。"""
+    out = inline(pay)
+    if not gloss_patterns:
+        return out
+    parts = re.split(r"(<[^>]+>)", out)
+    in_link = False
+    for i, part in enumerate(parts):
+        if part.startswith("<"):
+            ps = part.lower()
+            if ps.startswith("<a"):
+                in_link = True
+            elif ps.startswith("</a"):
+                in_link = False
+            continue
+        if in_link:
+            continue
+        parts[i] = gloss_wrap(part)
+    return "".join(parts)
+
+
 def render(blocks, hids=None):
     """blocks -> html。hids には (id,label) の見出し一覧を集める。"""
     out = []
@@ -134,27 +201,31 @@ def render(blocks, hids=None):
             hid = f"h{len(hids)}" if hids is not None else ""
             if hids is not None:
                 hids.append((hid, pay))
+            # 章境界で「リンク済み」リセット → 章ごとに初出1回ずつ
+            gloss_seen_in_chapter.clear()
             out.append(f'<h2 id="{hid}">{inline(pay)}</h2>')
         elif typ == "h3":
-            out.append(f"<h3>{inline(pay)}</h3>")
+            out.append(f"<h3>{render_text(pay)}</h3>")
         elif typ == "p":
-            out.append(f"<p>{inline(pay)}</p>")
+            out.append(f"<p>{render_text(pay)}</p>")
         elif typ == "hr":
             out.append('<hr class="scene">')
         elif typ == "quote":
-            inner = "".join(f"<p>{inline(x)}</p>" for x in pay)
+            inner = "".join(f"<p>{render_text(x)}</p>" for x in pay)
             out.append(f"<blockquote>{inner}</blockquote>")
         elif typ == "ul":
-            items = "".join(f"<li>{inline(x)}</li>" for x in pay)
+            items = "".join(f"<li>{render_text(x)}</li>" for x in pay)
             out.append(f"<ul>{items}</ul>")
     return "".join(out)
 
 
+# 各区画の描画前に gloss_seen をリセット（区画＝独立した章扱い）
+def _reset(): gloss_seen_in_chapter.clear()
 hidsA, hidsB = [], []
-head_html = render(head_blocks)
-A_html = render(A_blocks, hidsA)
-B_html = render(B_blocks, hidsB)
-post_html = render(post_blocks)
+_reset(); head_html = render(head_blocks)
+_reset(); A_html = render(A_blocks, hidsA)
+_reset(); B_html = render(B_blocks, hidsB)
+_reset(); post_html = render(post_blocks)
 
 
 def navlist(hids, route):
@@ -164,6 +235,9 @@ def navlist(hids, route):
 
 
 navA, navB = navlist(hidsA, "A"), navlist(hidsB, "B")
+
+# 用語辞書 JSON（モーダル本文用）
+gloss_json = json.dumps(gloss_data, ensure_ascii=False)
 
 DOC = f"""<!DOCTYPE html>
 <html lang="ja">
@@ -253,6 +327,34 @@ DOC = f"""<!DOCTYPE html>
     .book .title .ttl-en{{font-size:34px;letter-spacing:.12em}}
     .book .title .ttl-jp{{font-size:14px;letter-spacing:.28em}}
   }}
+  /* ─── 用語辞書リンク／モーダル ─── */
+  a.gloss{{color:inherit;text-decoration:underline;text-decoration-style:dotted;
+    text-decoration-color:var(--accent);text-underline-offset:3px;
+    text-decoration-thickness:1px;cursor:pointer}}
+  a.gloss:hover{{color:var(--accent)}}
+  .gloss-modal{{position:fixed;inset:0;z-index:1000}}
+  .gloss-modal[hidden]{{display:none}}
+  .gloss-modal .gloss-overlay{{position:absolute;inset:0;
+    background:rgba(0,0,0,0.78);backdrop-filter:blur(2px)}}
+  .gloss-modal .gloss-panel{{position:absolute;left:50%;top:50%;
+    transform:translate(-50%,-50%);width:min(90vw,480px);
+    max-height:84vh;overflow-y:auto;background:var(--bg2);
+    border:1px solid var(--accent);border-radius:6px;padding:28px 26px 24px;
+    box-shadow:0 16px 64px rgba(0,0,0,.6),0 0 24px rgba(232,90,38,.15);
+    font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif}}
+  .gloss-modal .gloss-close{{position:absolute;top:8px;right:14px;
+    background:transparent;border:0;color:var(--dim);font-size:22px;
+    line-height:1;cursor:pointer;
+    font-family:system-ui,-apple-system,sans-serif}}
+  .gloss-modal .gloss-close:hover{{color:var(--ink)}}
+  .gloss-modal .gloss-image{{display:block;width:100%;height:auto;
+    margin:0 0 18px;border-radius:4px}}
+  .gloss-modal .gloss-title{{margin:0 0 14px;font-size:18px;font-weight:600;
+    letter-spacing:.1em;color:var(--accent);
+    font-family:"Melete","Helvetica Neue",system-ui,sans-serif}}
+  .gloss-modal .gloss-body{{color:var(--ink);font-size:14px;line-height:1.95}}
+  .gloss-modal .gloss-body p{{margin:0 0 .9em}}
+  .gloss-modal .gloss-body p:last-child{{margin:0}}
   .book h2{{font-size:22px;font-weight:700;letter-spacing:.05em;
     margin:2.8em 0 1.2em;padding:.15em 0 .15em .7em;color:var(--ink);
     border-left:3px solid var(--accent)}}
@@ -631,6 +733,49 @@ DOC = f"""<!DOCTYPE html>
     }});
   }});
   gotoState('head');
+</script>
+
+<!-- ────────── 用語辞書モーダル ────────── -->
+<div id="gloss-modal" class="gloss-modal" hidden aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="gloss-overlay" data-gloss-close></div>
+  <div class="gloss-panel">
+    <button class="gloss-close" type="button" aria-label="閉じる" data-gloss-close>×</button>
+    <img class="gloss-image" alt="" hidden>
+    <h3 class="gloss-title"></h3>
+    <div class="gloss-body"></div>
+  </div>
+</div>
+<script>
+window.GLOSS_DATA = {gloss_json};
+(function(){{
+  var modal = document.getElementById('gloss-modal');
+  if (!modal) return;
+  var titleEl = modal.querySelector('.gloss-title');
+  var bodyEl  = modal.querySelector('.gloss-body');
+  var imgEl   = modal.querySelector('.gloss-image');
+  function openGloss(key){{
+    var data = (window.GLOSS_DATA || {{}})[key];
+    if (!data) return;
+    titleEl.textContent = data.title || key;
+    bodyEl.innerHTML = data.body || '';
+    if (data.image){{ imgEl.src = data.image; imgEl.alt = data.title || key; imgEl.hidden = false; }}
+    else {{ imgEl.removeAttribute('src'); imgEl.hidden = true; }}
+    modal.hidden = false; modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }}
+  function closeGloss(){{
+    modal.hidden = true; modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }}
+  document.addEventListener('click', function(e){{
+    var a = e.target.closest && e.target.closest('a.gloss');
+    if (a){{ e.preventDefault(); openGloss(a.dataset.gloss); return; }}
+    if (e.target.closest && e.target.closest('[data-gloss-close]')){{ e.preventDefault(); closeGloss(); }}
+  }});
+  document.addEventListener('keydown', function(e){{
+    if (e.key === 'Escape' && !modal.hidden) closeGloss();
+  }});
+}})();
 </script>
 </body>
 </html>

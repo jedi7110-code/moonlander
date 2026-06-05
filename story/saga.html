@@ -105,6 +105,58 @@
     .book .title .ttl-en { font-size:34px; letter-spacing:.12em; }
     .book .title .ttl-jp { font-size:14px; letter-spacing:.28em; }
   }
+
+  /* ─── 用語辞書リンク（本文中の初出に張られる下線） ─── */
+  a.gloss {
+    color:inherit; text-decoration:underline;
+    text-decoration-style:dotted; text-decoration-color:var(--accent);
+    text-underline-offset:3px; text-decoration-thickness:1px;
+    cursor:pointer;
+  }
+  a.gloss:hover { color:var(--accent); }
+
+  /* ─── 用語辞書モーダル ─── */
+  .gloss-modal { position:fixed; inset:0; z-index:1000; }
+  .gloss-modal[hidden] { display:none; }
+  .gloss-modal .gloss-overlay {
+    position:absolute; inset:0;
+    background:rgba(0,0,0,0.78);
+    backdrop-filter:blur(2px);
+  }
+  .gloss-modal .gloss-panel {
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%, -50%);
+    width:min(90vw, 480px);
+    max-height:84vh; overflow-y:auto;
+    background:var(--bg2);
+    border:1px solid var(--accent);
+    border-radius:6px; padding:28px 26px 24px;
+    box-shadow:0 16px 64px rgba(0,0,0,.6),
+               0 0 24px rgba(232,90,38,.15);
+    font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho",
+                "Noto Serif JP",serif;
+  }
+  .gloss-modal .gloss-close {
+    position:absolute; top:8px; right:14px;
+    background:transparent; border:0; color:var(--dim);
+    font-size:22px; line-height:1; cursor:pointer;
+    font-family:system-ui,-apple-system,sans-serif;
+  }
+  .gloss-modal .gloss-close:hover { color:var(--ink); }
+  .gloss-modal .gloss-image {
+    display:block; width:100%; height:auto;
+    margin:0 0 18px; border-radius:4px;
+  }
+  .gloss-modal .gloss-title {
+    margin:0 0 14px; font-size:18px; font-weight:600;
+    letter-spacing:.1em; color:var(--accent);
+    font-family:"Melete","Helvetica Neue",system-ui,sans-serif;
+  }
+  .gloss-modal .gloss-body {
+    color:var(--ink); font-size:14px; line-height:1.95;
+  }
+  .gloss-modal .gloss-body p { margin:0 0 .9em; }
+  .gloss-modal .gloss-body p:last-child { margin:0; }
   .book h2 {
     font-size:22px; font-weight:700; letter-spacing:.05em;
     margin:2.8em 0 1.2em; padding:.15em 0 .15em .7em;
@@ -353,6 +405,65 @@
 
   // 先頭（最上部＝冒頭）から開始
   sc.scrollTop = 0;
+</script>
+
+<!-- ────────── 用語辞書モーダル ────────── -->
+<div id="gloss-modal" class="gloss-modal" hidden aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="gloss-overlay" data-gloss-close></div>
+  <div class="gloss-panel">
+    <button class="gloss-close" type="button" aria-label="閉じる" data-gloss-close>×</button>
+    <img class="gloss-image" alt="" hidden>
+    <h3 class="gloss-title"></h3>
+    <div class="gloss-body"></div>
+  </div>
+</div>
+<script>
+window.GLOSS_DATA = {};
+
+(function(){
+  var modal = document.getElementById('gloss-modal');
+  if (!modal) return;
+  var titleEl = modal.querySelector('.gloss-title');
+  var bodyEl  = modal.querySelector('.gloss-body');
+  var imgEl   = modal.querySelector('.gloss-image');
+
+  function openGloss(key){
+    var data = (window.GLOSS_DATA || {})[key];
+    if (!data) return;
+    titleEl.textContent = data.title || key;
+    bodyEl.innerHTML = data.body || '';
+    if (data.image){
+      imgEl.src = data.image; imgEl.alt = data.title || key;
+      imgEl.hidden = false;
+    } else {
+      imgEl.removeAttribute('src'); imgEl.hidden = true;
+    }
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeGloss(){
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  // 本文中の a.gloss クリックでモーダル開く
+  document.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a.gloss');
+    if (a){
+      e.preventDefault();
+      openGloss(a.dataset.gloss);
+      return;
+    }
+    if (e.target.closest && e.target.closest('[data-gloss-close]')){
+      e.preventDefault(); closeGloss();
+    }
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && !modal.hidden) closeGloss();
+  });
+})();
 </script>
 </body>
 </html>
