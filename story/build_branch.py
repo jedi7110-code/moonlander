@@ -327,6 +327,11 @@ DOC = f"""<!DOCTYPE html>
     .book .title .ttl-en{{font-size:34px;letter-spacing:.12em}}
     .book .title .ttl-jp{{font-size:14px;letter-spacing:.28em}}
   }}
+  /* UPDATED 日付（タイトル直後の段落）をロゴと同じ Melete に */
+  .book .title + p{{text-align:center;color:var(--dim);
+    font-family:"Melete","Helvetica Neue",system-ui,sans-serif;
+    font-weight:500;font-size:11px;letter-spacing:.28em;
+    margin:-1em 0 3em;text-indent:.28em}}
   /* ─── 用語辞書リンク／モーダル ─── */
   a.gloss{{color:inherit;text-decoration:underline;text-decoration-style:dotted;
     text-decoration-color:var(--accent);text-underline-offset:3px;
