@@ -74,6 +74,8 @@
     <a class="xlink" href="saga.html" title="本編『FALL-LINE』へ">▷ 本編</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
     <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
+    <button id="fontDec" title="文字を小さく" aria-label="文字を小さく">A-</button>
+    <button id="fontInc" title="文字を大きく" aria-label="文字を大きく">A+</button>
     <button id="thbtn">夜 / 紙</button>
   </div>
 
@@ -233,6 +235,19 @@
     try{localStorage.setItem('mira-paper',
       document.documentElement.classList.contains('paper')?'1':'0');}catch(e){}
   });
+
+  // 文字サイズ A-/A+（記憶）。html の --fs を更新し reader.css の calc に効かせる
+  var FSKEY = 'mira-fs', fs = 1;
+  try { var _s = parseFloat(localStorage.getItem(FSKEY)); if (_s) fs = _s; } catch(e) {}
+  function applyFs(){ document.documentElement.style.setProperty('--fs', fs); }
+  function setFs(v){
+    fs = Math.min(1.6, Math.max(0.8, Math.round(v * 10) / 10));
+    applyFs();
+    try { localStorage.setItem(FSKEY, String(fs)); } catch(e) {}
+  }
+  applyFs();
+  document.getElementById('fontInc').addEventListener('click', function(){ setFs(fs + 0.1); });
+  document.getElementById('fontDec').addEventListener('click', function(){ setFs(fs - 0.1); });
 
   // 進捗ゲージ：表示中のペインを監視し、見出し位置に目盛
   var pgFill = document.getElementById('fill');
