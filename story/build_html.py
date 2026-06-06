@@ -283,11 +283,11 @@ DOC = f"""<!DOCTYPE html>
   }}
   .book {{
     max-width:42rem; margin:0 auto; padding:5vh 6vw 16vh;
-    font-size:18px; line-height:1.95; letter-spacing:.02em;
+    font-size:calc(18px * var(--fs, 1)); line-height:1.95; letter-spacing:.02em;
     text-align:justify;
   }}
   @media (max-width:640px){{
-    .book{{ font-size:16px; padding:4vh 7vw 14vh; }}
+    .book{{ font-size:calc(16px * var(--fs, 1)); padding:4vh 7vw 14vh; }}
   }}
   .book .series {{
     color:var(--accent); font-size:12px; letter-spacing:.5em;
@@ -498,10 +498,10 @@ DOC = f"""<!DOCTYPE html>
   <div class="bar">
     <span class="nm">{html.escape(title)}</span>
     <nav>{nav_html}</nav>
-    <a class="xlink" href="blackhexa.html" title="別冊『FALL-LANDING』へ">▷ 別冊</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
-    <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
-    <button id="themeBtn" title="配色切替">夜 / 紙</button>
+    <button id="bmBtn" title="しおり：押した位置を記憶／戻る">📑 しおり</button>
+    <button id="fontDec" title="文字を小さく" aria-label="文字を小さく">A-</button>
+    <button id="fontInc" title="文字を大きく" aria-label="文字を大きく">A+</button>
   </div>
   <div class="scroll" id="scroll">
     <div class="book">
@@ -536,15 +536,18 @@ DOC = f"""<!DOCTYPE html>
     }});
   }});
 
-  // 配色トグル（記憶）
-  var btn = document.getElementById('themeBtn');
-  try {{ if (localStorage.getItem('mira-paper')==='1')
-        document.documentElement.classList.add('paper'); }} catch(e) {{}}
-  btn.addEventListener('click', function(){{
-    document.documentElement.classList.toggle('paper');
-    try {{ localStorage.setItem('mira-paper',
-      document.documentElement.classList.contains('paper') ? '1':'0'); }} catch(e) {{}}
-  }});
+  // 文字サイズ +/-（記憶）。html に --fs を設定し .book の calc に効かせる
+  var FSKEY = 'mira-fs', fs = 1;
+  try {{ var _s = parseFloat(localStorage.getItem(FSKEY)); if (_s) fs = _s; }} catch(e) {{}}
+  function applyFs(){{ document.documentElement.style.setProperty('--fs', fs); }}
+  function setFs(v){{
+    fs = Math.min(1.6, Math.max(0.8, Math.round(v * 10) / 10));
+    applyFs();
+    try {{ localStorage.setItem(FSKEY, String(fs)); }} catch(e) {{}}
+  }}
+  applyFs();
+  document.getElementById('fontInc').addEventListener('click', function(){{ setFs(fs + 0.1); }});
+  document.getElementById('fontDec').addEventListener('click', function(){{ setFs(fs - 0.1); }});
 
   // 進捗ゲージ：現在位置と章ごとの目盛
   var book = sc.querySelector('.book');
@@ -592,9 +595,24 @@ DOC = f"""<!DOCTYPE html>
     _bmT = setTimeout(function(){{ bmSet(sc.scrollTop); }}, 500);
   }}, {{passive:true}});
 
+  // しおり：押した瞬間の位置を保存（既に保存位置近くにいるなら、その保存位置へジャンプ）
   document.getElementById('bmBtn').addEventListener('click', function(){{
-    var p = bmGet();
-    if (p > 0) sc.scrollTo({{top:p, behavior:'smooth'}});
+    var btn = this;
+    var cur = sc.scrollTop;
+    var saved = bmGet();
+    if (saved > 0 && Math.abs(cur - saved) > 40) {{
+      // 別の場所にいる → 保存済みの位置へ戻る
+      sc.scrollTo({{top: saved, behavior:'smooth'}});
+      var orig = btn.textContent;
+      btn.textContent = '📑 戻る';
+      setTimeout(function(){{ btn.textContent = orig; }}, 900);
+    }} else {{
+      // いまの位置を保存
+      bmSet(cur);
+      var orig2 = btn.textContent;
+      btn.textContent = '📑 保存';
+      setTimeout(function(){{ btn.textContent = orig2; }}, 900);
+    }}
   }});
 
   function _maybeResume(){{
