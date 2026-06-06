@@ -327,7 +327,7 @@ DOC = f"""<!DOCTYPE html>
     margin:.2em 0 1.8em; text-align:center; line-height:1.2;
   }}
   .book .title .ttl-en {{
-    display:block; font-size:clamp(22px, 9vw, 44px); font-weight:700;
+    display:block; font-size:min(7vw, 44px); font-weight:700;
     letter-spacing:.16em; color:var(--ink); white-space:nowrap;
     font-family:"Melete","Bahnschrift","Eurostile",
                 "Helvetica Neue",system-ui,sans-serif;
