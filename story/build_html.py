@@ -274,6 +274,34 @@ DOC = f"""<!DOCTYPE html>
   .bar button:hover, .bar a.xlink:hover {{
     color:var(--ink); border-color:var(--accent);
   }}
+  /* ハンバーガー（モバイル時のみ表示） */
+  #barToggle {{ display:none; padding:5px 9px; font-size:16px; line-height:1; }}
+  @media (max-width:640px){{
+    #barToggle {{ display:inline-flex; align-items:center; justify-content:center; }}
+    /* 閉時はナビとユーティリティを隠す */
+    .bar > nav,
+    .bar > .xlink,
+    .bar > #bmBtn,
+    .bar > #fontDec,
+    .bar > #fontInc {{ display:none; }}
+    /* 開時：バー高さを自動拡張し、ドロワーとして展開 */
+    .bar.open {{
+      height:auto; flex-wrap:wrap; align-items:center;
+      background:var(--bg2); padding:8px 16px 12px;
+      border-bottom:1px solid var(--rule);
+    }}
+    .bar.open > nav {{
+      display:flex; flex-direction:column; flex-basis:100%; width:100%;
+      gap:2px; margin-top:8px; overflow:visible;
+    }}
+    .bar.open > nav a {{ padding:9px 12px; border-radius:6px; }}
+    .bar.open > .xlink,
+    .bar.open > #bmBtn,
+    .bar.open > #fontDec,
+    .bar.open > #fontInc {{ display:inline-flex; align-items:center; }}
+    /* ユーティリティボタン群を独立行に */
+    .bar.open > .xlink {{ margin-left:0; }}
+  }}
 
   /* 横書き本文（通常レイアウト・上から下へ読む） */
   .scroll {{
@@ -502,7 +530,8 @@ DOC = f"""<!DOCTYPE html>
 </style>
 </head>
 <body>
-  <div class="bar">
+  <div class="bar" id="bar">
+    <button id="barToggle" type="button" aria-label="メニュー" aria-expanded="false" title="メニュー">☰</button>
     <span class="nm">{html.escape(title)}</span>
     <nav>{nav_html}</nav>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
@@ -533,12 +562,29 @@ DOC = f"""<!DOCTYPE html>
 <script>
   var sc = document.getElementById('scroll');
 
-  // 章ナビ：通常の縦スクロールで見出しの先頭へ
+  // ハンバーガー：モバイル時にバーを引き出しとして開閉
+  var bar = document.getElementById('bar');
+  var barToggle = document.getElementById('barToggle');
+  function closeBar(){{ bar.classList.remove('open'); barToggle.setAttribute('aria-expanded','false'); }}
+  barToggle.addEventListener('click', function(e){{
+    e.stopPropagation();
+    var open = bar.classList.toggle('open');
+    barToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }});
+  document.addEventListener('click', function(e){{
+    if (!bar.contains(e.target)) closeBar();
+  }});
+  document.addEventListener('keydown', function(e){{
+    if (e.key === 'Escape' && bar.classList.contains('open')) closeBar();
+  }});
+
+  // 章ナビ：通常の縦スクロールで見出しの先頭へ（モバイルではタップ後にドロワーを閉じる）
   document.querySelectorAll('.bar nav a').forEach(function(a){{
     a.addEventListener('click', function(e){{
       e.preventDefault();
       var t = document.querySelector(a.getAttribute('href'));
       if (t) t.scrollIntoView({{behavior:'smooth', block:'start'}});
+      closeBar();
     }});
   }});
 

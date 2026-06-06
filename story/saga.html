@@ -64,6 +64,34 @@
   .bar button:hover, .bar a.xlink:hover {
     color:var(--ink); border-color:var(--accent);
   }
+  /* ハンバーガー（モバイル時のみ表示） */
+  #barToggle { display:none; padding:5px 9px; font-size:16px; line-height:1; }
+  @media (max-width:640px){
+    #barToggle { display:inline-flex; align-items:center; justify-content:center; }
+    /* 閉時はナビとユーティリティを隠す */
+    .bar > nav,
+    .bar > .xlink,
+    .bar > #bmBtn,
+    .bar > #fontDec,
+    .bar > #fontInc { display:none; }
+    /* 開時：バー高さを自動拡張し、ドロワーとして展開 */
+    .bar.open {
+      height:auto; flex-wrap:wrap; align-items:center;
+      background:var(--bg2); padding:8px 16px 12px;
+      border-bottom:1px solid var(--rule);
+    }
+    .bar.open > nav {
+      display:flex; flex-direction:column; flex-basis:100%; width:100%;
+      gap:2px; margin-top:8px; overflow:visible;
+    }
+    .bar.open > nav a { padding:9px 12px; border-radius:6px; }
+    .bar.open > .xlink,
+    .bar.open > #bmBtn,
+    .bar.open > #fontDec,
+    .bar.open > #fontInc { display:inline-flex; align-items:center; }
+    /* ユーティリティボタン群を独立行に */
+    .bar.open > .xlink { margin-left:0; }
+  }
 
   /* 横書き本文（通常レイアウト・上から下へ読む） */
   .scroll {
@@ -292,7 +320,8 @@
 </style>
 </head>
 <body>
-  <div class="bar">
+  <div class="bar" id="bar">
+    <button id="barToggle" type="button" aria-label="メニュー" aria-expanded="false" title="メニュー">☰</button>
     <span class="nm">FALL-LINE</span>
     <nav><a href="#c1">残響　ウィリアムズバーグ</a><a href="#c2">プロローグ</a><a href="#c3">第一章　失踪した少女と、狭間の異星人</a><a href="#c4">第二章　インプラントと、自分への問い</a><a href="#c5">第三章　神とされること</a><a href="#c6">第四章　PAX と、反融合思想主義者</a><a href="#c7">第五章　ライラ、留まることを選ぶ者</a><a href="#c8">第六章　千年後、継承</a><a href="#c9">エピローグ</a><a href="#c10">外伝　FALL-LANDING</a><a href="#c11">主要登場人物</a><a href="#c12">主題とモチーフ</a></nav>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
@@ -323,12 +352,29 @@
 <script>
   var sc = document.getElementById('scroll');
 
-  // 章ナビ：通常の縦スクロールで見出しの先頭へ
+  // ハンバーガー：モバイル時にバーを引き出しとして開閉
+  var bar = document.getElementById('bar');
+  var barToggle = document.getElementById('barToggle');
+  function closeBar(){ bar.classList.remove('open'); barToggle.setAttribute('aria-expanded','false'); }
+  barToggle.addEventListener('click', function(e){
+    e.stopPropagation();
+    var open = bar.classList.toggle('open');
+    barToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('click', function(e){
+    if (!bar.contains(e.target)) closeBar();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && bar.classList.contains('open')) closeBar();
+  });
+
+  // 章ナビ：通常の縦スクロールで見出しの先頭へ（モバイルではタップ後にドロワーを閉じる）
   document.querySelectorAll('.bar nav a').forEach(function(a){
     a.addEventListener('click', function(e){
       e.preventDefault();
       var t = document.querySelector(a.getAttribute('href'));
       if (t) t.scrollIntoView({behavior:'smooth', block:'start'});
+      closeBar();
     });
   });
 

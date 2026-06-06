@@ -299,6 +299,28 @@ DOC = f"""<!DOCTYPE html>
   .bar button:hover, .bar a.xlink:hover{{color:var(--ink);
     border-color:var(--accent)}}
   .bar button.hide{{display:none}}
+  /* ハンバーガー（モバイル時のみ表示） */
+  #barToggle{{display:none;padding:5px 9px;font-size:16px;line-height:1}}
+  @media (max-width:640px){{
+    #barToggle{{display:inline-flex;align-items:center;justify-content:center}}
+    .bar > nav,
+    .bar > .xlink,
+    .bar > #bmBtn,
+    .bar > #thbtn,
+    .bar > #rebtn,
+    .bar > #othbtn{{display:none}}
+    .bar.open{{height:auto;flex-wrap:wrap;align-items:center;
+      background:var(--bg2);padding:8px 16px 12px;
+      border-bottom:1px solid var(--rule)}}
+    .bar.open > nav{{display:flex;flex-direction:column;flex-basis:100%;width:100%;
+      gap:2px;margin-top:8px;overflow:visible}}
+    .bar.open > nav a{{padding:9px 12px;border-radius:6px}}
+    .bar.open > .xlink,
+    .bar.open > #bmBtn,
+    .bar.open > #thbtn{{display:inline-flex;align-items:center}}
+    .bar.open > #rebtn:not(.hide),
+    .bar.open > #othbtn:not(.hide){{display:inline-flex;align-items:center}}
+  }}
 
   .scroll{{position:fixed;inset:46px 0 0 0;overflow-y:auto;
     overflow-x:hidden;-webkit-overflow-scrolling:touch;display:none}}
@@ -470,7 +492,8 @@ DOC = f"""<!DOCTYPE html>
 </style>
 </head>
 <body>
-  <div class="bar">
+  <div class="bar" id="bar">
+    <button id="barToggle" type="button" aria-label="メニュー" aria-expanded="false" title="メニュー">☰</button>
     <span class="nm">{html.escape(title)}</span>
     <span class="rt" id="rt">分岐譚</span>
     <nav id="nav"></nav>
@@ -598,11 +621,28 @@ DOC = f"""<!DOCTYPE html>
     gotoState(rt.textContent.indexOf('A')>=0 ? 'B' : 'A');
   }});
 
-  // 章ナビ：通常の縦スクロールで見出しの先頭へ
+  // ハンバーガー：モバイル時のみバーを引き出しとして開閉
+  var bar=document.getElementById('bar');
+  var barToggle=document.getElementById('barToggle');
+  function closeBar(){{ bar.classList.remove('open'); barToggle.setAttribute('aria-expanded','false'); }}
+  barToggle.addEventListener('click', function(e){{
+    e.stopPropagation();
+    var op=bar.classList.toggle('open');
+    barToggle.setAttribute('aria-expanded', op?'true':'false');
+  }});
+  document.addEventListener('click', function(e){{
+    if(!bar.contains(e.target)) closeBar();
+  }});
+  document.addEventListener('keydown', function(e){{
+    if(e.key==='Escape' && bar.classList.contains('open')) closeBar();
+  }});
+
+  // 章ナビ：通常の縦スクロールで見出しの先頭へ（タップ後はドロワーを閉じる）
   nav.addEventListener('click', function(e){{
     var a=e.target.closest('a'); if(!a)return;
     var g=a.dataset.go.split(':'), t=document.getElementById(g[1]);
     if(t) t.scrollIntoView({{behavior:'smooth', block:'start'}});
+    closeBar();
   }});
 
   // ネタバレ開閉
