@@ -197,8 +197,9 @@ a.gloss:hover { color:var(--accent); }
 }
 .book p { margin:0 0 1.05em; text-indent:0; }
 .book hr.scene {
-  border:0; border-top:1px solid var(--rule);
-  width:36%; margin:2.6em auto;
+  border:0; height:1px; width:38%; margin:2.8em auto;
+  background:linear-gradient(90deg, transparent, var(--dim), transparent);
+  opacity:.65;
 }
 .book blockquote {
   margin:1.6em 0; padding:1em 1.1em; background:var(--quote);
