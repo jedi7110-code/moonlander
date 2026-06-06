@@ -312,12 +312,10 @@ DOC = f"""<!DOCTYPE html>
     <nav id="nav"></nav>
     <button id="rebtn" class="hide">分岐をやり直す</button>
     <button id="othbtn" class="hide">もう一方を読む</button>
-    <a class="xlink" href="saga.html" title="本編『FALL-LINE』へ">▷ 本編</a>
     <a class="xlink" href="index.html" title="入口へ">⌂</a>
     <button id="bmBtn" title="しおり：前回読んだ位置へ">📑 しおり</button>
     <button id="fontDec" title="文字を小さく" aria-label="文字を小さく">A-</button>
     <button id="fontInc" title="文字を大きく" aria-label="文字を大きく">A+</button>
-    <button id="thbtn">夜 / 紙</button>
   </div>
 
   <!-- 共通：序章 ＋ 末尾に分岐選択（本文と一体・上下自由スクロール） -->
@@ -382,7 +380,9 @@ DOC = f"""<!DOCTYPE html>
   </aside>
   <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
 
+<script src="reader.js"></script>
 <script>
+  // ────────── 分岐譚：序章＋ルートA/Bのペイン切替 ──────────
   var NAVA = `{navA}`, NAVB = `{navB}`;
   var panes = {{head:'sc-head', A:'sc-A', B:'sc-B'}};
   var rt = document.getElementById('rt'),
@@ -399,9 +399,9 @@ DOC = f"""<!DOCTYPE html>
     requestAnimationFrame(function(){{
       requestAnimationFrame(function(){{ if(el) el.scrollTop = 0; }}); }});
   }}
+  function activeScroll(){{ return document.querySelector('.scroll.on'); }}
 
   // 状態は 'head'（序章＋末尾に選択）/ 'A' / 'B' の三つ。
-  // 序章は固定せず、上下に自由スクロールできる。
   function gotoState(st, keepPos){{
     if (st==='head'){{
       showScroll('sc-head');
@@ -409,7 +409,7 @@ DOC = f"""<!DOCTYPE html>
       nav.innerHTML='';
       reb.classList.add('hide'); oth.classList.add('hide');
       if (!keepPos) toTop(document.getElementById('sc-head'));
-    }} else {{ // 'A' or 'B'
+    }} else {{
       showScroll(panes[st]);
       rt.textContent = (st==='A'?'ルートA 触れた者':'ルートB 触れなかった者');
       nav.innerHTML = (st==='A'?NAVA:NAVB);
@@ -420,11 +420,14 @@ DOC = f"""<!DOCTYPE html>
     try{{localStorage.setItem('mono-state',st);}}catch(e){{}}
   }}
 
-  // 触れる／触れない＝明示クリックでのみルートへ。自動遷移はしない。
+  // ────────── 共通ヘッダ機能（ハンバーガー・文字サイズ） ──────────
+  // しおりは多ペイン対応の独自実装が下にあるため、ここでは渡さない
+  Reader.init({{}});
+
+  // ルート選択
   document.querySelectorAll('.card').forEach(function(c){{
     c.addEventListener('click', function(){{ gotoState(c.dataset.pick); }});
   }});
-  // 「分岐をやり直す」＝序章へ戻り、末尾の選択まで滑らかに移動
   reb.addEventListener('click', function(){{
     gotoState('head', true);
     requestAnimationFrame(function(){{
@@ -436,28 +439,11 @@ DOC = f"""<!DOCTYPE html>
     gotoState(rt.textContent.indexOf('A')>=0 ? 'B' : 'A');
   }});
 
-  // ハンバーガー：モバイル時のみバーを引き出しとして開閉
-  var bar=document.getElementById('bar');
-  var barToggle=document.getElementById('barToggle');
-  function closeBar(){{ bar.classList.remove('open'); barToggle.setAttribute('aria-expanded','false'); }}
-  barToggle.addEventListener('click', function(e){{
-    e.stopPropagation();
-    var op=bar.classList.toggle('open');
-    barToggle.setAttribute('aria-expanded', op?'true':'false');
-  }});
-  document.addEventListener('click', function(e){{
-    if(!bar.contains(e.target)) closeBar();
-  }});
-  document.addEventListener('keydown', function(e){{
-    if(e.key==='Escape' && bar.classList.contains('open')) closeBar();
-  }});
-
-  // 章ナビ：通常の縦スクロールで見出しの先頭へ（タップ後はドロワーを閉じる）
+  // 章ナビ：見出しの先頭へ（ドロワーを閉じるのは reader.js が delegation で処理）
   nav.addEventListener('click', function(e){{
     var a=e.target.closest('a'); if(!a)return;
     var g=a.dataset.go.split(':'), t=document.getElementById(g[1]);
     if(t) t.scrollIntoView({{behavior:'smooth', block:'start'}});
-    closeBar();
   }});
 
   // ネタバレ開閉
@@ -467,34 +453,10 @@ DOC = f"""<!DOCTYPE html>
     }});
   }});
 
-  // 配色トグル（記憶）
-  var th=document.getElementById('thbtn');
-  try{{ if(localStorage.getItem('mira-paper')==='1')
-        document.documentElement.classList.add('paper'); }}catch(e){{}}
-  th.addEventListener('click', function(){{
-    document.documentElement.classList.toggle('paper');
-    try{{localStorage.setItem('mira-paper',
-      document.documentElement.classList.contains('paper')?'1':'0');}}catch(e){{}}
-  }});
-
-  // 文字サイズ A-/A+（記憶）。html の --fs を更新し reader.css の calc に効かせる
-  var FSKEY = 'mira-fs', fs = 1;
-  try {{ var _s = parseFloat(localStorage.getItem(FSKEY)); if (_s) fs = _s; }} catch(e) {{}}
-  function applyFs(){{ document.documentElement.style.setProperty('--fs', fs); }}
-  function setFs(v){{
-    fs = Math.min(1.6, Math.max(0.8, Math.round(v * 10) / 10));
-    applyFs();
-    try {{ localStorage.setItem(FSKEY, String(fs)); }} catch(e) {{}}
-  }}
-  applyFs();
-  document.getElementById('fontInc').addEventListener('click', function(){{ setFs(fs + 0.1); }});
-  document.getElementById('fontDec').addEventListener('click', function(){{ setFs(fs - 0.1); }});
-
-  // 進捗ゲージ：表示中のペインを監視し、見出し位置に目盛
+  // ────────── 進捗ゲージ：表示中のペインを監視 ──────────
   var pgFill = document.getElementById('fill');
   var pgTicks = document.getElementById('ticks');
   var pgPct = document.getElementById('pct');
-  function activeScroll(){{ return document.querySelector('.scroll.on'); }}
   function rebuildTicks(){{
     pgTicks.innerHTML = '';
     var sc = activeScroll(); if(!sc) return;
@@ -520,22 +482,9 @@ DOC = f"""<!DOCTYPE html>
   document.querySelectorAll('.scroll').forEach(function(s){{
     s.addEventListener('scroll', updateProgress, {{passive:true}});
   }});
-  window.addEventListener('resize', function(){{
-    rebuildTicks(); updateProgress();
-  }});
+  window.addEventListener('resize', function(){{ rebuildTicks(); updateProgress(); }});
 
-  // ペイン切替時に再計算する gotoState のラッパ
-  var _goto = gotoState;
-  gotoState = function(st, keepPos){{
-    _goto(st, keepPos);
-    requestAnimationFrame(function(){{
-      requestAnimationFrame(function(){{
-        rebuildTicks(); updateProgress();
-      }});
-    }});
-  }};
-
-  // しおり（序章／A／B 独立に localStorage に保存）
+  // ────────── しおり（多ペイン：序章／A／B 独立に保存） ──────────
   function bmKey(){{
     var s = activeScroll();
     return s ? 'mira-bm-mono-' + s.id.replace('sc-','') : null;
@@ -560,11 +509,22 @@ DOC = f"""<!DOCTYPE html>
     }}, {{passive:true}});
   }});
 
+  // しおりボタン：saga と同じ「保存／戻る＋フィードバック」挙動
   document.getElementById('bmBtn').addEventListener('click', function(){{
+    var btn = this;
     var sc = activeScroll(); var k = bmKey();
     if (!sc || !k) return;
-    var p = bmGet(k);
-    if (p > 0) sc.scrollTo({{top:p, behavior:'smooth'}});
+    var cur = sc.scrollTop;
+    var saved = bmGet(k);
+    var orig = btn.textContent;
+    if (saved > 0 && Math.abs(cur - saved) > 40) {{
+      sc.scrollTo({{top: saved, behavior:'smooth'}});
+      btn.textContent = '📑 戻る';
+    }} else {{
+      bmSet(k, cur);
+      btn.textContent = '📑 保存';
+    }}
+    setTimeout(function(){{ btn.textContent = orig; }}, 900);
   }});
 
   function _maybeResume(){{
@@ -586,22 +546,22 @@ DOC = f"""<!DOCTYPE html>
     setTimeout(function(){{ t.classList.remove('show'); }}, 8000);
   }}
 
-  // gotoState のたびにしおり提示も再評価
-  var _goto2 = gotoState;
+  // ペイン切替後に進捗とレジューム再評価
+  var _goto = gotoState;
   gotoState = function(st, keepPos){{
-    _goto2(st, keepPos);
+    _goto(st, keepPos);
     requestAnimationFrame(function(){{
-      requestAnimationFrame(function(){{ _maybeResume(); }});
+      requestAnimationFrame(function(){{
+        rebuildTicks(); updateProgress(); _maybeResume();
+      }});
     }});
   }};
 
-  // 最初は序章から（毎回選び直せる）
+  // 最初は序章から
   window.addEventListener('load', function(){{
     gotoState('head');
     requestAnimationFrame(function(){{
-      requestAnimationFrame(function(){{
-        rebuildTicks(); updateProgress();
-      }});
+      requestAnimationFrame(function(){{ rebuildTicks(); updateProgress(); }});
     }});
   }});
   gotoState('head');

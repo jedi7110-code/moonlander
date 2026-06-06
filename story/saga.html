@@ -43,47 +43,25 @@
     <div class="pct" id="pct">0%</div>
   </aside>
   <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
+<script src="reader.js"></script>
 <script>
+  // saga 固有：章ナビ scroll-to-h2、進捗ゲージ
   var sc = document.getElementById('scroll');
 
-  // ハンバーガー：モバイル時にバーを引き出しとして開閉
-  var bar = document.getElementById('bar');
-  var barToggle = document.getElementById('barToggle');
-  function closeBar(){ bar.classList.remove('open'); barToggle.setAttribute('aria-expanded','false'); }
-  barToggle.addEventListener('click', function(e){
-    e.stopPropagation();
-    var open = bar.classList.toggle('open');
-    barToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
-  document.addEventListener('click', function(e){
-    if (!bar.contains(e.target)) closeBar();
-  });
-  document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape' && bar.classList.contains('open')) closeBar();
+  // 共通ヘッダ機能（ハンバーガー・文字サイズ・しおり・前回続きトースト）
+  Reader.init({
+    getScroll: function(){ return sc; },
+    bmKey: 'mira-bm-saga'
   });
 
-  // 章ナビ：通常の縦スクロールで見出しの先頭へ（モバイルではタップ後にドロワーを閉じる）
+  // 章ナビ：見出しの先頭へ（ハンバーガー側で delegation により自動で閉じる）
   document.querySelectorAll('.bar nav a').forEach(function(a){
     a.addEventListener('click', function(e){
       e.preventDefault();
       var t = document.querySelector(a.getAttribute('href'));
       if (t) t.scrollIntoView({behavior:'smooth', block:'start'});
-      closeBar();
     });
   });
-
-  // 文字サイズ +/-（記憶）。html に --fs を設定し .book の calc に効かせる
-  var FSKEY = 'mira-fs', fs = 1;
-  try { var _s = parseFloat(localStorage.getItem(FSKEY)); if (_s) fs = _s; } catch(e) {}
-  function applyFs(){ document.documentElement.style.setProperty('--fs', fs); }
-  function setFs(v){
-    fs = Math.min(1.6, Math.max(0.8, Math.round(v * 10) / 10));
-    applyFs();
-    try { localStorage.setItem(FSKEY, String(fs)); } catch(e) {}
-  }
-  applyFs();
-  document.getElementById('fontInc').addEventListener('click', function(){ setFs(fs + 0.1); });
-  document.getElementById('fontDec').addEventListener('click', function(){ setFs(fs - 0.1); });
 
   // 進捗ゲージ：現在位置と章ごとの目盛
   var book = sc.querySelector('.book');
@@ -112,60 +90,6 @@
   window.addEventListener('resize', function(){ rebuildTicks(); updateProgress(); });
   window.addEventListener('load', function(){ rebuildTicks(); updateProgress(); });
   rebuildTicks(); updateProgress();
-
-  // しおり：localStorage に現在位置を自動保存し、起動時に復帰を提示
-  var BMKEY = 'mira-bm-saga';
-  function bmGet(){
-    try { return parseInt(localStorage.getItem(BMKEY)||'0', 10); }
-    catch(e) { return 0; }
-  }
-  function bmSet(v){
-    try { localStorage.setItem(BMKEY, String(v)); } catch(e) {}
-  }
-  var _bmReady = false;
-  setTimeout(function(){ _bmReady = true; }, 1500);
-  var _bmT = 0;
-  sc.addEventListener('scroll', function(){
-    if (!_bmReady) return;
-    clearTimeout(_bmT);
-    _bmT = setTimeout(function(){ bmSet(sc.scrollTop); }, 500);
-  }, {passive:true});
-
-  // しおり：押した瞬間の位置を保存（既に保存位置近くにいるなら、その保存位置へジャンプ）
-  document.getElementById('bmBtn').addEventListener('click', function(){
-    var btn = this;
-    var cur = sc.scrollTop;
-    var saved = bmGet();
-    if (saved > 0 && Math.abs(cur - saved) > 40) {
-      // 別の場所にいる → 保存済みの位置へ戻る
-      sc.scrollTo({top: saved, behavior:'smooth'});
-      var orig = btn.textContent;
-      btn.textContent = '📑 戻る';
-      setTimeout(function(){ btn.textContent = orig; }, 900);
-    } else {
-      // いまの位置を保存
-      bmSet(cur);
-      var orig2 = btn.textContent;
-      btn.textContent = '📑 保存';
-      setTimeout(function(){ btn.textContent = orig2; }, 900);
-    }
-  });
-
-  function _maybeResume(){
-    var p = bmGet();
-    var max = sc.scrollHeight - sc.clientHeight;
-    if (max <= 0 || p < Math.max(80, max * 0.05)) return;
-    var t = document.getElementById('resume');
-    t.querySelector('.pct').textContent = Math.round(p / max * 100) + '%';
-    t.classList.add('show');
-    t.onclick = function(e){
-      e.preventDefault();
-      sc.scrollTo({top:p, behavior:'smooth'});
-      t.classList.remove('show');
-    };
-    setTimeout(function(){ t.classList.remove('show'); }, 8000);
-  }
-  window.addEventListener('load', _maybeResume);
 
   // 先頭（最上部＝冒頭）から開始
   sc.scrollTop = 0;
