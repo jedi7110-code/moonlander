@@ -538,7 +538,6 @@ DOC = f"""<!DOCTYPE html>
     <div class="pct" id="pct">0%</div>
   </aside>
   <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
-  <div class="hint">↓ 上から下へスクロールして読み進めます</div>
 
 <script>
   var NAVA = `{navA}`, NAVB = `{navB}`;
