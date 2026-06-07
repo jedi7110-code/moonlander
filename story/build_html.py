@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""物語-長編版.md を縦書き小説HTMLへ変換する。
-単一ソース（.md）から生成するので、本文を直すときは .md を編集して再実行する。
+"""saga.md を小説HTMLへ変換する。
+単一ソース（.md）から全文版と章別版を生成するので、本文を直すときは .md を編集して再実行する。
   $ python3 build_html.py
 """
 import re, html, json, pathlib
@@ -155,125 +155,164 @@ def render_text(pay: str) -> str:
     return "".join(parts)
 
 # ---- HTML 生成 ----
-body, nav, title, chap_i = [], [], "FALL-LINE", 0
-for typ, pay in blocks:
+CHAPTER_DIR = pathlib.Path(__file__).with_name("fall-line")
+
+def is_absolute_url(src: str) -> bool:
+    return bool(re.match(r"^(?:[a-z]+:)?//|^/|^data:", src))
+
+def prefixed_path(src: str, prefix: str) -> str:
+    if not prefix or is_absolute_url(src) or src.startswith("../"):
+        return src
+    return prefix + src
+
+def title_html(pay: str):
+    if "──" in pay:
+        en_part, jp_part = [p.strip() for p in pay.split("──", 1)]
+        return en_part, (
+            '<div class="series">THE FALL</div>'
+            '<h1 class="title">'
+            f'<span class="ttl-en">{inline(en_part)}</span>'
+            f'<span class="ttl-jp">{inline(jp_part)}</span>'
+            '</h1>'
+        )
+    return pay, '<div class="series">THE FALL</div>' f'<h1 class="title">{inline(pay)}</h1>'
+
+def render_block(typ, pay, asset_prefix="", cid=None):
     if typ == "h1":
-        # 「英語 ── 日本語」を分割して2段表示にする
-        if "──" in pay:
-            en_part, jp_part = [p.strip() for p in pay.split("──", 1)]
-            title = en_part  # <title>タグやナビバーには英語部のみ使用
-            body.append(
-                '<div class="series">THE FALL</div>'
-                '<h1 class="title">'
-                f'<span class="ttl-en">{inline(en_part)}</span>'
-                f'<span class="ttl-jp">{inline(jp_part)}</span>'
-                '</h1>'
-            )
-        else:
-            title = pay
-            body.append(
-                '<div class="series">THE FALL</div>'
-                f'<h1 class="title">{inline(pay)}</h1>'
-            )
-    elif typ == "h2":
-        chap_i += 1
-        cid = f"c{chap_i}"
-        nav.append((cid, pay))
-        # 章の境界で「リンク済み」リセット → 各章の初出に再び1回ずつ付く
-        gloss_seen_in_chapter.clear()
-        body.append(f'<h2 id="{cid}">{inline(pay)}</h2>')
-    elif typ == "h3":
-        body.append(f"<h3>{render_text(pay)}</h3>")
-    elif typ == "p":
-        body.append(f"<p>{render_text(pay)}</p>")
-    elif typ == "hr":
-        body.append('<hr class="scene">')
-    elif typ == "quote":
+        return title_html(pay)[1]
+    if typ == "h2":
+        id_attr = f' id="{cid}"' if cid else ""
+        return f"<h2{id_attr}>{inline(pay)}</h2>"
+    if typ == "h3":
+        return f"<h3>{render_text(pay)}</h3>"
+    if typ == "p":
+        return f"<p>{render_text(pay)}</p>"
+    if typ == "hr":
+        return '<hr class="scene">'
+    if typ == "quote":
         inner = "".join(f"<p>{render_text(x)}</p>" for x in pay)
-        body.append(f'<blockquote>{inner}</blockquote>')
-    elif typ == "ul":
+        return f"<blockquote>{inner}</blockquote>"
+    if typ == "ul":
         items = "".join(f"<li>{render_text(x)}</li>" for x in pay)
-        body.append(f"<ul>{items}</ul>")
-    elif typ == "img":
+        return f"<ul>{items}</ul>"
+    if typ == "img":
         alt, src = pay
-        body.append(
+        src = prefixed_path(src, asset_prefix)
+        return (
             f'<figure class="ill"><img src="{html.escape(src)}" '
             f'alt="{html.escape(alt)}" loading="lazy"></figure>'
         )
+    return ""
 
-nav_html = "".join(
-    f'<a href="#{cid}">{html.escape(label)}</a>' for cid, label in nav
-)
+def slug_for(idx: int, label: str) -> str:
+    if label.startswith("残響"):
+        return "resonance.html"
+    if label.startswith("プロローグ"):
+        return "prologue.html"
+    if label.startswith("第一章"):
+        return "chapter-01.html"
+    if label.startswith("第二章"):
+        return "chapter-02.html"
+    if label.startswith("第三章"):
+        return "chapter-03.html"
+    if label.startswith("第四章"):
+        return "chapter-04.html"
+    if label.startswith("第五章"):
+        return "chapter-05.html"
+    if label.startswith("第六章"):
+        return "chapter-06.html"
+    if label.startswith("エピローグ"):
+        return "epilogue.html"
+    if label.startswith("外伝"):
+        return "appendix-fall-landing.html"
+    if label.startswith("主要登場人物"):
+        return "characters.html"
+    if label.startswith("主題とモチーフ"):
+        return "motifs.html"
+    return f"section-{idx:02d}.html"
 
-# 用語辞書 JSON（モーダル本文用）。f文字列の {{}} 衝突を避けるため事前に文字列化
-gloss_json = json.dumps(gloss_data, ensure_ascii=False)
+title = "FALL-LINE"
+title_block = None
+front_blocks = []
+chapters = []
+current = None
 
-DOC = f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html.escape(title)} ── 長編小説版</title>
-<link rel="stylesheet" href="reader.css">
-<style>
-  /* ───── saga (FALL-LINE) 固有 ───── */
-  /* タイトル文字サイズ：FALL-LINE は 9 字 */
-  .book .title .ttl-en {{ font-size:min(6vw, 40px); }}
-  /* 巻末「次に読む（別冊）」カードのホバー＝月夜の purple ティント */
-  .next-read .nr-card:hover {{ border-color:#a99fe0; }}
-</style>
-</head>
-<body>
-  <div class="bar" id="bar">
-    <button id="barToggle" type="button" aria-label="メニュー" aria-expanded="false" title="メニュー">☰</button>
-    <span class="nm">{html.escape(title)}</span>
-    <nav>{nav_html}</nav>
-    <a class="xlink" href="index.html" title="入口へ">⌂</a>
-    <button id="bmBtn" title="しおり：押した位置を記憶／戻る">📑 しおり</button>
-    <button id="fontDec" title="文字を小さく" aria-label="文字を小さく">A-</button>
-    <button id="fontInc" title="文字を大きく" aria-label="文字を大きく">A+</button>
-  </div>
-  <div class="scroll" id="scroll">
-    <div class="book">
-      {''.join(body)}
-      <aside class="next-read">
-        <div class="nr-label">▷ 次に読む（別冊）</div>
-        <a class="nr-card" href="blackhexa.html">
-          <h3>FALL-LANDING ── フォールランディング</h3>
-          <p>本編の前史にあたる外伝。月面に立つ六角柱の黒い鏡面体〈黒筐（こっきょう）〉に「触れる／触れない」を選ぶと、物語は二つに裂け、二度と交わらない。ルートAの〈退ける手つき〉が、本編のミラたちの背中に書き写されていく前史として接続する。</p>
-        </a>
-        <a class="nr-back" href="index.html">⌂ 入口へ戻る</a>
-      </aside>
-    </div>
-  </div>
-  <aside class="progress" aria-hidden="true">
-    <div class="track"></div>
-    <div class="ticks" id="ticks"></div>
-    <div class="fill" id="fill"></div>
-    <div class="pct" id="pct">0%</div>
-  </aside>
-  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
-<script src="reader.js"></script>
-<script>
-  // saga 固有：章ナビ scroll-to-h2、進捗ゲージ
-  var sc = document.getElementById('scroll');
+for typ, pay in blocks:
+    if typ == "h1":
+        title, title_block = title_html(pay)
+        continue
+    if typ == "h2":
+        idx = len(chapters) + 1
+        current = {
+            "idx": idx,
+            "cid": f"c{idx}",
+            "label": pay,
+            "file": slug_for(idx, pay),
+            "blocks": [(typ, pay)],
+        }
+        chapters.append(current)
+        continue
+    if current is None:
+        front_blocks.append((typ, pay))
+    else:
+        current["blocks"].append((typ, pay))
 
-  // 共通ヘッダ機能（ハンバーガー・文字サイズ・しおり・前回続きトースト）
-  Reader.init({{
-    getScroll: function(){{ return sc; }},
-    bmKey: 'mira-bm-saga'
-  }});
+def render_blocks_for_page(page_blocks, asset_prefix="", include_ids=False):
+    global gloss_seen_in_chapter
+    gloss_seen_in_chapter.clear()
+    out = []
+    for typ, pay in page_blocks:
+        if typ == "h2":
+            gloss_seen_in_chapter.clear()
+            cid = None
+            if include_ids:
+                for ch in chapters:
+                    if ch["label"] == pay:
+                        cid = ch["cid"]
+                        break
+            out.append(render_block(typ, pay, asset_prefix=asset_prefix, cid=cid))
+        else:
+            out.append(render_block(typ, pay, asset_prefix=asset_prefix))
+    return "".join(out)
 
+def chapter_nav_html(root_prefix="", full=False):
+    links = []
+    for ch in chapters:
+        href = f"#{ch['cid']}" if full else ch["file"]
+        links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
+    return "".join(links)
+
+def glossary_json_for(prefix=""):
+    if not prefix:
+        return json.dumps(gloss_data, ensure_ascii=False)
+    data = json.loads(json.dumps(gloss_data, ensure_ascii=False))
+    for item in data.values():
+        image = item.get("image")
+        if image:
+            item["image"] = prefixed_path(image, prefix)
+    return json.dumps(data, ensure_ascii=False)
+
+def progress_script(bm_key, scroll_nav=False):
+    nav_script = ""
+    if scroll_nav:
+        nav_script = """
   // 章ナビ：見出しの先頭へ（ハンバーガー側で delegation により自動で閉じる）
-  document.querySelectorAll('.bar nav a').forEach(function(a){{
-    a.addEventListener('click', function(e){{
+  document.querySelectorAll('.bar nav a').forEach(function(a){
+    a.addEventListener('click', function(e){
       e.preventDefault();
       var t = document.querySelector(a.getAttribute('href'));
-      if (t) t.scrollIntoView({{behavior:'smooth', block:'start'}});
-    }});
-  }});
+      if (t) t.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+"""
+    return f"""<script>
+  var sc = document.getElementById('scroll');
 
-  // 進捗ゲージ：現在位置と章ごとの目盛
+  Reader.init({{
+    getScroll: function(){{ return sc; }},
+    bmKey: '{bm_key}'
+  }});
+{nav_script}
   var book = sc.querySelector('.book');
   var fill = document.getElementById('fill');
   var ticks = document.getElementById('ticks');
@@ -300,11 +339,12 @@ DOC = f"""<!DOCTYPE html>
   window.addEventListener('resize', function(){{ rebuildTicks(); updateProgress(); }});
   window.addEventListener('load', function(){{ rebuildTicks(); updateProgress(); }});
   rebuildTicks(); updateProgress();
-
-  // 先頭（最上部＝冒頭）から開始
   sc.scrollTop = 0;
-</script>
+</script>"""
 
+def gloss_modal(prefix=""):
+    gloss_json = glossary_json_for(prefix)
+    return f"""
 <!-- ────────── 用語辞書モーダル ────────── -->
 <div id="gloss-modal" class="gloss-modal" hidden aria-hidden="true" role="dialog" aria-modal="true">
   <div class="gloss-overlay" data-gloss-close></div>
@@ -346,7 +386,6 @@ window.GLOSS_DATA = {gloss_json};
     document.body.style.overflow = '';
   }}
 
-  // 本文中の a.gloss クリックでモーダル開く
   document.addEventListener('click', function(e){{
     var a = e.target.closest && e.target.closest('a.gloss');
     if (a){{
@@ -362,10 +401,162 @@ window.GLOSS_DATA = {gloss_json};
     if (e.key === 'Escape' && !modal.hidden) closeGloss();
   }});
 }})();
-</script>
+</script>"""
+
+def next_read_html(root_prefix=""):
+    return f"""
+      <aside class="next-read">
+        <div class="nr-label">▷ 次に読む（別冊）</div>
+        <a class="nr-card" href="{root_prefix}blackhexa.html">
+          <h3>FALL-LANDING ── フォールランディング</h3>
+          <p>本編の前史にあたる外伝。月面に立つ六角柱の黒い鏡面体〈黒筐（こっきょう）〉に「触れる／触れない」を選ぶと、物語は二つに裂け、二度と交わらない。ルートAの〈退ける手つき〉が、本編のミラたちの背中に書き写されていく前史として接続する。</p>
+        </a>
+        <a class="nr-back" href="{root_prefix}index.html">⌂ 入口へ戻る</a>
+      </aside>"""
+
+def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-saga", scroll_nav=False):
+    return f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(page_title)}</title>
+<link rel="stylesheet" href="{root_prefix}reader.css">
+<style>
+  /* ───── saga (FALL-LINE) 固有 ───── */
+  .book .title .ttl-en {{ font-size:min(6vw, 40px); }}
+  .next-read .nr-card:hover {{ border-color:#a99fe0; }}
+  .chapter-links {{
+    display:grid; gap:12px; margin:2.5em 0 3em;
+  }}
+  .chapter-links a {{
+    display:block; color:inherit; text-decoration:none;
+    border:1px solid var(--rule); border-radius:8px;
+    padding:14px 16px; background:var(--bg2); transition:.18s;
+  }}
+  .chapter-links a:hover {{ border-color:var(--accent); transform:translateY(-1px); }}
+  .chapter-pager {{
+    display:flex; justify-content:space-between; gap:14px;
+    margin:3em 0 0; padding-top:1.6em; border-top:1px solid var(--rule);
+  }}
+  .chapter-pager a {{
+    color:var(--dim); text-decoration:none; border:1px solid var(--rule);
+    border-radius:8px; padding:8px 12px; font-size:13px;
+  }}
+  .chapter-pager a:hover {{ color:var(--ink); border-color:var(--accent); }}
+</style>
+</head>
+<body>
+  <div class="bar" id="bar">
+    <button id="barToggle" type="button" aria-label="メニュー" aria-expanded="false" title="メニュー">☰</button>
+    <span class="nm">{html.escape(title)}</span>
+    <nav>{nav_html}</nav>
+    <a class="xlink" href="{root_prefix}index.html" title="入口へ">⌂</a>
+    <button id="fontDec" title="文字を小さく" aria-label="文字を小さく">A-</button>
+    <button id="fontInc" title="文字を大きく" aria-label="文字を大きく">A+</button>
+  </div>
+  <div class="scroll" id="scroll">
+    <div class="book">
+      {body_html}
+    </div>
+  </div>
+  <aside class="progress" aria-hidden="true">
+    <div class="track"></div>
+    <div class="ticks" id="ticks"></div>
+    <div class="fill" id="fill"></div>
+    <div class="pct" id="pct">0%</div>
+  </aside>
+<script src="{root_prefix}reader.js"></script>
+{progress_script(bm_key, scroll_nav=scroll_nav)}
+{gloss_modal(root_prefix)}
 </body>
 </html>
 """
 
+full_body = []
+if title_block:
+    full_body.append(title_block)
+full_body.append(render_blocks_for_page(front_blocks, include_ids=False))
+for ch in chapters:
+    full_body.append(render_blocks_for_page(ch["blocks"], include_ids=True))
+full_body.append(next_read_html(""))
+
+DOC = page_doc(
+    f"{title} ── 長編小説版",
+    chapter_nav_html(full=True),
+    "".join(full_body),
+    root_prefix="",
+    bm_key="mira-bm-saga",
+    scroll_nav=True,
+)
+
 OUT.write_text(DOC, encoding="utf-8")
-print(f"wrote {OUT}  ({len(DOC):,} bytes, {len(nav)} chapters, {len(blocks)} blocks)")
+
+CHAPTER_DIR.mkdir(exist_ok=True)
+
+index_links = "".join(
+    f'<a href="{html.escape(ch["file"])}">{html.escape(ch["label"])}</a>'
+    for ch in chapters
+)
+chapter_index_body = (
+    (title_block or "")
+    + render_blocks_for_page(front_blocks, asset_prefix="../", include_ids=False)
+    + '<h2>章別ページ</h2>'
+    + f'<div class="chapter-links">{index_links}</div>'
+    + '<aside class="next-read">'
+    + '<div class="nr-label">▷ 全文版</div>'
+    + '<a class="nr-card" href="../saga.html">'
+    + '<h3>FALL-LINE ── 全文版</h3>'
+    + '<p>全章を一つのページで読むための従来版。検索や通読を一つの画面で行いたいときはこちら。</p>'
+    + '</a>'
+    + '<a class="nr-back" href="../index.html">⌂ 入口へ戻る</a>'
+    + '</aside>'
+)
+chapter_index_doc = page_doc(
+    f"{title} ── 章別ページ",
+    chapter_nav_html(full=False),
+    chapter_index_body,
+    root_prefix="../",
+    bm_key="mira-bm-saga-index",
+    scroll_nav=False,
+)
+(CHAPTER_DIR / "index.html").write_text(chapter_index_doc, encoding="utf-8")
+
+for i, ch in enumerate(chapters):
+    prev_ch = chapters[i - 1] if i > 0 else None
+    next_ch = chapters[i + 1] if i + 1 < len(chapters) else None
+    pager = ['<nav class="chapter-pager" aria-label="章送り">']
+    if prev_ch:
+        pager.append(f'<a href="{html.escape(prev_ch["file"])}">← {html.escape(prev_ch["label"])}</a>')
+    else:
+        pager.append('<span></span>')
+    if next_ch:
+        pager.append(f'<a href="{html.escape(next_ch["file"])}">{html.escape(next_ch["label"])} →</a>')
+    else:
+        pager.append('<span></span>')
+    pager.append('</nav>')
+
+    chapter_body = []
+    if title_block:
+        chapter_body.append(title_block)
+    if i == 0:
+        chapter_body.append(render_blocks_for_page(front_blocks, asset_prefix="../", include_ids=False))
+    chapter_body.append(render_blocks_for_page(ch["blocks"], asset_prefix="../", include_ids=False))
+    chapter_body.append("".join(pager))
+    if i == len(chapters) - 1:
+        chapter_body.append(next_read_html("../"))
+
+    doc = page_doc(
+        f"{title} ── {ch['label']}",
+        chapter_nav_html(full=False),
+        "".join(chapter_body),
+        root_prefix="../",
+        bm_key=f"mira-bm-saga-{ch['file'].replace('.html', '')}",
+        scroll_nav=False,
+    )
+    (CHAPTER_DIR / ch["file"]).write_text(doc, encoding="utf-8")
+
+print(
+    f"wrote {OUT}  ({len(DOC):,} bytes, {len(chapters)} chapters, {len(blocks)} blocks)"
+)
+print(f"wrote {CHAPTER_DIR}/index.html and {len(chapters)} chapter pages")
