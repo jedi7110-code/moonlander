@@ -65,7 +65,6 @@
   //  スクロール中もデバウンスで自動保存（起動 1.5 秒後から）。
   function setupBookmark(getScroll, key){
     var btn = document.getElementById('bmBtn');
-    if (!btn) return;
     key = key || 'mira-bm';
     function get(){
       try { return parseInt(localStorage.getItem(key) || '0', 10); }
@@ -90,24 +89,26 @@
     // 初回 + 100ms 後（遅延生成ペイン対策）
     attach(getScroll());
     setTimeout(function(){ attach(getScroll()); }, 100);
-    // クリック挙動
-    btn.addEventListener('click', function(){
-      var sc = getScroll(); if (!sc) return;
-      attach(sc);  // 別ペインになっていたら今のペインで自動保存も繋ぎ直す
-      var cur = sc.scrollTop;
-      var saved = get();
-      var orig = btn.textContent;
-      if (saved > 0 && Math.abs(cur - saved) > 40) {
-        // 別の場所にいる → 保存位置へ戻る
-        sc.scrollTo({top: saved, behavior: 'smooth'});
-        btn.textContent = '📑 戻る';
-      } else {
-        // いまの位置を保存
-        setVal(cur);
-        btn.textContent = '📑 保存';
-      }
-      setTimeout(function(){ btn.textContent = orig; }, 900);
-    });
+    // クリック挙動（ボタンがあるページだけ）
+    if (btn) {
+      btn.addEventListener('click', function(){
+        var sc = getScroll(); if (!sc) return;
+        attach(sc);  // 別ペインになっていたら今のペインで自動保存も繋ぎ直す
+        var cur = sc.scrollTop;
+        var saved = get();
+        var orig = btn.textContent;
+        if (saved > 0 && Math.abs(cur - saved) > 40) {
+          // 別の場所にいる → 保存位置へ戻る
+          sc.scrollTo({top: saved, behavior: 'smooth'});
+          btn.textContent = '📑 戻る';
+        } else {
+          // いまの位置を保存
+          setVal(cur);
+          btn.textContent = '📑 保存';
+        }
+        setTimeout(function(){ btn.textContent = orig; }, 900);
+      });
+    }
     // 前回の続き案内トースト（ロード時に1回だけ）
     window.addEventListener('load', function(){
       var sc = getScroll(); if (!sc) return;

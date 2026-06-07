@@ -275,12 +275,88 @@ def render_blocks_for_page(page_blocks, asset_prefix="", include_ids=False):
             out.append(render_block(typ, pay, asset_prefix=asset_prefix))
     return "".join(out)
 
+def without_trailing_scene(page_blocks):
+    page_blocks = page_blocks[:]
+    while page_blocks and page_blocks[-1][0] == "hr":
+        page_blocks.pop()
+    return page_blocks
+
+def build_reading_pages():
+    pages = []
+    for ch in chapters:
+        if ch["label"].startswith("第一章"):
+            blocks_for_split = ch["blocks"]
+            hr_indexes = [i for i, (typ, _pay) in enumerate(blocks_for_split) if typ == "hr"]
+            if len(hr_indexes) >= 4:
+                split_defs = [
+                    ("第一章・上　消えた少女", "chapter-01.html", blocks_for_split[1:hr_indexes[1]]),
+                    ("第一章・中　水惑星ターラ", "chapter-01-2.html", blocks_for_split[hr_indexes[1] + 1:hr_indexes[3]]),
+                    ("第一章・下　狭間の異星人", "chapter-01-3.html", blocks_for_split[hr_indexes[3] + 1:]),
+                ]
+                for label, file_name, part_blocks in split_defs:
+                    pages.append({
+                        "label": label,
+                        "file": file_name,
+                        "blocks": [("h2", label)] + without_trailing_scene(part_blocks),
+                    })
+                continue
+        pages.append({
+            "label": ch["label"],
+            "file": ch["file"],
+            "blocks": without_trailing_scene(ch["blocks"]),
+        })
+    return pages
+
+reading_pages = build_reading_pages()
+
+def full_nav_items():
+    items = []
+    for ch in chapters:
+        if ch["label"].startswith("第一章"):
+            items.extend([
+                {"href": f"#{ch['cid']}", "label": "第一章・上　消えた少女"},
+                {"href": f"#{ch['cid']}-2", "label": "第一章・中　水惑星ターラ"},
+                {"href": f"#{ch['cid']}-3", "label": "第一章・下　狭間の異星人"},
+            ])
+        else:
+            items.append({"href": f"#{ch['cid']}", "label": ch["label"]})
+    return items
+
 def chapter_nav_html(root_prefix="", full=False):
     links = []
-    for ch in chapters:
-        href = f"#{ch['cid']}" if full else ch["file"]
+    items = full_nav_items() if full else reading_pages
+    for ch in items:
+        href = ch["href"] if full else ch["file"]
         links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
     return "".join(links)
+
+def render_full_chapter(ch):
+    if not ch["label"].startswith("第一章"):
+        return render_blocks_for_page(ch["blocks"], include_ids=True)
+
+    blocks_for_split = ch["blocks"]
+    hr_indexes = [i for i, (typ, _pay) in enumerate(blocks_for_split) if typ == "hr"]
+    if len(hr_indexes) < 4:
+        return render_blocks_for_page(ch["blocks"], include_ids=True)
+
+    global gloss_seen_in_chapter
+    gloss_seen_in_chapter.clear()
+
+    parts = [
+        ("第一章・上　消えた少女", ch["cid"], blocks_for_split[1:hr_indexes[1]], "h2"),
+        ("第一章・中　水惑星ターラ", f"{ch['cid']}-2", blocks_for_split[hr_indexes[1] + 1:hr_indexes[3]], "h3"),
+        ("第一章・下　狭間の異星人", f"{ch['cid']}-3", blocks_for_split[hr_indexes[3] + 1:], "h3"),
+    ]
+
+    out = []
+    for label, anchor_id, part_blocks, heading in parts:
+        if heading == "h2":
+            out.append(render_block("h2", label, cid=anchor_id))
+        else:
+            out.append(f'<h3 id="{anchor_id}">{inline(label)}</h3>')
+        for typ, pay in without_trailing_scene(part_blocks):
+            out.append(render_block(typ, pay))
+    return "".join(out)
 
 def glossary_json_for(prefix=""):
     if not prefix:
@@ -466,6 +542,7 @@ def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-sa
     <div class="fill" id="fill"></div>
     <div class="pct" id="pct">0%</div>
   </aside>
+  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
 <script src="{root_prefix}reader.js"></script>
 {progress_script(bm_key, scroll_nav=scroll_nav)}
 {gloss_modal(root_prefix)}
@@ -478,7 +555,7 @@ if title_block:
     full_body.append(title_block)
 full_body.append(render_blocks_for_page(front_blocks, include_ids=False))
 for ch in chapters:
-    full_body.append(render_blocks_for_page(ch["blocks"], include_ids=True))
+    full_body.append(render_full_chapter(ch))
 full_body.append(next_read_html(""))
 
 DOC = page_doc(
@@ -496,7 +573,7 @@ CHAPTER_DIR.mkdir(exist_ok=True)
 
 index_links = "".join(
     f'<a href="{html.escape(ch["file"])}">{html.escape(ch["label"])}</a>'
-    for ch in chapters
+    for ch in reading_pages
 )
 chapter_index_body = (
     (title_block or "")
@@ -522,9 +599,9 @@ chapter_index_doc = page_doc(
 )
 (CHAPTER_DIR / "index.html").write_text(chapter_index_doc, encoding="utf-8")
 
-for i, ch in enumerate(chapters):
-    prev_ch = chapters[i - 1] if i > 0 else None
-    next_ch = chapters[i + 1] if i + 1 < len(chapters) else None
+for i, ch in enumerate(reading_pages):
+    prev_ch = reading_pages[i - 1] if i > 0 else None
+    next_ch = reading_pages[i + 1] if i + 1 < len(reading_pages) else None
     pager = ['<nav class="chapter-pager" aria-label="章送り">']
     if prev_ch:
         pager.append(f'<a href="{html.escape(prev_ch["file"])}">← {html.escape(prev_ch["label"])}</a>')
@@ -543,7 +620,7 @@ for i, ch in enumerate(chapters):
         chapter_body.append(render_blocks_for_page(front_blocks, asset_prefix="../", include_ids=False))
     chapter_body.append(render_blocks_for_page(ch["blocks"], asset_prefix="../", include_ids=False))
     chapter_body.append("".join(pager))
-    if i == len(chapters) - 1:
+    if i == len(reading_pages) - 1:
         chapter_body.append(next_read_html("../"))
 
     doc = page_doc(
@@ -559,4 +636,4 @@ for i, ch in enumerate(chapters):
 print(
     f"wrote {OUT}  ({len(DOC):,} bytes, {len(chapters)} chapters, {len(blocks)} blocks)"
 )
-print(f"wrote {CHAPTER_DIR}/index.html and {len(chapters)} chapter pages")
+print(f"wrote {CHAPTER_DIR}/index.html and {len(reading_pages)} chapter pages")
