@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stargate Warp Test</title>
+<style>
+body { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
+#ui { position: fixed; top: 10px; left: 10px; color: #fff; z-index: 10; }
+#ui button { background: #222; color: #fff; border: 1px solid #666; padding: 8px 14px; margin-right: 6px; cursor: pointer; font-family: monospace; }
+#ui button:hover { background: #444; }
+#ui input { width: 60px; background: #111; color: #fff; border: 1px solid #555; padding: 4px; margin-right: 10px; }
+#ui label { margin-right: 4px; }
+</style>
+<script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+<div id="ui">
+  <button id="replay">▶ Replay</button>
+  <button id="looptoggle">Loop: ON</button>
+  <label>duration(ms)</label><input id="dur" type="number" value="2200">
+  <label>speed</label><input id="spd" type="number" step="0.1" value="1.8">
+  <button id="apply">Apply</button>
+</div>
+<script>
+let warpDuration = 2200;
+let warpSpeed = 1.8;
+
+const WarpPipeline = new Phaser.Class({
+  Extends: Phaser.Renderer.WebGL.Pipelines.PostFXPipeline,
+  initialize: function WarpPipeline(game) {
+    Phaser.Renderer.WebGL.Pipelines.PostFXPipeline.call(this, {
+      game: game,
+      renderTarget: true,
+      fragShader: [
+        'precision mediump float;',
+        'uniform sampler2D uMainSampler;',
+        'uniform vec2 uResolution;',
+        'uniform float uTime;',
+        'uniform float uProgress;',
+        'uniform float uSpeed;',
+        'varying vec2 outTexCoord;',
+        'float hash(float n){ return fract(sin(n)*43758.5453); }',
+        'float noise1d(float x){ float i=floor(x); float f=fract(x); return mix(hash(i),hash(i+1.0),smoothstep(0.0,1.0,f)); }',
+        'vec3 palette(float t){ return 0.5 + 0.5*cos(6.2831*(vec3(0.0,0.33,0.67)+t)); }',
+        'void main(){',
+        '  vec2 uv = outTexCoord - 0.5;',
+        '  uv.x *= uResolution.x / uResolution.y;',
+        '  float ang = atan(uv.y, uv.x);',
+        '  float d = length(uv);',
+        '  float flow = uTime * uSpeed * max(0.1, uProgress);',
+        '  float s1 = noise1d(ang*28.0 + flow*0.4);',
+        '  float s2 = noise1d(ang*14.0 - flow*0.25);',
+        '  float s3 = noise1d(ang*50.0 + flow*0.6);',
+        '  float streak = pow(s1*0.5 + s2*0.3 + s3*0.2, 2.4) * 2.0;',
+        '  float radial = 0.5 + 0.5*sin(d*12.0 - flow*4.0);',
+        '  radial = pow(radial, 2.5);',
+        '  float rays = streak * (0.3 + radial*0.9);',
+        '  float fall = smoothstep(1.4, 0.05, d);',
+        '  float cT = ang/6.2831 * 3.0 + d*1.5 + flow*0.08;',
+        '  vec3 rayCol = palette(cT);',
+        '  rayCol = pow(rayCol, vec3(0.75));',
+        '  vec3 col = rayCol * rays * fall * 2.6;',
+        '  float core = pow(max(0.0, 1.0 - d*3.5), 4.0);',
+        '  col += vec3(1.0, 0.98, 1.0) * core * 2.0;',
+        '  vec4 orig = texture2D(uMainSampler, outTexCoord);',
+        '  float gameA = max(0.0, 1.0 - uProgress*1.8);',
+        '  col = orig.rgb * gameA + col * smoothstep(0.0, 0.15, uProgress);',
+        '  gl_FragColor = vec4(col, 1.0);',
+        '}'
+      ].join('\n')
+    });
+    this.progress = 0;
+  },
+  onPreRender: function () {
+    this.set2f('uResolution', this.renderer.width, this.renderer.height);
+    this.set1f('uTime', this.game.loop.time / 1000);
+    this.set1f('uProgress', this.progress);
+    this.set1f('uSpeed', warpSpeed);
+  }
+});
+
+const config = {
+  type: Phaser.WEBGL,
+  width: 1400,
+  height: 900,
+  backgroundColor: '#000011',
+  pipeline: { 'Warp': WarpPipeline },
+  scene: { create: create }
+};
+
+const game = new Phaser.Game(config);
+let currentScene;
+
+function create() {
+  currentScene = this;
+  // ダミー背景：星空っぽい点
+  for (let i = 0; i < 200; i++) {
+    const x = Phaser.Math.Between(0, 1400);
+    const y = Phaser.Math.Between(0, 900);
+    const r = Phaser.Math.FloatBetween(0.5, 2);
+    const a = Phaser.Math.FloatBetween(0.3, 1);
+    this.add.circle(x, y, r, 0xffffff, a);
+  }
+  // サンプル船
+  const ship = this.add.rectangle(700, 450, 30, 30, 0xffaa33);
+  ship.setStrokeStyle(2, 0xffffff);
+
+  triggerWarp(this);
+}
+
+let loopMode = true;
+function triggerWarp(scene) {
+  scene.cameras.main.setPostPipeline('Warp');
+  const pipes = scene.cameras.main.postPipelines || [];
+  const warpPipe = pipes[pipes.length - 1];
+  warpPipe.progress = 0;
+  scene.tweens.add({
+    targets: warpPipe,
+    progress: 1,
+    duration: warpDuration,
+    ease: 'Cubic.easeIn',
+    onComplete: () => {
+      // 白フラッシュ
+      const flash = scene.add.graphics().setScrollFactor(0).setDepth(99);
+      flash.fillStyle(0xffffff, 1);
+      flash.fillRect(0, 0, 1400, 900);
+      scene.cameras.main.removePostPipeline(warpPipe);
+      scene.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 600,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          flash.destroy();
+          if (loopMode) scene.time.delayedCall(800, () => triggerWarp(scene));
+        }
+      });
+    }
+  });
+}
+
+document.getElementById('replay').onclick = () => { if (currentScene) triggerWarp(currentScene); };
+document.getElementById('looptoggle').onclick = (e) => {
+  loopMode = !loopMode;
+  e.target.textContent = 'Loop: ' + (loopMode ? 'ON' : 'OFF');
+};
+document.getElementById('apply').onclick = () => {
+  warpDuration = parseInt(document.getElementById('dur').value) || 2200;
+  warpSpeed = parseFloat(document.getElementById('spd').value) || 1.8;
+};
+</script>
+</body>
+</html>

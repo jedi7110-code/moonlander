@@ -339,14 +339,13 @@
 `/Volumes/Extreme SSD/A-makes/AI生成画像/moon-liz/ChatGPT-Image-2026年5月26日-11_44_26-Topaz-Bloom-2x-スケール.jpg`
 
 ### 名称
-- 製品名/旧式規格名: `ILZ`（イルズ）。
-- 正式名称: `Inner Limbic Zenon`。
-- `Zenon` は一般名詞として意味を説明せず、神経接続を保護する旧式規格または開発計画の固有名として扱う。
-- ミラが最初の二文字を入れ替え、機体表記を `ILZ` から `LIZ` に変えた。
+- 製品群名: `LI-2 Modules`。
+- 個体の型式表記: `LI-2 MODULE` または `LI-2`。
+- ミラが手製の型紙で末尾の `-2` を `Z` に塗り替え、機体表記を `LIZ` に変えた。
 - ミラは自分の機体を「リサ」と呼ぶ。量産製品を個人的な相棒へ変えた命名。
-- 構造: `Inner Limbic Zenon` → `ILZ（イルズ）` → ミラによる `LIZ` → 呼び名「リサ」。
-- 正式名称の由来は本文で詳しく説明しない。元の刻印、書き換えた文字、ミラの呼び名だけで示せる。
-- 旧候補: `Limbic Immersion Zero` / `Limbic Interface Zone` / `Inner Limbic Zero`。現時点では採用しない。
+- 構造: `LI-2 MODULE` → ミラによる `LIZ` → 呼び名「リサ」。
+- `LI` の正式な展開は本文で説明しない。旧式の型式名、書き換えた文字、ミラの呼び名だけで示す。
+- 旧候補: `ILZ / Inner Limbic Zenon`、`Limbic Immersion Zero`、`Limbic Interface Zone`、`Inner Limbic Zero`。現時点では採用しない。
 
 ### 核
 - LIZ は単なるロボットではなく、神経培養基盤を積んだ自立型の現場端末。
