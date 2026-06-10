@@ -1,19 +1,13 @@
 // アニメーション登録（create() 内で scene 引数を渡して呼ぶ）
 export function registerAnimations(scene) {
 // 爆発アニメーションの作成
+// explosion.png は 2048x2048 ÷ 256 = 8x8 の 64 フレーム（index 0-63）
+// スプライトの破棄は呼び出し側（gameover.js の animationcomplete）が担う
 scene.anims.create({
     key: 'explode',
-    frames: scene.anims.generateFrameNumbers('explosion', { start: 0, end: 64 }),
+    frames: scene.anims.generateFrameNumbers('explosion', { start: 0, end: 63 }),
     frameRate: 24,
-    repeat: 0,
-    onUpdate: function (anim, frame, gameObject) {
-        if (frame.prevFrame !== null) {
-            gameObject.setTexture(frame.texture.key, frame.prevFrame.textureSourceIndex);
-        }
-    },
-    onComplete: function (anim, frame, gameObject) {
-        gameObject.destroy();
-    }
+    repeat: 0
 });
 
 // 被弾（血飛沫）アニメーションの作成

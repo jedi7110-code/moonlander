@@ -1,5 +1,6 @@
 // 爆発演出 + シーン restart。scene.jetSound 停止と scene.gameStarted リセットを内包。
-let explosionPlaying = false;
+// 再生中フラグは scene プロパティ（create で毎回リセット）。モジュール変数にすると
+// 爆発完了前に別経路の restart が走った場合に true のまま固着し、以後 gameOver が無効になる
 
 export function gameOver(scene, message) {
     // 爆発時にjet音を停止
@@ -7,8 +8,8 @@ export function gameOver(scene, message) {
         scene.jetSound.stop();
     }
 
-    if (!explosionPlaying) {
-        explosionPlaying = true;
+    if (!scene._explosionPlaying) {
+        scene._explosionPlaying = true;
 
         // 爆発アニメーションを作成して再生
         const explosion = scene.add.sprite(scene.spaceship.x, scene.spaceship.y, 'explosion');
@@ -37,28 +38,30 @@ export function gameOver(scene, message) {
         if (hintEl) hintEl.classList.remove('show');
 
         explosion.on('animationcomplete', () => {
-            explosionPlaying = false;
+            scene._explosionPlaying = false;
             explosion.destroy();
         });
 
+        // タイマーは scene.time に紐付け、restart 時に自動破棄されるようにする
+        // （raw setTimeout だと restart 後の新しい周回に発火して二重 restart になる）
         // ゲームオーバーメッセージ（messageが空ならテキスト表示なし）
         if (message) {
-            setTimeout(() => {
+            scene.time.delayedCall(1000, () => {
                 const failKeyMap = {
                     'Mission Failed': 'label_missionfailed',
                     'Rescue Failed': 'label_rescuefailed'
                 };
                 const failKey = failKeyMap[message] || 'label_missionfailed';
                 scene.add.image(scene.spaceship.x, scene.spaceship.y - 50, failKey).setOrigin(0.5, 0.5).setDepth(11).setScale((scene._labelDisplayScale || 0.25) * 1.6);
-            }, 1000);
+            });
         }
 
         scene.gameStarted = false; // 操作無効化
 
         // 爆発演出が終わってからスタート位置（待機画面）へ復帰
-        setTimeout(() => {
+        scene.time.delayedCall(3000, () => {
             scene.scene.restart();
-        }, 3000);
+        });
 
         // 爆発時にエンプティー音を停止
         if (scene.emptySound.isPlaying) {

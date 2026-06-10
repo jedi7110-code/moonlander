@@ -134,8 +134,8 @@ UI表示:
 - 全 capture phase listener / passive で他のタッチ動作を阻害しない
 
 ### よくある落とし穴
-- ES module は aggressive cache される。`main.js` / `preload.js` 編集後は `index.html` の `?v=N` と `main.js` 内 import の `?v=N` を **両方** bump する
-- 現在は `?v=7`
+- ES module は aggressive cache される。js を編集したら、そのファイルを import している**全箇所**の `?v=N` を bump する（main.js なら index.html 側も）
+- **同一モジュールの `?v` は全 import 箇所で必ず同じ値にする**。値がズレると ES modules は別URLとして二重ロードし、デプロイ時にキャッシュ混在で新旧コードが混ざる（2026-06-10 に cockpit.js が v=98/v=101 に分裂していたのを修正済み）。確認: `grep -hoE "\./[a-z-]+\.js\?v=[0-9]+" js/*.js | sort | uniq -c` で各モジュールが1行になればOK
 - `loadingScreen` への click/touchend で `e.preventDefault()` するのは OK だが `e.stopPropagation()` は呼ばないこと（Phaser の body 自動 unlock が効かなくなる）
 
 ## 開発フロー

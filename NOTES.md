@@ -180,3 +180,28 @@ js/
 - **今のうちに C案で分割**しておくのがオススメ
 - 理由: 機能追加を続けるならコスト回収が早い、ES Modules の学習コストほぼゼロ、一度分割すれば「あの機能どこ？」のストレスが消える
 - やるなら段階的に：最初に `audio.js` と `shadows.js`（純粋関数だけ）を切り出してテストし、問題なければ進める
+
+## コード診断と修正（2026-06-10）
+
+全 js / index.html / assets を診断し、以下を修正済み:
+
+- **.vercelignore**: `.claude/`・`NOTES.md`・`stargate.html` を追加（本番URLで CLAUDE.md のネタバレが読めていた。次回 push で反映）
+- **?v 不一致**: cockpit.js が create.js 側 v=98 / update.js 側 v=101 で二重ロードされていた → 統一。**ルール: 同一モジュールの ?v は全 import 箇所で必ず同じ値にする**
+- **restart 残留フラグ**: ハシゴ登降・帰還・転倒(tippingOver)系のフラグが create.js の初期化リストに無く、捕獲リスタート後にソフトロックし得た → 一式追加
+- **gameover.js**: `explosionPlaying` をモジュール変数→scene プロパティ化（固着でgameOver無効化するバグ）、setTimeout→`scene.time.delayedCall`（二重restart防止）
+- **爆発アニメ**: `end: 64`→`63`（explosion.png は 8x8=64 フレーム）。無効だった onUpdate/onComplete 設定を削除
+- **捕獲後レーザー2倍速**: gameOver専用の前進ブロックと通常ブロックが二重に走っていた → 通常ブロック側でゲートに統一
+- **documentリスナー蓄積**: audio unlock ×4 とコナミ keydown がリスタート毎に複製登録 → ページにつき1回に（コナミの `window.__testMode` 引き継ぎ動作は不変・意図仕様）
+- **背景の二重描画**・**zoomchange 内の未定義変数 `title`**（発火すれば即クラッシュの地雷）を削除
+
+### 診断で見つかった将来課題（未着手）
+
+1. **初回ロード約45MB**: alien-b 連番PNG 18枚≒12MB、無圧縮WAV計12MB など。着陸フェーズ必須分のみ preload → 残りは着陸成功後に遅延ロード。WebP/スプライトシート化、WAV→OGG で 1/10 級の削減余地
+2. **フレームレート依存**: 燃料消費・傾き・カメラ lerp がフレーム固定値。iOS Safari は rAF 60Hz 上限なので実機では問題ないが、高リフレッシュモニタ＋Chrome では燃料が倍速で減る。
+   - **方針（2026-06-10 決定）: 現状維持**。「60Hz固定」案も検討したが、Phaser 3.55 で固定するには `forceSetTimeOut`（setTimeout ループ化）しかなく、vsync 非同期になり現行60Hz端末にジャダーが出るため却下
+   - 実害報告が出たら update の delta 補正で対応。Phaser 3.60+ へ上げる機会があれば `fps: { limit: 60 }` 一行で済む（ただし 3.60 はパーティクル API 全面変更につき移行コスト大）
+3. **update.js 2,579行の分割**: 着陸判定/ステージ2セットアップ/エンディングの関数抽出。捕獲シーケンス約120行×2の重複統合、ハシゴ定数の一元化
+4. **コックピットHUD**: 毎フレーム offsetWidth 読み（強制リフロー）+ 無条件DOM書き込み → 寸法キャッシュ＋差分書き込みへ
+5. **CRT軽量化の逃げ道未配線**: style.css の `body.no-crt` がどこからも付与されていない。低性能端末向けトグルを配線する
+6. **preload の未使用ロード**: `landPointG`(1.3MB)・`cockpitTitle`(426KB)・`spacemy` は参照ゼロ。削除可
+7. **未使用アセット約520KB**: ogp.jpg / background01.jpg / flag.png / flag-flash.png / spaceshipshadow.png（spaceman.png は Stage 2 構想用につき保留）

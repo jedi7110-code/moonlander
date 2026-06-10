@@ -1,8 +1,8 @@
 // Phaser scene の update フック本体。
 import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
-import { gameOver } from './gameover.js?v=2';
-import { enterCockpitMode, updateCockpit } from './cockpit.js?v=101';
+import { gameOver } from './gameover.js?v=3';
+import { enterCockpitMode, updateCockpit } from './cockpit.js?v=102';
 import { startCredits } from './preload.js?v=22';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
@@ -143,25 +143,9 @@ if (scene.astronautMode && scene.astronaut) {
     const jumpPower = -150;
     const onGround = scene.astronaut.y >= scene.astronautGroundY;
 
-    // 捕獲後はプレイヤー操作不可（ビーム関連を停止し、レーザーだけ飛び続ける）
-    // ※敵の移動・追加捕獲判定は継続させるため return しない
-    if (scene.astronautGameOver) {
-        if (scene.beamTameSound && scene.beamTameSound.isPlaying) scene.beamTameSound.stop();
-        if (scene.beamChargeEmitter) scene.beamChargeEmitter.on = false;
-        if (scene.lasers) {
-            scene.lasers = scene.lasers.filter(l => {
-                const dx = l.dir * l.speed * dt;
-                l.beam.x += dx;
-                l.glow.x += dx;
-                if (scene.time.now - l.born > l.life) {
-                    l.beam.destroy();
-                    l.glow.destroy();
-                    return false;
-                }
-                return true;
-            });
-        }
-    }
+    // 捕獲後（astronautGameOver）のレーザー前進・音停止・エミッタ消灯は
+    // 通常のレーザー更新ブロックと charging 判定側でゲートして処理する
+    // （ここに専用の前進処理を持つと通常ブロックと二重に走り、レーザーが2倍速になる）
 
     // 手動登り：上下キーで一段ずつ進む。各ステップ位置はハシゴの段に正確に対応
     // 影は step index の進捗に応じて 1→0 に変化（地面で標準、登るほど薄く）
@@ -400,8 +384,8 @@ if (scene.astronautMode && scene.astronaut) {
     const gg = Math.round(0xff * gaugeRatio);
     const gb = Math.round(0xcc * gaugeRatio);
     const normalColor = (gr << 16) | (gg << 8) | gb;
-    // 長押し中はゲージが点滅（チャージ中表示）
-    const charging = scene.cursors.space.isDown && scene.beamHoldStart && scene.chargeAllowed;
+    // 長押し中はゲージが点滅（チャージ中表示）。捕獲後はチャージ音・粒子も止める
+    const charging = !scene.astronautGameOver && scene.cursors.space.isDown && scene.beamHoldStart && scene.chargeAllowed;
     if (charging) {
         const flashOn = (Math.floor(scene.time.now / 80) % 2) === 0;
         scene.beamGaugeFill.fillColor = flashOn ? 0xffffff : normalColor;
@@ -515,8 +499,9 @@ if (scene.astronautMode && scene.astronaut) {
             l.beam.x += dx;
             l.glow.x += dx;
             // 当たり判定（地底人）。チャージビームは小さい敵を貫通
+            // 捕獲後は飛んでいるレーザーの当たり判定だけ無効化（前進と寿命管理は継続）
             let hit = false;
-            if (scene.enemies && scene.enemies.length) {
+            if (!scene.astronautGameOver && scene.enemies && scene.enemies.length) {
                 const beamBounds = l.beam.getBounds();
                 scene.enemies = scene.enemies.filter(e => {
                     const emergedEnough = !e.emerging || e.y <= scene.groundFeetY + e.displayHeight * 2 / 3;

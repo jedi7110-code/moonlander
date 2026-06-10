@@ -1,8 +1,8 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
         import { preload as preloadAssets, startBriefing } from './preload.js?v=22';
-        import { create as createScene } from './create.js?v=77';
-        import { update as updateScene } from './update.js?v=119';
+        import { create as createScene } from './create.js?v=78';
+        import { update as updateScene } from './update.js?v=120';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
         // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、
@@ -203,6 +203,12 @@
 
 
 
+        // showTitle は死亡リスタート/周回のたびに呼ばれるため、document への
+        // リスナーはページにつき1回だけ登録する（毎回登録すると世代分蓄積する）。
+        // scene インスタンスは Phaser が restart を跨いで再利用するので初回の closure で問題ない
+        let docAudioUnlockBound = false;
+        let konamiListenerBound = false;
+
         function showTitle(scene) {
             // 状態判定：初回（HTML側） / クリア後の周回 or 死亡後リスタート（Phaserロゴ + HTMLプロンプト）
             // 着陸シーケンスで loading-screen を再利用するため remove ではなく hidden 化している。
@@ -257,9 +263,12 @@
                     if (sm.unlock && sm.locked) sm.unlock();
                 } catch (e) {}
             };
-            ['touchend', 'touchstart', 'mousedown', 'click'].forEach((ev) => {
-                document.addEventListener(ev, resumeAudioContext, { capture: true, passive: true });
-            });
+            if (!docAudioUnlockBound) {
+                docAudioUnlockBound = true;
+                ['touchend', 'touchstart', 'mousedown', 'click'].forEach((ev) => {
+                    document.addEventListener(ev, resumeAudioContext, { capture: true, passive: true });
+                });
+            }
 
             let started = false;
             function startGame() {
@@ -406,7 +415,9 @@
             // ─── コナミコマンド：タイトル画面で ↑↑↓↓←→←→ + Enter でテストモード起動 ───
             // 起動後は本番でも無敵モード（プレイヤー捕獲・デブリ衝突無効）になり、
             // ブリーフィング前に "> TEST MODE" を 2 秒表示してから通常 briefing が始まる。
-            (() => {
+            // 一度発動した window.__testMode は restart を跨いで引き継がれる（意図仕様）
+            if (!konamiListenerBound) {
+                konamiListenerBound = true;
                 const KONAMI_SEQ = [
                     'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
                     'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight'
@@ -428,7 +439,7 @@
                         if (buf.length > KONAMI_SEQ.length * 2) buf.shift();
                     }
                 });
-            })();
+            }
             // 死亡後リスタート / クリア後周回：Phaser キャンバスへのタップでも開始
             // (HTML タイトル画面のタップは loadingScreen のリスナーで処理済み)
             scene.input.on('pointerdown', () => {

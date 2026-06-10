@@ -1,8 +1,8 @@
 // Phaser scene の create フック本体。
 import { generateLabels, SVG_SCALE } from './ui-text.js';
 import { attachUiGuide } from './ui-guide.js?v=2';
-import { registerAnimations } from './animations.js';
-import { createCockpitObjects } from './cockpit.js?v=98';
+import { registerAnimations } from './animations.js?v=2';
+import { createCockpitObjects } from './cockpit.js?v=102';
 
 export function create(scene) {
 // Helvetica はシステムフォントなので待機不要
@@ -38,11 +38,40 @@ scene.astronautFacing = null;
 scene.astronautVY = 0;
 scene.astronautVX = 0;
 scene.escapeJetSound = null;
+// ステージ2（降下・登り・帰還）の途中でリスタートした場合の残留対策。
+// これらが残ると次周で登り/降りブロックが誤発火し、操作不能やソフトロックになる
+scene.playerDescendingManual = false;
+scene.astronautDescending = false;
+scene.descendStepPositions = null;
+scene.descendStepIndex = 0;
+scene.descendStepInProgress = false;
+scene.descendCallback = null;
+scene.playerClimbingManual = false;
+scene.climbStepPositions = null;
+scene.climbStepIndex = 0;
+scene.climbStepInProgress = false;
+scene.playerClimbCallback = null;
+scene.playerClimbStartY = 0;
+scene.playerClimbTopY = 0;
+scene.returnClimbReady = false;
+scene.returnClimbLadderX = null;
+scene.returnClimbAwaitExit = false;
+scene.returnClimbStart = null;
+scene.tippingOver = false; // 転倒中リスタートで固着するとパッド上クラッシュ判定が無効化される
+scene.monoHighlights = null; // 破棄済み Graphics への毎フレーム再描画を防ぐ
+scene.spawnEnemy = null;
+scene.shipHatch = null;
+scene.groundMask = null;
+scene.beamGaugeBg = null;
+scene.beamGaugeFill = null;
+scene.astronautHasMoved = false;
+scene.astronautTurnDir = null;
+scene.astronautCarDir = null;
+scene.atMonolithPrev = false;
+scene._explosionPlaying = false; // 爆発完了前の restart で固着すると以後 gameOver が無効になる
 
 // キーボード入力の設定
 const enterKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-
-scene.add.image(0, 0, 'background').setOrigin(0, 0);
 
 // 背景画像の幅と高さを取得
 const backgroundImage = scene.textures.get('background').getSourceImage();
@@ -397,11 +426,6 @@ scene.cameras.main.centerOn(scene.spaceship.x, 150);
 scene.cameras.main.setZoom(1.2);
 // 8bitエフェクトを全体にかける
 // scene.cameras.main.setPostPipeline('PixelArt'); // 一旦OFF（マスクとの干渉）
-
-// カメラのズームが変更されたときにタイトル画像のスケールを調整するリスナーを追加
-scene.cameras.main.addListener('zoomchange', (cam, newZoom) => {
-    title.setScale(1 / newZoom);
-});
 
 // コックピット視点（着陸時）用のオーバーレイ要素を初期化（全て非表示で待機）
 createCockpitObjects(scene);
