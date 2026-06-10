@@ -156,6 +156,7 @@ def render_text(pay: str) -> str:
 
 # ---- HTML 生成 ----
 CHAPTER_DIR = pathlib.Path(__file__).with_name("fall-line")
+PUBLIC_CHAPTER_PREFIXES = ("残響", "プロローグ", "第一章")
 
 def is_absolute_url(src: str) -> bool:
     return bool(re.match(r"^(?:[a-z]+:)?//|^/|^data:", src))
@@ -293,6 +294,9 @@ def build_reading_pages():
 
 reading_pages = build_reading_pages()
 
+def is_public_chapter(ch):
+    return ch["label"].startswith(PUBLIC_CHAPTER_PREFIXES)
+
 def full_nav_items():
     items = []
     for ch in chapters:
@@ -304,7 +308,12 @@ def chapter_nav_html(root_prefix="", full=False):
     items = full_nav_items() if full else reading_pages
     for ch in items:
         href = ch["href"] if full else ch["file"]
-        links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
+        if full or is_public_chapter(ch):
+            links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
+        else:
+            links.append(
+                f'<span class="locked" aria-disabled="true">{html.escape(ch["label"])}</span>'
+            )
     return "".join(links)
 
 def render_full_chapter(ch):
@@ -442,7 +451,20 @@ def next_read_html(root_prefix=""):
         <a class="nr-back" href="{root_prefix}index.html">⌂ 入口へ戻る</a>
       </aside>"""
 
-def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-saga", scroll_nav=False):
+def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-saga", scroll_nav=False, reader=True):
+    if reader:
+        progress_aside = """<aside class="progress" aria-hidden="true">
+    <div class="track"></div>
+    <div class="ticks" id="ticks"></div>
+    <div class="fill" id="fill"></div>
+    <div class="pct" id="pct">0%</div>
+  </aside>
+  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>"""
+        page_script = progress_script(bm_key, scroll_nav=scroll_nav)
+    else:
+        # 目次ページ: スクロールメモリ・進捗レール・resumeトーストなし
+        progress_aside = ""
+        page_script = "<script>\n  Reader.init({});\n</script>"
     return f"""<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -462,6 +484,11 @@ def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-sa
     border:1px solid var(--rule); border-radius:8px;
     padding:14px 16px; background:var(--bg2); transition:.18s;
   }}
+  .chapter-links .locked {{
+    display:block; color:var(--dim); opacity:.45;
+    border:1px solid var(--rule); border-radius:8px;
+    padding:14px 16px; background:var(--bg2);
+  }}
   .chapter-links a:hover {{ border-color:var(--accent); transform:translateY(-1px); }}
   .chapter-pager {{
     display:flex; justify-content:space-between; gap:14px;
@@ -472,6 +499,15 @@ def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-sa
     border-radius:8px; padding:8px 12px; font-size:13px;
   }}
   .chapter-pager a:hover {{ color:var(--ink); border-color:var(--accent); }}
+  .bar nav .locked {{ opacity:.38; cursor:default; }}
+  .release-note {{
+    text-align:center; color:var(--dim);
+    font-family:system-ui,-apple-system,sans-serif;
+  }}
+  .release-note h3 {{
+    margin:0 0 .45em; color:var(--ink); font-size:18px;
+  }}
+  .release-note p {{ margin:0; font-size:14px; line-height:1.85; }}
 </style>
 </head>
 <body>
@@ -488,15 +524,9 @@ def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-sa
       {body_html}
     </div>
   </div>
-  <aside class="progress" aria-hidden="true">
-    <div class="track"></div>
-    <div class="ticks" id="ticks"></div>
-    <div class="fill" id="fill"></div>
-    <div class="pct" id="pct">0%</div>
-  </aside>
-  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
+  {progress_aside}
 <script src="{root_prefix}reader.js"></script>
-{progress_script(bm_key, scroll_nav=scroll_nav)}
+{page_script}
 {gloss_modal(root_prefix)}
 </body>
 </html>
@@ -528,7 +558,11 @@ for stale_name in ("chapter-01-2.html", "chapter-01-3.html"):
         stale_path.unlink()
 
 index_links = "".join(
-    f'<a href="{html.escape(ch["file"])}">{html.escape(ch["label"])}</a>'
+    (
+        f'<a href="{html.escape(ch["file"])}">{html.escape(ch["label"])}</a>'
+        if is_public_chapter(ch)
+        else f'<span class="locked" aria-disabled="true">{html.escape(ch["label"])}</span>'
+    )
     for ch in reading_pages
 )
 chapter_index_body = (
@@ -537,11 +571,11 @@ chapter_index_body = (
     + '<h2>章別ページ</h2>'
     + f'<div class="chapter-links">{index_links}</div>'
     + '<aside class="next-read">'
-    + '<div class="nr-label">▷ 全文版</div>'
-    + '<a class="nr-card" href="../saga.html">'
-    + '<h3>FALL-LINE ── 全文版</h3>'
-    + '<p>全章を一つのページで読むための従来版。検索や通読を一つの画面で行いたいときはこちら。</p>'
-    + '</a>'
+    + '<div class="nr-label">公開範囲</div>'
+    + '<div class="release-note">'
+    + '<h3>第一章まで公開中</h3>'
+    + '<p>第二章以降は改稿中です。</p>'
+    + '</div>'
     + '<a class="nr-back" href="../index.html">⌂ 入口へ戻る</a>'
     + '</aside>'
 )
@@ -552,6 +586,7 @@ chapter_index_doc = page_doc(
     root_prefix="../",
     bm_key="mira-bm-saga-index",
     scroll_nav=False,
+    reader=False,
 )
 (CHAPTER_DIR / "index.html").write_text(chapter_index_doc, encoding="utf-8")
 
@@ -564,7 +599,10 @@ for i, ch in enumerate(reading_pages):
     else:
         pager.append('<span></span>')
     if next_ch:
-        pager.append(f'<a href="{html.escape(next_ch["file"])}">{html.escape(next_ch["label"])} →</a>')
+        if is_public_chapter(next_ch):
+            pager.append(f'<a href="{html.escape(next_ch["file"])}">{html.escape(next_ch["label"])} →</a>')
+        else:
+            pager.append('<span></span>')
     else:
         pager.append('<span></span>')
     pager.append('</nav>')

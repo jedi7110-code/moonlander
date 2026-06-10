@@ -17,6 +17,11 @@
     border:1px solid var(--rule); border-radius:8px;
     padding:14px 16px; background:var(--bg2); transition:.18s;
   }
+  .chapter-links .locked {
+    display:block; color:var(--dim); opacity:.45;
+    border:1px solid var(--rule); border-radius:8px;
+    padding:14px 16px; background:var(--bg2);
+  }
   .chapter-links a:hover { border-color:var(--accent); transform:translateY(-1px); }
   .chapter-pager {
     display:flex; justify-content:space-between; gap:14px;
@@ -27,20 +32,29 @@
     border-radius:8px; padding:8px 12px; font-size:13px;
   }
   .chapter-pager a:hover { color:var(--ink); border-color:var(--accent); }
+  .bar nav .locked { opacity:.38; cursor:default; }
+  .release-note {
+    text-align:center; color:var(--dim);
+    font-family:system-ui,-apple-system,sans-serif;
+  }
+  .release-note h3 {
+    margin:0 0 .45em; color:var(--ink); font-size:18px;
+  }
+  .release-note p { margin:0; font-size:14px; line-height:1.85; }
 </style>
 </head>
 <body>
   <div class="bar" id="bar">
     <button id="barToggle" type="button" aria-label="メニュー" aria-expanded="false" title="メニュー">☰</button>
     <span class="nm">FALL-LINE</span>
-    <nav><a href="resonance.html">残響　ウィリアムズバーグ</a><a href="prologue.html">プロローグ</a><a href="chapter-01.html">第一章　失踪した少女と、狭間の異星人</a><a href="chapter-02.html">第二章　インプラントと、自分への問い</a><a href="chapter-03.html">第三章　神とされること</a><a href="chapter-04.html">第四章　PAX と、反融合思想主義者</a><a href="chapter-05.html">第五章　ライラ、留まることを選ぶ者</a><a href="chapter-06.html">第六章　千年後、継承</a><a href="epilogue.html">エピローグ</a><a href="appendix-fall-landing.html">外伝　FALL-LANDING</a><a href="characters.html">主要登場人物</a><a href="motifs.html">主題とモチーフ</a></nav>
+    <nav><a href="resonance.html">残響　ウィリアムズバーグ</a><a href="prologue.html">プロローグ</a><a href="chapter-01.html">第一章　失踪した少女と、狭間の異星人</a><span class="locked" aria-disabled="true">第二章　インプラントと、自分への問い</span><span class="locked" aria-disabled="true">第三章　神とされること</span><span class="locked" aria-disabled="true">第四章　PAX と、反融合思想主義者</span><span class="locked" aria-disabled="true">第五章　ライラ、留まることを選ぶ者</span><span class="locked" aria-disabled="true">第六章　千年後、継承</span><span class="locked" aria-disabled="true">エピローグ</span><span class="locked" aria-disabled="true">外伝　FALL-LANDING</span><span class="locked" aria-disabled="true">主要登場人物</span><span class="locked" aria-disabled="true">主題とモチーフ</span></nav>
     <a class="xlink" href="../index.html" title="入口へ">⌂</a>
     <button id="fontDec" title="文字を小さく" aria-label="文字を小さく">A-</button>
     <button id="fontInc" title="文字を大きく" aria-label="文字を大きく">A+</button>
   </div>
   <div class="scroll" id="scroll">
     <div class="book">
-      <div class="series">THE FALL</div><h1 class="title"><span class="ttl-en"><span class="tcy">FALL</span>-<span class="tcy">LINE</span></span><span class="ttl-jp">フォールライン</span></h1><h2>外伝　<span class="tcy">FALL</span>-<span class="upr">LANDING</span></h2><blockquote><p>月面の〈黒筐（こっきょう）〉──六角柱の黒い鏡面体──に「触れる</p><p>／触れない」で物語が二つに裂ける別冊『<span class="tcy">FALL</span>-<span class="upr">LANDING</span> ──</p><p>フォールランディング』。本編の前史にあたる外伝で、触れた者は</p><p>〈退ける手つき〉の最初のひとつとなって本編につながり、触れなかった</p><p>者は本編とは交わらない袋小路を辿る。</p></blockquote><nav class="chapter-pager" aria-label="章送り"><a href="epilogue.html">← エピローグ</a><a href="characters.html">主要登場人物 →</a></nav>
+      <div class="series">THE FALL</div><h1 class="title"><span class="ttl-en"><span class="tcy">FALL</span>-<span class="tcy">LINE</span></span><span class="ttl-jp">フォールライン</span></h1><h2>外伝　<span class="tcy">FALL</span>-<span class="upr">LANDING</span></h2><blockquote><p>月面の〈黒筐（こっきょう）〉──六角柱の黒い鏡面体──に「触れる</p><p>／触れない」で物語が二つに裂ける別冊『<span class="tcy">FALL</span>-<span class="upr">LANDING</span> ──</p><p>フォールランディング』。本編の前史にあたる外伝で、触れた者は</p><p>〈退ける手つき〉の最初のひとつとなって本編につながり、触れなかった</p><p>者は本編とは交わらない袋小路を辿る。</p></blockquote><nav class="chapter-pager" aria-label="章送り"><a href="epilogue.html">← エピローグ</a><span></span></nav>
     </div>
   </div>
   <aside class="progress" aria-hidden="true">

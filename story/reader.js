@@ -118,7 +118,7 @@
       var toast = document.getElementById('resume');
       if (!toast) return;
       var pct = toast.querySelector('.pct');
-      if (pct) pct.textContent = Math.round(saved / max * 100) + '%';
+      if (pct) pct.textContent = Math.min(100, Math.round(saved / max * 100)) + '%';
       toast.classList.add('show');
       toast.onclick = function(e){
         e.preventDefault();

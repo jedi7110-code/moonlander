@@ -17,6 +17,11 @@
     border:1px solid var(--rule); border-radius:8px;
     padding:14px 16px; background:var(--bg2); transition:.18s;
   }
+  .chapter-links .locked {
+    display:block; color:var(--dim); opacity:.45;
+    border:1px solid var(--rule); border-radius:8px;
+    padding:14px 16px; background:var(--bg2);
+  }
   .chapter-links a:hover { border-color:var(--accent); transform:translateY(-1px); }
   .chapter-pager {
     display:flex; justify-content:space-between; gap:14px;
@@ -27,65 +32,35 @@
     border-radius:8px; padding:8px 12px; font-size:13px;
   }
   .chapter-pager a:hover { color:var(--ink); border-color:var(--accent); }
+  .bar nav .locked { opacity:.38; cursor:default; }
+  .release-note {
+    text-align:center; color:var(--dim);
+    font-family:system-ui,-apple-system,sans-serif;
+  }
+  .release-note h3 {
+    margin:0 0 .45em; color:var(--ink); font-size:18px;
+  }
+  .release-note p { margin:0; font-size:14px; line-height:1.85; }
 </style>
 </head>
 <body>
   <div class="bar" id="bar">
     <button id="barToggle" type="button" aria-label="メニュー" aria-expanded="false" title="メニュー">☰</button>
     <span class="nm">FALL-LINE</span>
-    <nav><a href="resonance.html">残響　ウィリアムズバーグ</a><a href="prologue.html">プロローグ</a><a href="chapter-01.html">第一章　失踪した少女と、狭間の異星人</a><a href="chapter-02.html">第二章　インプラントと、自分への問い</a><a href="chapter-03.html">第三章　神とされること</a><a href="chapter-04.html">第四章　PAX と、反融合思想主義者</a><a href="chapter-05.html">第五章　ライラ、留まることを選ぶ者</a><a href="chapter-06.html">第六章　千年後、継承</a><a href="epilogue.html">エピローグ</a><a href="appendix-fall-landing.html">外伝　FALL-LANDING</a><a href="characters.html">主要登場人物</a><a href="motifs.html">主題とモチーフ</a></nav>
+    <nav><a href="resonance.html">残響　ウィリアムズバーグ</a><a href="prologue.html">プロローグ</a><a href="chapter-01.html">第一章　失踪した少女と、狭間の異星人</a><span class="locked" aria-disabled="true">第二章　インプラントと、自分への問い</span><span class="locked" aria-disabled="true">第三章　神とされること</span><span class="locked" aria-disabled="true">第四章　PAX と、反融合思想主義者</span><span class="locked" aria-disabled="true">第五章　ライラ、留まることを選ぶ者</span><span class="locked" aria-disabled="true">第六章　千年後、継承</span><span class="locked" aria-disabled="true">エピローグ</span><span class="locked" aria-disabled="true">外伝　FALL-LANDING</span><span class="locked" aria-disabled="true">主要登場人物</span><span class="locked" aria-disabled="true">主題とモチーフ</span></nav>
     <a class="xlink" href="../index.html" title="入口へ">⌂</a>
     <button id="fontDec" title="文字を小さく" aria-label="文字を小さく">A-</button>
     <button id="fontInc" title="文字を大きく" aria-label="文字を大きく">A+</button>
   </div>
   <div class="scroll" id="scroll">
     <div class="book">
-      <div class="series">THE FALL</div><h1 class="title"><span class="ttl-en"><span class="tcy">FALL</span>-<span class="tcy">LINE</span></span><span class="ttl-jp">フォールライン</span></h1><p><span class="upr">UPDATED</span> <span class="tcy">2026</span>.<span class="tcy">06</span>.<span class="tcy">08</span></p><hr class="scene"><h2>章別ページ</h2><div class="chapter-links"><a href="resonance.html">残響　ウィリアムズバーグ</a><a href="prologue.html">プロローグ</a><a href="chapter-01.html">第一章　失踪した少女と、狭間の異星人</a><a href="chapter-02.html">第二章　インプラントと、自分への問い</a><a href="chapter-03.html">第三章　神とされること</a><a href="chapter-04.html">第四章　PAX と、反融合思想主義者</a><a href="chapter-05.html">第五章　ライラ、留まることを選ぶ者</a><a href="chapter-06.html">第六章　千年後、継承</a><a href="epilogue.html">エピローグ</a><a href="appendix-fall-landing.html">外伝　FALL-LANDING</a><a href="characters.html">主要登場人物</a><a href="motifs.html">主題とモチーフ</a></div><aside class="next-read"><div class="nr-label">▷ 全文版</div><a class="nr-card" href="../saga.html"><h3>FALL-LINE ── 全文版</h3><p>全章を一つのページで読むための従来版。検索や通読を一つの画面で行いたいときはこちら。</p></a><a class="nr-back" href="../index.html">⌂ 入口へ戻る</a></aside>
+      <div class="series">THE FALL</div><h1 class="title"><span class="ttl-en"><span class="tcy">FALL</span>-<span class="tcy">LINE</span></span><span class="ttl-jp">フォールライン</span></h1><p><span class="upr">UPDATED</span> <span class="tcy">2026</span>.<span class="tcy">06</span>.<span class="tcy">08</span></p><hr class="scene"><h2>章別ページ</h2><div class="chapter-links"><a href="resonance.html">残響　ウィリアムズバーグ</a><a href="prologue.html">プロローグ</a><a href="chapter-01.html">第一章　失踪した少女と、狭間の異星人</a><span class="locked" aria-disabled="true">第二章　インプラントと、自分への問い</span><span class="locked" aria-disabled="true">第三章　神とされること</span><span class="locked" aria-disabled="true">第四章　PAX と、反融合思想主義者</span><span class="locked" aria-disabled="true">第五章　ライラ、留まることを選ぶ者</span><span class="locked" aria-disabled="true">第六章　千年後、継承</span><span class="locked" aria-disabled="true">エピローグ</span><span class="locked" aria-disabled="true">外伝　FALL-LANDING</span><span class="locked" aria-disabled="true">主要登場人物</span><span class="locked" aria-disabled="true">主題とモチーフ</span></div><aside class="next-read"><div class="nr-label">公開範囲</div><div class="release-note"><h3>第一章まで公開中</h3><p>第二章以降は改稿中です。</p></div><a class="nr-back" href="../index.html">⌂ 入口へ戻る</a></aside>
     </div>
   </div>
-  <aside class="progress" aria-hidden="true">
-    <div class="track"></div>
-    <div class="ticks" id="ticks"></div>
-    <div class="fill" id="fill"></div>
-    <div class="pct" id="pct">0%</div>
-  </aside>
-  <a class="resume" id="resume" href="#">▷ 前回の続き <small class="pct">--%</small></a>
+  
 <script src="../reader.js"></script>
 <script>
-  var sc = document.getElementById('scroll');
-
-  Reader.init({
-    getScroll: function(){ return sc; },
-    bmKey: 'mira-bm-saga-index'
-  });
-
-  var book = sc.querySelector('.book');
-  var fill = document.getElementById('fill');
-  var ticks = document.getElementById('ticks');
-  var pct = document.getElementById('pct');
-  function rebuildTicks(){
-    ticks.innerHTML = '';
-    var hs = book.querySelectorAll('h2');
-    var total = sc.scrollHeight;
-    if (total <= 0) return;
-    hs.forEach(function(h){
-      var i = document.createElement('i');
-      i.style.top = (h.offsetTop / total * 100) + '%';
-      ticks.appendChild(i);
-    });
-  }
-  function updateProgress(){
-    var max = sc.scrollHeight - sc.clientHeight;
-    if (max <= 0){ fill.style.height = '0%'; pct.textContent = '0%'; return; }
-    var r = Math.min(1, Math.max(0, sc.scrollTop / max));
-    fill.style.height = (r * 100) + '%';
-    pct.textContent = Math.round(r * 100) + '%';
-  }
-  sc.addEventListener('scroll', updateProgress, {passive:true});
-  window.addEventListener('resize', function(){ rebuildTicks(); updateProgress(); });
-  window.addEventListener('load', function(){ rebuildTicks(); updateProgress(); });
-  rebuildTicks(); updateProgress();
-  sc.scrollTop = 0;
+  Reader.init({});
 </script>
 
 <!-- ────────── 用語辞書モーダル ────────── -->
