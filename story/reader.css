@@ -102,12 +102,12 @@ body {
   -webkit-overflow-scrolling:touch;
 }
 .book {
-  max-width:42rem; margin:0 auto; padding:5vh 6vw 16vh;
-  font-size:calc(18px * var(--fs, 1));
+  max-width:46rem; margin:0 auto; padding:5vh 6vw 16vh;
+  font-size:calc(20px * var(--fs, 1));
   line-height:1.95; letter-spacing:.02em; text-align:justify;
 }
 @media (max-width:640px) {
-  .book { font-size:calc(16px * var(--fs, 1)); padding:4vh 7vw 14vh; }
+  .book { font-size:calc(17px * var(--fs, 1)); padding:4vh 7vw 14vh; }
 }
 
 /* シリーズ表記 / タイトル / UPDATED 行 */
@@ -232,7 +232,7 @@ html.paper .book figure.ill img {
 
 /* ────────── 本文末尾「次に読む」カード ────────── */
 .next-read {
-  margin:4em auto 0; padding-top:2em; max-width:42rem;
+  margin:4em auto 0; padding-top:2em; max-width:46rem;
   border-top:1px solid var(--rule);
 }
 .next-read .nr-label {

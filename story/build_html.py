@@ -471,7 +471,7 @@ def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-sa
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(page_title)}</title>
-<link rel="stylesheet" href="{root_prefix}reader.css">
+<link rel="stylesheet" href="{root_prefix}reader.css?v=2">
 <style>
   /* ───── saga (FALL-LINE) 固有 ───── */
   .book .title .ttl-en {{ font-size:min(6vw, 40px); }}
