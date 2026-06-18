@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>船内の日常 ── 観察モード（プロト）</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #05070d;
+      overflow: hidden;
+      font-family: monospace;
+    }
+    #obs-container {
+      width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #obs-container canvas { display: block; }
+
+    /* 司令部メッセージ / クルーの返答（タイプライター） */
+    #cmd-message {
+      position: fixed;
+      left: 50%; bottom: 84px;   /* 船の下・入力欄のすぐ上に表示 */
+      transform: translateX(-50%) translateY(20px);
+      width: min(620px, 80vw);
+      max-height: 30vh; overflow-y: auto;
+      padding: 16px 22px;
+      background: rgba(4, 16, 24, 0.92);
+      border: 1px solid #2d9bd0; border-left: 4px solid #39d0ff;
+      box-shadow: 0 0 24px rgba(57, 208, 255, 0.25);
+      color: #b7f0ff; font-size: 16px; line-height: 1.7;
+      white-space: pre-wrap; letter-spacing: 0.04em;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    #cmd-message.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* クルーの呼びかけ（四の壁ノック）アラート */
+    #want-alert {
+      position: fixed; left: 50%; top: 4%;
+      transform: translateX(-50%) translateY(-12px);
+      padding: 12px 22px;
+      background: rgba(40, 10, 8, 0.94);
+      border: 1px solid #ff5a4a; border-radius: 3px;
+      box-shadow: 0 0 24px rgba(255, 90, 74, 0.35);
+      color: #ffd2cc; font-size: 15px; letter-spacing: 0.04em;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    #want-alert.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* 補給パネル（左下）＋ 対話バー（右下） */
+    #controls {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      display: flex; justify-content: space-between; align-items: flex-end;
+      padding: 14px 18px; gap: 16px; pointer-events: none;
+    }
+    #supply-panel, #chat-form { pointer-events: auto; }
+    #supply-panel { display: flex; gap: 8px; }
+    #supply-panel button {
+      font-family: monospace; font-size: 14px;
+      padding: 8px 12px; cursor: pointer;
+      background: rgba(20, 30, 48, 0.9); color: #cfe4ff;
+      border: 1px solid #4a6a8f; border-radius: 3px;
+    }
+    #supply-panel button:hover { border-color: #ffae4a; color: #ffd9a8; }
+    #chat-form { display: flex; gap: 8px; }
+    #chat-input {
+      font-family: monospace; font-size: 14px;
+      width: min(360px, 50vw); padding: 9px 12px;
+      background: rgba(8, 18, 28, 0.92); color: #b7f0ff;
+      border: 1px solid #2d9bd0; border-radius: 3px; outline: none;
+    }
+    #chat-input::placeholder { color: #4f6f8c; }
+    #chat-form button {
+      font-family: monospace; font-size: 14px; padding: 9px 16px; cursor: pointer;
+      background: #123040; color: #39d0ff; border: 1px solid #39d0ff; border-radius: 3px;
+    }
+
+    /* 言語トグル（右上） */
+    #lang-toggle {
+      position: fixed; top: 12px; right: 14px; z-index: 10;
+      font-family: monospace; font-size: 13px; padding: 6px 12px; cursor: pointer;
+      background: rgba(8, 18, 28, 0.92); color: #9fb6d6;
+      border: 1px solid #4a6a8f; border-radius: 3px;
+    }
+    #lang-toggle:hover { border-color: #39d0ff; color: #cfe4ff; }
+  </style>
+</head>
+<body>
+  <div id="obs-container"></div>
+
+  <button id="lang-toggle">EN</button>
+  <div id="want-alert"></div>
+  <div id="cmd-message"></div>
+
+  <div id="controls">
+    <div id="supply-panel">
+      <button data-supply="food">F 食料</button>
+      <button data-supply="water">W 水</button>
+      <button data-supply="catfood">C 猫餌</button>
+      <button data-supply="music">M 音楽</button>
+    </div>
+    <form id="chat-form" autocomplete="off">
+      <input id="chat-input" type="text" placeholder="クルーに話しかける（please で機嫌が上がる）" />
+      <button type="submit">送信</button>
+    </form>
+  </div>
+
+  <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+  <script type="module" src="js/obs/main.js?v=15"></script>
+</body>
+</html>
