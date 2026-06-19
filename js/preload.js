@@ -77,7 +77,7 @@ export function startBriefing(loadingScreen, onDismiss, scene) {
             '> FROM: PERCIVAL',
             '> TO:   BARRAMUNDI',
             '',
-            'CLASSIFIED MEMO TO LANDER COMMANDER:',
+            'CLASSIFIED MEMO TO LANDER COMMANDER MILO JARVIS:',
             '',
             'UNKNOWN ARTIFACT DETECTED ON LUNAR SURFACE.',
             'SCIENCE TEAM SENT FOR INVESTIGATION.',
@@ -92,7 +92,7 @@ export function startBriefing(loadingScreen, onDismiss, scene) {
             'WARNING: SUBSURFACE BIO-SIGNATURES DETECTED.',
             'ASSUME ALL CONTACT IS HOSTILE.',
             '',
-            'GOOD LUCK, COMMANDER.'
+            'GOOD LUCK, COMMANDER JARVIS.'
         ].join('\n'),
         J: [
             '> セキュアリンク確立',
@@ -101,7 +101,7 @@ export function startBriefing(loadingScreen, onDismiss, scene) {
             '> 発信：パーシヴァル',
             '> 宛先：バラマンディ号',
             '',
-            '機密通信 着陸船指揮官へ：',
+            '機密通信 着陸船指揮官 マイロ・ジャービスへ：',
             '',
             '月面にて未確認の遺物を検出。',
             '調査のため科学チームを派遣したが、47時間前に全通信が途絶した。',
@@ -115,7 +115,7 @@ export function startBriefing(loadingScreen, onDismiss, scene) {
             '警告：地表下に生体反応を検知。',
             '接触するものはすべて敵対存在と見なせ。',
             '',
-            '武運を祈る、指揮官。'
+            '武運を祈る、ジャービス指揮官。'
         ].join('\n')
     };
     let text = texts.E;

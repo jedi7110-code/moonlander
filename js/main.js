@@ -1,8 +1,8 @@
         import { fadeStopSound } from './audio.js';
         import { createGlitchOverlay } from './glitch-overlay.js';
-        import { preload as preloadAssets, startBriefing } from './preload.js?v=22';
+        import { preload as preloadAssets, startBriefing } from './preload.js?v=23';
         import { create as createScene } from './create.js?v=78';
-        import { update as updateScene } from './update.js?v=120';
+        import { update as updateScene } from './update.js?v=121';
 
         // #game-container を視覚的にビューポートに合わせて縮小（比率維持・拡大はしない）
         // 内部レイアウト（CRT/ローディング画面/ブリーフィング）は 1200x800 想定のまま、

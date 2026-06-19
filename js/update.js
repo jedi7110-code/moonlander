@@ -3,7 +3,7 @@ import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js?v=3';
 import { enterCockpitMode, updateCockpit } from './cockpit.js?v=102';
-import { startCredits } from './preload.js?v=22';
+import { startCredits } from './preload.js?v=23';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // または本番環境でコナミコマンド (window.__testMode) で起動したテストモードでも
