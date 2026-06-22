@@ -118,6 +118,11 @@ def gloss_wrap(text_segment: str) -> str:
 # ---- インライン整形 ----
 def inline(t: str) -> str:
     t = html.escape(t)
+    t = re.sub(
+        r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+        r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>',
+        t,
+    )
     t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
     t = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", t)
     # 半角英数の連なりは縦中横（4文字以下）／それ以上は正立回転回避
@@ -226,6 +231,8 @@ def slug_for(idx: int, label: str) -> str:
         return "epilogue.html"
     if label.startswith("外伝"):
         return "appendix-fall-landing.html"
+    if label.startswith("作中音楽"):
+        return "music.html"
     if label.startswith("主要登場人物"):
         return "characters.html"
     if label.startswith("主題とモチーフ"):
@@ -295,7 +302,7 @@ def build_reading_pages():
 reading_pages = build_reading_pages()
 
 def is_public_chapter(ch):
-    return ch["label"].startswith(PUBLIC_CHAPTER_PREFIXES)
+    return True
 
 def full_nav_items():
     items = []
@@ -573,8 +580,8 @@ chapter_index_body = (
     + '<aside class="next-read">'
     + '<div class="nr-label">公開範囲</div>'
     + '<div class="release-note">'
-    + '<h3>第二章まで公開中</h3>'
-    + '<p>第三章以降は改稿中です。</p>'
+    + '<h3>全章公開中</h3>'
+    + '<p>改稿しながら更新しています。</p>'
     + '</div>'
     + '<a class="nr-back" href="../index.html">⌂ 入口へ戻る</a>'
     + '</aside>'
