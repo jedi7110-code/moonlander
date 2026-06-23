@@ -4,7 +4,7 @@
 単一ソース（.md）から全文版と章別版を生成するので、本文を直すときは .md を編集して再実行する。
   $ python3 build_html.py
 """
-import re, html, json, pathlib
+import re, html, json, pathlib, urllib.parse
 
 SRC = pathlib.Path(__file__).with_name("saga.md")
 OUT = pathlib.Path(__file__).with_name("saga.html")
@@ -118,11 +118,16 @@ def gloss_wrap(text_segment: str) -> str:
 # ---- インライン整形 ----
 def inline(t: str) -> str:
     t = html.escape(t)
-    t = re.sub(
-        r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
-        r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>',
-        t,
-    )
+    def md_link(m):
+        label = m.group(1)
+        url = html.unescape(m.group(2))
+        safe_url = html.escape(url, quote=True)
+        icon_url = "https://www.google.com/s2/favicons?sz=16&domain_url=" + urllib.parse.quote(url, safe="")
+        return (
+            f'<a class="ext-link" href="{safe_url}" target="_blank" rel="noopener noreferrer">'
+            f'<img class="favicon" src="{icon_url}" alt="" loading="lazy">{label}</a>'
+        )
+    t = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", md_link, t)
     t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
     t = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", t)
     # 半角英数の連なりは縦中横（4文字以下）／それ以上は正立回転回避
@@ -133,8 +138,16 @@ def inline(t: str) -> str:
     # HTMLタグ内の strong/em などを巻き込まないよう、タグとテキストを
     # 分離してテキスト部分にだけ適用する
     parts = re.split(r"(<[^>]+>)", t)
+    in_link = False
     for i, part in enumerate(parts):
-        if not part.startswith("<"):
+        if part.startswith("<"):
+            ps = part.lower()
+            if ps.startswith("<a"):
+                in_link = True
+            elif ps.startswith("</a"):
+                in_link = False
+            continue
+        if not in_link:
             parts[i] = re.sub(r"[0-9A-Za-z]+", tcy, part)
     return "".join(parts)
 

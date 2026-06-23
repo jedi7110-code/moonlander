@@ -2102,9 +2102,23 @@ UPDATED 2026.06.15
 
 ## 作中音楽
 
-- **The Durutti Column『Deux Triangles』** … ミラが三年以上探している一枚。[YouTubeで探す](https://www.youtube.com/results?search_query=The+Durutti+Column+Deux+Triangles)
-- **Martin Denny『Quiet Village』** … ミラが半年前に三ドルで救い出した一枚。[YouTubeで探す](https://www.youtube.com/results?search_query=Martin+Denny+Quiet+Village)
-- **グレン・キャンベル〈Wichita Lineman〉** … リサが眠る前に低く流した古いオリジナル。[YouTubeで聴く](https://www.youtube.com/watch?v=99Jyv1r5aRw)
+- **The Durutti Column『Deux Triangles』**
+- ミラが三年以上探している一枚。
+- [Favourite Painting](https://youtu.be/F2YTl2VLu7o?si=eBFXd0c6eo6i4j1-)
+- [Piece For Out Of Tune Grande Piano](https://www.youtube.com/watch?v=klmMN3EPI3g)
+- [YouTubeで探す](https://www.youtube.com/results?search_query=The+Durutti+Column+Deux+Triangles)
+- [Discogs](https://www.discogs.com/release/477055-The-Durutti-Column-Deux-Triangles)
+![The Durutti Column『Deux Triangles』ジャケット](https://i.discogs.com/fFGmCljlePXw4eV8bUD9JvfwZB3tCs2LaAHsVRpq2MM/rs:fit/g:sm/q:90/h:600/w:589/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTQ3NzA1/NS0xMTE5MzYyNDQ1/LmpwZw.jpeg)
+- **Martin Denny『Quiet Village』**
+- ミラが半年前に三ドルで救い出した一枚。
+- [YouTubeで探す](https://www.youtube.com/results?search_query=Martin+Denny+Quiet+Village)
+- [Discogs](https://www.discogs.com/ja/release/399425-Martin-Denny-Quiet-Village-The-Exotic-Sounds-Of-Martin-Denny)
+![Martin Denny『Quiet Village』ジャケット](https://i.discogs.com/aTa2FLZcPZMuptCCaT6-ocyuNSXlkqyn0sjPLCp6iPY/rs:fit/g:sm/q:90/h:592/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTM5OTQy/NS0xMjkwMzc2MzQx/LmpwZWc.jpeg)
+- **グレン・キャンベル〈Wichita Lineman〉**
+- リサが眠る前に低く流した古いオリジナル。
+- [YouTubeで聴く](https://youtu.be/Q8P_xTBpAcY?si=SpDTuGssJnZEpLG6)
+- [Discogs](https://www.discogs.com/ja/release/2538833-Glen-Campbell-Wichita-Lineman)
+![グレン・キャンベル〈Wichita Lineman〉ジャケット](https://i.discogs.com/qlDXsC4wwnZuPe6gJ_17eTekXMGhWxIAmP0Yz7qFRpE/rs:fit/g:sm/q:90/h:600/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI1Mzg4/MzMtMTM5NTg0Njgx/Mi00MzMwLnBuZw.jpeg)
 - **店内の生成ビートルズ曲** … 作中設定の生成曲。リンクなし。
 
 ## 主要登場人物
