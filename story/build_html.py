@@ -34,7 +34,7 @@ lines = SRC.read_text(encoding="utf-8").splitlines()
 
 # ---- マークダウンをブロックへ ----
 blocks = []          # (type, payload)
-para, quote, ul = [], [], []
+para, quote, ul, ol = [], [], [], []
 
 def flush_para():
     global para
@@ -54,8 +54,14 @@ def flush_ul():
         blocks.append(("ul", ul[:]))
         ul = []
 
+def flush_ol():
+    global ol
+    if ol:
+        blocks.append(("ol", ol[:]))
+        ol = []
+
 def flush_all():
-    flush_para(); flush_quote(); flush_ul()
+    flush_para(); flush_quote(); flush_ul(); flush_ol()
 
 for raw in lines:
     line = raw.rstrip("\n")
@@ -71,18 +77,22 @@ for raw in lines:
     if s == "---":
         flush_all(); blocks.append(("hr", None)); continue
     if s.startswith(">"):
-        flush_para(); flush_ul()
+        flush_para(); flush_ul(); flush_ol()
         quote.append(s.lstrip(">").strip()); continue
     if s.startswith("- "):
-        flush_para(); flush_quote()
+        flush_para(); flush_quote(); flush_ol()
         ul.append(s[2:].strip()); continue
+    ol_m = re.match(r'^\d+\.\s+(.*)$', s)
+    if ol_m:
+        flush_para(); flush_quote(); flush_ul()
+        ol.append(ol_m.group(1).strip()); continue
     # 画像挿入（行全体が ![alt](src) のとき）
     img_m = re.match(r'^!\[(.*?)\]\(([^)]+)\)$', s)
     if img_m:
         flush_all()
         blocks.append(("img", (img_m.group(1), img_m.group(2)))); continue
     # 通常本文：空行までを 1 段落に結合（md 内の改行は折り返し）
-    flush_quote(); flush_ul()
+    flush_quote(); flush_ul(); flush_ol()
     para.append(s)
 flush_all()
 
@@ -214,6 +224,9 @@ def render_block(typ, pay, asset_prefix="", cid=None):
     if typ == "ul":
         items = "".join(f"<li>{render_text(x)}</li>" for x in pay)
         return f"<ul>{items}</ul>"
+    if typ == "ol":
+        items = "".join(f"<li>{render_text(x)}</li>" for x in pay)
+        return f"<ol>{items}</ol>"
     if typ == "img":
         alt, src = pay
         src = prefixed_path(src, asset_prefix)
