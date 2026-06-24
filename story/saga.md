@@ -1,6 +1,6 @@
 # FALL-LINE ── フォールライン
 
-UPDATED 2026.06.15
+UPDATED 2026.06.24
 
 ---
 
@@ -765,19 +765,25 @@ UPDATED 2026.06.15
 
 　猫が筐体へ飛び乗り、ミラの腿に前脚を置いた。ミラはその額を撫でた。
 呼ぶべき名前は、やはり出てこなかった。猫はそんなことを気にする様子も
-なく、喉を鳴らした。リサの表示器から〈休養推奨〉が消え、代わりに
-〈外出非推奨〉が出た。
-
-「少しだけ」とミラは言った。
+なく、喉を鳴らした。リサの表示器には、まだ〈休養推奨〉が残っていた。
 
 　その夜、ミラはすぐには眠らなかった。
 
 　ベッド脇の時計は、ガラス管の中に橙色の数字を浮かべていた。午前零時を
 少し回っている。
+　ミラはしばらく天井を見ていた。それから、簡易ベッドの縁に手をかけ、
+ゆっくりと立ち上がった。
 
-　ミラはドアに掛けてあった黄色い耐酸ポンチョを羽織り、鼻と口を覆う
-濾過マスクをつけて部屋を出た。非常階段を下まで降り、建物の出口で
-フードを深く引いた。
+　ドアに掛けてあった黄色い耐酸ポンチョへ手を伸ばした。途中で手を止め、
+筐体の脇のリサを振り返った。
+
+「少しだけ」
+
+　リサの表示器から〈休養推奨〉が消え、代わりに〈外出非推奨〉が出た。
+しばらくして、表示が一度だけ瞬き、〈濾過マスク〉に変わった。
+
+　ミラは黄色い耐酸ポンチョを羽織り、鼻と口を覆う濾過マスクをつけて
+部屋を出た。非常階段を下まで降り、建物の出口でフードを深く引いた。
 
 　酸の雨を避けて軒下を歩き、路地を二度曲がった。
 そこに、看板のない小さな店があった。入口の上には、紫色の殺菌灯が一本
@@ -2122,7 +2128,11 @@ UPDATED 2026.06.15
 - [YouTubeで聴く](https://youtu.be/Q8P_xTBpAcY?si=SpDTuGssJnZEpLG6)
 - [Discogs](https://www.discogs.com/ja/release/2538833-Glen-Campbell-Wichita-Lineman)
 ![グレン・キャンベル〈Wichita Lineman〉ジャケット](https://i.discogs.com/qlDXsC4wwnZuPe6gJ_17eTekXMGhWxIAmP0Yz7qFRpE/rs:fit/g:sm/q:90/h:600/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI1Mzg4/MzMtMTM5NTg0Njgx/Mi00MzMwLnBuZw.jpeg)
-- **店内の生成ビートルズ曲** … 作中設定の生成曲。リンクなし。
+- **The Beatles『Yesterday And Today』**
+- 店のカウンター奥に額装されている、本物の〈ブッチャー・カバー〉。
+- [YouTubeで見る](https://www.youtube.com/watch?v=Lal1g4Of2ck)
+- [YouTubeで見る](https://www.youtube.com/watch?v=KvDg1ZqDuaM)
+- [Discogs](https://www.discogs.com/master/59364-The-Beatles-Yesterday-And-Today?srsltid=AfmBOoq6yChYxwqFQopE2ApjO636eNeGHTtLncedYyTGq1LPCdqFQarm)
 
 ## 主要登場人物
 
