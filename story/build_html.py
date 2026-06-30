@@ -184,7 +184,7 @@ def render_text(pay: str) -> str:
 
 # ---- HTML 生成 ----
 CHAPTER_DIR = pathlib.Path(__file__).with_name("fall-line")
-PUBLIC_CHAPTER_PREFIXES = ("残響", "プロローグ", "第一章", "第二章")
+HIDDEN_TOC_PREFIXES = ("第四章", "第五章", "第六章", "エピローグ")
 
 def is_absolute_url(src: str) -> bool:
     return bool(re.match(r"^(?:[a-z]+:)?//|^/|^data:", src))
@@ -327,8 +327,8 @@ def build_reading_pages():
 
 reading_pages = build_reading_pages()
 
-def is_public_chapter(ch):
-    return True
+def is_visible_in_toc(ch):
+    return not ch["label"].startswith(HIDDEN_TOC_PREFIXES)
 
 def full_nav_items():
     items = []
@@ -340,13 +340,10 @@ def chapter_nav_html(root_prefix="", full=False):
     links = []
     items = full_nav_items() if full else reading_pages
     for ch in items:
+        if not is_visible_in_toc(ch):
+            continue
         href = ch["href"] if full else ch["file"]
-        if full or is_public_chapter(ch):
-            links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
-        else:
-            links.append(
-                f'<span class="locked" aria-disabled="true">{html.escape(ch["label"])}</span>'
-            )
+        links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
     return "".join(links)
 
 def render_full_chapter(ch):
@@ -593,10 +590,9 @@ for stale_name in ("chapter-01-2.html", "chapter-01-3.html"):
 index_links = "".join(
     (
         f'<a href="{html.escape(ch["file"])}">{html.escape(ch["label"])}</a>'
-        if is_public_chapter(ch)
-        else f'<span class="locked" aria-disabled="true">{html.escape(ch["label"])}</span>'
     )
     for ch in reading_pages
+    if is_visible_in_toc(ch)
 )
 chapter_index_body = (
     (title_block or "")
@@ -606,7 +602,7 @@ chapter_index_body = (
     + '<aside class="next-read">'
     + '<div class="nr-label">公開範囲</div>'
     + '<div class="release-note">'
-    + '<h3>全章公開中</h3>'
+    + '<h3>第三章まで公開中</h3>'
     + '<p>改稿しながら更新しています。</p>'
     + '</div>'
     + '<a class="nr-back" href="../index.html">⌂ 入口へ戻る</a>'
@@ -631,11 +627,8 @@ for i, ch in enumerate(reading_pages):
         pager.append(f'<a href="{html.escape(prev_ch["file"])}">← {html.escape(prev_ch["label"])}</a>')
     else:
         pager.append('<span></span>')
-    if next_ch:
-        if is_public_chapter(next_ch):
-            pager.append(f'<a href="{html.escape(next_ch["file"])}">{html.escape(next_ch["label"])} →</a>')
-        else:
-            pager.append('<span></span>')
+    if next_ch and is_visible_in_toc(next_ch):
+        pager.append(f'<a href="{html.escape(next_ch["file"])}">{html.escape(next_ch["label"])} →</a>')
     else:
         pager.append('<span></span>')
     pager.append('</nav>')
