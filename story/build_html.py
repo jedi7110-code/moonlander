@@ -340,10 +340,13 @@ def chapter_nav_html(root_prefix="", full=False):
     links = []
     items = full_nav_items() if full else reading_pages
     for ch in items:
-        if not is_visible_in_toc(ch):
-            continue
         href = ch["href"] if full else ch["file"]
-        links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
+        if is_visible_in_toc(ch):
+            links.append(f'<a href="{html.escape(href)}">{html.escape(ch["label"])}</a>')
+        else:
+            links.append(
+                f'<span class="locked" aria-disabled="true">{html.escape(ch["label"])}</span>'
+            )
     return "".join(links)
 
 def render_full_chapter(ch):
@@ -590,9 +593,10 @@ for stale_name in ("chapter-01-2.html", "chapter-01-3.html"):
 index_links = "".join(
     (
         f'<a href="{html.escape(ch["file"])}">{html.escape(ch["label"])}</a>'
+        if is_visible_in_toc(ch)
+        else f'<span class="locked" aria-disabled="true">{html.escape(ch["label"])}</span>'
     )
     for ch in reading_pages
-    if is_visible_in_toc(ch)
 )
 chapter_index_body = (
     (title_block or "")
