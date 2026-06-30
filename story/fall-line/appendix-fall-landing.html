@@ -9,6 +9,12 @@
   /* ───── saga (FALL-LINE) 固有 ───── */
   .book .title .ttl-en { font-size:min(6vw, 40px); }
   .next-read .nr-card:hover { border-color:#a99fe0; }
+  .next-read .nr-card.nr-locked {
+    opacity:.46; cursor:default;
+  }
+  .next-read .nr-card.nr-locked:hover {
+    transform:none; border-color:var(--rule);
+  }
   .chapter-links {
     display:grid; gap:12px; margin:2.5em 0 3em;
   }
@@ -54,7 +60,7 @@
   </div>
   <div class="scroll" id="scroll">
     <div class="book">
-      <div class="series">THE FALL</div><h1 class="title"><span class="ttl-en"><span class="tcy">FALL</span>-<span class="tcy">LINE</span></span><span class="ttl-jp">フォールライン</span></h1><h2>外伝　<span class="tcy">FALL</span>-<span class="upr">LANDING</span></h2><blockquote><p>月面の〈黒筐（こっきょう）〉──六角柱の黒い鏡面体──に「触れる</p><p>／触れない」で物語が二つに裂ける別冊『<span class="tcy">FALL</span>-<span class="upr">LANDING</span> ──</p><p>フォールランディング』。本編の前史にあたる外伝で、触れた者は</p><p>〈退ける手つき〉の最初のひとつとなって本編につながり、触れなかった</p><p>者は本編とは交わらない袋小路を辿る。</p></blockquote><nav class="chapter-pager" aria-label="章送り"><a href="epilogue.html">← エピローグ</a><a href="music.html">作中音楽 →</a></nav>
+      <div class="series">THE FALL</div><h1 class="title"><span class="ttl-en"><span class="tcy">FALL</span>-<span class="tcy">LINE</span></span><span class="ttl-jp">フォールライン</span></h1><h2>外伝　<span class="tcy">FALL</span>-<span class="upr">LANDING</span></h2><blockquote><p>月面の〈黒筐（こっきょう）〉──六角柱の黒い鏡面体──に「触れる</p><p>／触れない」で物語が二つに裂ける別冊『<span class="tcy">FALL</span>-<span class="upr">LANDING</span> ──</p><p>フォールランディング』。本編の前史にあたる外伝で、触れた者は</p><p>〈退ける手つき〉の最初のひとつとなって本編につながり、触れなかった</p><p>者は本編とは交わらない袋小路を辿る。</p></blockquote><nav class="chapter-pager" aria-label="章送り"><span></span><a href="music.html">作中音楽 →</a></nav>
     </div>
   </div>
   <aside class="progress" aria-hidden="true">

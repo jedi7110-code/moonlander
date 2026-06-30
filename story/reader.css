@@ -275,6 +275,12 @@ html.paper .book figure.ill img {
 .next-read .nr-card:hover {
   transform:translateY(-2px); border-color:var(--accent);
 }
+.next-read .nr-card.nr-locked {
+  opacity:.46; cursor:default;
+}
+.next-read .nr-card.nr-locked:hover {
+  transform:none; border-color:var(--rule);
+}
 .next-read .nr-card h3 {
   margin:0 0 .4em; font-size:18px; letter-spacing:.06em; color:var(--ink);
 }

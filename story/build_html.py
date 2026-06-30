@@ -477,10 +477,10 @@ def next_read_html(root_prefix=""):
     return f"""
       <aside class="next-read">
         <div class="nr-label">▷ 次に読む（別冊）</div>
-        <a class="nr-card" href="{root_prefix}blackhexa.html">
+        <div class="nr-card nr-locked" aria-disabled="true">
           <h3>FALL-LANDING ── フォールランディング</h3>
           <p>本編の前史にあたる外伝。月面に立つ六角柱の黒い鏡面体〈黒筐（こっきょう）〉に「触れる／触れない」を選ぶと、物語は二つに裂け、二度と交わらない。ルートAの〈退ける手つき〉が、本編のミラたちの背中に書き写されていく前史として接続する。</p>
-        </a>
+        </div>
         <a class="nr-back" href="{root_prefix}index.html">⌂ 入口へ戻る</a>
       </aside>"""
 
@@ -509,6 +509,12 @@ def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-sa
   /* ───── saga (FALL-LINE) 固有 ───── */
   .book .title .ttl-en {{ font-size:min(6vw, 40px); }}
   .next-read .nr-card:hover {{ border-color:#a99fe0; }}
+  .next-read .nr-card.nr-locked {{
+    opacity:.46; cursor:default;
+  }}
+  .next-read .nr-card.nr-locked:hover {{
+    transform:none; border-color:var(--rule);
+  }}
   .chapter-links {{
     display:grid; gap:12px; margin:2.5em 0 3em;
   }}
@@ -627,7 +633,7 @@ for i, ch in enumerate(reading_pages):
     prev_ch = reading_pages[i - 1] if i > 0 else None
     next_ch = reading_pages[i + 1] if i + 1 < len(reading_pages) else None
     pager = ['<nav class="chapter-pager" aria-label="章送り">']
-    if prev_ch:
+    if prev_ch and is_visible_in_toc(prev_ch):
         pager.append(f'<a href="{html.escape(prev_ch["file"])}">← {html.escape(prev_ch["label"])}</a>')
     else:
         pager.append('<span></span>')

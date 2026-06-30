@@ -9,6 +9,12 @@
   /* ───── saga (FALL-LINE) 固有 ───── */
   .book .title .ttl-en { font-size:min(6vw, 40px); }
   .next-read .nr-card:hover { border-color:#a99fe0; }
+  .next-read .nr-card.nr-locked {
+    opacity:.46; cursor:default;
+  }
+  .next-read .nr-card.nr-locked:hover {
+    transform:none; border-color:var(--rule);
+  }
   .chapter-links {
     display:grid; gap:12px; margin:2.5em 0 3em;
   }

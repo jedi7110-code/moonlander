@@ -66,35 +66,37 @@
 
 
   /* ────────── Cards: echo logo geometry ────────── */
-  a.card{display:grid;grid-template-columns:10px 1fr;
+  .card{display:grid;grid-template-columns:10px 1fr;
     text-decoration:none;color:inherit;
     border:1px solid var(--rule);
     margin:0 0 22px;transition:transform .22s, border-color .22s,
     background .22s;
     background:var(--bg2);overflow:hidden;position:relative}
-  a.card .accent{background:var(--orange);height:100%;
+  .card .accent{background:var(--orange);height:100%;
     transition:background .22s}
-  a.card.side .accent{background:var(--steel)}
-  a.card .body{padding:24px 28px 26px}
+  .card.side .accent{background:var(--steel)}
+  .card .body{padding:24px 28px 26px}
   a.card:hover{transform:translateY(-2px);
     border-color:var(--orange);background:var(--steel-deep)}
   a.card.side:hover{border-color:var(--dim)}
   a.card.side:hover .accent{background:var(--ink)}
+  .card.locked{opacity:.46;cursor:default}
+  .card.locked .accent{background:var(--steel)}
   .role{display:inline-block;font-size:10px;letter-spacing:.28em;
     color:var(--orange);border:1px solid var(--orange);
     padding:2px 10px;margin-bottom:.9em;
     font-family:"Melete",system-ui,-apple-system,sans-serif;
     font-weight:500;
     text-transform:uppercase;text-indent:.28em}
-  a.card.side .role{color:var(--dim);border-color:var(--rule)}
-  a.card h2{margin:0 0 .15em;font-size:26px;letter-spacing:.14em;
+  .card.side .role{color:var(--dim);border-color:var(--rule)}
+  .card h2{margin:0 0 .15em;font-size:26px;letter-spacing:.14em;
     font-family:"Melete","Bahnschrift","Eurostile","Helvetica Neue",
                 system-ui,-apple-system,sans-serif;
     font-weight:700;color:var(--ink)}
-  a.card .ttl-jp{display:block;font-size:12px;color:var(--dim);
+  .card .ttl-jp{display:block;font-size:12px;color:var(--dim);
     letter-spacing:.36em;margin:.2em 0 1em;font-weight:400;
     font-family:"Helvetica Neue",system-ui,sans-serif}
-  a.card p{margin:0;color:#c8c5b9;font-size:15px;line-height:1.95}
+  .card p{margin:0;color:#c8c5b9;font-size:15px;line-height:1.95}
 
   /* footer accent */
   .footer-mark{margin:3em auto 0;text-align:center;
@@ -142,11 +144,11 @@
         <span class="ttl-jp">フォールライン</span>
       </h2>
       <p>雨の都市の潜行者ミラ・ハーロウから始まる長編サーガ。
-      現在は残響・プロローグ・第一章まで公開中。</p>
+      現在は残響・プロローグ・第三章まで公開中。</p>
     </div>
   </a>
 
-  <a class="card side" href="blackhexa.html">
+  <div class="card side locked" aria-disabled="true">
     <div class="accent"></div>
     <div class="body">
       <span class="role">② 別冊（分岐小説）</span>
@@ -158,7 +160,7 @@
       裂け、二度と交わらない。読者がルートA・Bを選んで最後まで歩く、
       分岐型の中編。</p>
     </div>
-  </a>
+  </div>
 
   <div class="footer-mark">▷ THE FALL ◁</div>
 
