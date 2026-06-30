@@ -33,7 +33,7 @@ html.paper {
 }
 
 * { box-sizing:border-box; }
-html, body { height:100%; margin:0; }
+html, body { min-height:100%; margin:0; }
 body {
   background:var(--bg); color:var(--ink);
   font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",
@@ -97,9 +97,7 @@ body {
 
 /* ────────── 読書エリア ────────── */
 .scroll {
-  position:fixed; inset:46px 0 0 0;
-  overflow-y:auto; overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;
+  min-height:100vh; padding-top:46px; overflow-x:hidden;
 }
 .book {
   max-width:46rem; margin:0 auto; padding:5vh 6vw 16vh;
@@ -217,6 +215,7 @@ a.gloss:hover { color:var(--accent); }
   font-size:22px; font-weight:700; letter-spacing:.05em;
   margin:2.8em 0 1.2em; padding:.15em 0 .15em .7em;
   color:var(--ink); border-left:3px solid var(--accent);
+  scroll-margin-top:64px;
 }
 .book h3 {
   font-size:16px; font-weight:600; letter-spacing:.05em;

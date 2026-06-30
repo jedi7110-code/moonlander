@@ -4,8 +4,8 @@
    ヘッダ機能：ハンバーガー・文字サイズ・しおり・前回続きトースト
    使い方：
      Reader.init({
-       getScroll: () => document.getElementById('scroll'),  // 必須
-       bmKey: 'mira-bm-saga',                                // しおりの localStorage キー
+       getScroll: () => window,      // window/body スクロール。旧式の独自スクロール要素も可
+       bmKey: 'mira-bm-saga',        // しおりの localStorage キー
      });
    ページ固有（章ナビのスクロール、進捗ゲージ、分岐選択など）は
    各ビルドの inline <script> に残す。
@@ -59,6 +59,43 @@
     dec.addEventListener('click', function(){ set(fs - 0.1); });
   }
 
+  // ────────── スクロール抽象 ──────────
+  // iOS Safari の「画面上部タップで先頭へ戻る」を効かせるため、
+  // FALL-LINE は window/body スクロールを使う。旧ページ用に要素スクロールも残す。
+  function rootScroller(){
+    return document.scrollingElement || document.documentElement || document.body;
+  }
+  function isWindowScroller(sc){
+    return sc === window || sc === document || sc === document.body ||
+           sc === document.documentElement || sc === rootScroller();
+  }
+  function scrollTopOf(sc){
+    if (isWindowScroller(sc)) {
+      return window.pageYOffset || rootScroller().scrollTop || 0;
+    }
+    return sc.scrollTop || 0;
+  }
+  function scrollMaxOf(sc){
+    if (isWindowScroller(sc)) {
+      var root = rootScroller();
+      return Math.max(0, root.scrollHeight - window.innerHeight);
+    }
+    return Math.max(0, sc.scrollHeight - sc.clientHeight);
+  }
+  function scrollToTop(sc, top, behavior){
+    var opts = {top: top, behavior: behavior || 'auto'};
+    if (isWindowScroller(sc)) {
+      window.scrollTo(opts);
+    } else {
+      sc.scrollTo(opts);
+    }
+  }
+  function addScrollHandler(sc, handler){
+    (isWindowScroller(sc) ? window : sc).addEventListener(
+      'scroll', handler, {passive: true}
+    );
+  }
+
   // ────────── しおり ──────────
   //  クリック：いま見ている位置を保存（フィードバック「📑 保存」）。
   //   ただし保存位置から離れている時は、保存位置へジャンプ（「📑 戻る」）。
@@ -80,11 +117,11 @@
     function attach(sc){
       if (!sc || sc.__bmAttached) return;
       sc.__bmAttached = true;
-      sc.addEventListener('scroll', function(){
+      addScrollHandler(sc, function(){
         if (!ready) return;
         clearTimeout(t);
-        t = setTimeout(function(){ setVal(sc.scrollTop); }, 500);
-      }, {passive: true});
+        t = setTimeout(function(){ setVal(scrollTopOf(sc)); }, 500);
+      });
     }
     // 初回 + 100ms 後（遅延生成ペイン対策）
     attach(getScroll());
@@ -94,12 +131,12 @@
       btn.addEventListener('click', function(){
         var sc = getScroll(); if (!sc) return;
         attach(sc);  // 別ペインになっていたら今のペインで自動保存も繋ぎ直す
-        var cur = sc.scrollTop;
+        var cur = scrollTopOf(sc);
         var saved = get();
         var orig = btn.textContent;
         if (saved > 0 && Math.abs(cur - saved) > 40) {
           // 別の場所にいる → 保存位置へ戻る
-          sc.scrollTo({top: saved, behavior: 'smooth'});
+          scrollToTop(sc, saved, 'smooth');
           btn.textContent = '📑 戻る';
         } else {
           // いまの位置を保存
@@ -113,7 +150,7 @@
     window.addEventListener('load', function(){
       var sc = getScroll(); if (!sc) return;
       var saved = get();
-      var max = sc.scrollHeight - sc.clientHeight;
+      var max = scrollMaxOf(sc);
       if (max <= 0 || saved < Math.max(80, max * 0.05)) return;
       var toast = document.getElementById('resume');
       if (!toast) return;
@@ -122,7 +159,7 @@
       toast.classList.add('show');
       toast.onclick = function(e){
         e.preventDefault();
-        sc.scrollTo({top: saved, behavior: 'smooth'});
+        scrollToTop(sc, saved, 'smooth');
         toast.classList.remove('show');
       };
       setTimeout(function(){ toast.classList.remove('show'); }, 8000);

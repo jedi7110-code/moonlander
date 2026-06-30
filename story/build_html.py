@@ -376,21 +376,29 @@ def progress_script(bm_key, scroll_nav=False):
   });
 """
     return f"""<script>
-  var sc = document.getElementById('scroll');
+  var sc = window;
+  var root = document.scrollingElement || document.documentElement;
+  var scrollWrap = document.getElementById('scroll');
 
   Reader.init({{
     getScroll: function(){{ return sc; }},
     bmKey: '{bm_key}'
   }});
 {nav_script}
-  var book = sc.querySelector('.book');
+  var book = scrollWrap.querySelector('.book');
   var fill = document.getElementById('fill');
   var ticks = document.getElementById('ticks');
   var pct = document.getElementById('pct');
+  function scrollTop(){{
+    return window.pageYOffset || root.scrollTop || 0;
+  }}
+  function scrollMax(){{
+    return Math.max(0, root.scrollHeight - window.innerHeight);
+  }}
   function rebuildTicks(){{
     ticks.innerHTML = '';
     var hs = book.querySelectorAll('h2');
-    var total = sc.scrollHeight;
+    var total = root.scrollHeight;
     if (total <= 0) return;
     hs.forEach(function(h){{
       var i = document.createElement('i');
@@ -399,17 +407,17 @@ def progress_script(bm_key, scroll_nav=False):
     }});
   }}
   function updateProgress(){{
-    var max = sc.scrollHeight - sc.clientHeight;
+    var max = scrollMax();
     if (max <= 0){{ fill.style.height = '0%'; pct.textContent = '0%'; return; }}
-    var r = Math.min(1, Math.max(0, sc.scrollTop / max));
+    var r = Math.min(1, Math.max(0, scrollTop() / max));
     fill.style.height = (r * 100) + '%';
     pct.textContent = Math.round(r * 100) + '%';
   }}
-  sc.addEventListener('scroll', updateProgress, {{passive:true}});
+  window.addEventListener('scroll', updateProgress, {{passive:true}});
   window.addEventListener('resize', function(){{ rebuildTicks(); updateProgress(); }});
   window.addEventListener('load', function(){{ rebuildTicks(); updateProgress(); }});
   rebuildTicks(); updateProgress();
-  sc.scrollTop = 0;
+  window.scrollTo(0, 0);
 </script>"""
 
 def gloss_modal(prefix=""):
