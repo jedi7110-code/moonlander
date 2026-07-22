@@ -68,6 +68,12 @@ for raw in lines:
     s = line.strip()
     if s == "":
         flush_all(); continue
+    revision_m = re.match(r'^<!-- revision:([0-9a-f]+):(start|end) -->$', s)
+    if revision_m:
+        flush_all()
+        revision_id, edge = revision_m.groups()
+        blocks.append((f"revision_{edge}", revision_id))
+        continue
     if s.startswith("# "):
         flush_all(); blocks.append(("h1", s[2:].strip())); continue
     if s.startswith("## "):
@@ -207,6 +213,14 @@ def title_html(pay: str):
     return pay, '<div class="series">THE FALL</div>' f'<h1 class="title">{inline(pay)}</h1>'
 
 def render_block(typ, pay, asset_prefix="", cid=None):
+    if typ == "revision_start":
+        return (
+            f'<div class="revision revision-{html.escape(pay)}" '
+            f'data-revision="{html.escape(pay)}" '
+            'style="color:color-mix(in srgb,#ff2f3f 76%,var(--ink))">'
+        )
+    if typ == "revision_end":
+        return "</div>"
     if typ == "h1":
         return title_html(pay)[1]
     if typ == "h2":
