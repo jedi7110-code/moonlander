@@ -28,6 +28,42 @@ When the user proposes a wording change, image, or scene detail:
 - Preserve the distinction between terms such as `ダイブ世界`, `ダイブ先`,
   `仮想惑星`, `継ぎ目`, `層`, `原稿`, and `記述の層`.
 
+## Author and character constraints
+
+- The author composes from a highly specific inner image first: spatial layout,
+  light, color, material wear, sound, smell, and physical procedure. Treat a
+  later-described image as missing source information, not optional decoration.
+- Do not impose a theme, moral, symbolic meaning, or ending before the concrete
+  scenes produce one. The author often discovers meaning after the image exists.
+- The author rejects abstract bridges and canned AI transitions when the next
+  scene can show the difference itself. Do not add a sentence merely to explain
+  why the narrative is moving to the next scene.
+- Avoid dialogue whose only function is reader exposition. Characters should
+  speak to verify, refuse, request, or decide something they need in that moment.
+- Never force a local observation to connect immediately to `継ぎ目`, `原稿`,
+  godhood, or the central theme. Establish the observable sequence first.
+- Mira observes before she feels or judges. She treats injustice as structure,
+  forms a hypothesis, checks procedure, and acts when the risk is acceptable.
+  She is cautious but not timid, cool but not indifferent.
+- Mira does not make righteous speeches, embrace a chosen-one role, or readily
+  surrender her body and records. A canonical example: she refuses Nadia's body
+  examination and offers inspection logs instead.
+- The seed is canonically under the inside of Mira's left forearm, where it can
+  be pressed through her sleeve. Do not move it to the back of her hand.
+- LIZ should remain quiet and machine-like. Show care through displays, logged
+  observations, arm position, and procedure rather than human-like chatter.
+
+## Recovery when a proposal misses
+
+- If the user says the meaning or image is unclear, do not rescue the proposal
+  by adding another explanatory sentence. Return to positions, actions,
+  observations, and causality, then rebuild from those facts.
+- Do not rush to establish a relationship, connect the theme, or close a scene.
+- After a substantial replacement, reread the whole block for repeated encounter
+  structures, repeated gestures, terminology drift, and physical continuity.
+- `novel-brushup-notes.md` contains the detailed author profile, Mira profile,
+  known failure modes, and current companion-introduction design.
+
 ## Edit workflow
 
 - Use `apply_patch` for manual edits.
