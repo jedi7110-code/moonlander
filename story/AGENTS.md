@@ -53,6 +53,43 @@ When the user proposes a wording change, image, or scene detail:
 - LIZ should remain quiet and machine-like. Show care through displays, logged
   observations, arm position, and procedure rather than human-like chatter.
 
+## Preferences confirmed from revision history
+
+The manuscript has been revised through many small commits. Future agents do
+not need to reread the full history unless current files conflict. Use this
+precedence order:
+
+1. The user's latest statement.
+2. The current `saga.md`.
+3. Recent commit diffs affecting the passage.
+4. `review-notes.md` and `novel-brushup-notes.md`.
+5. Older outlines, reviews, and AI-generated proposals.
+
+- A later image supplied by the user overrides an earlier plausible sentence.
+  This is increased visual precision, not indecision.
+- Physical and procedural accuracy comes before thematic elegance. A wrong
+  object position, signal path, tool action, period detail, or body movement
+  breaks the scene even when the metaphor works.
+- Insight must be earned through an observable sequence: action, measurement,
+  repetition, comparison, then inference. Avoid "somehow she understood."
+- Remove narrator hindsight and explanatory padding such as "the reason could
+  not be explained," "she would learn later," or "at this point she did not
+  know" when the scene already carries the fact.
+- Add narrative weight through work, routine, maintenance, food, clothing, and
+  worn objects, not through action montages or extra danger beats.
+- Characters become distinct through the job they trust and the one procedure
+  that fails: Ian registers, Nadia measures, Quang repairs, and Mira inspects.
+- Dialogue must perform an immediate task: verify, refuse, request, negotiate,
+  or decide. Do not use characters as exposition prompts.
+- Treat polished genre labels, acronyms, villain names, and quotable slogans
+  with suspicion. The group in Chapter 4 has no name; `PAX` is obsolete in the
+  novel even if it remains in historical notes or the game.
+- The inherited element is no longer a "hand gesture" or `手つき`. LIZ records
+  Mira's judgment and movement; what persists is the choice to stop, wait, and
+  not override another person's will.
+- Current casting references are performance guides only. Mira's current
+  reference is Rebecca Ferguson; do not reproduce an actor's face in prose.
+
 ## Recovery when a proposal misses
 
 - If the user says the meaning or image is unclear, do not rescue the proposal
