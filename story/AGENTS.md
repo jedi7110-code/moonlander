@@ -52,6 +52,13 @@ When the user proposes a wording change, image, or scene detail:
   be pressed through her sleeve. Do not move it to the back of her hand.
 - LIZ should remain quiet and machine-like. Show care through displays, logged
   observations, arm position, and procedure rather than human-like chatter.
+- LIZ does not make Mira invisible and cannot erase an owner's raw world logs.
+  Standard incident tickets contain the resident id, time, and anomalous line,
+  but omit addressee and gaze target. Those remain in each owner's raw log.
+  LIZ uses legitimate world-specific one-time credentials and keeps their
+  identity mapping locally while disconnected from the institutional network.
+  Cross-company raw logs plus credential-issuance records can eventually expose
+  Mira; the separation delays identification rather than preventing it.
 
 ## Preferences confirmed from revision history
 
@@ -81,6 +88,15 @@ precedence order:
   that fails: Ian registers, Nadia measures, Quang repairs, and Mira inspects.
 - Dialogue must perform an immediate task: verify, refuse, request, negotiate,
   or decide. Do not use characters as exposition prompts.
+- The author often hears a non-Japanese actor perform the dialogue in English
+  before rendering it as Japanese translated SF. Translate the speech act,
+  emotional pressure, and visible action rather than the English words. Preserve
+  a slight translated cadence, but check where a mild English imperative becomes
+  too harsh in Japanese. Canonical example: a quiet `Stop it.` addressed to
+  kneeling residents becomes `立ってくれ`, not the stronger command `やめろ`.
+  Treat this as acting direction before translation: give the imagined actor a
+  playable objective and blocking, not an abstract emotion, then choose the
+  Japanese line that produces the same change in the scene.
 - Treat polished genre labels, acronyms, villain names, and quotable slogans
   with suspicion. The group in Chapter 4 has no name; `PAX` is obsolete in the
   novel even if it remains in historical notes or the game.
