@@ -85,7 +85,7 @@ precedence order:
 - Add narrative weight through work, routine, maintenance, food, clothing, and
   worn objects, not through action montages or extra danger beats.
 - Characters become distinct through the job they trust and the one procedure
-  that fails: Ian registers, Nadia measures, Quang repairs, and Mira inspects.
+  that fails: Owen registers, Nadia measures, Quang repairs, and Mira inspects.
 - Dialogue must perform an immediate task: verify, refuse, request, negotiate,
   or decide. Do not use characters as exposition prompts.
 - The author often hears a non-Japanese actor perform the dialogue in English
