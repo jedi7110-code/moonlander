@@ -1,6 +1,6 @@
 # FALL-LINE ── フォールライン
 
-UPDATED 2026.07.02
+UPDATED 2026.08.12
 
 ---
 
