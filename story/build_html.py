@@ -190,7 +190,7 @@ def render_text(pay: str) -> str:
 
 # ---- HTML 生成 ----
 CHAPTER_DIR = pathlib.Path(__file__).with_name("fall-line")
-HIDDEN_TOC_PREFIXES = ("第四章", "第五章", "第六章", "エピローグ", "外伝")
+HIDDEN_TOC_PREFIXES = ("第五章", "第六章", "エピローグ", "外伝")
 
 def is_absolute_url(src: str) -> bool:
     return bool(re.match(r"^(?:[a-z]+:)?//|^/|^data:", src))
@@ -634,7 +634,7 @@ chapter_index_body = (
     + '<aside class="next-read">'
     + '<div class="nr-label">公開範囲</div>'
     + '<div class="release-note">'
-    + '<h3>第三章まで公開中</h3>'
+    + '<h3>第四章まで公開中</h3>'
     + '<p>改稿しながら更新しています。</p>'
     + '</div>'
     + '<a class="nr-back" href="../index.html">⌂ 入口へ戻る</a>'
