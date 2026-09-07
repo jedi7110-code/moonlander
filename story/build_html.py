@@ -190,7 +190,9 @@ def render_text(pay: str) -> str:
 
 # ---- HTML 生成 ----
 CHAPTER_DIR = pathlib.Path(__file__).with_name("fall-line")
-HIDDEN_TOC_PREFIXES = ("第五章", "第六章", "エピローグ", "外伝")
+HIDDEN_TOC_PREFIXES = (
+    "第五章", "第六章", "第七章", "第八章", "第九章", "エピローグ", "外伝"
+)
 
 def is_absolute_url(src: str) -> bool:
     return bool(re.match(r"^(?:[a-z]+:)?//|^/|^data:", src))
@@ -267,6 +269,12 @@ def slug_for(idx: int, label: str) -> str:
         return "chapter-05.html"
     if label.startswith("第六章"):
         return "chapter-06.html"
+    if label.startswith("第七章"):
+        return "chapter-07.html"
+    if label.startswith("第八章"):
+        return "chapter-08.html"
+    if label.startswith("第九章"):
+        return "chapter-09.html"
     if label.startswith("エピローグ"):
         return "epilogue.html"
     if label.startswith("外伝"):
