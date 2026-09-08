@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080c0d">
+  <meta name="description" content="月面に軟着陸し、地底から現れるエイリアンをかわして仲間を救出。全員を船へ連れ帰り、月面を脱出する3Dゲーム。">
+  <meta property="og:title" content="MOONLANDER 3D">
+  <meta property="og:description" content="静かの海、通信途絶から47時間。着陸し、仲間を救い、軌道へ帰還せよ。">
+  <meta property="og:image" content="https://moonlander-two.vercel.app/assets/ogp.png">
+  <link rel="icon" href="/assets/favi.ico">
+  <title>MOONLANDER 3D — 静かの海 救出作戦</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="game" aria-label="MOONLANDER 3D 月面救出ゲーム">
+    <canvas id="world" aria-label="3D月面。操作方法ボタンでキーボード・タッチ操作を確認できます。" tabindex="0"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="MOONLANDER 3D タイトルへ"><img src="/assets/title-green.png" alt="MOONLANDER"><span>3D</span></a>
+      <span class="sector"><i></i> MARE TRANQUILLITATIS <span>静かの海</span></span>
+      <nav class="tools" aria-label="ゲーム設定">
+        <button id="sound" aria-label="音をオンにする" title="音の切り替え">SOUND <span>OFF</span></button>
+        <button id="help" aria-label="操作方法を開く">操作方法 <kbd>?</kbd></button>
+        <button id="pause" aria-label="一時停止" title="一時停止 / Esc">Ⅱ</button>
+        <button id="fullscreen" aria-label="全画面表示" title="全画面表示">⛶</button>
+      </nav>
+    </header>
+
+    <section id="start-screen" class="start-screen" aria-label="ミッション開始">
+      <div class="intro">
+        <p class="eyebrow"><span class="status-dot"></span> PAX / RESCUE OPERATIONS</p>
+        <h1>MOON<span>LANDER</span><sup>3D</sup></h1>
+        <div class="mission-title"><span>MISSION 01</span><h2>静かの海、救出作戦。</h2></div>
+        <p class="brief">科学チームからの通信が途絶えて47時間。<br>月面に着陸し、生存者を連れ帰れ。<br>地表下に、未確認の生体反応。</p>
+        <button id="start" class="primary" disabled><span>システム起動中…</span><b>↗</b></button>
+        <p class="start-note">W A S D で移動 · SPACE で逆噴射</p>
+        <div class="transmission"><span class="transmission-bars">▂ ▅ ▃ ▇ ▂</span><div>バラマンディ号 / 指揮官 マイロ・ジャービス<small>SECURE CHANNEL · UAC-7710-A3</small></div></div>
+      </div>
+      <div class="scene-caption" aria-hidden="true"><span>01 / BARRAMUNDI</span><b>LUNAR LANDING MODULE</b><span>LANDING SYSTEMS · STANDBY</span></div>
+      <ol class="mission-strip">
+        <li><span>01</span><div>着陸<small>SOFT LANDING</small></div><b>↘</b></li>
+        <li><span>02</span><div>探索・交戦<small>SURFACE OPERATIONS</small></div><b>⌖</b></li>
+        <li><span>03</span><div>仲間救出<small>CREW RECOVERY</small></div><b>♧</b></li>
+        <li><span>04</span><div>月面脱出<small>RETURN TO ORBIT</small></div><b>↗</b></li>
+      </ol>
+    </section>
+
+    <section id="hud" class="hud hidden" aria-label="ミッション情報">
+      <div class="objective"><p id="phase-label" class="eyebrow">01 / DESCENT</p><h2 id="objective">指定地点に軟着陸せよ</h2><p id="objective-detail">SPACE で逆噴射。降下速度を 1.4m/s 以下に。</p></div>
+      <div class="mission-progress"><span id="round">MISSION 01</span><ol id="stages"><li class="active">01<span>着陸</span></li><li>02<span>探索</span></li><li>03<span>救出</span></li><li>04<span>脱出</span></li></ol></div>
+      <div class="telemetry">
+        <div class="readout"><label id="readout-a-label">高度 / ALTITUDE</label><strong id="readout-a">40.0<small>m</small></strong></div>
+        <div class="readout"><label id="readout-b-label">降下速度 / DESCENT</label><strong id="readout-b">1.2<small>m/s</small></strong></div>
+        <div class="readout"><label id="readout-c-label">機体の傾き / TILT</label><strong id="readout-c">0.0<small>°</small></strong></div>
+        <div class="resource"><div><label id="resource-label">FUEL</label><span id="resource-value">100%</span></div><div class="meter"><i id="resource-fill"></i></div><small id="resource-note">推進剤残量</small></div>
+        <div id="charge" class="charge hidden"><span>CHARGING</span><div class="meter"><i id="charge-fill"></i></div></div>
+      </div>
+      <div id="reticle" class="reticle hidden" aria-hidden="true"><i></i><span></span></div>
+      <div id="waypoint" class="waypoint" aria-hidden="true"><span>◇</span><b id="waypoint-name">LANDING ZONE</b><small id="waypoint-distance">40 m</small></div>
+      <div class="radar-panel"><div><span>LOCAL SCAN</span><span id="radar-range">120 m</span></div><canvas id="radar" width="320" height="320" aria-label="周辺地図。緑が船、白が自分、青がクルー、赤が敵。"></canvas><p><i class="green"></i>船 <i class="cyan"></i>クルー <i class="red"></i>敵</p></div>
+      <div id="event-message" class="event-message" role="status" aria-live="polite"></div>
+      <button id="interact" class="interact hidden"><kbd>E</kbd><span>ハッチを開く</span></button>
+      <div class="bottom-bar"><span id="controls-hint"><kbd>W A S D</kbd> 水平移動 <kbd>SPACE</kbd> 逆噴射 <kbd>SHIFT</kbd> 降下</span><span id="clock">T+ 00:00</span><button id="camera">視点切替 <kbd>C</kbd></button></div>
+    </section>
+
+    <div id="touch-controls" class="touch-controls hidden" aria-label="タッチ操作">
+      <div id="joystick" class="joystick" aria-label="移動スティック"><div></div><span>MOVE</span></div>
+      <div class="touch-actions"><button id="touch-alt">降下</button><button id="touch-main">逆噴射</button></div>
+    </div>
+
+    <dialog id="guide" aria-labelledby="guide-title">
+      <form method="dialog"><button class="close" aria-label="閉じる">×</button></form>
+      <p class="eyebrow">FLIGHT MANUAL / PAX</p><h2 id="guide-title">操作方法</h2>
+      <div class="guide-columns"><section><h3>01 — 月面着陸</h3><dl><dt>W A S D / 矢印</dt><dd>機体を前後左右に移動</dd><dt>SPACE</dt><dd>逆噴射・上昇</dd><dt>SHIFT</dt><dd>降下を速める</dd></dl><p>緑の着陸地点に、傾き±5°・降下速度1.4m/s以下・横滑り1.4m/s以下で着地。燃料とデブリに注意。</p></section><section><h3>02 — 探索・救出</h3><dl><dt>W A S D / 矢印</dt><dd>月面を前後左右に移動</dd><dt>マウス</dt><dd>カーソルの方向を狙う</dd><dt>SPACE / 左クリック</dt><dd>離すと射撃。1.5秒長押しで貫通ビーム</dd><dt>SHIFT</dt><dd>ジャンプ。長押しで高く跳ぶ</dd><dt>E</dt><dd>ハシゴを降りる・全員乗船後に脱出</dd></dl></section></div>
+      <div class="guide-rules"><p><b>生存者を全員、船へ。</b> 探査車に近づくとクルーが追従。船へ護衛すると順番に乗り込む。自分や仲間が敵に捕まると失敗。</p><p>通常ビームは残量で威力が3段階に変化。船・探査車の近くは急速充電。5体撃破するたびに大型の敵が出現。2周目からは救出人数が1人ずつ増加。</p></div>
+      <p class="guide-extra">C：追従 / 俯瞰視点　右ドラッグ：視点回転　ESC：一時停止<br>タッチ操作：左スティックで移動、右側のボタンで逆噴射・射撃・ジャンプ。射撃は進行方向を基準に近くの敵を狙います。</p>
+      <button id="guide-close" class="primary"><span>了解</span><b>↗</b></button>
+    </dialog>
+
+    <section id="pause-screen" class="modal-screen hidden" aria-label="一時停止"><div class="modal-card"><p class="eyebrow">UPLINK HELD</p><h2>一時停止</h2><p>準備ができたら、ミッションを再開。</p><button id="resume" class="primary">再開する <kbd>ESC</kbd></button><button id="restart-pause" class="secondary">このミッションをやり直す</button></div></section>
+    <section id="result-screen" class="modal-screen hidden" aria-live="polite"><div class="modal-card"><p id="result-eyebrow" class="eyebrow">MISSION COMPLETE</p><h2 id="result-title">全員、帰還。</h2><p id="result-description"></p><div id="result-stats" class="result-stats"></div><button id="retry" class="primary"><span>もう一度挑戦</span><b>↗</b></button><button id="back-title" class="secondary">タイトルへ</button></div></section>
+    <div id="fatal" class="fatal hidden" role="alert"></div>
+    <noscript><div class="fatal">このゲームを遊ぶには、ブラウザのJavaScriptを有効にしてください。</div></noscript>
+  </main>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

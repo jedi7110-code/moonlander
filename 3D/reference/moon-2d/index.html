@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+
+<head prefix="og:http://ogp.me/ns#">
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-MG86NXDS');</script>
+    <!-- End Google Tag Manager -->
+    <title>Moon Lander</title>
+    <meta name="description" content="「静かの海」に投下された探査チーム。彼らが最後に送信したのは、未知の巨大構造物と「正体不明の音」の記録だった。38万キロ彼方の暗黒で、人類は何を目覚めさせたのか。">
+    <meta charset="utf-8">
+    <meta property="og:url" content="https://moonlander-two.vercel.app/" />
+    <meta property="og:type" content="product" />
+    <meta property="og:title" content="Moon Lander" />
+    <meta property="og:description" content="「静かの海」に投下された探査チーム。彼らが最後に送信したのは、未知の巨大構造物と「正体不明の音」の記録だった。38万キロ彼方の暗黒で、人類は何を目覚めさせたのか。" />
+    <meta property="og:site_name" content="Moon Lander" />
+    <meta property="og:image" content="https://moonlander-two.vercel.app/assets/ogp.png" />
+    <link rel="icon" href="assets/favi.ico">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+    <!-- iOS：ホーム画面に追加されたとき URL バーなしで起動 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Moonlander">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <!-- ブリーフィング用 日本語フォント -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="style.css?v=122">
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+</head>
+
+<body oncontextmenu='return false;' oncopy='return false;'>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MG86NXDS"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+    <!-- 8bit/CRT風エフェクト用SVGフィルタ（posterize + 2段ブルーム） -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <filter id="crt-8bit" color-interpolation-filters="sRGB">
+            <feComponentTransfer in="SourceGraphic" result="posterized">
+                <feFuncR type="discrete" tableValues="0 0.016 0.032 0.048 0.063 0.079 0.095 0.111 0.127 0.143 0.159 0.175 0.19 0.206 0.222 0.238 0.254 0.27 0.286 0.302 0.317 0.333 0.349 0.365 0.381 0.397 0.413 0.429 0.444 0.46 0.476 0.492 0.508 0.524 0.54 0.556 0.571 0.587 0.603 0.619 0.635 0.651 0.667 0.683 0.698 0.714 0.73 0.746 0.762 0.778 0.794 0.81 0.825 0.841 0.857 0.873 0.889 0.905 0.921 0.937 0.952 0.968 0.984 1"/>
+                <feFuncG type="discrete" tableValues="0 0.016 0.032 0.048 0.063 0.079 0.095 0.111 0.127 0.143 0.159 0.175 0.19 0.206 0.222 0.238 0.254 0.27 0.286 0.302 0.317 0.333 0.349 0.365 0.381 0.397 0.413 0.429 0.444 0.46 0.476 0.492 0.508 0.524 0.54 0.556 0.571 0.587 0.603 0.619 0.635 0.651 0.667 0.683 0.698 0.714 0.73 0.746 0.762 0.778 0.794 0.81 0.825 0.841 0.857 0.873 0.889 0.905 0.921 0.937 0.952 0.968 0.984 1"/>
+                <feFuncB type="discrete" tableValues="0 0.016 0.032 0.048 0.063 0.079 0.095 0.111 0.127 0.143 0.159 0.175 0.19 0.206 0.222 0.238 0.254 0.27 0.286 0.302 0.317 0.333 0.349 0.365 0.381 0.397 0.413 0.429 0.444 0.46 0.476 0.492 0.508 0.524 0.54 0.556 0.571 0.587 0.603 0.619 0.635 0.651 0.667 0.683 0.698 0.714 0.73 0.746 0.762 0.778 0.794 0.81 0.825 0.841 0.857 0.873 0.889 0.905 0.921 0.937 0.952 0.968 0.984 1"/>
+            </feComponentTransfer>
+            <!-- 明部抽出（かなり明るい部分のみ残す） -->
+            <feColorMatrix in="posterized" type="matrix" values="
+                1.8 0 0 0 -0.95
+                0 1.8 0 0 -0.95
+                0 0 1.8 0 -0.95
+                0 0 0 1 0" result="bright"/>
+            <!-- 近距離ブルーム（シャープな発光コア） -->
+            <feGaussianBlur in="bright" stdDeviation="1" result="blurNear"/>
+            <!-- 遠距離ハレーション（広がる柔らかい光） -->
+            <feGaussianBlur in="bright" stdDeviation="6" result="blurFar"/>
+            <!-- ハレーションを加算（8%） -->
+            <feComposite in="blurFar" in2="posterized" operator="arithmetic" k1="0" k2="0.08" k3="1" k4="0" result="step1"/>
+            <!-- 近距離ブルームを加算（12%） -->
+            <feComposite in="blurNear" in2="step1" operator="arithmetic" k1="0" k2="0.12" k3="1" k4="0"/>
+        </filter>
+    </svg>
+
+    <div id="game-container">
+        <div class="crt-overlay crt-subpixel"></div>
+        <div class="crt-overlay crt-scanlines"></div>
+        <!-- ローディング画面：ゲーム枠内 / opening-title.jpg をモニター背景に表示 -->
+        <div id="loading-screen">
+            <div class="loading-frame">
+                <div class="loading-frame-bg"></div>
+                <div class="loading-frame-side l"></div>
+                <div class="loading-frame-side r"></div>
+                <div class="loading-frame-arm tl"></div>
+                <div class="loading-frame-arm tr"></div>
+                <div class="loading-frame-arm bl"></div>
+                <div class="loading-frame-arm br"></div>
+                <div class="loading-text">LOADING</div>
+                <div class="loading-gauge"><div class="loading-gauge-fill"></div></div>
+            </div>
+            <div class="title-screen">
+                <img class="title-image" src="assets/title-green.png" alt="Moonlander">
+                <div class="title-press">PRESS ENTER</div>
+            </div>
+            <!-- コックピットの STANDBY ボタン上のクリック領域。タイトル画面でのみ有効。
+                 別タブで story（THE FALL）を開く。座標は opening-title.webp 内の
+                 STANDBY ボタン位置（%指定）。 -->
+            <a class="standby-link" href="https://moonlander-two.vercel.app/story/" target="_blank" rel="noopener" aria-label="STANDBY — 物語を読む"></a>
+            <!-- ミッションブリーフィング（タイトル前に表示。ENTERでスキップ） -->
+            <div class="briefing-screen">
+                <pre class="briefing-text"></pre>
+                <div class="briefing-foot">
+                    <div class="briefing-lang">[ J / E ]</div>
+                    <div class="briefing-skip">[ PRESS ENTER ]</div>
+                </div>
+            </div>
+            <!-- 着陸時のコックピット視点モニター（briefing と同位置・同スケールで表示） -->
+            <div class="cockpit-monitor">
+                <div class="cockpit-monitor-inner">
+                    <img class="cockpit-image" src="assets/land-point.jpg" alt="">
+                    <div class="cockpit-shadow"></div>
+                    <!-- HUD：着陸ゾーン（着陸台の左右端）を示す緑のガイドライン。
+                         地面に貼り付いてパン＆傾きに追従し、十字との位置関係で
+                         OK 範囲内かを直感的に判断できる。 -->
+                    <div class="cockpit-okzone">
+                        <span class="okzone-line okzone-line-l"></span>
+                        <span class="okzone-line okzone-line-r"></span>
+                    </div>
+                    <!-- 高度ラダー：100m おきの赤線。0m が太い着地ライン -->
+                    <div class="cockpit-altladder"></div>
+                    <div class="cockpit-crosshair">
+                        <span class="ch-h"></span><span class="ch-v"></span>
+                        <span class="ch-c"></span>
+                    </div>
+                    <!-- 対地速度：タコメーター風半円ダイヤル（十字の上） -->
+                    <div class="cockpit-vsi">
+                        <svg class="vsi-gauge" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                            <!-- 外周アーク -->
+                            <path d="M 10 55 A 40 40 0 0 1 90 55" stroke="#88ffaa" stroke-width="1.5" fill="none" opacity="0.7"/>
+                            <!-- 安全帯アーク -->
+                            <path class="vsi-safe-arc" d="" stroke="#88ffaa" stroke-width="3" fill="none" opacity="0.85"/>
+                            <!-- 目盛 -->
+                            <g class="vsi-ticks" stroke="#88ffaa" stroke-width="1" opacity="0.85"></g>
+                            <!-- 針 -->
+                            <line class="vsi-needle" x1="50" y1="55" x2="50" y2="22" stroke="#c8ffd8" stroke-width="2" stroke-linecap="round"/>
+                            <!-- センターキャップ -->
+                            <circle cx="50" cy="55" r="2.5" fill="#88ffaa"/>
+                        </svg>
+                        <div class="vsi-num"><span class="vsi-val">0.0</span> <span class="vsi-unit">KM/H</span></div>
+                    </div>
+                    <!-- モニター上端：手動操縦中バナー（常時表示） -->
+                    <div class="cockpit-mancl">&gt; MAN CTRL &lt;</div>
+                    <!-- モニター下端：ANG / SPD 個別状態（OK ↔ -- 切替） -->
+                    <div class="cockpit-status">
+                        <span class="cs-ang-lbl">ANG:</span>
+                        <span class="cs-ang-val">OK</span>
+                        <span class="cs-sep">|</span>
+                        <span class="cs-spd-lbl">SPD:</span>
+                        <span class="cs-spd-val">OK</span>
+                    </div>
+                </div>
+                <!-- 高度計：十字の上、中央 -->
+                <div class="cockpit-attitude">
+                    <div class="att-alt"><span class="att-alt-val">0</span> <span class="att-alt-unit">M</span></div>
+                </div>
+                <!-- 水平ライン：十字と同じ中心（独立要素） -->
+                <div class="cockpit-horizon"><div class="att-horizon"></div></div>
+                <div class="cockpit-fuel">
+                    <div class="fuel-bar"><div class="fuel-fill"></div></div>
+                    <div class="fuel-lbl">FUEL</div>
+                </div>
+            </div>
+            <!-- 爆発と同時にコックピット内を暗転させるオーバーレイ -->
+            <div id="cockpit-fade-dark"></div>
+            <!-- 失敗時の爆破：コックピット画像の上に重ねる explosion.png スプライト
+                 （暗転より上のレイヤーなので暗転で消えない） -->
+            <div id="cockpit-blast" aria-hidden="true"></div>
+        </div>
+        <!-- 死亡後のリスタート待機プロンプト -->
+        <div id="restart-prompt">PRESS ENTER TO RESTART</div>
+        <!-- スタート時の黒フェード切替 -->
+        <div id="fade-overlay"></div>
+    </div>
+
+    <!-- 捕獲時のグリッチ用：ブラウザ最前面の WebGL オーバーレイ -->
+    <canvas id="glitch-overlay"></canvas>
+
+    <script type="module" src="js/main.js?v=53"></script>
+
+    <!-- 横画面スマホ用オンスクリーンコントロール -->
+    <div class="touch-controls" id="touch-controls">
+        <div class="touch-dpad">
+            <button class="touch-btn dpad-up"    id="btn-up"   data-key="ArrowUp">▲</button>
+            <button class="touch-btn dpad-left"  id="btn-left" data-key="ArrowLeft">◀</button>
+            <button class="touch-btn dpad-right" id="btn-right" data-key="ArrowRight">▶</button>
+            <button class="touch-btn dpad-down"  id="btn-down" data-key="ArrowDown">▼</button>
+        </div>
+        <div class="touch-actions">
+            <button class="touch-btn act-beam" id="btn-beam" data-key="Space">BEAM</button>
+            <button class="touch-btn act-jump" id="btn-jump" data-key="ArrowUp">JUMP</button>
+        </div>
+        <button class="touch-btn act-enter" id="btn-enter" data-key="Enter">ENTER</button>
+    </div>
+
+</body>
+
+</html>
