@@ -10,7 +10,7 @@ export class AudioBus {
   async load(name){
     if(this.buffers.has(name))return this.buffers.get(name);
     if(this.pending.has(name))return this.pending.get(name);
-    const work=fetch(`/assets/sound/${FILES[name]}`).then(r=>{if(!r.ok)throw new Error('Audio unavailable');return r.arrayBuffer();}).then(data=>this.context.decodeAudioData(data)).then(buffer=>{this.buffers.set(name,buffer);return buffer;}).catch(()=>null);
+    const work=fetch(`${import.meta.env.BASE_URL}assets/sound/${FILES[name]}`).then(r=>{if(!r.ok)throw new Error('Audio unavailable');return r.arrayBuffer();}).then(data=>this.context.decodeAudioData(data)).then(buffer=>{this.buffers.set(name,buffer);return buffer;}).catch(()=>null);
     this.pending.set(name,work);return work;
   }
   play(name,volume=1,loop=false){

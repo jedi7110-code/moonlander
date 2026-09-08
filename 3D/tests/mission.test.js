@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {MoonGame} from '../js/game.js';
-import {MoonScene,terrainHeight} from '../js/scene.js';
+import {MoonGame} from '../src/js/game.js';
+import {MoonScene,terrainHeight} from '../src/js/scene.js';
 
 test('entire mission can be completed using normal input with real terrain, rocks and live enemies',()=>{
   const scenery={scene:new THREE.Scene()};MoonScene.prototype.makeTerrain.call(scenery);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MoonGame,RULES,landingCheck,beamPower} from '../js/game.js';
+import {MoonGame,RULES,landingCheck,beamPower} from '../src/js/game.js';
 
 const dt=1/60;
 const make=()=>new MoonGame({random:()=>.5});

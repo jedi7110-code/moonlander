@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {createLander,createAstronaut,createAlien,createRover,createPad,animateAstronaut,animateAlien} from '../js/models.js';
-import {MoonScene,terrainHeight} from '../js/scene.js';
-import {registerGameTools} from '../js/webmcp.js';
-import {MoonGame} from '../js/game.js';
+import {createLander,createAstronaut,createAlien,createRover,createPad,animateAstronaut,animateAlien} from '../src/js/models.js';
+import {MoonScene,terrainHeight} from '../src/js/scene.js';
+import {registerGameTools} from '../src/js/webmcp.js';
+import {MoonGame} from '../src/js/game.js';
 
 // Three.js model-construction test without a browser or a GPU; only text texture
 // rasterization is replaced. Visual rendering is not asserted by this test.
