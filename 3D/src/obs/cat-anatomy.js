@@ -25,6 +25,7 @@ const TAIL_POSES={
   walk:[[0,0,0],[0,.06,-.095],[0,.14,-.185],[0,.24,-.26],[0,.32,-.30],[0,.355,-.27],[0,.35,-.205]],
   idle:[[0,0,0],[0,.005,-.10],[0,.005,-.205],[0,.025,-.31],[0,.08,-.39],[0,.14,-.41],[0,.18,-.37]],
   duct:[[0,0,0],[0,-.03,-.10],[0,-.05,-.20],[0,-.05,-.30],[0,-.03,-.40],[0,0,-.45],[0,.03,-.47]],
+  groom:[[0,0,0],[0,-.045,-.10],[.10,-.13,-.15],[.22,-.17,-.11],[.25,-.175,.06],[.22,-.17,.21],[.16,-.17,.27]],
 };
 
 export function createCatTail(material){
@@ -36,12 +37,12 @@ export function createCatTail(material){
   animateCatTail(mesh,{time:0,resting:true,moving:false});return mesh;
 }
 
-export function animateCatTail(mesh,{time,resting,moving,crouching=false}){
+export function animateCatTail(mesh,{time,resting,moving,crouching=false,grooming=0}){
   const data=mesh.userData,{curve,segments,sides,point,normal,target}=data;
   if(data.lastTime===time)return;
   const blend=data.lastTime===null?1:1-Math.exp(-Math.max(0,Math.min(.1,time-data.lastTime))*8);data.lastTime=time;
   const pose=TAIL_POSES[crouching?'duct':resting?'sleep':moving?'walk':'idle'];
-  pose.forEach((p,i)=>{const fraction=i/(pose.length-1);target.set(...p);target.x+=Math.sin(time*(resting?.65:1.15)-fraction*1.7)*(resting?.006:.025)*fraction*fraction;curve.points[i].lerp(target,blend);});
+  pose.forEach((p,i)=>{const fraction=i/(pose.length-1),g=TAIL_POSES.groom[i];target.set(p[0]+(g[0]-p[0])*grooming,p[1]+(g[1]-p[1])*grooming,p[2]+(g[2]-p[2])*grooming);target.x+=Math.sin(time*(resting?.65:1.15)-fraction*1.7)*(resting||grooming>.5?.006:.025)*fraction*fraction;curve.points[i].lerp(target,blend);});
   curve.updateArcLengths();const frames=curve.computeFrenetFrames(segments,false),positions=mesh.geometry.attributes.position,normals=mesh.geometry.attributes.normal;
   // Reuse one mesh and its buffers so bending never exposes separate segments.
   for(let i=0;i<=segments;i++){

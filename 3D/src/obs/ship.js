@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
-import {GYM,CAT_PORT,STATIONS} from './layout.js';
+import {GYM,CAT_PORT,CAT_BOWL,STATIONS} from './layout.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
@@ -212,9 +212,11 @@ export function buildShip(m) {
   engine(staticRoot,m,5.65,0);
   const supplyHatch=hatch(staticRoot,animated,m,positionX(1110),0);
   for(let i=0;i<3;i++)box(staticRoot,i===1?m.teal:m.olive,11.78,.26+i*.48,-.61,1.23,.46,.89,.07);
-  const bowl=cylinder(staticRoot,m.metal,10.48,.07,.79,.16,.10,.20,28);cylinder(staticRoot,m.dark,10.48,.121,.79,.16,.012,.16,28);
-  const foodGroup=new THREE.Group();animated.add(foodGroup);
-  for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,m.olive,10.48+Math.cos(a)*r,.14,.79+Math.sin(a)*r,.025,.018,.022);}
+  const bowlX=positionX(CAT_BOWL.x),bowlY=FLOOR_Y[CAT_BOWL.floor],bowlZ=CAT_BOWL.depth;
+  cylinder(staticRoot,m.metal,bowlX,bowlY+.07,bowlZ,.16,.10,.20,28);
+  cylinder(staticRoot,m.dark,bowlX,bowlY+.121,bowlZ,.16,.012,.16,28);
+  const foodGroup=new THREE.Group();foodGroup.position.set(bowlX,bowlY,bowlZ);animated.add(foodGroup);
+  for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,m.olive,Math.cos(a)*r,.14,Math.sin(a)*r,.025,.018,.022);}
   const fan=new THREE.Group();fan.position.set(12.08,2.14,-1.32);animated.add(fan);
   const fanRim=new THREE.Mesh(new THREE.TorusGeometry(.34,.039,12,36),m.metal);fan.add(fanRim);
   for(let i=0;i<4;i++){const blade=box(fan,m.dark,0,0,0,.18,.61,.035,.03);blade.rotation.z=i*Math.PI/2;}

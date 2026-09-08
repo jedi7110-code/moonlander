@@ -7,10 +7,10 @@
   <title>BARRAMUNDI | 船内の日常 3D</title>
   <meta name="description" content="バラマンディ号の船内。マイロと船猫の暮らしを、三層の横断面から見守る。">
   <link rel="icon" href="/3D/assets/favi.ico">
-  <script type="module" crossorigin src="/3D/assets/obs-NdBhDUyB.js"></script>
+  <script type="module" crossorigin src="/3D/assets/obs-B7wHM6bE.js"></script>
   <link rel="modulepreload" crossorigin href="/3D/assets/three-Bsoz13LS.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CFbEIYT1.js">
-  <link rel="stylesheet" crossorigin href="/3D/assets/obs-CRiAzLx5.css">
+  <link rel="stylesheet" crossorigin href="/3D/assets/obs-aX6p3TSD.css">
 </head>
 <body>
   <main id="observation">
@@ -28,6 +28,11 @@
       <div class="crew-state"><span class="crew-tag">01</span><div><strong>MILO JARVIS</strong><span id="milo-activity">船内待機</span></div><span id="milo-mood" class="mood-indicator">良好</span></div>
       <div id="needs" class="needs"></div>
       <div class="cat-state"><i data-lucide="cat"></i><div><strong data-ja="船猫" data-en="SHIP'S CAT">船猫</strong><span id="cat-activity">くつろいでいる</span></div></div>
+    </section>
+    <section id="health-alert" class="health-alert" aria-label="健康状態" hidden>
+      <i data-lucide="heart-pulse" aria-hidden="true"></i>
+      <div><strong id="health-title" role="status" aria-live="polite"></strong><span id="health-detail"></span></div>
+      <button id="seek-treatment"><i data-lucide="cross" aria-hidden="true"></i><span id="treatment-label">医療区画へ</span></button>
     </section>
     <section id="viewport" aria-label="バラマンディ号の船内横断面">
       <canvas id="ship-view" aria-label="三層の船内。マイロと猫が暮らしている" tabindex="0"></canvas>

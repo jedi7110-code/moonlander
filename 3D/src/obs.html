@@ -26,6 +26,11 @@
       <div id="needs" class="needs"></div>
       <div class="cat-state"><i data-lucide="cat"></i><div><strong data-ja="船猫" data-en="SHIP'S CAT">船猫</strong><span id="cat-activity">くつろいでいる</span></div></div>
     </section>
+    <section id="health-alert" class="health-alert" aria-label="健康状態" hidden>
+      <i data-lucide="heart-pulse" aria-hidden="true"></i>
+      <div><strong id="health-title" role="status" aria-live="polite"></strong><span id="health-detail"></span></div>
+      <button id="seek-treatment"><i data-lucide="cross" aria-hidden="true"></i><span id="treatment-label">医療区画へ</span></button>
+    </section>
     <section id="viewport" aria-label="バラマンディ号の船内横断面">
       <canvas id="ship-view" aria-label="三層の船内。マイロと猫が暮らしている" tabindex="0"></canvas>
       <div class="view-top"><span>SECTION A—A <b>/</b> PORT SIDE</span><div class="camera-tools">

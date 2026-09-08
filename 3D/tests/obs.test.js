@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {CrewMotion,Supplies,CatRoutine,FLOORS,currentAction} from '../src/obs/state.js';
 import {Brain} from '../../js/obs/brain.js?v=15';
-import {MeshStandardMaterial,Box3} from 'three';
+import {MeshStandardMaterial,Box3,Vector3} from 'three';
+import {CAT_BOWL,getStation} from '../src/obs/layout.js';
+import {positionX} from '../src/obs/ship.js';
 import {createMilo,createCat,animateMilo,animateCat} from '../src/obs/characters.js';
 import {StationFeedback,SIGNAL_COLORS} from '../src/obs/feedback.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -44,7 +46,19 @@ test('supplies are finite and never regenerate without an order',()=>{
 test('cat eats only on reaching the bowl and consumes one delivery',()=>{
   const care=new Supplies(),cat=new CatRoutine(care);cat.fetch();cat.update(1);assert.equal(care.has('catfood'),true);
   for(let i=0;i<45*60&&cat.mode!=='eat';i++)cat.update(1/60);
-  assert.equal(cat.mode,'eat');assert.equal(cat.motion.floor,2);assert.equal(cat.motion.x,1176);assert.equal(care.supplies.catfood,2);assert.equal(cat.hunger,100);
+  assert.equal(cat.mode,'eat');assert.equal(cat.motion.floor,CAT_BOWL.floor);assert.equal(cat.motion.x,CAT_BOWL.approachX);assert.equal(cat.motion.facing,-1);assert.equal(care.supplies.catfood,2);assert.equal(cat.hunger,100);
+});
+test('the bowl is between the galley and water station, with the cat eating beside it',()=>{
+  assert.ok(CAT_BOWL.x>getStation('galley').x&&CAT_BOWL.x<getStation('hydro').x);
+  const material=new MeshStandardMaterial(),cat=createCat(new Proxy({},{get:()=>material}));
+  cat.position.set(positionX(CAT_BOWL.approachX),0,CAT_BOWL.depth);cat.rotation.y=-Math.PI/2;
+  for(let time=0;time<8;time+=.25){
+    animateCat(cat,{time,moving:false,climbing:false,facing:-1,mode:'eat'});cat.updateMatrixWorld(true);
+    const mouth=cat.userData.head.localToWorld(new Vector3(0,-.062,.14));
+    assert.ok(Math.abs(mouth.x-positionX(CAT_BOWL.x))<.13);assert.ok(Math.abs(mouth.z-CAT_BOWL.depth)<.13);
+    assert.ok(mouth.y>.12&&mouth.y<.19);
+  }
+  animateCat(cat,{time:9,moving:true,climbing:false,facing:1,mode:'walk'});assert.equal(cat.userData.neck.position.y,.414);
 });
 test('the original 2D brain completes a meal through the 3D adapter',()=>{
   const care=new Supplies(),actor=new CrewMotion({floor:2,x:1090}),scene={time:{delayedCall(){}},sound:{add(){return{play(){},once(){}}}}};

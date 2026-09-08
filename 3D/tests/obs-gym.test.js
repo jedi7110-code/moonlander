@@ -10,7 +10,7 @@ import {BIKE,createGym,animateGym,pedalPosition} from '../src/obs/gym.js';
 function setup(){const actor=new CrewMotion({floor:2,x:840}),care=new Supplies(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care});return{actor,brain,care};}
 test('the gym is a 3D-only station and leaves the six original needs intact',()=>{
   const {brain}=setup();assert.equal(originalStation('gym'),undefined);assert.equal(getStation('gym').floor,2);
-  assert.equal(Object.keys(brain.needs).length,6);assert.equal(Object.keys(brain.statusNeeds).length,7);
+  assert.equal(Object.keys(brain.needs).length,6);assert.equal(Object.keys(brain.statusNeeds).length,8);
   const before=brain.exercise;brain.state='goingTo';brain.update(20);assert.equal(brain.exercise,before-4);
   for(const value of Object.values(brain.statusNeeds))assert.ok(Number.isFinite(value));
 });

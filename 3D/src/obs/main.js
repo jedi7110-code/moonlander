@@ -1,4 +1,4 @@
-import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft} from 'lucide';
+import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinChess} from './chess-ui.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
@@ -9,11 +9,11 @@ import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
 import {AirlockPassage} from './airlock.js';
 
 const $=id=>document.getElementById(id);
-const icons={Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft};
+const icons={Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
-const needName=key=>key==='exercise'?words('運動','Exercise'):t('need_'+key);
+const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
 let paused=false,elapsed=0,view=null,frame=0,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
@@ -31,9 +31,19 @@ const scene={
     hideWant(){$('call-alert').hidden=true;},
     openGame(){pendingHQ=false;$('dialogue').hidden=true;view?.setMode('milo');chess.show();audio.pause(true);},
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
+    healthEvent(event){
+      if(event.type==='onset'){
+        showMessage(event.kind==='fever'?words('寒気がする。熱もあるようだ。','I have chills. I think I am running a fever.'):event.source==='fitting'?words('点検中、金具で左腕を切った。手当てが要りそうだ。','I cut my left arm on a fitting. It needs dressing.'):words('足元がふらついて、左腕を壁で擦った。','I lost my footing and scraped my left arm against the wall.'));
+        audio.tone(240,.25,.035);
+      }else if(event.type==='worsened'){
+        showMessage(event.stage==='critical'?words('もう作業を続けられない。医療区画へ向かう。','I cannot keep working. I am heading to the medical bay.'):words('具合が悪くなってきた。早く手当てを受けたい。','I am getting worse. I need treatment soon.'));
+        audio.tone(190,.4,.045);
+      }else if(event.type==='restricted')showMessage(words('今は先に手当てを受ける。','I need treatment first.'));
+      else if(event.type==='interrupted')showMessage(words('手当ては、まだ終わっていない。','The treatment is not finished yet.'));
+    },
     medicalResult(report){
       const advice={water:['水分を取っておこう。','I should get some water.'],rest:['少し休んだほうがよさそうだ。','I could use some rest.'],routine:['いつもの範囲に収まっている。','Readings are within my usual range.']};
-      showMessage(words('健診が終わった。','Checkup complete. ')+words(...advice[report.advice]));
+      showMessage((report.treated?words('手当てが終わった。','Treatment complete. '):words('健診が終わった。','Checkup complete. '))+words(...advice[report.advice]));
     }
   }
 };
@@ -62,8 +72,9 @@ for(const key of Object.keys(brain.statusNeeds)){
 function updateHUD(){
   const minutes=Math.floor(brain.hour*60);$('ship-clock').textContent=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
   $('milo-mood').textContent=t('mood_'+brain.mood);
-  $('milo-activity').textContent=chess.open?words('チェスで対局中','Playing chess'):paused?words('一時停止','Paused'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('チェスをしにラウンジへ','Going to the lounge for chess'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?words('医療区画で健診中','Checkup in progress'):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
-  for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',value<30);}
+  $('milo-activity').textContent=chess.open?words('チェスで対局中','Playing chess'):paused?words('一時停止','Paused'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('チェスをしにラウンジへ','Going to the lounge for chess'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
+  for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
+  updateHealthHUD();
   const catStates={sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
   const passage=cat.motion.portal;
   $('cat-activity').textContent=passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...catStates[cat.mode]);
@@ -88,6 +99,17 @@ function updateHUD(){
     if($('station-phase').textContent!==phase)$('station-phase').textContent=phase;
   }
 }
+function updateHealthHUD(){
+  const health=brain.health,stage=health.stage,medical=brain.actStation==='medical',exam=currentAction(brain)==='medical',course=health.treatment;
+  const states={warning:['要手当て','Needs treatment'],urgent:['悪化','Deteriorating'],critical:['緊急','Critical'],treating:['治療中','Treating'],recovering:['回復中','Recovering']};
+  $('health-alert').hidden=stage==='healthy';$('health-alert').dataset.stage=stage;
+  const symptom=health.condition?.kind==='injury'?words('左腕の怪我','Left arm injury'):health.condition?words('発熱','Fever'):words('健康状態','Health');
+  const title=stage==='healthy'?'':`${symptom} / ${words(...states[stage])}`;
+  if($('health-title').textContent!==title)$('health-title').textContent=title;
+  const seconds=course?Math.max(0,Math.ceil(course.duration-course.elapsed)):0;
+  $('health-detail').textContent=course?words(`処置完了まで ${seconds}秒`,`Treatment completes in ${seconds}s`):exam?words('健康状態を測定中','Checking vital signs'):medical?words('医療区画へ移動中','En route to medical bay'):stage==='recovering'?words('処置済み。経過観察中','Treated. Under observation'):health.critical?words('作業中止・医療区画へ移動','Work stopped. Medical care required'):health.urgent?words('移動能力が低下','Mobility reduced'):words('症状が続いている','Symptoms persist');
+  $('seek-treatment').disabled=medical;$('treatment-label').textContent=medical?(course?words('治療中','Treating'):exam?words('健診中','Checking'):words('移動中','En route')):words('医療区画へ','Medical bay');
+}
 function localize(){
   document.documentElement.lang=getLang();document.querySelectorAll('[data-ja]').forEach(el=>el.textContent=el.dataset[getLang()]);
   $('obs-lang').textContent=words('EN','JA');$('obs-lang').setAttribute('aria-label',words('Switch to English','日本語に切り替え'));
@@ -104,17 +126,19 @@ function acknowledge(){const reply=brain.acknowledge();if(brain.gamePending&&pau
 function requestGame(){
   pendingHQ=false;if(paused)setPause(false);
   if(brain.requestGame()){showMessage(words('チェスを一局やろう。ラウンジへ行くよ。','Let’s play chess. I will head to the lounge.'));confirmOrder('lounge');}
+  else if(brain.actStation==='medical')confirmOrder('medical');
 }
 function requestSupply(){
   if(brain.requestSupplies()){showMessage(words('コンソールから配送を頼んでくる。','I will order supplies at the console.'));confirmOrder('console');}
+  else if(brain.health.critical){showMessage(words('配送の前に、手当てを受ける。','I need treatment before arranging supplies.'));confirmOrder('medical');}
   else showMessage(care.delivery?words('配送は手配中だ。','The delivery is already being arranged.'):words('備蓄はまだ十分にある。','The reserves are full.'));
   updateHUD();
 }
 function useStation(id){
   const station=getStation(id);
   if(!station)return;
-  if(station.supply&&!care.has(station.supply)){feedback.notify(id,'blocked');audio.tone(190,.18,.025);showMessage(words('在庫がない。コンソールから配送を頼もう。','No stock left. We need to order a shipment at the console.'));updateHUD();return;}
-  pendingHQ=false;brain._go(station);confirmOrder(id);
+  if(!brain.health.critical&&station.supply&&!care.has(station.supply)){feedback.notify(id,'blocked');audio.tone(190,.18,.025);showMessage(words('在庫がない。コンソールから配送を頼もう。','No stock left. We need to order a shipment at the console.'));updateHUD();return;}
+  pendingHQ=false;brain._go(station);confirmOrder(brain.actStation);
 }
 function useSupply(type){
   if(type==='catfood'){
@@ -127,7 +151,7 @@ function useSupply(type){
 function headquarters(){
   if(brain.isCalling()){acknowledge();return;}
   if(brain.requestCommand()){pendingHQ=true;showMessage(words('バラマンディ号、定時通信。','Barramundi, scheduled transmission.'),'HQ');}
-  confirmOrder('console');
+  if(brain.actStation)confirmOrder(brain.actStation);
 }
 $('obs-pause').addEventListener('click',()=>setPause(!paused));
 $('obs-lang').addEventListener('click',()=>{toggleLang();localize();});
@@ -143,6 +167,7 @@ $('obs-chat').addEventListener('submit',event=>{
   if(actor.commandVersion!==version)confirmOrder(brain.actStation);$('obs-input').value='';audio.tone(330,.08,.02);updateHUD();
 });
 $('play-chess').addEventListener('click',requestGame);
+$('seek-treatment').addEventListener('click',()=>useStation('medical'));
 $('dismiss-dialogue').addEventListener('click',()=>$('dialogue').hidden=true);
 $('acknowledge').addEventListener('click',acknowledge);
 $('hq-message').addEventListener('click',headquarters);

@@ -5,11 +5,11 @@ import {MEDICAL} from './layout.js';
 export const MED_BED={x:(MEDICAL.x-700)*.022,depth:-.22,top:.86,length:2.78,width:1.06,transition:2};
 const smooth=value=>{const t=THREE.MathUtils.clamp(value,0,1);return t*t*(3-2*t);};
 
-export function medicalRecline(time){
-  return smooth(Math.min(time,MEDICAL.dur/1000-time)/MED_BED.transition);
+export function medicalRecline(time,duration=MEDICAL.dur/1000){
+  return smooth(Math.min(time,duration-time)/MED_BED.transition);
 }
-export function applyMedicalPose(root,time){
-  const p=medicalRecline(time),angle=-Math.PI/2*p,hip=.988;
+export function applyMedicalPose(root,time,duration){
+  const p=medicalRecline(time,duration),angle=-Math.PI/2*p,hip=.988;
   const {body,head,arms,legs}=root.userData;
   root.rotation.y=Math.PI/2;
   // Rotate around the hips, so the patient settles onto the couch rather than orbiting the feet.
@@ -21,10 +21,12 @@ export function applyMedicalPose(root,time){
   for(const {leg,knee,boot}of legs){leg.rotation.x=-1.25*sitting;knee.rotation.x=1.4*sitting;boot.rotation.x=-.15*sitting;}
 }
 
-// Fictional instrument values reflect existing game needs; a check does not cure or refill them.
-export function medicalReadings(needs){
-  return{pulse:Math.round(64+(100-needs.energy)*.18+Math.max(0,45-needs.thirst)*.22),
-    respiration:Math.round(13+(100-needs.energy)*.045),temperature:36.6,
+// Fictional instrument values; checkups and treatment never refill food, water or energy.
+export function medicalReadings(needs,health=null){
+  const condition=health?.condition,severity=condition?(100-health.value)/100:0;
+  const recovery=health?.treatment?Math.max(0,1-health.treatment.elapsed/health.treatment.duration):1;
+  return{pulse:Math.round(64+(100-needs.energy)*.18+Math.max(0,45-needs.thirst)*.22+severity*35*recovery),
+    respiration:Math.round(13+(100-needs.energy)*.045+severity*8*recovery),temperature:36.6+(condition?.kind==='fever'?(1.4+severity)*recovery:0),
     advice:needs.thirst<35?'water':needs.energy<35?'rest':'routine'};
 }
 
@@ -92,9 +94,11 @@ export function createMedicalBay(m,y){
   return{root,bed,display,lampMaterial};
 }
 
-export function animateMedical(bay,time,active,readings){
-  const phase=active?time<MED_BED.transition?'POSITIONING':time>MEDICAL.dur/1000-MED_BED.transition?'COMPLETE':'ACQUIRING':readings?'LAST CHECK':'STANDBY';
-  const key=phase==='ACQUIRING'?`${phase}:${Math.floor(time*10)}`:phase+JSON.stringify(readings);
+export function animateMedical(bay,time,active,readings,{duration=MEDICAL.dur/1000,treating=false,alert=false}={}){
+  const phase=active?time<MED_BED.transition?'POSITIONING':time>duration-MED_BED.transition?'COMPLETE':treating?'TREATING':'ACQUIRING':readings?'LAST CHECK':'STANDBY';
+  bay.lampMaterial.color.setHex(alert&&!active?0xf17d68:['ACQUIRING','TREATING'].includes(phase)?0x85e3af:active?0xf3bd62:0x485e58);
+  const live=['ACQUIRING','TREATING'].includes(phase);
+  const key=live?`${phase}:${Math.floor(time*10)}`:phase+JSON.stringify(readings);
   if(bay.display.frame===key)return;
   bay.display.frame=key;
   const ctx=bay.display.canvas.getContext('2d'),width=600,height=330;
@@ -103,13 +107,13 @@ export function animateMedical(bay,time,active,readings){
   for(let x=20;x<580;x+=25){ctx.beginPath();ctx.moveTo(x,65);ctx.lineTo(x,251);ctx.stroke();}
   for(let y=65;y<252;y+=25){ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(579,y);ctx.stroke();}
   ctx.fillStyle='#b5d7c5';ctx.font='22px monospace';ctx.fillText('MED-02 / '+phase,20,35);
-  if(readings&&(phase==='ACQUIRING'||phase==='COMPLETE'||!active)){
+  if(readings&&(live||phase==='COMPLETE'||!active)){
     ctx.fillStyle='#a0e5cc';ctx.font='26px monospace';ctx.fillText(`PULSE ${readings.pulse}   RESP ${readings.respiration}`,22,286);
     ctx.font='19px monospace';ctx.fillText('TEMP '+readings.temperature.toFixed(1)+' C',22,315);
     for(let row=0;row<2;row++){
       ctx.strokeStyle=row?'#ddc581':'#87e2c4';ctx.lineWidth=2.5;ctx.beginPath();
       for(let x=0;x<558;x++){
-        const t=x/150-(phase==='ACQUIRING'?time:0),beat=((t%1)+1)%1;
+        const t=x/150-(live?time:0),beat=((t%1)+1)%1;
         const value=row?Math.sin(t*1.6)*14:Math.sin(t*6.28)*3-11*Math.exp(-(((beat-.34)/.05)**2))+53*Math.exp(-(((beat-.40)/.017)**2))-18*Math.exp(-(((beat-.45)/.027)**2));
         const y=112+row*99-value;x?ctx.lineTo(21+x,y):ctx.moveTo(21+x,y);
       }
@@ -118,6 +122,5 @@ export function animateMedical(bay,time,active,readings){
   }else{
     ctx.fillStyle='#87a398';ctx.font='23px monospace';ctx.fillText(active?'PATIENT POSITIONING':'NO PATIENT',165,168);
   }
-  bay.lampMaterial.color.setHex(phase==='ACQUIRING'?0x85e3af:active?0xf3bd62:0x485e58);
   bay.display.texture.needsUpdate=true;
 }

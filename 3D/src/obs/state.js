@@ -1,4 +1,4 @@
-import {FLOORS,LADDER_X,getStation,CAT_PORT} from './layout.js';
+import {FLOORS,LADDER_X,getStation,CAT_PORT,CAT_BOWL} from './layout.js';
 
 export class CrewMotion {
   constructor({floor=1,x=360,walkSpeed=54,climbSpeed=38}={}) {
@@ -110,17 +110,18 @@ export class Supplies {
 }
 
 export class CatRoutine {
-  constructor(care){this.care=care;this.motion=new CatMotion();this.hunger=68;this.mode='sleep';this.remaining=10;this.wanderIndex=0;}
+  constructor(care){this.care=care;this.motion=new CatMotion();this.hunger=68;this.mode='sleep';this.modeTime=0;this.remaining=10;this.wanderIndex=0;}
+  rest(mode,duration){this.mode=mode;this.modeTime=0;this.remaining=duration;}
   update(dt){
-    this.hunger=Math.max(0,this.hunger-dt*.36);this.motion.update(dt);
+    this.modeTime+=dt;this.hunger=Math.max(0,this.hunger-dt*.36);this.motion.update(dt);
     if(this.mode==='fetch'||this.motion.busy)return;
     if(this.hunger<42&&this.care.has('catfood')){this.fetch();return;}
     this.remaining-=dt;if(this.remaining>0)return;
-    if(this.mode==='eat'){this.mode='groom';this.remaining=7;return;}
+    if(this.mode==='eat'){this.rest('groom',7);return;}
     const places=[{floor:0,x:840},{floor:1,x:940},{floor:2,x:1155},{floor:1,x:510},{floor:0,x:1060}];
-    const target=places[this.wanderIndex++%places.length];this.mode='walk';this.motion.goTo(target,()=>{this.mode=this.wanderIndex%2?'groom':'sleep';this.remaining=12+this.wanderIndex%3*4;});
+    const target=places[this.wanderIndex++%places.length];this.mode='walk';this.modeTime=0;this.motion.goTo(target,()=>this.rest(this.wanderIndex%2?'groom':'sleep',12+this.wanderIndex%3*4));
   }
-  fetch(){if(this.mode==='fetch')return;this.mode='fetch';this.motion.goTo({floor:2,x:1176},()=>{if(this.care.take('catfood')){this.hunger=100;this.mode='eat';this.remaining=8;}else{this.mode='groom';this.remaining=4;}});}
+  fetch(){if(this.mode==='fetch')return;this.mode='fetch';this.modeTime=0;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX},()=>{if(this.care.take('catfood')){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});}
 }
 
 export function currentAction(brain){return brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null;}
