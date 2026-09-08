@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   root: 'src',
@@ -7,6 +8,12 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
-    rollupOptions: { output: { manualChunks: { three: ['three'] } } },
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./src/index.html', import.meta.url)),
+        obs: fileURLToPath(new URL('./src/obs.html', import.meta.url)),
+      },
+      output: { manualChunks: { three: ['three'] } },
+    },
   },
 });

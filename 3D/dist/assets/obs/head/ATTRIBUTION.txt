@@ -1,0 +1,15 @@
+Infinite, 3D Head Scan
+Creator: Lee Perry-Smith / Infinite-Realities
+License: Creative Commons Attribution 3.0 Unported
+https://creativecommons.org/licenses/by/3.0/
+
+Source: three.js r155 example assets
+https://github.com/mrdoob/three.js/tree/r155/examples/models/gltf/LeePerrySmith
+Original work: https://www.triplegangers.com/
+
+Used for Milo's head in Moonlander OBS 3D. Adaptations: scaled to the
+character, attached to the existing rig, and rendered with adjusted skin
+materials, short-hair shading, and added eyes. No endorsement is implied.
+
+Files: LeePerrySmith.glb, Map-COL.jpg,
+Infinite-Level_02_Tangent_SmoothUV.jpg, LeePerrySmith_License.txt

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d1112">
+  <title>BARRAMUNDI | 船内の日常 3D</title>
+  <meta name="description" content="バラマンディ号の船内。マイロと船猫の暮らしを、三層の横断面から見守る。">
+  <link rel="icon" href="/3D/assets/favi.ico">
+  <script type="module" crossorigin src="/3D/assets/obs-NdBhDUyB.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-Bsoz13LS.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CFbEIYT1.js">
+  <link rel="stylesheet" crossorigin href="/3D/assets/obs-CRiAzLx5.css">
+</head>
+<body>
+  <main id="observation">
+    <header class="masthead">
+      <a href="./" class="ship-brand"><span class="brand-mark">B</span><div><h1>BARRAMUNDI</h1><span>CREW OBSERVATION / 3D</span></div></a>
+      <div class="ship-system"><span class="status-led"></span><span data-ja="船内環境 正常" data-en="LIFE SUPPORT NOMINAL">船内環境 正常</span><span class="environment">21.4°C <b>/</b> 101.3 kPa</span></div>
+      <div class="header-actions">
+        <time id="ship-clock">08:00</time>
+        <button id="obs-pause" class="icon-button" aria-label="一時停止" data-tip="一時停止"><i data-lucide="pause"></i></button>
+        <button id="obs-sound" class="icon-button" aria-label="船内音をオン" aria-pressed="false" data-tip="船内音"><i data-lucide="volume-x"></i></button>
+        <button id="obs-lang" class="text-button" aria-label="Switch to English">EN</button>
+      </div>
+    </header>
+    <section class="telemetry" aria-label="乗員の状態">
+      <div class="crew-state"><span class="crew-tag">01</span><div><strong>MILO JARVIS</strong><span id="milo-activity">船内待機</span></div><span id="milo-mood" class="mood-indicator">良好</span></div>
+      <div id="needs" class="needs"></div>
+      <div class="cat-state"><i data-lucide="cat"></i><div><strong data-ja="船猫" data-en="SHIP'S CAT">船猫</strong><span id="cat-activity">くつろいでいる</span></div></div>
+    </section>
+    <section id="viewport" aria-label="バラマンディ号の船内横断面">
+      <canvas id="ship-view" aria-label="三層の船内。マイロと猫が暮らしている" tabindex="0"></canvas>
+      <div class="view-top"><span>SECTION A—A <b>/</b> PORT SIDE</span><div class="camera-tools">
+        <button id="view-all" class="icon-button active" data-tip="全景" aria-label="全景" aria-pressed="true"><i data-lucide="scan"></i></button>
+        <button id="view-milo" class="icon-button" data-tip="マイロ" aria-label="マイロに寄る" aria-pressed="false"><i data-lucide="user-round"></i></button>
+        <button id="view-cat" class="icon-button" data-tip="猫" aria-label="猫に寄る" aria-pressed="false"><i data-lucide="cat"></i></button>
+        <span class="tool-divider"></span>
+        <button id="zoom-out" class="icon-button" data-tip="縮小" aria-label="縮小"><i data-lucide="minus"></i></button>
+        <button id="zoom-in" class="icon-button" data-tip="拡大" aria-label="拡大"><i data-lucide="plus"></i></button>
+        <button id="obs-fullscreen" class="icon-button" data-tip="全画面" aria-label="全画面"><i data-lucide="maximize"></i></button>
+      </div></div>
+      <div id="station-status" class="station-status" role="status" aria-live="polite" aria-atomic="true" hidden><span class="signal-lamp" aria-hidden="true"></span><strong id="station-name"></strong><span id="station-phase"></span></div>
+      <div id="call-alert" class="call-alert" hidden><button id="acknowledge"><i data-lucide="radio"></i><span id="call-text"></span><i data-lucide="arrow-up-right"></i></button></div>
+      <div class="view-bottom"><span><i class="status-led"></i><span data-ja="居住区画 接続中" data-en="HABITAT LINK ACTIVE">居住区画 接続中</span><a class="asset-credit" href="./assets/obs/head/ATTRIBUTION.txt" target="_blank" rel="noopener">3D CREDITS</a></span><span id="camera-label">CAM 01 / WIDE</span></div>
+      <div id="loading" class="loading"><span class="status-led"></span><span data-ja="船内映像に接続中" data-en="CONNECTING TO HABITAT">船内映像に接続中</span></div>
+      <div id="obs-error" class="error" role="alert" hidden></div>
+    </section>
+    <div id="dialogue" class="dialogue" role="status" aria-live="polite" hidden><div><span id="dialogue-speaker">MILO</span><p id="dialogue-text"></p></div><button id="dismiss-dialogue" class="icon-button" aria-label="メッセージを閉じる"><i data-lucide="x"></i></button></div>
+    <footer class="control-desk">
+      <div class="supplies"><div class="supply-heading"><span class="section-label" data-ja="船内備蓄" data-en="SHIP RESERVES">船内備蓄</span><span id="delivery-status" role="status" aria-live="polite">在庫あり</span></div><div class="supply-buttons">
+        <button data-use="food" data-tip="食事"><i data-lucide="utensils"></i><span data-ja="食料" data-en="Food">食料</span><b id="stock-food">3/3</b></button>
+        <button data-use="water" data-tip="水を飲む"><i data-lucide="droplet"></i><span data-ja="水" data-en="Water">水</span><b id="stock-water">4/4</b></button>
+        <button data-use="catfood" data-tip="猫に餌を出す"><i data-lucide="fish"></i><span data-ja="猫餌" data-en="Cat">猫餌</span><b id="stock-catfood">3/3</b></button>
+        <button id="request-supply" data-tip="コンソールから配送依頼" disabled><i data-lucide="radio-tower"></i><span data-ja="配送" data-en="Order">配送</span></button>
+      </div></div>
+      <form id="obs-chat" autocomplete="off"><label class="section-label" for="obs-input">COMMS / MILO</label><div class="chat-line"><button type="button" id="play-chess" class="icon-button" aria-label="マイロとチェス" data-tip="マイロとチェス"><i data-lucide="swords"></i></button><input id="obs-input" maxlength="240" placeholder="マイロに話しかける" aria-label="マイロに話しかける"><button type="submit" class="icon-button" aria-label="送信" data-tip="送信"><i data-lucide="send"></i></button></div></form>
+      <button id="hq-message" class="hq-button" data-tip="司令部通信"><i data-lucide="radio-tower"></i><span>HQ</span></button>
+    </footer>
+  </main>
+</body>
+</html>
