@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {ball,box,cylinder,pipe,rod} from './materials.js';
 import {createCatEar,createCatTail,animateCatTail,createCatLegSkin,updateCatLegSkins} from './cat-anatomy.js';
-import {createCatSkull,createCatEyes,createCatMuzzle,updateCatEyes} from './cat-face.js';
+import {createCatSkull,createCatEyes,createCatMuzzle,updateCatEyes,catFaceSurface} from './cat-face.js';
 import {applyCyclingPose} from './gym.js';
 import {applyMedicalPose} from './medical.js';
 import {BUNK_BED,reclineProgress,applyReclinedPose} from './recline.js';
@@ -9,6 +9,7 @@ import {applyCatGrooming} from './cat-groom.js';
 import {createDiningProps,applyDiningPose,resetDiningPose} from './dining.js';
 import {applyWalkingPose} from './walking.js';
 import {CAT_LIMBS,applyCatLegPose} from './cat-walk.js';
+import {LOUNGE_SEAT} from './layout.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
 function limb(parent,mat,length,profile,depth=1) {
@@ -117,7 +118,14 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   }
   for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.x=climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0;
     knee.rotation.x=climbing?.9+Math.sin(stride-side*Math.PI/2)*.4:0;
-    if(seated){const lounge=action==='lounge';leg.rotation.x=lounge?-1.05:-1.15;knee.rotation.x=lounge?1.20:1.30;body.position.y=lounge?-.214:-.254;}
+    if(seated){
+      if(action==='lounge'){
+        body.position.y=LOUNGE_SEAT.top-(.988-.134);
+        // Set the hip on the cushion and solve the thigh slope for a grounded, vertical shin.
+        leg.rotation.x=-Math.acos((leg.position.y+body.position.y-.425-.107-.006)/.435);
+        knee.rotation.x=-leg.rotation.x;
+      }else{leg.rotation.x=-1.15;knee.rotation.x=1.30;body.position.y=-.254;}
+    }
     boot.rotation.x=seated?-(leg.rotation.x+knee.rotation.x):0;
   }
   if(walking)applyWalkingPose(root,walkDistance);
@@ -147,7 +155,7 @@ export function createCat(m) {
   const head=joint(neck,0,.066,.055);
   head.add(createCatSkull(m.furFace));
   const eyes=createCatEyes(head,m.furFace);createCatMuzzle(head);
-  const tongue=ball(head,m.pink,0,-.070,.153,.014,.005,.018);tongue.visible=false;
+  const tongue=ball(head,m.pink,0,-.070,catFaceSurface(0,-.070)+.012,.014,.005,.018);tongue.visible=false;
   const ears=[-1,1].map(side=>{const ear=createCatEar(m.furEar,side);ear.scale.y=.84;head.add(ear);return ear;});
   const legs=[];
   for(const z of [-.25,.20])for(const side of [-1,1]){

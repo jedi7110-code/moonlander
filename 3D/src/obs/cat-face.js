@@ -14,9 +14,9 @@ function section(y){
 export function catFaceSurface(x,y,sockets=true){
   const s=section(y),across=s.width>1e-8?Math.sqrt(Math.max(0,1-Math.pow(x/s.width,2))):0;
   const front=THREE.MathUtils.smoothstep(across,0,.4);
-  let relief=.016*gaussian(x,y,0,-.006,.025,.052)+.017*gaussian(x,y,0,-.022,.017,.019)+.014*gaussian(x,y,0,-.072,.050,.023);
+  let relief=.010*gaussian(x,y,0,-.006,.028,.052)+.007*gaussian(x,y,0,-.022,.022,.024)+.018*gaussian(x,y,0,-.068,.050,.030);
   for(const side of [-1,1]){
-    relief+=.040*gaussian(x,y,side*.026,-.044,.029,.024);
+    relief+=.026*gaussian(x,y,side*.026,-.044,.031,.030);
     if(sockets)relief-=.010*gaussian(x,y,side*.052,.023,.032,.025);
   }
   return s.center+s.depth*across+relief*front;
@@ -144,7 +144,8 @@ export function createCatMuzzle(head){
     line(head,[onFace(side*.007,-.025,.0055),onFace(side*.010,-.023,.0055),onFace(side*.013,-.021,.0055)],lip,.0011);
     for(let i=0;i<5;i++){
       const lift=(i-2)*.014;
-      const whisker=line(head,[[side*.032,-.040+i*.003,.135],[side*.090,-.030+lift,.143],[side*(.175+i%2*.025),-.035+lift*2,.095]],new THREE.MeshBasicMaterial({color:0xd7d8cb,transparent:true,opacity:.52}),.00025);
+      const root=onFace(side*.032,-.040+i*.003);
+      const whisker=line(head,[root,[side*.090,-.030+lift,root[2]+.005],[side*(.175+i%2*.025),-.035+lift*2,.095]],new THREE.MeshBasicMaterial({color:0xd7d8cb,transparent:true,opacity:.52}),.00025);
       whisker.name='Whisker';
     }
   }

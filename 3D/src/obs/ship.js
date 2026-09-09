@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
-import {GYM,CAT_PORT,CAT_BOWL,STATIONS} from './layout.js';
+import {GYM,CAT_PORT,CAT_BOWL,STATIONS,LOUNGE_SEAT} from './layout.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
@@ -87,6 +87,15 @@ function bunk(parent,m,x,y) {
   panel(parent,m,x,y+1.04,-1.07,2.29,.74,m.cushion);
   box(parent,m.yellow,x-.86,y+1.52,-.63,.27,.17,.2,.015);box(parent,m.lamp,x-.86,y+1.47,-.50,.19,.025,.05);
   label(parent,'PERSONAL / M. JARVIS',x,y+1.94,-.94,2.20,.28,{size:48});
+}
+export function createLoungeTable(m){
+  const root=new THREE.Group(),top=LOUNGE_SEAT.top+.32,thickness=.08,underside=top-thickness;
+  root.name='Lounge table';
+  cylinder(root,m.metal,0,underside/2,0,.056,underside).name='Table pedestal';
+  box(root,m.enamel,0,top-thickness/2,0,1.51,thickness,.80,.08).name='Tabletop';
+  box(root,m.red,-.33,top+.035/2,-.03,.38,.035,.24,.007).name='Table book';
+  cylinder(root,m.white,.21,top+.17/2,0,.07,.17,.079).name='Table cup';
+  return root;
 }
 function plumbing(parent,m,x,y,type) {
   box(parent,m.dark,x,y+1.29,-.42,1.66,2.59,1.68,.04);
@@ -193,15 +202,13 @@ export function buildShip(m) {
   const top=FLOOR_Y[0],mid=FLOOR_Y[1];
   plumbing(staticRoot,m,positionX(240),top,'shower');plumbing(staticRoot,m,positionX(380),top,'toilet');
   bunk(staticRoot,m,positionX(510),top);cupboard(staticRoot,m,2.1,top,-1.14,1.54,2.31);
-  box(staticRoot,m.dark,7.4,top+.29,-.45,4.12,.39,1.4,.045);
-  box(staticRoot,m.cushion,7.4,top+.54,-.45,3.98,.2,1.30,.07);
-  box(staticRoot,m.cushion,7.4,top+.95,-1.05,4.03,.89,.25,.06);
-  for(const x of [5.32,9.49])box(staticRoot,m.enamel,x,top+.63,-.47,.16,1.03,1.5,.04);
-  for(let i=0;i<3;i++)box(staticRoot,m.olive,6.05+i*1.25,top+.87,-.85,.7,.50,.15,.08);
-  cylinder(staticRoot,m.metal,8.25,top+.25,1.03,.056,.5);
-  box(staticRoot,m.enamel,8.25,top+.57,1.03,1.51,.08,.67,.08);
-  box(staticRoot,m.red,7.92,top+.625,1.00,.38,.035,.24,.007);
-  cylinder(staticRoot,m.white,8.46,top+.69,1.03,.07,.17,.079);
+  const seat=LOUNGE_SEAT;
+  box(staticRoot,m.dark,7.4,top+.24,seat.centerDepth,4.12,.32,.70,.045);
+  box(staticRoot,m.cushion,7.4,top+seat.top-.08,seat.centerDepth,3.98,.16,seat.cushionDepth,.07);
+  box(staticRoot,m.cushion,7.4,top+.82,-.44,4.03,.84,.20,.06);
+  for(const x of [5.32,9.49])box(staticRoot,m.enamel,x,top+.43,seat.centerDepth,.16,.69,.80,.04);
+  for(let i=0;i<3;i++)box(staticRoot,m.olive,6.05+i*1.25,top+.75,-.255,.7,.50,.15,.08);
+  const table=createLoungeTable(m);table.position.set(8.25,top,.91);staticRoot.add(table);
   cupboard(staticRoot,m,11.55,top,-1.11,1.35,2.35);
   panel(staticRoot,m,4.06,top+1.5,-1.38,1.37,1.26,m.white);
   label(staticRoot,'TARAIRON\nCREW 01',4.06,top+1.57,-1.255,1.13,.37,{bg:'#c8d0c4',fg:'#354236',size:40});

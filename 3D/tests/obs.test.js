@@ -4,14 +4,25 @@ import {readFile} from 'node:fs/promises';
 import {CrewMotion,Supplies,CatRoutine,FLOORS,currentAction} from '../src/obs/state.js';
 import {Brain} from '../../js/obs/brain.js?v=15';
 import {MeshStandardMaterial,Box3,Vector3} from 'three';
-import {CAT_BOWL,getStation} from '../src/obs/layout.js';
-import {positionX,createAccessLadder,HABITAT_VIEW} from '../src/obs/ship.js';
+import {CAT_BOWL,LOUNGE_SEAT,getStation} from '../src/obs/layout.js';
+import {positionX,createAccessLadder,createLoungeTable,HABITAT_VIEW} from '../src/obs/ship.js';
 import {createMilo,createCat,animateMilo,animateCat} from '../src/obs/characters.js';
 import {StationFeedback,SIGNAL_COLORS} from '../src/obs/feedback.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {headGeometry} from '../src/obs/head.js';
 
 function advance(actor,seconds){for(let i=0;i<seconds*60;i++)actor.update(1/60);}
+test('the lounge table clears the seat and its props rest on the top without a gap',()=>{
+  const material=new MeshStandardMaterial(),table=createLoungeTable(new Proxy({},{get:()=>material}));
+  const bounds=name=>new Box3().setFromObject(table.getObjectByName(name));
+  const top=bounds('Tabletop'),pedestal=bounds('Table pedestal');
+  assert.ok(top.max.y-LOUNGE_SEAT.top>.30&&top.max.y-LOUNGE_SEAT.top<.34);
+  assert.ok(top.min.y>LOUNGE_SEAT.top+.20);
+  assert.ok(Math.abs(pedestal.min.y)<1e-7);
+  assert.ok(Math.abs(pedestal.max.y-top.min.y)<1e-7);
+  for(const name of ['Table book','Table cup'])assert.ok(Math.abs(bounds(name).min.y-top.max.y)<1e-7);
+  table.traverse(mesh=>mesh.geometry?.dispose());material.dispose();
+});
 test('the rotating habitat belongs to the mothership, while Barramundi remains the lander',async()=>{
   const habitat=await readFile(new URL('../src/obs.html',import.meta.url),'utf8');
   const lander=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
@@ -124,6 +135,34 @@ test('Milo has adult limb proportions and grounded boots when standing or sittin
   animateMilo(milo,{action:null,moving:false,climbing:false,time:0,facing:1});milo.updateMatrixWorld(true);
   for(const {hand}of milo.userData.arms){const bounds=new Box3().setFromObject(hand);assert.ok(bounds.min.y>.70&&bounds.min.y<.80);}
   const torso=milo.getObjectByName('Continuous shoulders and torso');assert.ok(torso);assert.ok(milo.getObjectByName('Fitted tank top'));
+});
+test('lounge thighs and shins clear the cushion while hips remain supported and boots stay grounded',()=>{
+  const material=new MeshStandardMaterial(),milo=createMilo(new Proxy({},{get:()=>material}));
+  milo.position.z=LOUNGE_SEAT.depth;
+  for(const yaw of [-.15,0,.15]){
+    animateMilo(milo,{action:'lounge',moving:false,climbing:false,time:0,facing:1});
+    milo.rotation.y=yaw;milo.updateMatrixWorld(true);
+    for(const {leg,knee,boot}of milo.userData.legs){
+      const foot=new Box3().setFromObject(boot);assert.ok(foot.min.y>=-.005&&foot.min.y<.03);
+      assert.ok(knee.getWorldPosition(new Vector3()).z>.30);
+      leg.traverse(mesh=>{
+        if(!mesh.geometry)return;
+        const position=mesh.geometry.attributes.position,point=new Vector3();
+        for(let i=0;i<position.count;i++){
+          point.fromBufferAttribute(position,i).applyMatrix4(mesh.matrixWorld);
+          // Use the rounded cushion surface, not the empty corners of its bounding box.
+          const radius=.07,qx=Math.abs(point.x+positionX(getStation('lounge').x)-7.4)-(3.98/2-radius);
+          const qy=Math.abs(point.y-(LOUNGE_SEAT.top-.08))-(.08-radius);
+          const qz=Math.abs(point.z-LOUNGE_SEAT.centerDepth)-(LOUNGE_SEAT.cushionDepth/2-radius);
+          const distance=Math.hypot(Math.max(qx,0),Math.max(qy,0),Math.max(qz,0))+Math.min(Math.max(qx,qy,qz),0)-radius;
+          assert.ok(distance>=-.002,`leg inside cushion: ${point.toArray()}`);
+        }
+      });
+    }
+    const hips=new Box3().setFromObject(milo.userData.hips,true);
+    assert.ok(Math.abs(hips.min.y-LOUNGE_SEAT.top)<.002);
+    assert.ok(hips.min.z>-.40&&hips.max.z<.20,'the hips are supported within the seat');
+  }
 });
 test('cat ears are thin cupped shells and calico patches use body-local coordinates',()=>{
   const material=new MeshStandardMaterial(),cat=createCat(new Proxy({},{get:()=>material}));

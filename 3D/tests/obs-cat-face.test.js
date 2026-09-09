@@ -6,6 +6,35 @@ import {catFaceSurface,updateCatEyes} from '../src/obs/cat-face.js';
 
 const makeCat=()=>{const material=new MeshStandardMaterial();return createCat(new Proxy({},{get:()=>material}));};
 
+test('mirrored ears have outward forward-raked tips and diagonal roots buried in the skull',()=>{
+  const {ears}=makeCat().userData,points=[];
+  for(const ear of ears){
+    ear.updateMatrix();
+    const position=ear.children[0].geometry.attributes.position,side=Math.sign(ear.position.x);
+    const point=index=>new Vector3().fromBufferAttribute(position,index).applyMatrix4(ear.matrix);
+    const tip=point(24*21+10),base=point(10),outer=point(side<0?0:20),inner=point(side<0?20:0);
+    assert.ok(side*(tip.x-base.x)>.03,'the tip leans outward');
+    assert.ok(Math.abs(outer.x)<.10,'the root curves inward beneath the skull silhouette');
+    assert.ok(tip.z-base.z>.010,'the tip leans toward the nose, not the back of the skull');
+    assert.ok(tip.y-base.y>.08&&tip.y-base.y<.11);
+    assert.ok(inner.y-outer.y>.04,'the root slopes down toward the outer skull rather than sticking out horizontally');
+    points.push(tip);
+  }
+  assert.ok(Math.abs(points[0].x+points[1].x)<1e-7);
+  assert.ok(Math.abs(points[0].z-points[1].z)<1e-7);
+});
+
+test('the shortened muzzle has a broad round profile and attached whiskers and tongue',()=>{
+  const {head,tongue}=makeCat().userData;
+  for(let y=-.060;y<=-.015;y+=.001)assert.ok(catFaceSurface(0,y)<.146,'no projecting muzzle spike');
+  assert.ok(Math.abs(catFaceSurface(0,-.030)-catFaceSurface(0,-.055))<.004,'upper and lower muzzle form a blunt profile');
+  for(const whisker of head.children.filter(mesh=>mesh.name==='Whisker')){
+    const root=whisker.geometry.parameters.path.points[0];
+    assert.ok(Math.abs(root.z-catFaceSurface(root.x,root.y)-.0007)<1e-8);
+  }
+  assert.ok(Math.abs(tongue.position.z-catFaceSurface(tongue.position.x,tongue.position.y)-.012)<1e-8);
+});
+
 test('the eyes sit inside a continuous face with separate furred eyelids and shallow corneas',()=>{
   const {head,eyes}=makeCat().userData,skull=head.getObjectByName('Contoured cat skull');
   assert.ok(skull.geometry.attributes.facePosition);

@@ -47,14 +47,16 @@ export function updateCatLegSkins(root){
 }
 
 export function createCatEar(material,side){
-  const group=new THREE.Group();group.position.set(side*.084,.052,-.014);group.rotation.z=-side*.12;group.rotation.y=side*.38;
+  const group=new THREE.Group();group.position.set(side*.075,.053,-.017);group.rotation.y=side*.80;
   const positions=[],colors=[],uvs=[],indices=[],rows=24,columns=20,stride=columns+1,count=(rows+1)*stride;
   const outer=new THREE.Color(side<0?0x303330:0xac6737),inner=new THREE.Color(0xa77571),color=new THREE.Color();
   // Two thin curved surfaces meet around a rim; the front cups inward.
   for(let back=0;back<2;back++)for(let row=0;row<=rows;row++)for(let col=0;col<=columns;col++){
-    const t=row/rows,u=col/columns*2-1,width=.045*Math.pow(1-t,.68)+.001;
-    const x=u*width+side*.010*t,y=.116*t;
-    const z=.024*u*u*(1-t)-.025*t+.004*(1-t)-(back?.0035*(1-t)+.0015:0);
+    const t=row/rows,u=col/columns*2-1,width=.039*Math.pow(1-t,.68)+.001;
+    // Curve the diagonal root into the skull instead of leaving a horizontal ledge.
+    const root=1-THREE.MathUtils.smoothstep(t,0,.38);
+    const x=u*width+side*(.011*t-.020*root),y=.112*t-(.010+side*u*.027)*(1-t);
+    const z=.012*u*u*(1-t)+.044*t+.004*(1-t)-.012*root-(back?.0035*(1-t)+.0015:0);
     positions.push(x,y,z);uvs.push(col/columns,t);
     const margin=THREE.MathUtils.smoothstep(Math.abs(u),.48,.93),base=1-THREE.MathUtils.smoothstep(t,0,.23),tip=THREE.MathUtils.smoothstep(t,.77,.96);
     color.copy(inner).lerp(outer,back?1:Math.max(margin,base,tip));colors.push(color.r,color.g,color.b);
