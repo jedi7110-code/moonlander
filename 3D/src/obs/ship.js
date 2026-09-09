@@ -97,6 +97,31 @@ export function createLoungeTable(m){
   cylinder(root,m.white,.21,top+.17/2,0,.07,.17,.079).name='Table cup';
   return root;
 }
+export function createLounge(m){
+  const root=new THREE.Group(),seat=LOUNGE_SEAT;root.name='Lounge furniture';
+  box(root,m.dark,7.4,.24,seat.centerDepth,4.12,.32,.70,.045);
+  box(root,m.cushion,7.4,seat.top-.08,seat.centerDepth,3.98,.16,seat.cushionDepth,.07);
+  box(root,m.cushion,7.4,.82,-.44,4.03,.84,.20,.06);
+  for(const x of [5.32,9.49])box(root,m.enamel,x,.43,seat.centerDepth,.16,.69,.80,.04);
+  for(let i=0;i<3;i++)box(root,m.olive,6.05+i*1.25,.75,-.255,.7,.50,.15,.08);
+  const table=createLoungeTable(m);table.position.set(8.25,0,.91);root.add(table);
+  return root;
+}
+export function createStationInteraction(id,bounds,pickMaterial){
+  const size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(size.x,size.y,size.z),pickMaterial);
+  mesh.position.copy(center);mesh.userData.station=id;
+  const group=new THREE.Group(),material=new THREE.MeshBasicMaterial({color:0xf3bd62,transparent:true,depthWrite:false,depthTest:false,toneMapped:false});
+  group.position.set(center.x,bounds.min.y,bounds.max.z+.025);group.visible=false;
+  box(group,material,0,.055,0,size.x,.07,.018);
+  box(group,material,0,size.y-.02,0,.66,.10,.025,.012);
+  for(const side of [-1,1])for(const y of [.19,size.y-.16]){
+    box(group,material,side*size.x/2,y,0,.045,.30,.018);
+    if(y>.19)box(group,material,side*(size.x/2-.14),size.y-.02,0,.28,.045,.018);
+  }
+  group.children.forEach(part=>{part.castShadow=false;part.receiveShadow=false;part.renderOrder=8;});
+  return{mesh,group,material};
+}
 function plumbing(parent,m,x,y,type) {
   box(parent,m.dark,x,y+1.29,-.42,1.66,2.59,1.68,.04);
   panel(parent,m,x,y+1.3,.44,1.55,2.46,m.white);
@@ -202,13 +227,8 @@ export function buildShip(m) {
   const top=FLOOR_Y[0],mid=FLOOR_Y[1];
   plumbing(staticRoot,m,positionX(240),top,'shower');plumbing(staticRoot,m,positionX(380),top,'toilet');
   bunk(staticRoot,m,positionX(510),top);cupboard(staticRoot,m,2.1,top,-1.14,1.54,2.31);
-  const seat=LOUNGE_SEAT;
-  box(staticRoot,m.dark,7.4,top+.24,seat.centerDepth,4.12,.32,.70,.045);
-  box(staticRoot,m.cushion,7.4,top+seat.top-.08,seat.centerDepth,3.98,.16,seat.cushionDepth,.07);
-  box(staticRoot,m.cushion,7.4,top+.82,-.44,4.03,.84,.20,.06);
-  for(const x of [5.32,9.49])box(staticRoot,m.enamel,x,top+.43,seat.centerDepth,.16,.69,.80,.04);
-  for(let i=0;i<3;i++)box(staticRoot,m.olive,6.05+i*1.25,top+.75,-.255,.7,.50,.15,.08);
-  const table=createLoungeTable(m);table.position.set(8.25,top,.91);staticRoot.add(table);
+  const lounge=createLounge(m);lounge.position.y=top;staticRoot.add(lounge);
+  const loungeBounds=new THREE.Box3().setFromObject(lounge).expandByScalar(.06);
   cupboard(staticRoot,m,11.55,top,-1.11,1.35,2.35);
   panel(staticRoot,m,4.06,top+1.5,-1.38,1.37,1.26,m.white);
   label(staticRoot,'TARAIRON\nCREW 01',4.06,top+1.57,-1.255,1.13,.37,{bg:'#c8d0c4',fg:'#354236',size:40});
@@ -276,18 +296,12 @@ export function buildShip(m) {
   });
   const pickMaterial=new THREE.MeshBasicMaterial({visible:false}),indicators={};
   STATIONS.forEach(({id,x,floor:level})=>{
-    const w=id==='lounge'?4.1:id==='medical'?5.10:id==='eva'?3.65:['airlock','innerHatch'].includes(id)?.62:1.9;
+    const w=id==='medical'?5.10:id==='eva'?3.65:['airlock','innerHatch'].includes(id)?.62:1.9;
     const fixtureX=id==='airlock'?evaBay.hatch.position.x:id==='innerHatch'?evaBay.innerHatch.position.x:id==='medical'?MED_BED.x-.52:positionX(x);
-    const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,2.5,3),pickMaterial);mesh.position.set(fixtureX,FLOOR_Y[level]+1.25,0);mesh.userData.station=id;targets.push(mesh);animated.add(mesh);
-    const group=new THREE.Group(),material=new THREE.MeshBasicMaterial({color:0xf3bd62,transparent:true,depthWrite:false,depthTest:false,toneMapped:false});
-    group.position.set(fixtureX,FLOOR_Y[level],1.75);group.visible=false;animated.add(group);
-    box(group,material,0,.055,0,w,.07,.018);
-    box(group,material,0,2.48,0,.66,.10,.025,.012);
-    for(const side of [-1,1])for(const y of [.19,2.34]){
-      box(group,material,side*w/2,y,0,.045,.30,.018);
-      if(y>1)box(group,material,side*(w/2-.14),2.48,0,.28,.045,.018);
-    }
-    group.children.forEach(part=>{part.castShadow=false;part.receiveShadow=false;part.renderOrder=8;});indicators[id]={group,material};
+    const bounds=id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
+    const {mesh,group,material}=createStationInteraction(id,bounds,pickMaterial);
+    if(id!=='lounge')group.position.z=1.75;
+    targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
   return {staticMesh:batchStatic(staticRoot),animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal};
 }

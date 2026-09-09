@@ -2,7 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {ObservationView} from '../src/obs/view.js';
-import {HABITAT_VIEW} from '../src/obs/ship.js';
+import {HABITAT_VIEW,FLOOR_Y,createLounge,createStationInteraction} from '../src/obs/ship.js';
+
+test('the lounge target and frame follow the furniture instead of the crew destination',()=>{
+  const material=new THREE.MeshBasicMaterial(),lounge=createLounge(new Proxy({},{get:()=>material}));
+  lounge.position.y=FLOOR_Y[0];
+  const furniture=new THREE.Box3().setFromObject(lounge),bounds=furniture.clone().expandByScalar(.06);
+  const {mesh,group}=createStationInteraction('lounge',bounds,material);
+  const view=Object.create(ObservationView.prototype),scene=new THREE.Scene();
+  view.milo=new THREE.Group();view.cat=new THREE.Group();view.ship={targets:[mesh]};scene.add(mesh,group);scene.updateMatrixWorld(true);
+  const hitBox=new THREE.Box3().setFromObject(mesh);
+  assert.ok(hitBox.containsBox(furniture));assert.ok(Math.abs(mesh.position.x-7.405)<.001);
+  assert.equal(group.position.x,mesh.position.x);assert.equal(group.position.y,bounds.min.y);
+  assert.ok(bounds.max.y-FLOOR_Y[0]<1.4);
+  assert.ok(Math.abs(group.children[0].scale.x-(bounds.max.x-bounds.min.x))<1e-7);
+  view.camera=new THREE.OrthographicCamera(-6,6,3,-3,.1,50);view.camera.position.set(7.4,FLOOR_Y[0]+1,20);view.camera.updateMatrixWorld(true);
+  view.raycaster=new THREE.Raycaster();view.pointer=new THREE.Vector2();view.canvas={getBoundingClientRect:()=>({left:0,top:0,width:1200,height:600})};
+  const at=(x,y)=>{const p=new THREE.Vector3(x,FLOOR_Y[0]+y,bounds.max.z).project(view.camera);return view.targetAt({clientX:(p.x+1)*600,clientY:(1-p.y)*300});};
+  for(const [x,y]of [[5.32,.6],[6.05,.7],[8.25,.8],[9.49,.6]])assert.deepEqual(at(x,y),{type:'station',id:'lounge'});
+  for(const [x,y]of [[10.15,.7],[7.4,2],[4.9,.6]])assert.equal(at(x,y),null);
+});
 
 test('character meshes take priority over station hit volumes, but hidden parts do not',()=>{
   const view=Object.create(ObservationView.prototype),scene=new THREE.Scene(),material=new THREE.MeshBasicMaterial(),geometry=new THREE.BoxGeometry(1,1,1);
