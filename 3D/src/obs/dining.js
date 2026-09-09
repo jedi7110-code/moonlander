@@ -27,7 +27,7 @@ export function createDiningProps(body,m){
   lathe(mug,m.white,[[0,-.064],[.032,-.064],[.039,-.056],[.046,.059],[.045,.067],[.041,.068],[.039,.057],[.033,-.052],[0,-.052]],'Hollow enamel cup');
   const handle=new THREE.Mesh(new THREE.TorusGeometry(.032,.006,12,32),m.white);
   handle.position.set(.066,.003,0);handle.scale.y=1.18;mug.add(handle);
-  const water=ball(mug,m.water??m.metal,0,-.026,0,.035,.002,.035);
+  const water=ball(mug,m.water??m.metal,0,-.026,0,.033,.002,.033);water.name='Cup liquid surface';
   lathe(bowl,steel,[[0,-.042],[.061,-.042],[.080,-.025],[.102,.034],[.108,.041],[.107,.047],[.102,.047],[.096,.035],[.074,-.023],[0,-.031]],'Open meal bowl');
   const mealMaterial=new THREE.MeshStandardMaterial({color:0xad8649,roughness:.92});
   const meal=ball(bowl,mealMaterial,0,.017,0,.088,.015,.088);
@@ -79,7 +79,7 @@ export function applyDiningPose(root,action,time,duration=action==='galley'?6:5)
     const contact=lip.clone().add(v(0,-.002,.006)).sub(cupRim.clone().applyQuaternion(mug.quaternion));
     mug.position.copy(rest).lerp(contact,lift);
     placeHand(arms[1],pointOn(mug,cupGrip),mug.quaternion.clone().multiply(cupHand),1.1);
-    water.scale.y=.7;water.visible=tilt<.35;water.position.y=-.026-.015*smooth((progress-.42)/.2);
+    water.visible=tilt<.35;water.position.y=-.026-.015*smooth((progress-.42)/.2);
     if(head.userData.setMouthMotion)head.userData.setMouthMotion(0,tilt>.6?.22:0);
     return;
   }

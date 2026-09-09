@@ -1,5 +1,5 @@
 import {MathUtils} from 'three';
-import {hingeAngles} from './gym.js';
+import {placeCatPaw} from './cat-walk.js';
 
 const smooth=value=>{const t=MathUtils.clamp(value,0,1);return t*t*(3-2*t);};
 const envelope=(time,start,end)=>smooth((time-start)/.35)*smooth((end-time)/.35);
@@ -8,16 +8,6 @@ export function groomingSequence(time){
   const t=((time%9.6)+9.6)%9.6;
   return{lick:envelope(t,.6,2.9),wipe:envelope(t,2.9,5.2),flank:envelope(t,5.7,9.0),
     stroke:.5-.5*Math.cos((t-3.1)*Math.PI*2/1.05),lap:Math.max(0,Math.sin(t*Math.PI*2/.46))};
-}
-
-function setPaw(leg,x,y,z,weight){
-  const {hip,knee,rear}=leg,dx=x-hip.position.x,dz=z-hip.position.z;
-  const yaw=Math.abs(dx)>.0001?Math.atan2(dx,dz):0;
-  const forward=yaw?Math.hypot(dx,dz):dz;
-  const upperOffset=rear?Math.atan2(.025,.14):0,lowerOffset=Math.atan2(.025,.151);
-  const angles=hingeAngles(y-hip.position.y,forward,Math.hypot(.14,rear?.025:0),Math.hypot(.151,.025),rear?1:-1);
-  hip.rotation.set(MathUtils.lerp(hip.rotation.x,angles.upper-upperOffset,weight),yaw*weight,0,'YXZ');
-  knee.rotation.x=MathUtils.lerp(knee.rotation.x,angles.lower+upperOffset+lowerOffset,weight);
 }
 
 export function applyCatGrooming(root,{time,actionTime=time,remaining=Infinity,active,facing,passage}){
@@ -50,8 +40,8 @@ export function applyCatGrooming(root,{time,actionTime=time,remaining=Infinity,a
       y=MathUtils.lerp(y,.305+pose.wipe*pose.stroke*.20,raised);
       z=MathUtils.lerp(z,.397-pose.wipe*pose.stroke*.115,raised);
     }
-    setPaw(leg,x,y,z,weight);
-    leg.foot.rotation.x=-(body.rotation.x+leg.hip.rotation.x+leg.knee.rotation.x)*weight*(1-raised);
+    placeCatPaw(leg,x,y,z,weight);
+    leg.foot.rotateX(-raised*.45*weight);
   }
   tongue.visible=active&&weight>.85&&Math.max(pose.lick,pose.flank)>.65&&pose.lap>.35;
   tongue.scale.z=.014+pose.lap*.014;

@@ -70,7 +70,7 @@ test('feet remain on the pedals and hands on the handlebar throughout a full cyc
   assert.ok(gym.flywheel.rotation.x>0);
   const before=milo.userData.legs.map(({leg})=>leg.rotation.x);animateMilo(milo,{action:'gym',moving:false,time:2,actionTime:2});assert.notDeepEqual(milo.userData.legs.map(({leg})=>leg.rotation.x),before);
   animateMilo(milo,{action:null,moving:true,facing:1,time:3});
-  assert.equal(milo.userData.chest.rotation.x,0);assert.equal(milo.userData.head.position.y,1.637);
+  assert.ok(Math.abs(milo.userData.chest.rotation.x)<.04);assert.ok(Math.abs(milo.userData.head.position.y-1.637)<.002);
   for(const {arm,hand}of milo.userData.arms){assert.equal(arm.position.y,1.488);assert.equal(arm.position.z,0);assert.equal(hand.rotation.x,0);}
   for(const {leg,side}of milo.userData.legs)assert.equal(leg.position.x,side*.100);
 });

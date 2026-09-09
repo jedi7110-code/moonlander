@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import {ball,box,cylinder,pipe,rod} from './materials.js';
-import {createCatEar,createCatTail,animateCatTail} from './cat-anatomy.js';
+import {createCatEar,createCatTail,animateCatTail,createCatLegSkin,updateCatLegSkins} from './cat-anatomy.js';
+import {createCatSkull,createCatEyes,createCatMuzzle,updateCatEyes} from './cat-face.js';
 import {applyCyclingPose} from './gym.js';
 import {applyMedicalPose} from './medical.js';
 import {BUNK_BED,reclineProgress,applyReclinedPose} from './recline.js';
 import {applyCatGrooming} from './cat-groom.js';
 import {createDiningProps,applyDiningPose,resetDiningPose} from './dining.js';
+import {applyWalkingPose} from './walking.js';
+import {CAT_LIMBS,applyCatLegPose} from './cat-walk.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
 function limb(parent,mat,length,profile,depth=1) {
@@ -96,35 +99,36 @@ export function createMilo(m,headModel=new THREE.Group()) {
   root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage};root.name='Milo Jarvis';return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,actionTime=time,actionDuration,knock=0,health=null}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,walkDistance=time*1.188,actionTime=time,actionDuration,knock=0,health=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   resetDiningPose(root);
   const stride=time*(climbing?5.4:6.5),walking=moving&&!climbing&&!waiting;
   const seated=['lounge','console'].includes(action)&&!moving;
-  body.position.y=walking?Math.abs(Math.sin(stride))*.018:Math.sin(time*1.5)*.003;
+  body.position.y=walking?0:Math.sin(time*1.5)*.003;
   body.position.x=0;body.position.z=0;body.rotation.set(0,0,0);chest.scale.x=1+Math.sin(time*1.6)*.006;
   chest.rotation.set(0,0,0);chest.position.set(0,0,0);head.position.set(0,1.637,-.009);
   const desired=climbing?Math.PI:walking||waiting?facing*Math.PI/2:action==='eva'?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:.15;
   root.rotation.y+=Math.atan2(Math.sin(desired-root.rotation.y),Math.cos(desired-root.rotation.y))*.12;
   head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
-  for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,0,0);arm.rotation.set(walking?Math.sin(stride+side*Math.PI/2)*.42:climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
-    elbow.rotation.set(walking?-.14:climbing?-.70:-.08,0,0);
+  for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
+    elbow.rotation.set(climbing?-.70:-.08,0,0);
     fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.rotation.set(0,0,0);
     if(seated){arm.rotation.x=-.65;elbow.rotation.x=-.8;}
-    if(knock>0){arm.rotation.x=-1.5;elbow.rotation.x=-.5-Math.sin(knock*22)*.25;}
   }
-  for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.x=walking?Math.sin(stride-side*Math.PI/2)*.43:climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0;
-    knee.rotation.x=walking?Math.max(0,-Math.sin(stride-side*Math.PI/2))*.55:climbing?.9+Math.sin(stride-side*Math.PI/2)*.4:0;
+  for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.x=climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0;
+    knee.rotation.x=climbing?.9+Math.sin(stride-side*Math.PI/2)*.4:0;
     if(seated){const lounge=action==='lounge';leg.rotation.x=lounge?-1.05:-1.15;knee.rotation.x=lounge?1.20:1.30;body.position.y=lounge?-.214:-.254;}
     boot.rotation.x=seated?-(leg.rotation.x+knee.rotation.x):0;
   }
+  if(walking)applyWalkingPose(root,walkDistance);
+  if(knock>0)for(const {arm,elbow}of arms){arm.rotation.x=-1.5;elbow.rotation.x=-.5-Math.sin(knock*22)*.25;}
   if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top);
   if(action==='gym'&&!moving)applyCyclingPose(root,actionTime);
   if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration);
   bandage.visible=Boolean(health?.bandageTime>0||(health?.treatment?.kind==='injury'&&health.treatment.elapsed>health.treatment.duration*.5));
   if(health?.needsCare&&!climbing&&!['medical','gym','bunk','lounge','console'].includes(action)){
     if(health.condition.kind==='injury'){arms[0].arm.rotation.x=-.70;arms[0].elbow.rotation.x=-1.3;}
-    else{head.rotation.x=.12+Math.sin(time*9)*.012;body.position.y-=.008;}
+    else{head.rotation.x=.12+Math.sin(time*9)*.012;if(!walking)body.position.y-=.008;}
   }
   root.visible=!['shower','toilet'].includes(action)||moving;
   if(['galley','hydro'].includes(action)&&!moving&&!climbing)applyDiningPose(root,action,actionTime,actionDuration);
@@ -136,55 +140,47 @@ function coatBall(parent,material,x,y,z,w,h,d){
 }
 export function createCat(m) {
   const root=new THREE.Group(),body=joint(root,0,0,0);
-  coatBall(body,m.furBody,0,.32,-.055,.157,.184,.33);
-  coatBall(body,m.furBody,0,.32,-.265,.165,.184,.17);
-  ball(body,m.furLight,0,.36,.16,.125,.18,.17);
-  const neck=joint(body,0,.414,.23);ball(neck,m.furLight,0,-.005,0,.105,.135,.12);
+  coatBall(body,m.furBody,0,.360,-.055,.143,.146,.34);
+  coatBall(body,m.furBody,0,.354,-.265,.146,.147,.17);
+  ball(body,m.furLight,0,.374,.145,.112,.137,.123);
+  const neck=joint(body,0,.414,.23);ball(neck,m.furLight,0,-.004,-.006,.084,.105,.087);
   const head=joint(neck,0,.066,.055);
-  const eyes=[];
-  ball(head,m.furFace,0,0,0,.126,.12,.113);
-  ball(head,m.furLight,0,-.055,.064,.088,.063,.086);
-  for(const side of [-1,1]){
-    ball(head,m.furLight,side*.034,-.043,.102,.044,.032,.039);
-    const eye=joint(head,side*.065,.021,.088);eyes.push(eye);
-    ball(eye,m.black,0,0,0,.035,.029,.018);
-    ball(eye,m.catEye,0,0,.01,.029,.025,.013);
-    ball(eye,m.black,0,0,.022,.005,.019,.003);
-    ball(eye,m.white,-side*.006,.009,.024,.004,.004,.002);
-    for(let i=0;i<4;i++){const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(side*.045,-.035+i*.004,.131),new THREE.Vector3(side*.132,-.022+i*.015,.15),new THREE.Vector3(side*.217,-.039+i*.027,.12)]);
-      const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(8)),new THREE.LineBasicMaterial({color:0xc5c5bc,transparent:true,opacity:.55}));head.add(line);}
-  }
-  ball(head,m.pink,0,-.033,.137,.018,.012,.012);
-  pipe(head,m.pink,[[0,-.04,.144],[0,-.062,.14]],.002);
+  head.add(createCatSkull(m.furFace));
+  const eyes=createCatEyes(head,m.furFace);createCatMuzzle(head);
   const tongue=ball(head,m.pink,0,-.070,.153,.014,.005,.018);tongue.visible=false;
-  const ears=[-1,1].map(side=>{const ear=createCatEar(m.furEar,side);head.add(ear);return ear;});
+  const ears=[-1,1].map(side=>{const ear=createCatEar(m.furEar,side);ear.scale.y=.84;head.add(ear);return ear;});
   const legs=[];
   for(const z of [-.25,.20])for(const side of [-1,1]){
-    const hip=joint(body,side*.101,.33,z);
-    limb(hip,z<0?(side<0?m.furGinger:m.fur):m.furLight,.14,[[0,z<0?.087:.047],[.25,z<0?.085:.052],[.75,.034],[1,.033]],1.05);
-    const knee=joint(hip,0,-.14,z<0?-.025:0);
-    limb(knee,m.furLight,.135,[[0,.032],[.3,.038],[.8,.027],[1,.029]],1.15);
-    const foot=joint(knee,0,-.151,.025),paw=ball(foot,m.furLight,0,0,0,.047,.036,.072);
-    for(let i=0;i<3;i++)ball(foot,m.furLight,(i-1)*.021,-.003,.049,.014,.024,.022);
-    legs.push({hip,knee,foot,paw,side,rear:z<0});
+    const rear=z<0,anatomy=CAT_LIMBS[rear?'rear':'front'];
+    const hip=joint(body,side*.101,anatomy.height,anatomy.z);
+    hip.name=rear?'Hip':'Shoulder';
+    const knee=joint(hip,0,-anatomy.upper,0);knee.name=rear?'Stifle':'Elbow';
+    const ankle=joint(knee,0,-anatomy.lower,0);ankle.name=rear?'Hock':'Carpus';
+    const foot=joint(ankle,0,-anatomy.distal,0),paw=ball(foot,m.furLight,0,0,.011,.044,.033,.060);
+    for(let i=0;i<3;i++)ball(foot,m.furLight,(i-1)*.020,-.006,.055,.014,.024,.020);
+    const leg={hip,knee,ankle,foot,paw,side,rear,anatomy,body};
+    createCatLegSkin(leg,rear?m.furBody:m.furLight);legs.push(leg);
   }
   const tail=createCatTail(m.furTail);body.add(tail);
-  root.userData={body,neck,head,ears,eyes,legs,tail,tongue,groom:{weight:0,time:0,lastTime:null,side:-1}};root.name='Ship cat';return root;
+  root.userData={body,neck,head,ears,eyes,legs,tail,tongue,groom:{weight:0,time:0,lastTime:null,side:-1}};root.name='Ship cat';
+  applyCatLegPose(root,{distance:0,moving:false,resting:false});updateCatLegSkins(root);return root;
 }
 
-export function animateCat(root,{time,moving,climbing,facing,mode,passage=null,actionTime=time,remaining=Infinity}) {
-  const {body,neck,head,ears,eyes,legs,tail}=root.userData;const gait=time*9;
-  const resting=mode==='sleep';body.rotation.set(0,0,0);body.scale.set(1,resting?.72:1,resting?.88:1);body.position.y=resting?-.125:Math.sin(time*2.3)*.003;
+export function animateCat(root,{time,moving,climbing,facing,mode,walkDistance=time*.792,passage=null,actionTime=time,remaining=Infinity}) {
+  const {body,neck,head,ears,eyes,tail}=root.userData;
+  const resting=mode==='sleep'&&!moving;body.rotation.set(0,0,0);body.scale.set(1,resting?.72:1,resting?.88:1);body.position.y=resting?-.125:moving?Math.sin(walkDistance/.50*Math.PI*4)*.004:Math.sin(time*2.3)*.003;
   eyes.forEach(eye=>eye.scale.y=resting?.08:1-Math.pow(Math.max(0,Math.sin(time*.42)),60)*.9);
   const direction=climbing?Math.PI:facing*Math.PI/2;
   root.rotation.y+=Math.atan2(Math.sin(direction-root.rotation.y),Math.cos(direction-root.rotation.y))*.12;
   if(passage){root.rotation.y=passage.yaw;body.scale.y=1-passage.crouch*.14;body.position.y=0;}
   body.rotation.x=climbing?-1.0:0;
-  for(const {hip,knee,foot,side,rear}of legs){const phase=gait+(side===1?Math.PI:0)+(rear?Math.PI/2:0);hip.rotation.set(moving?Math.sin(phase)*.42:resting?-1.2:0,0,resting?side*.10:0,'XYZ');knee.rotation.x=moving?Math.max(0,-Math.sin(phase))*.6:resting?2.45:0;foot.rotation.set(0,0,0);}
+  applyCatLegPose(root,{distance:walkDistance,moving,resting});
   neck.position.y=mode==='eat'?.299:.414;
   neck.rotation.set(mode==='eat'?.90+Math.sin(time*7)*.045:resting?.72:Math.sin(time*.9)*.04,0,0,'XYZ');
   head.rotation.y=!moving&&mode!=='eat'?Math.sin(time*.42)*.20:0;
   ears.forEach((ear,i)=>ear.rotation.x=(resting?.10:0)+Math.pow(Math.max(0,Math.sin(time*.33+i*2.4)),60)*.10);
   const grooming=applyCatGrooming(root,{time,actionTime,remaining,active:mode==='groom'&&!moving&&!climbing&&!passage,facing,passage});
+  updateCatEyes(eyes);
+  updateCatLegSkins(root);
   animateCatTail(tail,{time,resting,moving,crouching:Boolean(passage),grooming});
 }

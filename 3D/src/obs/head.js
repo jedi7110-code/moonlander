@@ -1,16 +1,27 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
+function smoothstepSlope(value,low,high){
+  const t=THREE.MathUtils.clamp((value-low)/(high-low),0,1);return 6*t*(1-t)/(high-low);
+}
+
 export function headGeometry(source){
   const indexed=source.clone(),position=indexed.attributes.position,indices=indexed.index.array,kept=[];
   // Remove the scan's shoulders below the existing character's neck joint.
   for(let i=0;i<indices.length;i+=3)if([indices[i],indices[i+1],indices[i+2]].every(v=>position.getY(v)>=-1.05))kept.push(indices[i],indices[i+1],indices[i+2]);
-  // Blend the cropped nape into the body without narrowing the jaw or face.
+  // Carry the taper up the nape instead of ending it abruptly below the skull.
   const normal=indexed.attributes.normal;
   for(let i=0;i<position.count;i++){
-    const x=position.getX(i),y=position.getY(i),z=position.getZ(i),blend=(1-THREE.MathUtils.smoothstep(y,-1.05,.05))*(1-THREE.MathUtils.smoothstep(z,.5,1.6)),sx=1-.18*blend,sz=1-.4*blend;
+    const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
+    const height=1-THREE.MathUtils.smoothstep(y,-1.05,.85),rear=1-THREE.MathUtils.smoothstep(z,.5,1.6),blend=height*rear;
+    if(!blend)continue;
+    const sx=1-.32*blend,sz=1-.62*blend;
     position.setXYZ(i,x*sx,y,z*sz);
-    const nx=normal.getX(i)/sx,ny=normal.getY(i),nz=normal.getZ(i)/sz,length=Math.hypot(nx,ny,nz)||1;normal.setXYZ(i,nx/length,ny/length,nz/length);
+    // Inverse-transpose of the tapered surface, including its changing slope.
+    const dy=-smoothstepSlope(y,-1.05,.85)*rear,dz=-height*smoothstepSlope(z,.5,1.6);
+    const nx=normal.getX(i)/sx,nz=(normal.getZ(i)+.32*x*dz*nx)/(sz-.62*z*dz);
+    const ny=normal.getY(i)+.32*x*dy*nx+.62*z*dy*nz,length=Math.hypot(nx,ny,nz)||1;
+    normal.setXYZ(i,nx/length,ny/length,nz/length);
   }
   indexed.setIndex(kept);const geometry=indexed.toNonIndexed();indexed.dispose();geometry.computeBoundingBox();geometry.computeBoundingSphere();return geometry;
 }

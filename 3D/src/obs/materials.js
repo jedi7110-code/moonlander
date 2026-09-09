@@ -25,17 +25,23 @@ export async function materials() {
   };
   furBody.customProgramCacheKey=()=> 'obs-calico-body-v1';
   const furFace=furLight.clone();
+  const faceTexture=maps[3].clone();faceTexture.repeat.set(3,3);faceTexture.needsUpdate=true;
+  furFace.map=faceTexture;furFace.bumpMap=faceTexture;furFace.bumpScale=.0005;
   // The tapered white blaze follows the head, including when it turns.
   furFace.onBeforeCompile=shader=>{
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vCoatPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvCoatPosition = position;');
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 facePosition;\nvarying vec3 vCoatPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvCoatPosition = facePosition;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vCoatPosition;').replace('#include <map_fragment>',`#include <map_fragment>
-      float blazeWidth = 0.045 + 0.58 * (1.0 - smoothstep(-0.45, 0.78, vCoatPosition.y));
-      float blaze = (1.0 - smoothstep(blazeWidth - 0.035, blazeWidth + 0.035, abs(vCoatPosition.x))) * smoothstep(0.04, 0.28, vCoatPosition.z);
-      vec3 cap = mix(vec3(0.028, 0.031, 0.030), vec3(0.53, 0.245, 0.080), smoothstep(-0.10, 0.10, vCoatPosition.x));
-      diffuseColor.rgb *= mix(cap, vec3(1.0), blaze);
+      vec3 p = vCoatPosition;
+      float edge = 0.025 * sin(p.y * 23.0 + p.x * 17.0);
+      float blazeWidth = 0.065 + 0.20 * (1.0 - smoothstep(-0.30, 0.92, p.y));
+      float blaze = (1.0 - smoothstep(blazeWidth - 0.03, blazeWidth + 0.03, abs(p.x + 0.02))) * smoothstep(0.04, 0.28, p.z);
+      float muzzle = (1.0 - smoothstep(-0.47, -0.23, p.y + 0.12 * abs(p.x) + edge)) * smoothstep(-0.10, 0.35, p.z);
+      float black = (1.0 - smoothstep(-0.40, -0.22, p.x + edge)) * smoothstep(-0.12, 0.25, p.y + edge);
+      vec3 coat = mix(vec3(0.53, 0.245, 0.080), vec3(0.028, 0.031, 0.030), black);
+      diffuseColor.rgb *= mix(coat, vec3(1.0), max(blaze, muzzle));
     `);
   };
-  furFace.customProgramCacheKey=()=> 'obs-calico-face-v1';
+  furFace.customProgramCacheKey=()=> 'obs-calico-face-v2';
   const furTail=furGinger.clone();
   furTail.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 vTailUv;').replace('#include <begin_vertex>','#include <begin_vertex>\nvTailUv = uv;');

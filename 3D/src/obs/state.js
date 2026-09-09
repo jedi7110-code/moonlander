@@ -3,6 +3,7 @@ import {FLOORS,LADDER_X,getStation,CAT_PORT,CAT_BOWL} from './layout.js';
 export class CrewMotion {
   constructor({floor=1,x=360,walkSpeed=54,climbSpeed=38}={}) {
     this.floor=floor;this.x=x;this.y=FLOORS[floor].y;this.walkSpeed=walkSpeed;this.climbSpeed=climbSpeed;
+    this.walkDistance=0;
     this.queue=[];this.onArrive=null;this.facing=1;this.symbol='';this.knockTime=0;this.commandVersion=0;
   }
   get busy(){return this.queue.length>0;}
@@ -25,6 +26,7 @@ export class CrewMotion {
     const seg=this.queue[0];if(!seg)return;
     const key=seg.type==='climb'?'y':'x',speed=seg.type==='climb'?this.climbSpeed:this.walkSpeed;
     const delta=seg[key]-this[key],step=speed*dt;
+    if(key==='x')this.walkDistance+=Math.min(Math.abs(delta),step);
     if(key==='x'&&Math.abs(delta)>.01)this.facing=Math.sign(delta);
     if(Math.abs(delta)<=step){this[key]=seg[key];if(seg.type==='climb')this.floor=seg.floor;this.queue.shift();if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}}
     else this[key]+=Math.sign(delta)*step;
@@ -32,7 +34,7 @@ export class CrewMotion {
 }
 
 export class CatMotion extends CrewMotion {
-  constructor(options={}){super({floor:0,x:1035,walkSpeed:66,...options});this.z=CAT_PORT.walkZ;this.portal=null;this.destination=null;this.onDestination=null;}
+  constructor(options={}){super({floor:0,x:1035,walkSpeed:36,...options});this.z=CAT_PORT.walkZ;this.portalWalkDistance=0;this.portal=null;this.destination=null;this.onDestination=null;}
   get busy(){return Boolean(this.portal)||super.busy;}
   get climbing(){return false;}
   get hidden(){return this.portal?.phase==='transit';}
@@ -55,10 +57,11 @@ export class CatMotion extends CrewMotion {
     if(!this.portal){super.update(dt);return;}
     while(dt>0&&this.portal){
       const p=this.portal,step=Math.min(dt,p.duration-p.age);p.age+=step;dt-=step;
-      const t=p.age/p.duration,s=t*t*(3-2*t);
+      const t=p.age/p.duration,s=t*t*(3-2*t),previousZ=this.z;
       if(p.phase==='enter')this.z=CAT_PORT.walkZ+(CAT_PORT.insideZ-CAT_PORT.walkZ)*s;
       if(p.phase==='transit')this.y=FLOORS[p.from].y+(FLOORS[p.to].y-FLOORS[p.from].y)*s;
       if(p.phase==='exit')this.z=CAT_PORT.insideZ+(CAT_PORT.walkZ-CAT_PORT.insideZ)*s;
+      if(p.phase==='enter'||p.phase==='exit')this.portalWalkDistance+=Math.abs(this.z-previousZ);
       if(p.age<p.duration)break;
       p.age=0;
       if(p.phase==='turnIn'){p.phase='enter';p.duration=2.8;}

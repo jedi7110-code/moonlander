@@ -54,6 +54,26 @@ test('the cup tilts around its lip contact and lowers again',()=>{
   pose(root,'hydro',5);assert.ok(Math.abs(dining.mug.rotation.x)<1e-10);assert.ok(dining.mug.position.y<1);
 });
 
+test('the liquid stays thin and inside the cup when raised, tilted, lowered and reused',()=>{
+  const root=character(),{water}=root.userData.dining,position=water.geometry.attributes.position;
+  const scale=water.scale.toArray();let highest=-Infinity,lowest=Infinity;
+  for(let repeat=0;repeat<2;repeat++){
+    for(let frame=0;frame<=180;frame++){
+      pose(root,'hydro',frame/180*5);
+      assert.deepEqual(water.scale.toArray(),scale,'water level must not stretch the surface');
+      for(let i=0;i<position.count;i++){
+        const p=new Vector3().fromBufferAttribute(position,i).applyMatrix4(water.matrix);
+        assert.ok(p.y>-.052&&p.y<.057,'the liquid stays between the inner bottom and rim');
+        const innerRadius=.033+(p.y+.052)/.109*.006;
+        assert.ok(Math.hypot(p.x,p.z)<innerRadius,'the liquid stays inside the cup wall');
+      }
+      highest=Math.max(highest,water.position.y);lowest=Math.min(lowest,water.position.y);
+    }
+    pose(root,null,0,5,{moving:true});
+  }
+  assert.ok(highest-lowest>.014);assert.ok(water.scale.y<.003);
+});
+
 test('prop paths are continuous, pause with action time, and reset after interruption',()=>{
   const root=character(),{dining}=root.userData;
   for(const action of ['galley','hydro']){
@@ -70,8 +90,8 @@ test('prop paths are continuous, pause with action time, and reset after interru
     handAt(root,1,prop,action==='galley'?[.027,.018,.164]:[.097,.067,.019]);
     pose(root,null,0,6,{moving:true});
     for(const prop of [dining.mug,dining.spoon,dining.bowl])assert.equal(prop.visible,false);
-    for(const {arm,elbow,hand,fingers}of root.userData.arms){
-      assert.equal(arm.rotation.y,0);assert.equal(elbow.rotation.y,0);assert.deepEqual(hand.rotation.toArray().slice(0,3),[0,0,0]);
+    for(const {arm,elbow,hand,fingers,side}of root.userData.arms){
+      assert.equal(arm.rotation.y,0);assert.equal(elbow.rotation.y,0);assert.deepEqual(hand.rotation.toArray().slice(0,3),[0,side*Math.PI/2,0]);
       fingers.forEach(finger=>{assert.equal(finger.rotation.x,0);finger.userData.links.forEach(link=>assert.equal(link.rotation.x,0));});
     }
   }

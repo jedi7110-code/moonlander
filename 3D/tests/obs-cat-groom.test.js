@@ -41,7 +41,7 @@ test('paused grooming is stable and interrupted grooming releases all altered jo
   const before=snapshot();animateCat(root,{time:3.6,actionTime:3.6,remaining:12.4,mode:'groom',moving:false,facing:1});assert.deepEqual(snapshot(),before);
   for(let i=1;i<90;i++)animateCat(root,{time:3.6+i/60,actionTime:i/60,mode:'fetch',moving:true,facing:1});
   assert.equal(root.userData.groom.weight,0);assert.equal(root.userData.neck.rotation.y,0);assert.equal(root.userData.tongue.visible,false);
-  for(const {hip,foot}of root.userData.legs){assert.equal(hip.rotation.y,0);assert.equal(foot.rotation.x,0);}
+  for(const {hip,ankle,foot}of root.userData.legs){assert.equal(hip.rotation.y,0);assert.ok(Number.isFinite(ankle.rotation.x));assert.ok(Math.abs(foot.rotation.z)<1e-9);}
   animateCat(root,{time:6,mode:'eat',moving:false,facing:-1});assert.equal(root.userData.neck.position.y,.299);
 });
 test('entering a cat passage overrides grooming and preserves its low-clearance pose',()=>{

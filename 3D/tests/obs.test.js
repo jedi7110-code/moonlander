@@ -40,6 +40,22 @@ test('the scanned head retains its face, normals and UVs after the shoulder crop
   for(const name of ['position','normal','uv'])for(const number of geometry.attributes[name].array)assert.ok(Number.isFinite(number));
   assert.equal(geometry.attributes.normal.count,geometry.attributes.position.count);
   assert.equal(geometry.attributes.uv.count,geometry.attributes.position.count);
+  let output=0,napeVertices=0;
+  const original=source.attributes.position,indices=source.index.array,reshaped=geometry.attributes.position,normals=geometry.attributes.normal;
+  for(let i=0;i<indices.length;i+=3){
+    const triangle=[indices[i],indices[i+1],indices[i+2]];if(triangle.some(v=>original.getY(v)<-1.05))continue;
+    for(const vertex of triangle){
+      const y=original.getY(vertex),z=original.getZ(vertex);
+      if(y>=.85||z>=1.6){
+        for(const axis of ['X','Y','Z'])assert.equal(reshaped['get'+axis](output),original['get'+axis](vertex),'the face and upper skull stay unchanged');
+        for(const axis of ['X','Y','Z'])assert.equal(normals['get'+axis](output),source.attributes.normal['get'+axis](vertex));
+      }else assert.ok(Math.abs(Math.hypot(normals.getX(output),normals.getY(output),normals.getZ(output))-1)<1e-5);
+      if(y>0&&y<.65&&z<-.5){assert.ok(reshaped.getZ(output)>z+.015,'the taper continues above the old nape bulge');napeVertices++;}
+      for(const axis of ['X','Y'])assert.equal(geometry.attributes.uv['get'+axis](output),source.attributes.uv['get'+axis](vertex));
+      output++;
+    }
+  }
+  assert.ok(napeVertices>50);
   geometry.dispose();gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
 });
 test('crew walks to ladder, changes decks, and invokes arrival once',()=>{
@@ -117,25 +133,31 @@ test('cat ears are thin cupped shells and calico patches use body-local coordina
     for(let i=0;i<half;i++){const thickness=position.getZ(i)-position.getZ(i+half);assert.ok(thickness>0&&thickness<=.0051);}
     assert.ok(position.getZ(10)<position.getZ(0));
   }
-  const patches=[];cat.traverse(o=>{if(o.geometry?.attributes.coatPosition)patches.push(o);});assert.equal(patches.length,2);
+  const patches=[];cat.traverse(o=>{if(o.geometry?.attributes.coatPosition)patches.push(o);});assert.equal(patches.length,4);
   for(const mesh of patches){const position=mesh.geometry.attributes.position,coat=mesh.geometry.attributes.coatPosition;
     for(let i=0;i<position.count;i++)assert.ok(Math.abs(coat.getY(i)-(position.getY(i)*mesh.scale.y+mesh.position.y))<1e-6);
   }
 });
-test('the tapered tail stays continuous through motion and pauses without reallocating geometry',()=>{
+test('the rounded tail stays continuous through motion and pauses without reallocating geometry',()=>{
   const material=new MeshStandardMaterial(),cat=createCat(new Proxy({},{get:()=>material})),tail=cat.userData.tail,geometry=tail.geometry;
   assert.ok(tail.isMesh);assert.equal(tail.children.length,0);let time=0;
   for(const [mode,moving]of [['sleep',false],['walk',true],['groom',false],['sleep',false]]){
     for(let frame=0;frame<90;frame++){time+=1/60;animateCat(cat,{time,moving,climbing:false,facing:1,mode});}
     assert.equal(tail.geometry,geometry);const position=geometry.attributes.position;
     for(const number of position.array)assert.ok(Number.isFinite(number));
-    const {segments,sides,curve}=tail.userData;let previousRadius=1;
+    const {segments,capSegments,sides,curve,tipRadius}=tail.userData;let previousRadius=1;
     for(let ring=0;ring<=segments;ring++){
       const center=curve.getPointAt(ring/segments),index=ring*(sides+1),radius=Math.hypot(position.getX(index)-center.x,position.getY(index)-center.y,position.getZ(index)-center.z);
       assert.ok(radius<=previousRadius+1e-6);previousRadius=radius;
       for(const key of ['getX','getY','getZ'])assert.ok(Math.abs(position[key](index)-position[key](index+sides))<1e-6);
     }
-    assert.ok(previousRadius<1e-6);
+    assert.ok(Math.abs(previousRadius-tipRadius)<1e-6,'the tube retains thickness all the way to its rounded cap');
+    const end=curve.getPointAt(1),tip=new Vector3().fromBufferAttribute(position,(segments+capSegments)*(sides+1));
+    assert.ok(Math.abs(tip.distanceTo(end)-tipRadius)<1e-6);
+    for(let ring=segments;ring<=segments+capSegments;ring++)for(let side=0;side<=sides;side++){
+      const point=new Vector3().fromBufferAttribute(position,ring*(sides+1)+side);
+      assert.ok(Math.abs(point.distanceTo(end)-tipRadius)<1e-6,'the end is a hemisphere, not a cone');
+    }
     const saved=position.array.slice();animateCat(cat,{time,moving,climbing:false,facing:1,mode});assert.deepEqual(position.array,saved);
   }
 });
