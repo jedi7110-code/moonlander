@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,pipe,rod,label} from './materials.js';
 import {EVA_PASSAGE} from './layout.js';
+import {createEVAHelmet} from './eva-helmet.js';
 
 export const EVA_BAY={suitX:[7.85,9.05,10.25],suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:-.12};
 
@@ -47,16 +48,9 @@ export function hangingSuit(m,index){
     ball(suit,m.evaCloth,side*.35,.783,.105,.037,.067,.04);
     for(let j=0;j<3;j++)rod(suit,m.cloth,[side*.422-.043+j*.029,.72,.142],[side*.422-.043+j*.029,.787,.142],.005);
   }
-  cylinder(suit,m.metal,0,1.66,0,.208,.095,.208,32);
-  cylinder(suit,m.rubber,0,1.707,0,.192,.028,.192,32);
-  ball(suit,m.enamel,0,1.94,.0,.25,.25,.245);
-  ball(suit,m.rubber,0,1.965,.167,.218,.188,.13);
-  ball(suit,m.evaVisor,0,1.977,.19,.202,.166,.125);
-  for(const side of [-1,1]){
-    const hinge=cylinder(suit,m.metal,side*.241,1.96,0,.05,.035,.05,20);hinge.rotation.z=Math.PI/2;
-    box(suit,m.dark,side*.16,2.108,.10,.075,.07,.075,.014);
-    ball(suit,m.white,side*.16,2.108,.139,.023,.021,.006);
-  }
+  cylinder(suit,m.metal,0,1.66,0,.185,.095,.185,32);
+  cylinder(suit,m.rubber,0,1.707,0,.172,.028,.172,32);
+  suit.add(createEVAHelmet(m));
   box(suit,m.dark,0,1.37,.214,.32,.27,.072,.035);
   box(suit,m.enamel,0,1.39,.258,.285,.214,.03,.025);
   for(const side of [-1,1]){
@@ -135,10 +129,11 @@ export function createEVABay(m,y){
   EVA_BAY.suitX.forEach((x,index)=>{
     const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.scale.y=.90;root.add(suit);suits.push(suit);
   });
-  label(root,'EVA / SUIT SERVICE',9.05,y+2.79,-1.00,3.31,.22,{size:38});
+  box(root,m.dark,9.05,y+2.78,1.69,3.35,.30,.12,.014);
+  label(root,'EVA / SUIT SERVICE',9.05,y+2.78,1.756,3.31,.26,{size:48});
   const hatch=createEVAHatch(m,y),innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
-  label(root,'INNER',EVA_BAY.innerX-.15,y+2.88,1.80,.76,.15,{size:61});
-  label(root,'EVA / OUTER',EVA_BAY.hatchX-.51,y+2.88,1.80,1.23,.15,{size:48});
+  label(root,'INNER',EVA_BAY.innerX-.15,y+2.81,1.80,.84,.24,{size:61});
+  label(root,'EVA / OUTER',EVA_BAY.hatchX-.62,y+2.81,1.80,1.48,.24,{size:48});
   return{root,suits,hatch,innerHatch};
 }
 

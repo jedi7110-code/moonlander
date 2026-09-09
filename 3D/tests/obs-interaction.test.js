@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {ObservationView} from '../src/obs/view.js';
+import {HABITAT_VIEW} from '../src/obs/ship.js';
 
 test('character meshes take priority over station hit volumes, but hidden parts do not',()=>{
   const view=Object.create(ObservationView.prototype),scene=new THREE.Scene(),material=new THREE.MeshBasicMaterial(),geometry=new THREE.BoxGeometry(1,1,1);
@@ -33,7 +34,15 @@ test('a character tap zooms and follows the pressed subject without issuing a st
   assert.equal(view.mode,'cat');assert.equal(view.targetHeight,3.3);assert.deepEqual(orders,[]);assert.deepEqual(modes,['cat']);
   view.targetAt=()=>({type:'character',id:'milo'});handlers.pointerdown(event());handlers.pointerup(event());
   assert.equal(view.targetHeight,5.3);assert.equal(view.mode,'milo');
-  view.setMode('all');assert.equal(view.targetHeight,12);assert.equal(view.mode,'all');
+  view.setMode('all');assert.equal(view.targetHeight,12);assert.equal(view.mode,'all');assert.equal(view.targetCenter.y,HABITAT_VIEW.centerY);
+});
+
+test('panning can reach the upper shaft and wide view restores habitation framing',()=>{
+  const {view,handlers,event}=controls();handlers.pointerdown(event());handlers.pointermove(event(100,1100));handlers.pointerup(event(100,1100));
+  assert.equal(view.mode,'manual');assert.equal(view.targetCenter.y,HABITAT_VIEW.panMaxY);
+  handlers.pointerdown(event());handlers.pointermove(event(100,-900));handlers.pointerup(event(100,-900));
+  assert.equal(view.targetCenter.y,HABITAT_VIEW.panMinY);
+  view.setMode('all');assert.equal(view.targetCenter.y,HABITAT_VIEW.centerY);
 });
 
 test('station taps remain commands while dragging and cancelled touches never follow',()=>{

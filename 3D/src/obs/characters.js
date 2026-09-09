@@ -3,7 +3,9 @@ import {ball,box,cylinder,pipe,rod} from './materials.js';
 import {createCatEar,createCatTail,animateCatTail} from './cat-anatomy.js';
 import {applyCyclingPose} from './gym.js';
 import {applyMedicalPose} from './medical.js';
+import {BUNK_BED,reclineProgress,applyReclinedPose} from './recline.js';
 import {applyCatGrooming} from './cat-groom.js';
+import {createDiningProps,applyDiningPose,resetDiningPose} from './dining.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
 function limb(parent,mat,length,profile,depth=1) {
@@ -63,8 +65,15 @@ export function createMilo(m,headModel=new THREE.Group()) {
     limb(elbow,m.skin,.276,[[0,.034],[.17,.045],[.37,.047],[.62,.037],[.87,.027],[1,.025]],.89);
     const hand=joint(elbow,0,-.274,0);
     ball(hand,m.skin,0,-.045,.007,.034,.054,.022);
-    for(let i=0;i<4;i++)ball(hand,m.skin,(i-1.5)*.014,-.113+Math.abs(i-1.5)*.009,.012,.0075,.035,.009);
-    ball(hand,m.skin,-side*.029,-.051,.025,.011,.037,.013);
+    const fingers=[];
+    for(let i=0;i<4;i++){
+      const finger=joint(hand,(i-1.5)*.014,-.078+Math.abs(i-1.5)*.009,.012);
+      ball(finger,m.skin,0,-.014,0,.0075,.016,.009);
+      const middle=joint(finger,0,-.028,0);ball(middle,m.skin,0,-.012,0,.0073,.014,.0085);
+      const tip=joint(middle,0,-.024,0);ball(tip,m.skin,0,-.009,0,.007,.011,.008);
+      finger.userData.links=[middle,tip];fingers.push(finger);
+    }
+    const thumb=joint(hand,-side*.029,-.051,.025);ball(thumb,m.skin,0,0,0,.011,.037,.013);
     const leg=joint(body,side*.100,.970,0);
     limb(leg,pants,.435,[[0,.087],[.12,.098],[.34,.095],[.66,.081],[.9,.065],[1,.064]],1.05);
     box(leg,pants,side*.078,-.21,.009,.044,.154,.132,.012);
@@ -78,29 +87,30 @@ export function createMilo(m,headModel=new THREE.Group()) {
     ball(boot,m.rubber,0,-.038,.068,.062,.044,.089);
     box(boot,m.black,0,-.092,.024,.13,.03,.26,.01);
     for(let i=0;i<4;i++)rod(boot,m.dark,[-.036,.039,.005+i*.02],[.036,.037,.005+i*.02],.0035);
-    arms.push({arm,elbow,hand,side});legs.push({leg,knee,boot,side});
+    arms.push({arm,elbow,hand,fingers,thumb,side});legs.push({leg,knee,boot,side});
   }
-  const mug=new THREE.Group();cylinder(mug,m.white,0,0,0,.037,.075,.04,20);const handle=new THREE.Mesh(new THREE.TorusGeometry(.029,.006,8,20),m.white);handle.position.x=.041;mug.add(handle);mug.visible=false;arms[1].hand.add(mug);mug.position.set(0,-.07,.055);
+  const dining=createDiningProps(body,m),{mug}=dining;
   const bandage=new THREE.Group();bandage.position.y=-.13;arms[0].elbow.add(bandage);bandage.visible=false;
   cylinder(bandage,m.cloth,0,0,0,.049,.105,.049,24);
   for(const y of [-.037,-.013,.013,.037])cylinder(bandage,m.white,0,y,0,.050,.009,.050,24);
-  root.userData={body,chest,head,arms,legs,mug,hips,neck,bandage};root.name='Milo Jarvis';return root;
+  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage};root.name='Milo Jarvis';return root;
 }
 
 export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,actionTime=time,actionDuration,knock=0,health=null}) {
-  const {body,chest,head,arms,legs,mug,bandage}=root.userData;
+  const {body,chest,head,arms,legs,bandage}=root.userData;
+  resetDiningPose(root);
   const stride=time*(climbing?5.4:6.5),walking=moving&&!climbing&&!waiting;
-  const seated=['lounge','console','bunk'].includes(action)&&!moving;
+  const seated=['lounge','console'].includes(action)&&!moving;
   body.position.y=walking?Math.abs(Math.sin(stride))*.018:Math.sin(time*1.5)*.003;
   body.position.x=0;body.position.z=0;body.rotation.set(0,0,0);chest.scale.x=1+Math.sin(time*1.6)*.006;
   chest.rotation.set(0,0,0);chest.position.set(0,0,0);head.position.set(0,1.637,-.009);
   const desired=climbing?Math.PI:walking||waiting?facing*Math.PI/2:action==='eva'?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:.15;
   root.rotation.y+=Math.atan2(Math.sin(desired-root.rotation.y),Math.cos(desired-root.rotation.y))*.12;
   head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
-  for(const {arm,elbow,hand,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,0,0);arm.rotation.x=walking?Math.sin(stride+side*Math.PI/2)*.42:climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05;
-    arm.rotation.z=side*.025;elbow.rotation.x=walking?-.14:climbing?-.70:-.08;
+  for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,0,0);arm.rotation.set(walking?Math.sin(stride+side*Math.PI/2)*.42:climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
+    elbow.rotation.set(walking?-.14:climbing?-.70:-.08,0,0);
+    fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.rotation.set(0,0,0);
     if(seated){arm.rotation.x=-.65;elbow.rotation.x=-.8;}
-    if(action==='galley'||action==='hydro'){arm.rotation.x=side===1?-1.15:-.12;elbow.rotation.x=side===1?-1.1+Math.sin(time*2)*.09:-.15;}
     if(knock>0){arm.rotation.x=-1.5;elbow.rotation.x=-.5-Math.sin(knock*22)*.25;}
   }
   for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.x=walking?Math.sin(stride-side*Math.PI/2)*.43:climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0;
@@ -108,7 +118,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     if(seated){const lounge=action==='lounge';leg.rotation.x=lounge?-1.05:-1.15;knee.rotation.x=lounge?1.20:1.30;body.position.y=lounge?-.214:-.254;}
     boot.rotation.x=seated?-(leg.rotation.x+knee.rotation.x):0;
   }
-  if(action==='bunk'&&!moving){body.rotation.z=Math.PI/2;body.position.set(.62,.52,-.7);legs.forEach(({leg,knee,boot})=>{leg.rotation.x=0;knee.rotation.x=.13;boot.rotation.x=0;});arms.forEach(({arm,elbow})=>{arm.rotation.x=-.12;elbow.rotation.x=-.7;});}
+  if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top);
   if(action==='gym'&&!moving)applyCyclingPose(root,actionTime);
   if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration);
   bandage.visible=Boolean(health?.bandageTime>0||(health?.treatment?.kind==='injury'&&health.treatment.elapsed>health.treatment.duration*.5));
@@ -117,7 +127,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     else{head.rotation.x=.12+Math.sin(time*9)*.012;body.position.y-=.008;}
   }
   root.visible=!['shower','toilet'].includes(action)||moving;
-  mug.visible=['galley','hydro'].includes(action)&&!moving;
+  if(['galley','hydro'].includes(action)&&!moving&&!climbing)applyDiningPose(root,action,actionTime,actionDuration);
 }
 
 function coatBall(parent,material,x,y,z,w,h,d){

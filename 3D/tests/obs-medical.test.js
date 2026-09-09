@@ -42,7 +42,7 @@ test('readings reflect game fatigue and hydration, not random per-frame values',
 });
 test('couch stays clear of the passage, patient faces upward, and pose resets after leaving',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),milo=createMilo(m);let bay;
-  const ctx={fillRect(){},fillText(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}};
+  const ctx={fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};},beginPath(){},moveTo(){},lineTo(){},stroke(){}};
   globalThis.document={createElement(){return{getContext(){return ctx;}};}};
   try{bay=createMedicalBay(m,3.392);}finally{delete globalThis.document;}
   const bounds=new Box3().setFromObject(bay.root);

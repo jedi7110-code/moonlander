@@ -31,7 +31,7 @@ test('inspection requests arrive, report their own fixture, and end without chan
 });
 test('three hanging suits have separate silhouettes, clear boots, and a sealed right-hand hatch',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});let bay;
-  globalThis.document={createElement(){return{getContext(){return{fillRect(){},fillText(){}};}};}};
+  globalThis.document={createElement(){return{getContext(){return{fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};}};}};
   try{bay=createEVABay(m,3.392);}finally{delete globalThis.document;}
   assert.equal(bay.suits.length,3);bay.root.updateMatrixWorld(true);
   const bounds=bay.suits.map(suit=>new Box3().setFromObject(suit));

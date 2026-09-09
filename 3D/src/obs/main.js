@@ -150,7 +150,7 @@ function useSupply(type){
 }
 function headquarters(){
   if(brain.isCalling()){acknowledge();return;}
-  if(brain.requestCommand()){pendingHQ=true;showMessage(words('バラマンディ号、定時通信。','Barramundi, scheduled transmission.'),'HQ');}
+  if(brain.requestCommand()){pendingHQ=true;showMessage(words('タライロン生活区画、定時通信。','Tarairon habitat, scheduled transmission.'),'HQ');}
   if(brain.actStation)confirmOrder(brain.actStation);
 }
 $('obs-pause').addEventListener('click',()=>setPause(!paused));

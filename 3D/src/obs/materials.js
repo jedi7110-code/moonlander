@@ -54,7 +54,8 @@ export async function materials() {
     olive:standard(0x859273,.93,0,{map:maps[2],bumpMap:maps[2],bumpScale:.005}),
     cloth:standard(0xe1ded1,.95,0,{bumpMap:maps[2],bumpScale:.002}),
     evaCloth:standard(0xd8dad0,.91,.02,{bumpMap:maps[2],bumpScale:.004}),
-    evaVisor:standard(0x252e2b,.14,.82),
+    evaHelmet:standard(0xbcc5c4,.29,.72),
+    evaVisor:new THREE.MeshPhysicalMaterial({color:0x0b1217,roughness:.13,metalness:.58,clearcoat:1,clearcoatRoughness:.10}),
     evaWindow:new THREE.MeshBasicMaterial({color:0x020406}),
     cushion:standard(0x4b5957,.9,.01,{bumpMap:maps[2],bumpScale:.014}),
     skin:standard(0xb8896e,.75,0),
@@ -105,15 +106,22 @@ export function rod(parent,mat,a,b,r=.035) {
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.sub(from).normalize());mesh.castShadow=true;parent.add(mesh);return mesh;
 }
 export function label(parent,text,x,y,z,w,h,{fg='#d4dbcc',bg='#232b2b',size=48}={}) {
-  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=Math.max(64,Math.round(512*h/w));const ctx=canvas.getContext('2d');
-  ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=fg;ctx.font=`600 ${size}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
-  const lines=text.split('\n');lines.forEach((line,i)=>ctx.fillText(line,256,canvas.height/2+(i-(lines.length-1)/2)*size*1.3,490));
-  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:texture,roughness:.75,emissive:0xaaaaaa,emissiveMap:texture,emissiveIntensity:.1}));mesh.position.set(x,y,z);parent.add(mesh);return mesh;
+  // Match the physical plate's aspect ratio; a minimum canvas height alone squashes lettering.
+  const density=Math.max(1024/w,128/h),canvas=document.createElement('canvas');
+  canvas.width=Math.round(w*density);canvas.height=Math.round(h*density);const ctx=canvas.getContext('2d');
+  const lines=text.split('\n'),width=canvas.width*.92,height=canvas.height*.78;
+  let fontSize=height/(lines.length*1.2)*Math.min(size/48,1);
+  ctx.font=`600 ${fontSize}px monospace`;
+  fontSize*=Math.min(1,width/Math.max(...lines.map(line=>ctx.measureText(line).width)));
+  ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=fg;ctx.font=`600 ${fontSize}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+  lines.forEach((line,i)=>ctx.fillText(line,canvas.width/2,canvas.height/2+(i-(lines.length-1)/2)*fontSize*1.2));
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=4;
+  const material=new THREE.MeshBasicMaterial({map:texture,toneMapped:false});material.name=`Sign: ${text}`;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),material);mesh.name=material.name;mesh.position.set(x,y,z);parent.add(mesh);return mesh;
 }
 export function screen(parent,x,y,z,w=.85,h=.58,seed=0) {
   const canvas=document.createElement('canvas');canvas.width=384;canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle='#081c19';ctx.fillRect(0,0,384,256);ctx.strokeStyle='#7bdbc0';ctx.lineWidth=2;
-  ctx.font='14px monospace';ctx.fillStyle='#93d4b2';ctx.fillText(seed%2?'BARRAMUNDI / STATUS':'UAC 7710 / TELEMETRY',18,25);
+  ctx.font='14px monospace';ctx.fillStyle='#93d4b2';ctx.fillText(seed%2?'TARAIRON / HABITAT':'UAC 7710 / TELEMETRY',18,25);
   for(let row=0;row<9;row++){ctx.fillStyle=row%3?'#558879':'#a8c892';ctx.fillText(`${String(seed+row).padStart(2,'0')}  ${['LINK: NOMINAL','BUS  28.4 V','O2   21.0 %','TEMP 294.5 K','COOLANT LOOP','PUMP 14 ACTIVE'][row%6]}`,18,56+row*19);}
   ctx.strokeRect(235,44,128,150);for(let row=0;row<5;row++){ctx.beginPath();for(let i=0;i<125;i++){const py=65+row*26+Math.sin(i*.14+row+seed)*9; i?ctx.lineTo(237+i,py):ctx.moveTo(237+i,py);}ctx.stroke();}
   ctx.fillStyle='#00000040';for(let y0=0;y0<256;y0+=3)ctx.fillRect(0,y0,384,1);
@@ -128,5 +136,5 @@ export function batchStatic(root) {
   root.traverse(mesh=>{if(!mesh.isMesh || Array.isArray(mesh.material))return;const geometry=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
     if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[]});grouped.get(key).geometries.push(geometry);
   });
-  const merged=new THREE.Group();for(const {mat,geometries} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.castShadow=true;mesh.receiveShadow=true;merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
+  const merged=new THREE.Group();for(const {mat,geometries} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:');mesh.receiveShadow=mesh.castShadow;merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
 }

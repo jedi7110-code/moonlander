@@ -1,5 +1,6 @@
 import {Chess,DEFAULT_POSITION} from 'chess.js';
 
+// Keep the legacy key so changing the habitat's name does not discard saved games.
 export const CHESS_SAVE_KEY='barramundi-chess-v1';
 
 export class ChessMatch {

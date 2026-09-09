@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0d1112">
-  <title>BARRAMUNDI | 船内の日常 3D</title>
-  <meta name="description" content="バラマンディ号の船内。マイロと船猫の暮らしを、三層の横断面から見守る。">
+  <title>TARAIRON | 遠心重力生活区画 3D</title>
+  <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船猫の暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/3D/assets/favi.ico">
-  <script type="module" crossorigin src="/3D/assets/obs-B7wHM6bE.js"></script>
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-Bsoz13LS.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CFbEIYT1.js">
+  <script type="module" crossorigin src="/3D/assets/obs-CKeViXdX.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-BbsZyMpZ.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-DK_U-KGk.js">
   <link rel="stylesheet" crossorigin href="/3D/assets/obs-aX6p3TSD.css">
 </head>
 <body>
   <main id="observation">
     <header class="masthead">
-      <a href="./" class="ship-brand"><span class="brand-mark">B</span><div><h1>BARRAMUNDI</h1><span>CREW OBSERVATION / 3D</span></div></a>
+      <a href="./" class="ship-brand"><span class="brand-mark">T</span><div><h1>TARAIRON</h1><span>ROTATING HABITAT / 3D</span></div></a>
       <div class="ship-system"><span class="status-led"></span><span data-ja="船内環境 正常" data-en="LIFE SUPPORT NOMINAL">船内環境 正常</span><span class="environment">21.4°C <b>/</b> 101.3 kPa</span></div>
       <div class="header-actions">
         <time id="ship-clock">08:00</time>
@@ -34,9 +34,9 @@
       <div><strong id="health-title" role="status" aria-live="polite"></strong><span id="health-detail"></span></div>
       <button id="seek-treatment"><i data-lucide="cross" aria-hidden="true"></i><span id="treatment-label">医療区画へ</span></button>
     </section>
-    <section id="viewport" aria-label="バラマンディ号の船内横断面">
-      <canvas id="ship-view" aria-label="三層の船内。マイロと猫が暮らしている" tabindex="0"></canvas>
-      <div class="view-top"><span>SECTION A—A <b>/</b> PORT SIDE</span><div class="camera-tools">
+    <section id="viewport" aria-label="母艦タライロンの遠心重力生活区画の断面">
+      <canvas id="ship-view" aria-label="遠心重力生活区画の三層。マイロと猫が暮らしている" tabindex="0"></canvas>
+      <div class="view-top"><span>SECTION A—A <b>/</b> HABITAT</span><div class="camera-tools">
         <button id="view-all" class="icon-button active" data-tip="全景" aria-label="全景" aria-pressed="true"><i data-lucide="scan"></i></button>
         <button id="view-milo" class="icon-button" data-tip="マイロ" aria-label="マイロに寄る" aria-pressed="false"><i data-lucide="user-round"></i></button>
         <button id="view-cat" class="icon-button" data-tip="猫" aria-label="猫に寄る" aria-pressed="false"><i data-lucide="cat"></i></button>
@@ -47,7 +47,7 @@
       </div></div>
       <div id="station-status" class="station-status" role="status" aria-live="polite" aria-atomic="true" hidden><span class="signal-lamp" aria-hidden="true"></span><strong id="station-name"></strong><span id="station-phase"></span></div>
       <div id="call-alert" class="call-alert" hidden><button id="acknowledge"><i data-lucide="radio"></i><span id="call-text"></span><i data-lucide="arrow-up-right"></i></button></div>
-      <div class="view-bottom"><span><i class="status-led"></i><span data-ja="居住区画 接続中" data-en="HABITAT LINK ACTIVE">居住区画 接続中</span><a class="asset-credit" href="./assets/obs/head/ATTRIBUTION.txt" target="_blank" rel="noopener">3D CREDITS</a></span><span id="camera-label">CAM 01 / WIDE</span></div>
+      <div class="view-bottom"><span><i class="status-led"></i><span data-ja="遠心重力生活区画 接続中" data-en="ROTATING HABITAT LINK ACTIVE">遠心重力生活区画 接続中</span><a class="asset-credit" href="./assets/obs/head/ATTRIBUTION.txt" target="_blank" rel="noopener">3D CREDITS</a></span><span id="camera-label">CAM 01 / WIDE</span></div>
       <div id="loading" class="loading"><span class="status-led"></span><span data-ja="船内映像に接続中" data-en="CONNECTING TO HABITAT">船内映像に接続中</span></div>
       <div id="obs-error" class="error" role="alert" hidden></div>
     </section>

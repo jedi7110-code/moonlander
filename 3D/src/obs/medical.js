@@ -1,24 +1,14 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,rod,pipe,label} from './materials.js';
 import {MEDICAL} from './layout.js';
+import {reclineProgress,applyReclinedPose} from './recline.js';
 
 export const MED_BED={x:(MEDICAL.x-700)*.022,depth:-.22,top:.86,length:2.78,width:1.06,transition:2};
-const smooth=value=>{const t=THREE.MathUtils.clamp(value,0,1);return t*t*(3-2*t);};
-
 export function medicalRecline(time,duration=MEDICAL.dur/1000){
-  return smooth(Math.min(time,duration-time)/MED_BED.transition);
+  return reclineProgress(time,duration,MED_BED.transition);
 }
 export function applyMedicalPose(root,time,duration){
-  const p=medicalRecline(time,duration),angle=-Math.PI/2*p,hip=.988;
-  const {body,head,arms,legs}=root.userData;
-  root.rotation.y=Math.PI/2;
-  // Rotate around the hips, so the patient settles onto the couch rather than orbiting the feet.
-  body.rotation.x=angle;
-  body.position.set(0,hip+(MED_BED.top+.12-hip)*p-Math.cos(angle)*hip,-Math.sin(angle)*hip);
-  head.rotation.set(0,0,0);
-  for(const {arm,elbow}of arms){arm.rotation.x=-.1;elbow.rotation.x=-.18;}
-  const sitting=Math.sin(p*Math.PI);
-  for(const {leg,knee,boot}of legs){leg.rotation.x=-1.25*sitting;knee.rotation.x=1.4*sitting;boot.rotation.x=-.15*sitting;}
+  applyReclinedPose(root,medicalRecline(time,duration),MED_BED.top);
 }
 
 // Fictional instrument values; checkups and treatment never refill food, water or energy.
@@ -47,7 +37,8 @@ export function createMedicalBay(m,y){
   const root=new THREE.Group();root.name='Medical bay';const {x,depth,top,length,width}=MED_BED;
   box(root,m.enamel,4.15,y+1.40,-1.49,5.04,2.65,.10,.035);
   box(root,m.teal,4.15,y+2.45,-1.425,5.02,.075,.02);
-  label(root,'MEDICAL / 02',4.62,y+2.88,1.80,2.60,.15,{fg:'#dce6df',bg:'#335653',size:49});
+  box(root,m.dark,4.62,y+2.80,1.69,2.65,.30,.12,.012);
+  label(root,'MEDICAL / 02',4.62,y+2.80,1.756,2.60,.26,{fg:'#dce6df',bg:'#335653',size:49});
   // Sealed supply cabinet, with a green first-aid mark distinct from the EVA bay.
   box(root,m.dark,2.14,y+1.24,-.90,1.28,2.46,1.04,.045);
   for(const side of [-1,1]){
@@ -58,8 +49,8 @@ export function createMedicalBay(m,y){
   box(root,m.teal,2.14,y+1.77,-.285,.57,.53,.025,.018);
   box(root,m.white,2.14,y+1.77,-.266,.105,.35,.013);
   box(root,m.white,2.14,y+1.77,-.258,.35,.105,.013);
-  label(root,'MED SUPPLIES',2.14,y+2.26,-.282,1.04,.13,{size:47});
-  label(root,'SEALED / 04',2.14,y+.30,-.282,.92,.12,{size:47});
+  label(root,'MED SUPPLIES',2.14,y+2.26,-.25,1.04,.18,{size:47});
+  label(root,'SEALED / 04',2.14,y+.30,-.25,.92,.17,{size:47});
   const bed=new THREE.Group();bed.name='Examination couch';bed.position.set(x,y,depth);root.add(bed);
   for(const xx of [-.82,.82]){
     box(bed,m.dark,xx,.09,0,.49,.13,.87,.025);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials} from './materials.js';
-import {buildShip,positionX,positionY} from './ship.js';
+import {buildShip,positionX,positionY,HABITAT_VIEW} from './ship.js';
 import {createMilo,createCat,animateMilo,animateCat} from './characters.js';
 import {currentAction} from './state.js';
 import {loadMiloHead} from './head.js';
@@ -10,6 +10,7 @@ import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT} from './layout.js';
 import {animateAirlock} from './eva.js';
 import {animateMedical,medicalRecline,medicalReadings,MED_BED} from './medical.js';
+import {BUNK_BED,reclineProgress} from './recline.js';
 
 export class ObservationView {
   static async create(canvas){const [m,head]=await Promise.all([materials(),loadMiloHead()]);return new ObservationView(canvas,m,head);}
@@ -27,9 +28,9 @@ export class ObservationView {
     this.ship=buildShip(m);this.scene.add(this.ship.staticMesh,this.ship.animated);
     this.milo=createMilo(m,head);this.cat=createCat(m);this.scene.add(this.milo,this.cat);
     this.camera=new THREE.OrthographicCamera(-16,16,8,-8,.1,150);this.camera.position.set(0,6.7,40);this.camera.lookAt(0,5.0,0);
-    this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,5,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
+    this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.resize=()=>{const r=canvas.getBoundingClientRect();this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(12.8,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
+    this.resize=()=>{const r=canvas.getBoundingClientRect();this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
     this.observer=new ResizeObserver(this.resize);this.observer.observe(canvas);this.resize();this.viewHeight=this.targetHeight;this.setFrustum();
     this.listeners=[];this.bindControls();
     const stars=new Float32Array(420*3);for(let i=0;i<420;i++){stars[i*3]=(Math.sin(i*162.2)*.5)*90;stars[i*3+1]=(Math.sin(i*714.1)*.5)*52+5;stars[i*3+2]=-9-Math.abs(Math.sin(i))*10;}
@@ -53,14 +54,14 @@ export class ObservationView {
   bindControls(){
     let drag=null;
     this.bind('pointerdown',e=>{if(e.button!==0||e.isPrimary===false||drag)return;drag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,cx:this.targetCenter.x,cy:this.targetCenter.y,target:this.targetAt(e),moved:false};this.canvas.setPointerCapture(e.pointerId);});
-    this.bind('pointermove',e=>{if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-13,13);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,0,11);}});
+    this.bind('pointermove',e=>{if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-13,13);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,HABITAT_VIEW.panMinY,HABITAT_VIEW.panMaxY);}});
     this.bind('pointerup',e=>{if(!drag||e.pointerId!==drag.pointerId)return;const {target,moved}=drag;drag=null;this.hover(null);if(moved||!target)return;if(target.type==='character')this.setMode(target.id);else this.onStation?.(target.id);});
     this.bind('pointercancel',e=>{if(drag&&e.pointerId!==drag.pointerId)return;drag=null;this.hover(null);});
     this.bind('lostpointercapture',e=>{if(drag&&e.pointerId!==drag.pointerId)return;drag=null;this.hover(null);});
     this.bind('pointerleave',()=>this.hover(null));
     this.bind('wheel',e=>{e.preventDefault();this.changeZoom(e.deltaY<0?1.15:1/1.15);},{passive:false});
   }
-  setMode(mode){this.hover(null);this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:5.3;if(mode==='all')this.targetCenter.set(0,5,0);this.onModeChange?.(mode);}
+  setMode(mode){this.hover(null);this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
   changeZoom(ratio){this.hover(null);this.zoom=THREE.MathUtils.clamp(this.zoom*ratio,.8,5);const base=this.mode==='all'||this.mode==='manual'?this.fitHeight:this.mode==='cat'?3.3:5.3;this.targetHeight=THREE.MathUtils.clamp(base/this.zoom,1.9,this.fitHeight*1.25);}
   setFrustum(){const half=this.viewHeight/2,aspect=this.width/this.height;this.camera.left=-half*aspect;this.camera.right=half*aspect;this.camera.top=half;this.camera.bottom=-half;this.camera.updateProjectionMatrix();}
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null){
@@ -78,7 +79,7 @@ export class ObservationView {
     const couch=!passage&&catMotion.floor===0?THREE.MathUtils.clamp((catMotion.x-970)/65,0,1):0;
     this.cat.position.y+=couch*.64;this.cat.position.z-=couch*1.14;
     if(action==='lounge')this.milo.position.z=-.28;
-    if(action==='bunk')this.milo.position.z=-.05;
+    if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
     if(action==='gym')this.milo.position.z=BIKE.depth;
     if(action==='medical')this.milo.position.z=THREE.MathUtils.lerp(.78,MED_BED.depth,medicalRecline(actionTime,brain.curDurSec));
     if(!paused)this.ship.fan.children.slice(1).forEach(blade=>blade.rotation.z+=dt*3.0);

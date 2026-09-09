@@ -5,13 +5,32 @@ import {CrewMotion,Supplies,CatRoutine,FLOORS,currentAction} from '../src/obs/st
 import {Brain} from '../../js/obs/brain.js?v=15';
 import {MeshStandardMaterial,Box3,Vector3} from 'three';
 import {CAT_BOWL,getStation} from '../src/obs/layout.js';
-import {positionX} from '../src/obs/ship.js';
+import {positionX,createAccessLadder,HABITAT_VIEW} from '../src/obs/ship.js';
 import {createMilo,createCat,animateMilo,animateCat} from '../src/obs/characters.js';
 import {StationFeedback,SIGNAL_COLORS} from '../src/obs/feedback.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {headGeometry} from '../src/obs/head.js';
 
 function advance(actor,seconds){for(let i=0;i<seconds*60;i++)actor.update(1/60);}
+test('the rotating habitat belongs to the mothership, while Barramundi remains the lander',async()=>{
+  const habitat=await readFile(new URL('../src/obs.html',import.meta.url),'utf8');
+  const lander=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
+  assert.match(habitat,/<h1>TARAIRON<\/h1>/);assert.match(habitat,/遠心重力生活区画/);
+  assert.doesNotMatch(habitat,/<h1>BARRAMUNDI<\/h1>/);assert.match(lander,/バラマンディ号/);
+  assert.match(lander,/LUNAR LANDING MODULE/);
+});
+test('the ladder extends through the roof toward the axis, not below the floor, and stays in view',()=>{
+  const material=new MeshStandardMaterial(),ladder=createAccessLadder(new Proxy({},{get:()=>material}));
+  const bounds=new Box3().setFromObject(ladder),rungs=ladder.children.filter(child=>child.name==='Ladder rung');
+  assert.ok(bounds.min.y>-.1);assert.ok(bounds.max.y>13.3);
+  assert.ok(rungs.every(rung=>rung.position.y>0));
+  assert.ok(rungs.filter(rung=>rung.position.y>10.58).length>=8);
+  for(let i=1;i<rungs.length;i++)assert.ok(Math.abs(rungs[i].position.y-rungs[i-1].position.y-.28)<1e-10);
+  assert.ok(bounds.min.y>HABITAT_VIEW.centerY-HABITAT_VIEW.minHeight/2);
+  assert.ok(bounds.max.y<HABITAT_VIEW.centerY+HABITAT_VIEW.minHeight/2);
+  assert.equal(FLOORS.length,3);
+  ladder.traverse(mesh=>mesh.geometry?.dispose());material.dispose();
+});
 test('the scanned head retains its face, normals and UVs after the shoulder crop',async()=>{
   const bytes=await readFile(new URL('../public/assets/obs/head/LeePerrySmith.glb',import.meta.url));
   const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');

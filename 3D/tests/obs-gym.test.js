@@ -49,7 +49,7 @@ test('forward pedaling pushes down at the front and advances over the top',()=>{
 test('feet remain on the pedals and hands on the handlebar throughout a full cycle',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});
   const milo=createMilo(m);let gym;
-  globalThis.document={createElement(){return{getContext(){return{fillRect(){},fillText(){}};}};}};
+  globalThis.document={createElement(){return{getContext(){return{fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};}};}};
   try{gym=createGym(m,0);}finally{delete globalThis.document;}
   milo.position.z=BIKE.depth;
   for(let i=0;i<=90;i++){

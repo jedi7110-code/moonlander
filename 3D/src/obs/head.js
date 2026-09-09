@@ -30,8 +30,17 @@ export async function loadMiloHead(){
   const [gltf,map,normalMap]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg')]);
   map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;normalMap.anisotropy=4;
   const material=new THREE.MeshStandardMaterial({color:0xd2c8bd,map,normalMap,normalScale:new THREE.Vector2(.45,.45),roughness:.74,metalness:0,envMapIntensity:.3});
+  const mouthMotion={value:0};
   material.onBeforeCompile=shader=>{
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvHeadPosition = position;');
+    shader.uniforms.mouthMotion=mouthMotion;
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;\nuniform float mouthMotion;').replace('#include <begin_vertex>',`#include <begin_vertex>
+      vHeadPosition = position;
+      float lipLine = 0.45 - pow(abs(position.x + 0.11), 2.0) * 0.20;
+      float jaw = (1.0 - smoothstep(lipLine - 0.025, lipLine + 0.025, position.y))
+        * smoothstep(-0.9, -0.2, position.y) * smoothstep(1.6, 2.1, position.z)
+        * (1.0 - smoothstep(0.55, 0.95, abs(position.x + 0.11)));
+      transformed.y -= mouthMotion * 0.20 * jaw;
+    `);
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;').replace('#include <color_fragment>',`#include <color_fragment>
       vec2 leftEye = (vHeadPosition.xy - vec2(-0.81, 1.72)) / vec2(0.285, 0.115);
       vec2 rightEye = (vHeadPosition.xy - vec2(0.65, 1.70)) / vec2(0.285, 0.115);
@@ -42,10 +51,13 @@ export async function loadMiloHead(){
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.022, 0.018, 0.015) * (0.75 + grain * 0.45), hairMask);
     `);
   };
-  material.customProgramCacheKey=()=> 'obs-milo-scan-v1';
+  material.customProgramCacheKey=()=> 'obs-milo-scan-v2';
   const source=gltf.scene.getObjectByName('LeePerrySmith');
   if(!source?.isMesh)throw new Error('Milo head mesh is missing');
   const group=new THREE.Group(),mesh=new THREE.Mesh(headGeometry(source.geometry),material);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);
+  const mouth=new THREE.Mesh(new THREE.SphereGeometry(1,24,12),new THREE.MeshStandardMaterial({color:0x25140f,roughness:1}));
+  mouth.position.set(-.11,.405,2.285);mouth.visible=false;group.add(mouth);
+  group.userData.setMouthMotion=(open,chew)=>{mouthMotion.value=open+chew*.28;mouth.visible=open>.04;mouth.scale.set(.43,.075*open,.025);};
   eye(group,-.81,1.72,1.55);eye(group,.65,1.70,1.54);
   gltf.scene.traverse(object=>{object.geometry?.dispose();if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(m=>m.dispose());});
   return group;

@@ -15,7 +15,7 @@ export class CabinChess {
     this.match=new ChessMatch(saved);
     this.dialog=document.createElement('dialog');this.dialog.id='cabin-chess';this.dialog.setAttribute('aria-labelledby','chess-title');
     this.dialog.innerHTML=`
-      <header class="chess-header"><div><span>RECREATION / BARRAMUNDI</span><h2 id="chess-title"></h2></div><button data-action="close" class="icon-button">${icon('x')}</button></header>
+      <header class="chess-header"><div><span>RECREATION / TARAIRON</span><h2 id="chess-title"></h2></div><button data-action="close" class="icon-button">${icon('x')}</button></header>
       <div class="chess-layout">
         <section class="chess-table">
           <div class="chess-player"><span class="chess-side carbon-dot"></span><strong>MILO JARVIS</strong><span id="chess-turn" role="status" aria-live="polite"></span></div>

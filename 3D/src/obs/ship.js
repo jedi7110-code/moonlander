@@ -5,10 +5,34 @@ import {GYM,CAT_PORT,CAT_BOWL,STATIONS} from './layout.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
+import {BUNK_BED} from './recline.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 export const positionX=x=>(x-700)*.022;
 export const positionY=y=>(870-y)*.016;
+export const HABITAT_VIEW={centerY:6.6,minHeight:15.2,panMinY:0,panMaxY:13.4};
+
+export function createAccessLadder(m){
+  const root=new THREE.Group();root.name='Interdeck access shaft';
+  const bottom=.08,top=13.14;
+  panel(root,m,0,6.65,-1.46,1.12,13.3,m.dark);
+  for(const side of [-1,1]){
+    rod(root,m.yellow,[side*.36,bottom,.03],[side*.36,top,.03],.045);
+    box(root,m.dark,side*.56,6.7,-.5,.18,13.4,1.45,.02);
+    box(root,m.metal,side*.64,11.93,-.32,.10,2.75,1.83,.016);
+    for(const y of [11.04,12.12]){
+      box(root,m.dark,side*.53,y,.26,.095,.22,.05,.012);
+      box(root,m.lamp,side*.53,y,.292,.031,.13,.015,.005);
+    }
+  }
+  // Keep rung spacing continuous through the opening toward the rotation axis.
+  for(let i=0;i<=46;i++){
+    const y=.12+i*.28;
+    const rung=rod(root,m.metal,[-.36,y,.03],[.36,y,.03],.028);rung.name='Ladder rung';
+  }
+  for(const y of [...FLOOR_Y,10.58])for(const side of [-1,1])box(root,m.yellow,side*.64,y+.026,.74,.06,.045,1.58);
+  return root;
+}
 
 function bolts(parent,m,x,y,z,w,h) {
   for(const dx of [-w/2+.04,w/2-.04])for(const dy of [-h/2+.04,h/2-.04]){
@@ -53,22 +77,23 @@ function cupboard(parent,m,x,y,z,w=1.25,h=1.85) {
   for(const side of [-1,1]){panel(parent,m,x+side*w*.245,y+h/2,z+.35,w*.475,h-.07);box(parent,m.black,x+side*.075,y+h*.52,z+.42,.03,.2,.04,.01);grille(parent,m,x+side*w*.245,y+.25,z+.414,w*.33,.2);}
 }
 function bunk(parent,m,x,y) {
-  box(parent,m.dark,x,y+.32,-.26,2.4,.20,1.3,.04);box(parent,m.cushion,x,y+.45,-.26,2.3,.18,1.19,.07);
-  box(parent,m.olive,x+.32,y+.54,-.25,1.60,.10,1.13,.03);
+  const {depth,top,length,width}=BUNK_BED;
+  box(parent,m.dark,x,y+.32,depth,2.4,.20,1.3,.04);box(parent,m.cushion,x,y+.45,depth,length,.18,width,.07);
+  box(parent,m.olive,x+.32,y+top-.05,depth+.01,1.60,.10,1.13,.03);
   box(parent,m.cloth,x-.87,y+.59,-.25,.47,.18,.91,.08);
   for(let i=0;i<10;i++)rod(parent,m.olive,[x-.36+i*.14,y+.597,-.79],[x-.34+i*.14,y+.60,.25],.008);
   box(parent,m.dark,x,y+1.67,-.66,2.5,.13,.73,.035);
   for(const side of [-1,1])box(parent,m.dark,x+side*1.21,y+.96,-.80,.06,1.57,.06);
   panel(parent,m,x,y+1.04,-1.07,2.29,.74,m.cushion);
   box(parent,m.yellow,x-.86,y+1.52,-.63,.27,.17,.2,.015);box(parent,m.lamp,x-.86,y+1.47,-.50,.19,.025,.05);
-  label(parent,'PERSONAL / M. JARVIS',x,y+1.89,-1.08,1.9,.19,{size:36});
+  label(parent,'PERSONAL / M. JARVIS',x,y+1.94,-.94,2.20,.28,{size:48});
 }
 function plumbing(parent,m,x,y,type) {
   box(parent,m.dark,x,y+1.29,-.42,1.66,2.59,1.68,.04);
   panel(parent,m,x,y+1.3,.44,1.55,2.46,m.white);
   panel(parent,m,x,y+1.55,.53,.85,1.03,m.dark);
   box(parent,m.black,x+.56,y+1.17,.58,.06,.30,.05,.012);
-  label(parent,type==='shower'?'SHOWER':'WC',x,y+2.25,.60,.78,.18,{size:65});
+  label(parent,type==='shower'?'SHOWER':'WC',x,y+2.25,.60,.94,.26,{size:65});
   const lamp=ball(parent,m.green,x+.55,y+1.62,.6,.026,.026,.016);lamp.name=type+'Lamp';
   grille(parent,m,x,y+.36,.59,1.08,.27);
   pipe(parent,m.metal,[[x-.72,y+2.8,-.87],[x-.72,y+2.67,-.87],[x,y+2.67,-.87],[x,y+2.6,-.87]],.035);
@@ -98,7 +123,7 @@ function engine(parent,m,x,y) {
   for(let i=0;i<11;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(.526,.019,6,28),m.dark);ring.rotation.x=Math.PI/2;ring.position.set(x,y+.40+i*.16,-.35);parent.add(ring);}
   pipe(parent,m.red,[[x-.9,y+.18,-.30],[x-.9,y+2.5,-.30],[x+.9,y+2.5,-.30],[x+.9,y+.15,-.30]],.07);
   pipe(parent,m.teal,[[x-.73,y+.1,.05],[x-.73,y+1.84,.05],[x-.35,y+1.84,.1]],.042);
-  gauge(parent,m,x,y+1.52,.22,.14);label(parent,'COOLANT\nLOOP 02',x,y+.92,.20,.55,.28,{size:48});
+  gauge(parent,m,x,y+1.52,.22,.14);label(parent,'COOLANT\nLOOP 02',x,y+.92,.215,.60,.38,{size:48});
   for(const side of [-1,1]){const valve=new THREE.Mesh(new THREE.TorusGeometry(.15,.018,8,20),m.red);valve.position.set(x+side*.9,y+1.04,-.20);parent.add(valve);}
 }
 
@@ -107,8 +132,10 @@ export function buildShip(m) {
   box(staticRoot,m.dark,0,4.94,-.28,26.8,10.69,3.2,.3);
   // Interior faces sit in front of the hull's back surface; the viewing wall is removed.
   box(staticRoot,m.enamel,0,5,-1.98,26.30,10.20,.22,.14);
-  box(staticRoot,m.dark,0,10.31,-.12,26.9,.26,3.6,.05);
-  box(staticRoot,m.enamel,0,10.48,-.14,26.6,.19,3.46,.035);
+  for(const side of [-1,1]){
+    box(staticRoot,m.dark,side*7,10.31,-.12,12.9,.26,3.6,.05);
+    box(staticRoot,m.enamel,side*6.925,10.48,-.14,12.75,.19,3.46,.035);
+  }
   // The enclosing block is only a back plate, not a solid volume.
   staticRoot.children[0].scale.z=.19;
   staticRoot.children[0].position.z=-2.08;
@@ -127,14 +154,19 @@ export function buildShip(m) {
       box(staticRoot,m.dark,side*6.73,y-.17,-.12,12.37,.32,3.38,.025);
       box(staticRoot,m.metal,side*6.73,y-.013,-.12,12.3,.025,3.25);
     }
+    if(level===2){
+      box(staticRoot,m.dark,0,y-.17,-.12,1.09,.32,3.38,.025);
+      box(staticRoot,m.metal,0,y-.013,-.12,1.16,.025,3.25);
+    }
     box(staticRoot,m.dark,0,y-.18,1.56,26.22,.38,.20,.02);
-    label(staticRoot,`${String(level+1).padStart(2,'0')}  /  ${['HABITATION','OPERATIONS','ENGINEERING'][level]}`,-9.83,y-.17,1.705,4.5,.21,{fg:'#b2bcb0',size:36});
+    label(staticRoot,`${String(level+1).padStart(2,'0')} / ${['HABITATION','OPERATIONS','ENGINEERING'][level]}`,-9.65,y-.17,1.78,4.8,.30,{fg:'#d4dbcc',size:48});
     for(let xx=-12.8;xx<12.8;xx+=.42){
       for(const zz of [.1,.8,-.75])if(Math.abs(xx)>.50)box(staticRoot,m.rubber,xx,y+.005,zz,.18,.012,.021);
       box(staticRoot,m.rubber,xx,y-.19,1.68,.20,.105,.012,.009);
     }
     for(let xx=-11.8;xx<12.5;xx+=1.52){
       panel(staticRoot,m,xx,y+1.44,-1.70,1.48,2.70,level===1?m.dark:m.enamel);
+      if(level===0&&Math.abs(xx)<1.265)continue;
       box(staticRoot,m.dark,xx,y+2.96,-.25,1.43,.17,3.14,.025);
       box(staticRoot,m.metal,xx,y+2.85,-.36,.82,.13,.44,.02);
       box(staticRoot,level===1?m.coolLamp:m.lamp,xx,y+2.775,-.36,.73,.025,.31,.015);
@@ -151,13 +183,12 @@ export function buildShip(m) {
     const secondLight=new THREE.PointLight(0xe6ebe4,32,17,2);secondLight.position.set(6,y+2.3,.6);animated.add(secondLight);
   });
   for(const [level,y]of FLOOR_Y.entries())catPort(staticRoot,m,positionX(CAT_PORT.x),y,level);
-  // The ladder remains the crew route; the cat has separate wall passages.
-  panel(staticRoot,m,0,4.9,-1.46,1.12,9.74,m.dark);
-  for(const side of [-1,1]){rod(staticRoot,m.yellow,[side*.36,.05,.03],[side*.36,9.61,.03],.045);box(staticRoot,m.dark,side*.56,5.0,-.5,.18,10.2,1.45,.02);}
-  for(let yy=.12;yy<9.65;yy+=.28)rod(staticRoot,m.metal,[-.36,yy,.03],[.36,yy,.03],.028);
-  for(const y of FLOOR_Y)for(const side of [-1,1])box(staticRoot,m.yellow,side*.64,y+.026,.74,.06,.045,1.58);
-  label(staticRoot,'01 / HABITATION',6.1,9.31,-1.50,2.2,.26,{size:44});
-  label(staticRoot,'03 / ENGINEERING',6.1,2.53,-1.50,2.2,.26,{size:44});
+  // The upper shaft is a visible continuation, not an additional playable deck.
+  staticRoot.add(createAccessLadder(m));
+  box(staticRoot,m.dark,6.3,9.02,-.98,2.85,.32,.10,.014);
+  label(staticRoot,'01 / HABITATION',6.3,9.02,-.924,2.8,.30,{size:48});
+  box(staticRoot,m.dark,5.72,2.72,1.69,2.85,.28,.12,.014);
+  label(staticRoot,'03 / ENGINEERING',5.72,2.72,1.756,2.8,.26,{size:48});
 
   const top=FLOOR_Y[0],mid=FLOOR_Y[1];
   plumbing(staticRoot,m,positionX(240),top,'shower');plumbing(staticRoot,m,positionX(380),top,'toilet');
@@ -173,7 +204,7 @@ export function buildShip(m) {
   cylinder(staticRoot,m.white,8.46,top+.69,1.03,.07,.17,.079);
   cupboard(staticRoot,m,11.55,top,-1.11,1.35,2.35);
   panel(staticRoot,m,4.06,top+1.5,-1.38,1.37,1.26,m.white);
-  label(staticRoot,'BARRAMUNDI\nCREW 01',4.06,top+1.57,-1.255,1.13,.37,{bg:'#c8d0c4',fg:'#354236',size:40});
+  label(staticRoot,'TARAIRON\nCREW 01',4.06,top+1.57,-1.255,1.13,.37,{bg:'#c8d0c4',fg:'#354236',size:40});
 
   for(let i=0;i<3;i++)consoleUnit(staticRoot,m,-10.2+i*1.63,mid,1.56,i);
   chair(staticRoot,m,-8.8,mid,.82,Math.PI);
@@ -201,7 +232,8 @@ export function buildShip(m) {
   for(const x of [hydroX-.15,hydroX+.15]){cylinder(staticRoot,m.metal,x,1.26,-.47,.034,.10);ball(staticRoot,x<hydroX?m.teal:m.red,x,1.26,-.40,.025,.025,.025);}
   box(staticRoot,m.metal,hydroX,1.05,-.38,.74,.04,.51);
   const gym=createGym(m,positionX(GYM.x));animated.add(gym.root);
-  label(staticRoot,'GYM / ERGOMETER',positionX(GYM.x),2.55,-1.03,1.96,.24,{fg:'#c2d3c7',size:48});
+  box(staticRoot,m.dark,positionX(GYM.x),2.72,1.69,2.35,.28,.12,.014);
+  label(staticRoot,'GYM / ERGOMETER',positionX(GYM.x),2.72,1.756,2.3,.26,{fg:'#c2d3c7',size:48});
   panel(staticRoot,m,positionX(GYM.x)-.70,.97,-1.36,.57,.93,m.dark);
   for(let i=0;i<3;i++){
     const y=.69+i*.28,x=positionX(GYM.x)-.70;
