@@ -107,7 +107,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
 export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,walkDistance=time*1.188,actionTime=time,actionDuration,knock=0,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   resetDiningPose(root);
-  for(const prop of ['book','phones','toy'])root.userData.leisure[prop].visible=false;
+  for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
   const stride=time*(climbing?5.4:6.5),walking=moving&&!climbing&&!waiting;
   const seated=['lounge','console'].includes(action)&&!moving;
   body.position.y=walking?0:Math.sin(time*1.5)*.003;

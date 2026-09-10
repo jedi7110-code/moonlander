@@ -16,8 +16,9 @@ test('the EVA rack replaces audio in 3D without changing the original 2D station
 test('music requests and old station references cannot send Milo to removed equipment',()=>{
   const actor=new CrewMotion(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care:new Supplies()});
   assert.equal(brain._usable(sharedStation('stereo')),false);
-  for(const text of ['音楽をかけて','play music','stereo']){brain.handleChat(text);assert.equal(actor.commandVersion,0);assert.equal(brain.gamePending,false);}
-  brain._go(sharedStation('stereo'));assert.equal(actor.commandVersion,0);
+  for(const text of ['音楽をかけて','play music','stereo']){brain.handleChat(text);assert.equal(brain.actStation,'lounge');assert.equal(brain.nextLeisure,'music');assert.equal(brain.gamePending,false);}
+  const version=actor.commandVersion;
+  brain._go(sharedStation('stereo'));assert.equal(actor.commandVersion,version);
   brain.needs.fun=1;brain._choose();assert.equal(brain.actStation,'lounge');
 });
 test('inspection requests arrive, report their own fixture, and end without changing reserves',()=>{

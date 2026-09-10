@@ -12,9 +12,9 @@ const setup=()=>{
 test('3D slows clock and passive depletion without changing the original 2D pace',()=>{
   const {care,actor,scene,brain}=setup(),original=new Brain(scene,actor,{care});
   for(const b of [brain,original]){b.state='goingTo';Object.keys(b.needs).forEach(key=>b.needs[key]=80);b.update(10);}
-  assert.equal(original.dayMs,240000);assert.equal(brain.dayMs,1200000);
+  assert.equal(original.dayMs,240000);assert.equal(brain.dayMs,900000);
   assert.ok(Math.abs((80-brain.needs.hunger)-(80-original.needs.hunger)*CABIN_PACE.needDecay)<1e-10);
-  assert.ok(Math.abs(brain.hour-8.2)<1e-10);
+  assert.ok(Math.abs(brain.hour-(8+4/15))<1e-10);
 });
 test('satisfied needs do not spend supplies, but a manual meal still completes at normal speed',()=>{
   const {care,actor,brain}=setup();Object.keys(brain.needs).forEach(key=>brain.needs[key]=90);brain.exercise=90;
@@ -25,7 +25,12 @@ test('satisfied needs do not spend supplies, but a manual meal still completes a
 });
 test('cat appetite slows without stretching movement or sleep recovery',()=>{
   const {care}=setup(),cat=new CatRoutine(care);cat.hunger=80;cat.energy=20;cat.rest('sleep',20);cat.update(10);
-  assert.equal(cat.hunger,78.2);assert.equal(cat.energy,50);assert.equal(cat.modeTime,10);
+  assert.ok(Math.abs(cat.hunger-77.84)<1e-10);assert.equal(cat.energy,50);assert.equal(cat.modeTime,10);
+});
+test('low physical needs shorten leisure and postpone exercise',()=>{
+  const {brain}=setup();brain.needs.hunger=40;brain._startPerform(getStation('lounge'));assert.equal(brain.curDurSec,8);
+  brain._endPerform();Object.keys(brain.needs).forEach(key=>brain.needs[key]=80);brain.needs.hygiene=20;brain.exercise=1;
+  brain._choose();assert.equal(brain.actStation,'shower');
 });
 test('a ten-minute autonomous routine can serve all basic needs without starvation',()=>{
   const results=[];

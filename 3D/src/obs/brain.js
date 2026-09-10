@@ -53,7 +53,7 @@ export class CabinBrain extends Brain {
     if(this.health.urgent){this._go(getStation('medical'));return;}
     if(['goingToSupplyConsole','orderingSupply'].includes(this.state))return;
     if(this.plants.ready&&this.care.supplies.food<this.care.capacity.food&&Math.min(...Object.values(this.needs))>30&&!this.health.needsCare){this._go(getStation('plant'));return;}
-    const ready=!this.health.needsCare&&this.needs.energy>30&&this.needs.thirst>25&&this.needs.hunger>25;
+    const ready=!this.health.needsCare&&this.needs.energy>30&&this.needs.thirst>25&&this.needs.hunger>25&&this.needs.hygiene>25&&this.needs.bladder>25;
     if(ready&&this.exercise<48&&(this.exercise<25||this.exercise<=Math.min(...Object.values(this.needs)))){this._go(getStation('gym'));return;}
     if(Math.min(...Object.values(this.needs))>CABIN_PACE.autonomousNeedThreshold&&this.exercise>=48){this.idleT=0;return;}
     super._choose();
@@ -62,6 +62,7 @@ export class CabinBrain extends Brain {
   _go(station){
     station=getStation(station?.id);if(!station)return false;
     if(this.deferDeparture(()=>this._go(station)))return true;
+    if(station.id!=='lounge')this.nextLeisure=null;
     if(station.id==='medical'&&this.actStation==='medical')return true;
     if((this.health.critical&&station.id!=='medical')||(this.health.needsCare&&station.id==='gym')){
       this.scene.obsUI?.healthEvent?.({type:'restricted',stage:this.health.stage,kind:this.health.condition.kind});
@@ -77,9 +78,10 @@ export class CabinBrain extends Brain {
   }
   _startPerform(station){
     if(station.id==='lounge'&&!this.gamePending){
-      const options=['book','music',...(this.catRoutine?.canPlayLounge()?['cat']:[])].filter(mode=>mode!==this.lastLeisure);
-      this.leisure=options[Math.floor(this.random()*options.length)];this.lastLeisure=this.leisure;
-      station={...station,dur:this.leisure==='cat'?40000:this.leisure==='book'?32000:36000};this.cur=station;
+      const options=['tablet','music',...(this.catRoutine?.canPlayLounge()?['cat']:[])].filter(mode=>mode!==this.lastLeisure);
+      this.leisure=this.nextLeisure??options[Math.floor(this.random()*options.length)];this.nextLeisure=null;this.lastLeisure=this.leisure;
+      station={...station,dur:this.leisure==='cat'?40000:this.leisure==='tablet'?32000:36000};this.cur=station;
+      if(Math.min(this.needs.hunger,this.needs.thirst,this.needs.energy,this.needs.hygiene,this.needs.bladder)<45)station.dur=8000;
     }
     if(['shower','toilet'].includes(station.id)&&!this.bathroom){
       this.state='enteringBathroom';this.actKey='perform';
@@ -190,8 +192,8 @@ export class CabinBrain extends Brain {
       this._go(getStation('plant'));return words('栽培棚を見てくる。育った野菜は収穫しよう。','I will check the plants and harvest any mature greens.');
     }
     if(/music|音楽|曲|レコード|stereo|オーディオ|tune/i.test(text)){
-      this.lastLeisure='book';this._go(getStation('lounge'));
-      return words('ラウンジでひと休みしよう。ヘッドホンもある。','I will take a break in the lounge. There are headphones there.');
+      this.nextLeisure='music';this._go(getStation('lounge'));
+      return words('ヘッドホンで少し聴いてくる。','I will listen on my headphones for a while.');
     }
     if(/内扉|船内ハッチ|左.*ハッチ|inner (?:hatch|door)|cabin hatch/i.test(text)){
       this._go(getStation('innerHatch'));return words('船内側のハッチを点検してくる。','I will inspect the inner hatch.');
