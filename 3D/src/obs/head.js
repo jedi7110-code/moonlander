@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createHair,HAIRLINE_GLSL} from './hair.js';
 
 function smoothstepSlope(value,low,high){
   const t=THREE.MathUtils.clamp((value-low)/(high-low),0,1);return 6*t*(1-t)/(high-low);
@@ -56,16 +57,27 @@ export async function loadMiloHead(){
       vec2 leftEye = (vHeadPosition.xy - vec2(-0.81, 1.72)) / vec2(0.285, 0.115);
       vec2 rightEye = (vHeadPosition.xy - vec2(0.65, 1.70)) / vec2(0.285, 0.115);
       if (vHeadPosition.z > 1.4 && min(dot(leftEye, leftEye), dot(rightEye, rightEye)) < 1.0) discard;
-      float hairline = 1.45 + smoothstep(-1.2, 1.8, vHeadPosition.z) * 1.34 + pow(abs(vHeadPosition.x) / 1.8, 2.0) * 0.20;
-      float hairMask = smoothstep(hairline - 0.055, hairline + 0.045, vHeadPosition.y);
+      ${HAIRLINE_GLSL}
+      float hairMask = smoothstep(hairline - 0.16, hairline + 0.10, vHeadPosition.y);
+      hairMask *= mix(0.30, 1.0, smoothstep(hairline, max(hairline + 0.25, 2.55), vHeadPosition.y));
       float grain = fract(sin(dot(vHeadPosition, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+      float cheekLine = 0.53 + smoothstep(0.35, 1.45, abs(vHeadPosition.x)) * 0.54;
+      float beard = (1.0 - smoothstep(cheekLine - 0.15, cheekLine + 0.13, vHeadPosition.y))
+        * smoothstep(-0.85, -0.43, vHeadPosition.y) * smoothstep(0.45, 1.2, vHeadPosition.z);
+      float moustache = smoothstep(0.50, 0.64, vHeadPosition.y) * (1.0 - smoothstep(0.88, 1.02, vHeadPosition.y))
+        * (1.0 - smoothstep(0.38, 0.69, abs(vHeadPosition.x + 0.11))) * smoothstep(1.8, 2.15, vHeadPosition.z);
+      float lips = exp(-pow((vHeadPosition.y - 0.44) / 0.13, 2.0))
+        * (1.0 - smoothstep(0.35, 0.60, abs(vHeadPosition.x + 0.11))) * smoothstep(1.8, 2.1, vHeadPosition.z);
+      float facialHair = max(beard * (1.0 - lips), moustache);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.033, 0.026, 0.020), facialHair * (0.42 + grain * 0.22));
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.022, 0.018, 0.015) * (0.75 + grain * 0.45), hairMask);
     `);
   };
-  material.customProgramCacheKey=()=> 'obs-milo-scan-v2';
+  material.customProgramCacheKey=()=> 'obs-milo-scan-v5';
   const source=gltf.scene.getObjectByName('LeePerrySmith');
   if(!source?.isMesh)throw new Error('Milo head mesh is missing');
   const group=new THREE.Group(),mesh=new THREE.Mesh(headGeometry(source.geometry),material);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);
+  group.add(createHair(mesh.geometry));
   const mouth=new THREE.Mesh(new THREE.SphereGeometry(1,24,12),new THREE.MeshStandardMaterial({color:0x25140f,roughness:1}));
   mouth.position.set(-.11,.405,2.285);mouth.visible=false;group.add(mouth);
   group.userData.setMouthMotion=(open,chew)=>{mouthMotion.value=open+chew*.28;mouth.visible=open>.04;mouth.scale.set(.43,.075*open,.025);};

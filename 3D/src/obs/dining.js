@@ -8,6 +8,7 @@ const v=(x,y,z)=>new THREE.Vector3(x,y,z);
 const bowlHand=new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,Math.PI/2)),spoonHand=new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI/2,0,-.12));
 const cupHand=new THREE.Quaternion().setFromAxisAngle(v(0,1,0),Math.PI);
 const cupRim=v(0,.067,-.043),cupGrip=v(.097,.067,.019),spoonGrip=v(.027,.018,.164),bowlGrip=v(-.134,-.058,.015);
+export const DINING_APPROACH=.40;
 
 export function mouthPosition(head){
   // Lip landmark on the head scan, in metres relative to the neck joint.
@@ -44,7 +45,7 @@ export function createDiningProps(body,m){
 
 function pointOn(prop,point){return point.clone().applyQuaternion(prop.quaternion).add(prop.position);}
 
-function placeHand(rig,target,rotation,grip){
+export function placeHand(rig,target,rotation,grip){
   const {arm,elbow,hand}=rig,offset=target.clone().sub(arm.position);
   const yaw=Math.atan2(offset.x,offset.z),angles=hingeAngles(offset.y,Math.hypot(offset.x,offset.z),.310,.274,-1);
   arm.rotation.set(angles.upper,yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
@@ -64,9 +65,33 @@ function mixPoint(points,phase){
   return points.at(-1)[1].clone();
 }
 
-export function applyDiningPose(root,action,time,duration=action==='galley'?6:5){
-  const {head,arms,dining}=root.userData,{mug,bowl,spoon,bite,meal,water}=dining;
-  const progress=clamp(time/Math.max(duration,.1),0,1),ready=smooth(progress/.13)*smooth((1-progress)/.13);
+export function diningPhase(time,duration){
+  const p=clamp(time/Math.max(duration,.1),0,1);
+  return{progress:clamp((p-.27)/.46,0,1),hold:smooth((p-.15)/.12)*(1-smooth((p-.73)/.12)),reach:smooth(p/.15)*(1-smooth((p-.85)/.15)),approach:smooth(p/.10)*(1-smooth((p-.90)/.10))};
+}
+
+function dockProp(root,prop,dock,hold,defaultPosition){
+  const position=defaultPosition.clone(),rotation=new THREE.Quaternion();
+  if(dock){
+    root.userData.body.updateWorldMatrix(true,false);dock.updateWorldMatrix(true,false);
+    position.copy(root.userData.body.worldToLocal(dock.getWorldPosition(new THREE.Vector3())));
+    root.userData.body.getWorldQuaternion(rotation).invert().multiply(dock.getWorldQuaternion(new THREE.Quaternion()));
+  }
+  prop.position.lerpVectors(position,prop.position.clone(),hold);
+  prop.quaternion.slerpQuaternions(rotation,prop.quaternion.clone(),hold);
+}
+
+function reachHand(root,index,prop,grip,rotation,reach,hold){
+  const rig=root.userData.arms[index];
+  root.updateWorldMatrix(true,true);
+  const rest=root.userData.body.worldToLocal(rig.hand.getWorldPosition(new THREE.Vector3()));
+  const target=rest.lerp(pointOn(prop,grip),reach);
+  placeHand(rig,target,rotation,reach*(hold>0?1.1:.8));
+}
+
+export function applyDiningPose(root,action,time,duration=action==='galley'?6:5,docks=null){
+  const {head,dining}=root.userData,{mug,bowl,spoon,bite,meal,water}=dining;
+  const {progress,hold,reach}=diningPhase(time,duration),ready=1;
   head.rotation.set(.10*(1-ready),0,0);
   const mouth=mouthPosition(head);
   if(action==='hydro'){
@@ -78,21 +103,26 @@ export function applyDiningPose(root,action,time,duration=action==='galley'?6:5)
     mug.rotation.set(-tilt,0,0);
     const contact=lip.clone().add(v(0,-.002,.006)).sub(cupRim.clone().applyQuaternion(mug.quaternion));
     mug.position.copy(rest).lerp(contact,lift);
-    placeHand(arms[1],pointOn(mug,cupGrip),mug.quaternion.clone().multiply(cupHand),1.1);
+    dockProp(root,mug,docks?.mug,hold,v(.17,1.134,.40));
+    reachHand(root,1,mug,cupGrip,mug.quaternion.clone().multiply(cupHand),reach,hold);
     water.visible=tilt<.35;water.position.y=-.026-.015*smooth((progress-.42)/.2);
     if(head.userData.setMouthMotion)head.userData.setMouthMotion(0,tilt>.6?.22:0);
     return;
   }
   bowl.visible=true;spoon.visible=true;
   bowl.position.set(-.095,lerp(1.04,1.215,ready),lerp(.16,.285,ready));bowl.rotation.set(0,0,.025);
-  placeHand(arms[0],pointOn(bowl,bowlGrip),bowlHand,.75);
   const cycle=clamp((progress-.13)/.74,0,1)*2,phase=cycle===2?1:cycle%1;
   const scoop=bowl.position.clone().add(v(.025,.028,.009));
   const lifted=scoop.clone().add(v(.038,.10,.035)),atMouth=mouth.clone().add(v(0,.002,.014)),withdrawn=atMouth.clone().add(v(.065,-.085,.15));
   const tip=mixPoint([[0,scoop],[.17,lifted],[.43,atMouth],[.54,atMouth],[.76,withdrawn],[1,scoop]],phase);
   const rest=v(.16,1,.08);spoon.position.copy(rest).lerp(tip,ready);spoon.rotation.set(-.1*(1-smooth(phase/.25)),0,-.06*(1-ready));
-  placeHand(arms[1],pointOn(spoon,spoonGrip),spoon.quaternion.clone().multiply(spoonHand),1.15);
-  bite.visible=progress>.13&&progress<.87&&phase>.10&&phase<.50;
+  dockProp(root,bowl,docks?.bowl,hold,v(-.095,1.077,.30));
+  dockProp(root,spoon,docks?.spoon,hold,v(.17,1.039,.18));
+  // Lift the handle through a reachable arc while rotating it away from the worktop.
+  spoon.position.y+=Math.sin(Math.PI*hold)*.08;
+  reachHand(root,0,bowl,bowlGrip,bowl.quaternion.clone().multiply(bowlHand),reach,hold);
+  reachHand(root,1,spoon,spoonGrip,spoon.quaternion.clone().multiply(spoonHand),reach,hold);
+  bite.visible=hold===1&&progress>.13&&progress<.87&&phase>.10&&phase<.50;
   meal.position.y=.017-.006*Math.min(2,Math.floor(cycle+.5));
   const eating=ready*smooth((phase-.30)/.1)*(1-smooth((phase-.54)/.06));
   const chewing=ready*(phase>.57?Math.sin((phase-.57)*Math.PI*10)**2*.35:0);

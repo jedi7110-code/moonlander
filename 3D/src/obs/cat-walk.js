@@ -40,7 +40,7 @@ export function applyCatLegPose(root,{distance,moving,resting}){
   const {body,legs}=root.userData;
   for(const leg of legs){
     const target=moving?catFootfall(distance,leg.side,leg.rear):{y:CAT_WALK.pawHeight,z:leg.rear?-.215:.205};
-    if(resting)target.z=leg.rear?-.15:.23;
+    if(resting)target.z=MathUtils.lerp(target.z,leg.rear?-.15:.23,Number(resting));
     const shoulderSlide=!leg.rear&&moving?target.z-.205:0;
     leg.hip.position.set(leg.side*.101,leg.anatomy.height-Math.abs(shoulderSlide)*.10,leg.anatomy.z+shoulderSlide*.20);
     const y=(target.y-body.position.y)/body.scale.y;

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MeshStandardMaterial,Vector3} from 'three';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
-import {mouthPosition} from '../src/obs/dining.js';
+import {mouthPosition,diningPhase,createDiningProps,DINING_APPROACH} from '../src/obs/dining.js';
+import {Group} from 'three';
 
 const character=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 const pose=(root,action,time,duration=action==='galley'?6:5,extra={})=>{
@@ -11,8 +12,30 @@ const pose=(root,action,time,duration=action==='galley'?6:5,extra={})=>{
 const point=(prop,xyz)=>prop.localToWorld(new Vector3(...xyz));
 const handAt=(root,index,prop,grip)=>{
   const wrist=root.userData.arms[index].hand.getWorldPosition(new Vector3());
-  assert.ok(wrist.distanceTo(point(prop,grip))<1e-8,`wrist misses the ${prop.name} grip`);
+  assert.ok(wrist.distanceTo(point(prop,grip))<1e-8,`wrist misses the ${prop.name} grip by ${wrist.distanceTo(point(prop,grip))} at ${root.userData.auditTime}`);
 };
+
+test('dishes stay on the worktop until grasped, return to the same spot, and remain reachable',()=>{
+  const material=new MeshStandardMaterial(),parent=new Group(),docks=createDiningProps(parent,new Proxy({},{get:()=>material}));
+  docks.mug.position.set(-.17,1.134,.16);docks.mug.rotation.y=Math.PI;
+  docks.bowl.position.set(.095,1.077,.10);docks.bowl.rotation.y=Math.PI;
+  docks.spoon.position.set(-.17,1.039,.10);
+  for(const action of ['galley','hydro']){
+    const root=character();root.rotation.y=Math.PI;
+    for(let frame=0;frame<=600;frame++){
+      const time=frame/60,phase=diningPhase(time,10);root.position.z=.78-DINING_APPROACH*phase.approach;
+      pose(root,action,time,10,{diningDocks:docks});root.userData.auditTime=time;
+      for(const name of action==='galley'?['bowl','spoon']:['mug']){
+        const prop=root.userData.dining[name];
+        if(phase.hold===0)assert.ok(prop.getWorldPosition(new Vector3()).distanceTo(docks[name].getWorldPosition(new Vector3()))<1e-8);
+      }
+      if(phase.reach===1){
+        if(action==='galley'){handAt(root,0,root.userData.dining.bowl,[-.134,-.058,.015]);handAt(root,1,root.userData.dining.spoon,[.027,.018,.164]);}
+        else handAt(root,1,root.userData.dining.mug,[.097,.067,.019]);
+      }
+    }
+  }
+});
 
 test('food uses a bowl and spoon, water uses a hollow cup',()=>{
   const root=character(),{dining}=root.userData;
@@ -21,10 +44,11 @@ test('food uses a bowl and spoon, water uses a hollow cup',()=>{
   assert.ok(dining.mug.getObjectByName('Hollow enamel cup'));
 });
 
-test('hands remain on the props through the full meal and drink',()=>{
+test('hands remain on the props between grasp and release',()=>{
   const root=character(),{dining}=root.userData;
   for(const action of ['galley','hydro'])for(let frame=0;frame<=360;frame++){
     pose(root,action,frame/60,6);
+    if(diningPhase(frame/60,6).reach<1)continue;
     if(action==='galley'){
       handAt(root,0,dining.bowl,[-.134,-.058,.015]);handAt(root,1,dining.spoon,[.027,.018,.164]);
     }else handAt(root,1,dining.mug,[.097,.067,.019]);
@@ -35,23 +59,23 @@ test('hands remain on the props through the full meal and drink',()=>{
 test('two spoonfuls meet the lips, with food disappearing on consumption',()=>{
   const root=character(),{body,head,dining}=root.userData;
   for(const cycle of [0,1]){
-    pose(root,'galley',( .13+(cycle+.46)/2*.74)*6);
+    pose(root,'galley',(.27+(.13+(cycle+.46)/2*.74)*.46)*6);
     const mouth=body.localToWorld(mouthPosition(head));
     assert.ok(dining.spoon.getWorldPosition(new Vector3()).distanceTo(mouth)<.016);
     assert.equal(dining.bite.visible,true);
-    pose(root,'galley',(.13+(cycle+.52)/2*.74)*6);assert.equal(dining.bite.visible,false);
+    pose(root,'galley',(.27+(.13+(cycle+.52)/2*.74)*.46)*6);assert.equal(dining.bite.visible,false);
   }
 });
 
 test('the cup tilts around its lip contact and lowers again',()=>{
   const root=character(),{body,head,dining}=root.userData;
   for(const fraction of [.33,.40,.5,.62,.70,.73]){
-    pose(root,'hydro',fraction*5);
+    pose(root,'hydro',(.27+fraction*.46)*5);
     const mouth=body.localToWorld(mouthPosition(head));
     assert.ok(point(dining.mug,[0,.067,-.043]).distanceTo(mouth)<.007);
   }
   pose(root,'hydro',2.5);assert.ok(dining.mug.rotation.x<-.9);
-  pose(root,'hydro',5);assert.ok(Math.abs(dining.mug.rotation.x)<1e-10);assert.ok(dining.mug.position.y<1);
+  pose(root,'hydro',5);assert.ok(Math.abs(dining.mug.rotation.x)<1e-10);assert.equal(dining.mug.position.y,1.134);
 });
 
 test('the liquid stays thin and inside the cup when raised, tilted, lowered and reused',()=>{

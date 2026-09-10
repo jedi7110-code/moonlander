@@ -4,9 +4,19 @@ import {Box3,MeshStandardMaterial,Vector3} from 'three';
 import {createCat,animateCat} from '../src/obs/characters.js';
 import {CAT_WALK,catFootfall} from '../src/obs/cat-walk.js';
 import {CatMotion} from '../src/obs/state.js';
-import {CAT_PORT} from '../src/obs/layout.js';
+import {CAT_PORT,CAT_SCALE} from '../src/obs/layout.js';
 
 const makeCat=()=>{const material=new MeshStandardMaterial();return createCat(new Proxy({},{get:()=>material}));};
+test('the whole cat is uniformly eighty percent size and keeps that scale in every activity',()=>{
+  const cat=makeCat();assert.equal(CAT_SCALE,.8);assert.deepEqual(cat.scale.toArray(),[.8,.8,.8]);
+  const reduced=new Box3().setFromObject(cat,true).getSize(new Vector3());
+  cat.scale.setScalar(1);const original=new Box3().setFromObject(cat,true).getSize(new Vector3());
+  for(const axis of ['x','y','z'])assert.ok(Math.abs(reduced[axis]/original[axis]-.8)<1e-6);
+  cat.scale.setScalar(CAT_SCALE);
+  for(const mode of ['walk','eat','sleep','groom']){
+    animateCat(cat,{time:1,moving:mode==='walk',mode,facing:1});assert.deepEqual(cat.scale.toArray(),[.8,.8,.8]);
+  }
+});
 test('the cat has a tapered face, a narrow neck and substantial ankles rather than oversized paws',()=>{
   const cat=makeCat(),{head,neck,eyes,legs}=cat.userData,skull=head.getObjectByName('Contoured cat skull');
   assert.ok(skull);assert.ok(skull.geometry.boundingBox.max.z>1);
@@ -42,17 +52,17 @@ test('planted paws remain fixed in world space while shoulders and the body adva
   for(const facing of [-1,1]){
     const cat=makeCat(),previous=new Map();cat.rotation.y=facing*Math.PI/2;
     for(let i=0;i<=180;i++){
-      const distance=i/180*CAT_WALK.stride;cat.position.x=facing*distance;
+      const distance=i/180*CAT_WALK.stride*CAT_SCALE;cat.position.x=facing*distance;
       animateCat(cat,{time:i/180,moving:true,mode:'walk',facing,walkDistance:distance});cat.updateMatrixWorld(true);
       for(const leg of cat.userData.legs){
-        const target=catFootfall(distance,leg.side,leg.rear),point=leg.foot.getWorldPosition(new Vector3()),before=previous.get(leg);
+        const target=catFootfall(distance/CAT_SCALE,leg.side,leg.rear),point=leg.foot.getWorldPosition(new Vector3()),before=previous.get(leg);
         if(target.planted){
-          assert.ok(Math.abs(point.y-CAT_WALK.pawHeight)<1e-6,`paw height ${point.y}`);
+          assert.ok(Math.abs(point.y-CAT_WALK.pawHeight*CAT_SCALE)<1e-6,`paw height ${point.y}`);
           if(before?.planted&&before.phase<target.phase)assert.ok(point.distanceTo(before.point)<1e-6,`sliding ${point.distanceTo(before.point)}`);
           const bounds=new Box3().setFromObject(leg.foot);assert.ok(bounds.min.y>=-.001&&bounds.min.y<.01);
-        }else assert.ok(point.y>=CAT_WALK.pawHeight-1e-6);
+        }else assert.ok(point.y>=CAT_WALK.pawHeight*CAT_SCALE-1e-6);
         if(leg.rear){
-          assert.ok(leg.knee.rotation.x>0);assert.ok(leg.ankle.getWorldPosition(new Vector3()).y-point.y>.075);
+          assert.ok(leg.knee.rotation.x>0);assert.ok(leg.ankle.getWorldPosition(new Vector3()).y-point.y>.075*CAT_SCALE);
         }else assert.ok(leg.knee.rotation.x<0);
         previous.set(leg,{...target,point});
       }

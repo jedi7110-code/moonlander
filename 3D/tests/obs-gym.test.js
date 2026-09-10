@@ -6,12 +6,13 @@ import {CrewMotion,Supplies,currentAction,getStation} from '../src/obs/state.js'
 import {getStation as originalStation} from '../../js/obs/layout.js?v=15';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {BIKE,createGym,animateGym,pedalPosition} from '../src/obs/gym.js';
+import {CABIN_PACE} from '../src/obs/pace.js';
 
 function setup(){const actor=new CrewMotion({floor:2,x:840}),care=new Supplies(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care});return{actor,brain,care};}
 test('the gym is a 3D-only station and leaves the six original needs intact',()=>{
   const {brain}=setup();assert.equal(originalStation('gym'),undefined);assert.equal(getStation('gym').floor,2);
   assert.equal(Object.keys(brain.needs).length,6);assert.equal(Object.keys(brain.statusNeeds).length,8);
-  const before=brain.exercise;brain.state='goingTo';brain.update(20);assert.equal(brain.exercise,before-4);
+  const before=brain.exercise;brain.state='goingTo';brain.update(20);assert.equal(brain.exercise,before-4*CABIN_PACE.needDecay);
   for(const value of Object.values(brain.statusNeeds))assert.ok(Number.isFinite(value));
 });
 test('exercise deficiency causes an autonomous visit without overriding urgent physical needs',()=>{
@@ -23,7 +24,8 @@ test('cycling replenishes exercise but consumes energy, water and hygiene',()=>{
   const {brain,actor}=setup();brain.exercise=20;brain._go(getStation('gym'));actor.update(1/60);
   assert.equal(currentAction(brain),'gym');const before={...brain.needs};
   for(let i=0;i<8*60;i++)brain.update(1/60);
-  assert.ok(brain.exercise>=69);for(const key of ['energy','thirst','hygiene'])assert.ok(brain.needs[key]<before[key]-5);
+  assert.ok(brain.exercise>=69);
+  for(const [key,rate]of [['energy',.6],['thirst',.35],['hygiene',.55]])assert.ok(brain.needs[key]<before[key]-8*rate);
   assert.equal(brain.needs.exercise,undefined);
   brain._go(getStation('galley'));const stopped=brain.exercise;brain.update(1);assert.ok(brain.exercise<stopped);
 });

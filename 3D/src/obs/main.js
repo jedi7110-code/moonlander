@@ -1,18 +1,21 @@
 import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinChess} from './chess-ui.js';
+import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction} from './state.js';
 import {ObservationView} from './view.js';
 import {CabinAudio} from './audio.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
 import {AirlockPassage} from './airlock.js';
+import {Sprout} from 'lucide';
+import {PLANT} from './layout.js';
 
 const $=id=>document.getElementById(id);
-const icons={Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
+const icons={Sprout,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
-const stationName=id=>({gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
+const stationName=id=>({plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
 const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
@@ -26,6 +29,7 @@ const scene={
   time:{delayedCall(ms,callback){timers.push({at:elapsed+ms/1000,callback});}},
   sound:{add(){return{play(){audio.tone(440,.09,.02);},once(_event,callback){callback();},destroy(){}};}},
   obsUI:{
+    plantResult(count){showMessage(count?words(`野菜を収穫した。食料を${count}補充。`,`Greens harvested. Food +${count}.`):brain.plants.ready?words('食料庫はいっぱいだ。育った野菜は棚に残しておく。','Food storage is full. I will leave the mature greens growing.'):words('戻り水と養液の導電率を確認した。収穫までもう少しだ。','Condensate return and nutrient conductivity checked. The greens need more time.'));},
     flashMonitor(){$('call-alert').animate([{opacity:.6},{opacity:1}],{duration:350});},
     showWant(text){$('call-text').textContent=text.replace(t('want_hint'),'');$('call-alert').hidden=false;},
     hideWant(){$('call-alert').hidden=true;},
@@ -69,13 +73,27 @@ for(const key of Object.keys(brain.statusNeeds)){
   const row=document.createElement('div'),name=document.createElement('span'),value=document.createElement('b'),meter=document.createElement('progress');meter.max=100;
   row.append(name,value);item.append(row,meter);$('needs').append(item);needElements[key]={item,name,value,meter};
 }
+const plantElements=brain.plants.rows.map(()=>{
+  const row=document.createElement('div'),name=document.createElement('span'),meter=document.createElement('progress'),value=document.createElement('b');
+  meter.max=100;row.append(name,meter,value);$('plant-rows').append(row);return{row,name,meter,value};
+});
 function updateHUD(){
+  const ready=brain.plants.ready,working=brain.actStation==='plant';
+  $('plant-control').classList.toggle('ready',ready>0);
+  $('plant-control').disabled=working;
+  $('plant-status').textContent=working?words('栽培棚を確認中','Checking plants'):ready?words(`収穫可能 ${ready}段`,`Harvest ready: ${ready}`):words('栽培中','Growing');
+  $('plant-control').setAttribute('aria-label',words('栽培棚で手入れ・収穫','Tend and harvest plants'));
+  plantElements.forEach((nodes,i)=>{
+    const row=brain.plants.rows[i],percent=Math.floor(row.growth*100),name=words(row.ja,row.en);
+    nodes.name.textContent=name;nodes.meter.value=percent;nodes.meter.setAttribute('aria-label',name);nodes.value.textContent=percent+'%';nodes.row.classList.toggle('ready',row.growth>=1);
+  });
   const minutes=Math.floor(brain.hour*60);$('ship-clock').textContent=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
   $('milo-mood').textContent=t('mood_'+brain.mood);
   $('milo-activity').textContent=chess.open?words('チェスで対局中','Playing chess'):paused?words('一時停止','Paused'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('チェスをしにラウンジへ','Going to the lounge for chess'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
   for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
+  if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);
   updateHealthHUD();
-  const catStates={sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
+  const catStates={play:['マイロと遊んでいる','Playing with Milo'],joinPlay:['マイロのそばへ','Joining Milo'],sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],look:['周りを見ている','Looking around'],follow:['マイロについて歩く','Following Milo'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
   const passage=cat.motion.portal;
   $('cat-activity').textContent=passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...catStates[cat.mode]);
   for(const [key,stock]of Object.entries(care.supplies)){
@@ -128,6 +146,13 @@ function requestGame(){
   if(brain.requestGame()){showMessage(words('チェスを一局やろう。ラウンジへ行くよ。','Let’s play chess. I will head to the lounge.'));confirmOrder('lounge');}
   else if(brain.actStation==='medical')confirmOrder('medical');
 }
+function loungeClick(){
+  pendingHQ=false;
+  const result=brain.clickLounge();
+  if(result==='chess'){if(paused)setPause(false);showMessage(words('一局やろう。','Let’s play a round.'));}
+  if(result==='relax'||result==='chess')confirmOrder('lounge');
+  else if(result==='blocked'&&brain.actStation)confirmOrder(brain.actStation);
+}
 function requestSupply(){
   if(brain.requestSupplies()){showMessage(words('コンソールから配送を頼んでくる。','I will order supplies at the console.'));confirmOrder('console');}
   else if(brain.health.critical){showMessage(words('配送の前に、手当てを受ける。','I need treatment before arranging supplies.'));confirmOrder('medical');}
@@ -173,6 +198,7 @@ $('acknowledge').addEventListener('click',acknowledge);
 $('hq-message').addEventListener('click',headquarters);
 document.querySelectorAll('[data-use]').forEach(button=>button.addEventListener('click',()=>useSupply(button.dataset.use)));
 $('request-supply').addEventListener('click',requestSupply);
+$('plant-control').addEventListener('click',()=>useStation('plant'));
 for(const mode of ['all','milo','cat'])$('view-'+mode).addEventListener('click',()=>view?.setMode(mode));
 $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').addEventListener('click',()=>view?.changeZoom(1/1.3));
 if(!document.fullscreenEnabled)$('obs-fullscreen').hidden=true;
@@ -192,18 +218,19 @@ async function start(){
     view.feedback=feedback;
     view.onModeChange=()=>updateHUD();
     view.onStation=id=>{
-      if(id==='lounge'){requestGame();return;}
+      if(id==='lounge'){loungeClick();return;}
       if(id==='console'){requestSupply();return;}
       if(id==='hatch'){feedback.notify(id,'inspect');showMessage(care.delivery?words('補給便の受け入れを準備中。','Preparing to receive the shipment.'):words('受け入れ待機中。配送の依頼はコンソールで。','Hatch on standby. Place supply orders at the console.'),'LOGISTICS');updateHUD();return;}
       useStation(id);
     };
+    brain.catRoutine=cat;
     $('loading').hidden=true;
     function tick(now){
       const dt=Math.min((now-previous)/1000,.05);previous=now;
       if(!paused&&!document.hidden&&!chess.open){
         accumulator+=dt;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!chess.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);if(!actor.waitingForHatch)actor.update(step);cat.update(step);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+        while(accumulator>=1/60&&!chess.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);if(!actor.waitingForHatch)actor.update(step);cat.update(step,actor);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
       if(!document.hidden){feedback.update(dt,brain,actor,paused||chess.open);view.render(dt,elapsed,actor,brain,cat,care,paused||chess.open,airlock);}

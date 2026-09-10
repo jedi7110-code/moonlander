@@ -90,16 +90,21 @@ export function createCatTail(material){
   const mesh=new THREE.Mesh(geometry,material);
   geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);geometry.attributes.normal.setUsage(THREE.DynamicDrawUsage);
   mesh.position.set(0,.35,-.38);mesh.castShadow=true;mesh.receiveShadow=true;mesh.name='Rounded-tip cat tail';
-  mesh.userData={curve,segments,capSegments,sides,tipRadius:.026,lastTime:null,point:new THREE.Vector3(),normal:new THREE.Vector3(),target:new THREE.Vector3()};
+  mesh.userData={curve,segments,capSegments,sides,tipRadius:.026,lastTime:null,point:new THREE.Vector3(),normal:new THREE.Vector3(),target:new THREE.Vector3(),supportPoint:new THREE.Vector3(),supportInverse:new THREE.Matrix4()};
   animateCatTail(mesh,{time:0,resting:true,moving:false});return mesh;
 }
 
-export function animateCatTail(mesh,{time,resting,moving,crouching=false,grooming=0}){
+export function animateCatTail(mesh,{time,resting,moving,crouching=false,grooming=0,sitting=0}){
   const data=mesh.userData,{curve,segments,capSegments,sides,tipRadius,point,normal,target}=data;
   if(data.lastTime===time)return;
   const blend=data.lastTime===null?1:1-Math.exp(-Math.max(0,Math.min(.1,time-data.lastTime))*8);data.lastTime=time;
   const pose=TAIL_POSES[crouching?'duct':resting?'sleep':moving?'walk':'idle'];
   pose.forEach((p,i)=>{const fraction=i/(pose.length-1),g=TAIL_POSES.groom[i];target.set(p[0]+(g[0]-p[0])*grooming,p[1]+(g[1]-p[1])*grooming,p[2]+(g[2]-p[2])*grooming);target.x+=Math.sin(time*(resting?.65:1.15)-fraction*1.7)*(resting||grooming>.5?.006:.025)*fraction*fraction;curve.points[i].lerp(target,blend);});
+  if(sitting&&mesh.parent){
+    // Sitting tilts the pelvis; lay the tail onto the support rather than through it.
+    mesh.parent.updateMatrix();data.supportInverse.copy(mesh.parent.matrix).invert();
+    for(const p of curve.points){data.supportPoint.copy(p).add(mesh.position).applyMatrix4(mesh.parent.matrix);data.supportPoint.y=Math.max(.048,data.supportPoint.y);p.copy(data.supportPoint.applyMatrix4(data.supportInverse).sub(mesh.position));}
+  }
   curve.updateArcLengths();const frames=curve.computeFrenetFrames(segments,false),positions=mesh.geometry.attributes.position,normals=mesh.geometry.attributes.normal,length=curve.getLength();
   // A gently tapered tube ends in a hemisphere, not a point or an attached bead.
   for(let i=0;i<=segments+capSegments;i++){

@@ -5,6 +5,12 @@ export class CabinAudio {
       const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return false;
       this.context=new Context();this.master=this.context.createGain();this.master.gain.value=0;this.master.connect(this.context.destination);
       for(const frequency of [48,96]){const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.frequency.value=frequency;gain.gain.value=frequency===48?.055:.018;oscillator.connect(gain).connect(this.master);oscillator.start();}
+      const buffer=this.context.createBuffer(1,this.context.sampleRate*2,this.context.sampleRate),samples=buffer.getChannelData(0);
+      for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
+      const fan=this.context.createBufferSource(),filter=this.context.createBiquadFilter();
+      fan.buffer=buffer;fan.loop=true;filter.type='lowpass';filter.frequency.value=380;
+      this.fanGain=this.context.createGain();this.fanGain.gain.value=.012;
+      fan.connect(filter).connect(this.fanGain).connect(this.master);fan.start();
     }
     await this.context.resume();this.enabled=!this.enabled;this.master.gain.setTargetAtTime(this.enabled?.55:0,this.context.currentTime,.2);return this.enabled;
   }
@@ -12,7 +18,8 @@ export class CabinAudio {
     if(!this.enabled)return;
     const now=this.context.currentTime,osc=this.context.createOscillator(),gain=this.context.createGain();osc.type=type;osc.frequency.value=frequency;gain.gain.setValueAtTime(volume,now);gain.gain.exponentialRampToValueAtTime(.0001,now+duration);osc.connect(gain).connect(this.master);osc.start();osc.stop(now+duration);osc.onended=()=>{osc.disconnect();gain.disconnect();};
   }
-  update(dt,walking){
+  update(dt,walking,plantProximity=0){
+    if(this.fanGain)this.fanGain.gain.setTargetAtTime(.012+.028*Math.max(0,Math.min(1,plantProximity)),this.context.currentTime,.4);
     this.stepTime-=dt;
     if(walking&&this.stepTime<=0){this.tone(83,.06,.055,'triangle');this.stepTime=.47;}
   }

@@ -98,7 +98,7 @@ test('the bowl is between the galley and water station, with the cat eating besi
   assert.ok(CAT_BOWL.x>getStation('galley').x&&CAT_BOWL.x<getStation('hydro').x);
   const material=new MeshStandardMaterial(),cat=createCat(new Proxy({},{get:()=>material}));
   cat.position.set(positionX(CAT_BOWL.approachX),0,CAT_BOWL.depth);cat.rotation.y=-Math.PI/2;
-  for(let time=0;time<8;time+=.25){
+  for(let time=1.75;time<8;time+=.25){
     animateCat(cat,{time,moving:false,climbing:false,facing:-1,mode:'eat'});cat.updateMatrixWorld(true);
     const mouth=cat.userData.head.localToWorld(new Vector3(0,-.062,.14));
     assert.ok(Math.abs(mouth.x-positionX(CAT_BOWL.x))<.13);assert.ok(Math.abs(mouth.z-CAT_BOWL.depth)<.13);

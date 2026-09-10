@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Box3,MeshStandardMaterial,Vector3} from 'three';
+import {MeshStandardMaterial,Vector3} from 'three';
 import {createCat} from '../src/obs/characters.js';
 import {catFaceSurface,updateCatEyes} from '../src/obs/cat-face.js';
 
@@ -39,7 +39,7 @@ test('the eyes sit inside a continuous face with separate furred eyelids and sha
   const {head,eyes}=makeCat().userData,skull=head.getObjectByName('Contoured cat skull');
   assert.ok(skull.geometry.attributes.facePosition);
   assert.equal(head.children.filter(child=>child.name==='Contoured cat skull').length,1);
-  const width=new Box3().setFromObject(skull).getSize(new Vector3()).x;
+  const width=skull.geometry.boundingBox.getSize(new Vector3()).x*skull.scale.x;
   assert.ok(Math.abs(eyes[0].position.x-eyes[1].position.x)<width*.5);
   for(const eye of eyes){
     assert.deepEqual(eye.children.map(mesh=>mesh.name),['Almond eye surface','Eyelid margin','Furred eyelids']);

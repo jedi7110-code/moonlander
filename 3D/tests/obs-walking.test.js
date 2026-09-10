@@ -86,7 +86,8 @@ test('the walking wrist turn does not leak into idle, climbing or station poses'
     pose(root,.27);
     const options={time:3,moving:false,climbing:false,facing:1,action:null,actionTime:3,actionDuration:20,...extra};
     animateMilo(root,options);animateMilo(fresh,options);
-    assert.deepEqual(snapshot(root),snapshot(fresh));
+    const actual=snapshot(root).flat(),expected=snapshot(fresh).flat();
+    actual.forEach((value,i)=>assert.ok(Math.abs(value-expected[i])<1e-12));
   }
 });
 

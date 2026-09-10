@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import {createDiningProps} from './dining.js';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
-import {GYM,CAT_PORT,CAT_BOWL,STATIONS,LOUNGE_SEAT} from './layout.js';
+import {GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,LOUNGE_SEAT} from './layout.js';
+import {createPlantRack} from './plants.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
@@ -122,15 +124,24 @@ export function createStationInteraction(id,bounds,pickMaterial){
   group.children.forEach(part=>{part.castShadow=false;part.receiveShadow=false;part.renderOrder=8;});
   return{mesh,group,material};
 }
-function plumbing(parent,m,x,y,type) {
-  box(parent,m.dark,x,y+1.29,-.42,1.66,2.59,1.68,.04);
-  panel(parent,m,x,y+1.3,.44,1.55,2.46,m.white);
-  panel(parent,m,x,y+1.55,.53,.85,1.03,m.dark);
-  box(parent,m.black,x+.56,y+1.17,.58,.06,.30,.05,.012);
-  label(parent,type==='shower'?'SHOWER':'WC',x,y+2.25,.60,.94,.26,{size:65});
-  const lamp=ball(parent,m.green,x+.55,y+1.62,.6,.026,.026,.016);lamp.name=type+'Lamp';
-  grille(parent,m,x,y+.36,.59,1.08,.27);
+function plumbing(parent,animated,m,x,y,type) {
+  box(parent,m.dark,x,y+1.29,-1.20,1.66,2.59,.12,.04);
+  for(const side of [-1,1])box(parent,m.white,x+side*.79,y+1.29,-.34,.10,2.59,1.80,.025);
+  box(parent,m.white,x,y+2.54,-.34,1.66,.10,1.80,.025);
+  box(parent,m.dark,x,y+.025,-.34,1.50,.05,1.80,.01);
+  if(type==='toilet'){
+    cylinder(parent,m.white,x,y+.24,-.72,.24,.48,.29);
+    const seat=new THREE.Mesh(new THREE.TorusGeometry(.22,.045,12,36),m.dark);seat.rotation.x=Math.PI/2;seat.position.set(x,y+.49,-.72);parent.add(seat);
+  }else pipe(parent,m.metal,[[x+.5,y+.4,-1.08],[x+.5,y+2.15,-1.08],[x,y+2.15,-.85]],.025);
+  const door=new THREE.Group();door.position.set(x-.735,y,.44);animated.add(door);
+  panel(door,m,.735,1.3,0,1.47,2.46,m.white);
+  panel(door,m,.735,1.55,.09,.85,1.03,m.dark);
+  box(door,m.black,1.295,1.17,.14,.06,.30,.05,.012);
+  label(door,type==='shower'?'SHOWER':'WC',.735,2.25,.16,.94,.26,{size:65});
+  const lamp=ball(door,m.green,1.285,1.62,.16,.026,.026,.016);lamp.name=type+'Lamp';
+  grille(door,m,.735,.36,.15,1.08,.27);
   pipe(parent,m.metal,[[x-.72,y+2.8,-.87],[x-.72,y+2.67,-.87],[x,y+2.67,-.87],[x,y+2.6,-.87]],.035);
+  return{door,lamp};
 }
 function hatch(parent,animated,m,x,y) {
   box(parent,m.dark,x,y+1.15,-.81,2.1,2.30,.46,.11);
@@ -225,7 +236,7 @@ export function buildShip(m) {
   label(staticRoot,'03 / ENGINEERING',5.72,2.72,1.756,2.8,.26,{size:48});
 
   const top=FLOOR_Y[0],mid=FLOOR_Y[1];
-  plumbing(staticRoot,m,positionX(240),top,'shower');plumbing(staticRoot,m,positionX(380),top,'toilet');
+  const bathrooms={shower:plumbing(staticRoot,animated,m,positionX(240),top,'shower'),toilet:plumbing(staticRoot,animated,m,positionX(380),top,'toilet')};
   bunk(staticRoot,m,positionX(510),top);cupboard(staticRoot,m,2.1,top,-1.14,1.54,2.31);
   const lounge=createLounge(m);lounge.position.y=top;staticRoot.add(lounge);
   const loungeBounds=new THREE.Box3().setFromObject(lounge).expandByScalar(.06);
@@ -243,21 +254,27 @@ export function buildShip(m) {
   const innerDoor=evaBay.innerHatch.userData.door,innerSignal=evaBay.innerHatch.userData.signal;
   animated.attach(innerDoor);
 
-  for(let i=0;i<4;i++){
+  for(let i=0;i<2;i++){
     const x=-10.8+i*1.50;box(staticRoot,m.dark,x,.49,-.48,1.47,.95,1.13,.03);panel(staticRoot,m,x,.47,.13,1.39,.83,m.white);box(staticRoot,m.black,x,.76,.215,.49,.035,.044,.01);box(staticRoot,m.metal,x,1.0,-.42,1.51,.07,1.25,.018);
     cupboard(staticRoot,m,x,1.65,-1.20,1.41,1.03);
   }
-  box(staticRoot,m.dark,-9.33,1.052,-.36,1.02,.028,.72,.04);
-  for(const x of [-9.64,-9.09])for(const z of [-.58,-.17]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.17,.017,8,22),m.metal);ring.rotation.x=Math.PI/2;ring.position.set(x,1.075,z);staticRoot.add(ring);}
-  cylinder(staticRoot,m.metal,-9.64,1.19,-.58,.146,.23,.17);
-  box(staticRoot,m.dark,-6.28,1.075,-.29,.85,.03,.52,.08);
-  pipe(staticRoot,m.metal,[[-6.28,1.01,-.73],[-6.28,1.41,-.73],[-6.28,1.45,-.44],[-6.28,1.30,-.38]],.028);
+  box(staticRoot,m.dark,-10.8,1.052,-.36,1.02,.028,.72,.04);
+  for(const x of [-11.11,-10.56])for(const z of [-.58,-.17]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.17,.017,8,22),m.metal);ring.rotation.x=Math.PI/2;ring.position.set(x,1.075,z);staticRoot.add(ring);}
+  cylinder(staticRoot,m.metal,-11.11,1.19,-.58,.146,.23,.17);
+  box(staticRoot,m.dark,-9.3,1.075,-.29,.85,.03,.52,.08);
+  pipe(staticRoot,m.metal,[[-9.3,1.01,-.73],[-9.3,1.41,-.73],[-9.3,1.45,-.44],[-9.3,1.30,-.38]],.028);
   box(staticRoot,m.enamel,-11.90,1.42,-.33,.65,.74,.8,.045);grille(staticRoot,m,-11.9,1.4,.09,.37,.27);
   cylinder(staticRoot,m.white,-11.50,1.13,-.02,.055,.18,.065);
   const hydroX=positionX(560);cupboard(staticRoot,m,hydroX,0,-1.03,1.25,2.35);
+  const plants=createPlantRack(m,positionX(PLANT.x));animated.add(plants.root);
   box(staticRoot,m.dark,hydroX,1.42,-.64,.66,.61,.13,.025);label(staticRoot,'H2O / 21°C',hydroX,1.62,-.56,.54,.13,{fg:'#a2d9c7',size:50});
   for(const x of [hydroX-.15,hydroX+.15]){cylinder(staticRoot,m.metal,x,1.26,-.47,.034,.10);ball(staticRoot,x<hydroX?m.teal:m.red,x,1.26,-.40,.025,.025,.025);}
-  box(staticRoot,m.metal,hydroX,1.05,-.38,.74,.04,.51);
+  box(staticRoot,m.metal,hydroX,1.05,-.12,.74,.04,.76);
+  const diningDocks={galley:createDiningProps(animated,m),hydro:createDiningProps(animated,m)};
+  const galleyX=positionX(300),foodDock=diningDocks.galley,waterDock=diningDocks.hydro;
+  foodDock.bowl.position.set(galleyX+.095,1.077,.10);foodDock.bowl.rotation.y=Math.PI;foodDock.bowl.visible=true;
+  foodDock.spoon.position.set(galleyX-.17,1.039,.10);foodDock.spoon.visible=true;foodDock.bite.visible=false;
+  waterDock.mug.position.set(hydroX-.17,1.134,.16);waterDock.mug.rotation.y=Math.PI;waterDock.mug.visible=true;
   const gym=createGym(m,positionX(GYM.x));animated.add(gym.root);
   box(staticRoot,m.dark,positionX(GYM.x),2.72,1.69,2.35,.28,.12,.014);
   label(staticRoot,'GYM / ERGOMETER',positionX(GYM.x),2.72,1.756,2.3,.26,{fg:'#c2d3c7',size:48});
@@ -275,7 +292,7 @@ export function buildShip(m) {
   cylinder(staticRoot,m.metal,bowlX,bowlY+.07,bowlZ,.16,.10,.20,28);
   cylinder(staticRoot,m.dark,bowlX,bowlY+.121,bowlZ,.16,.012,.16,28);
   const foodGroup=new THREE.Group();foodGroup.position.set(bowlX,bowlY,bowlZ);animated.add(foodGroup);
-  for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,m.olive,Math.cos(a)*r,.14,Math.sin(a)*r,.025,.018,.022);}
+  for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,m.olive,Math.cos(a)*r,CAT_BOWL.foodHeight,Math.sin(a)*r,.025,.018,.022);}
   const fan=new THREE.Group();fan.position.set(12.08,2.14,-1.32);animated.add(fan);
   const fanRim=new THREE.Mesh(new THREE.TorusGeometry(.34,.039,12,36),m.metal);fan.add(fanRim);
   for(let i=0;i<4;i++){const blade=box(fan,m.dark,0,0,0,.18,.61,.035,.03);blade.rotation.z=i*Math.PI/2;}
@@ -296,12 +313,12 @@ export function buildShip(m) {
   });
   const pickMaterial=new THREE.MeshBasicMaterial({visible:false}),indicators={};
   STATIONS.forEach(({id,x,floor:level})=>{
-    const w=id==='medical'?5.10:id==='eva'?3.65:['airlock','innerHatch'].includes(id)?.62:1.9;
-    const fixtureX=id==='airlock'?evaBay.hatch.position.x:id==='innerHatch'?evaBay.innerHatch.position.x:id==='medical'?MED_BED.x-.52:positionX(x);
-    const bounds=id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
+    const w=id==='galley'?3.06:id==='plant'?2.90:id==='medical'?5.10:id==='eva'?3.65:['airlock','innerHatch'].includes(id)?.62:1.9;
+    const fixtureX=id==='galley'?-10.05:id==='airlock'?evaBay.hatch.position.x:id==='innerHatch'?evaBay.innerHatch.position.x:id==='medical'?MED_BED.x-.52:positionX(x);
+    const bounds=id==='plant'?new THREE.Box3().setFromObject(plants.root).expandByScalar(.04):id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
     const {mesh,group,material}=createStationInteraction(id,bounds,pickMaterial);
     if(id!=='lounge')group.position.z=1.75;
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
-  return {staticMesh:batchStatic(staticRoot),animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal};
+  return {staticMesh:batchStatic(staticRoot),animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants};
 }

@@ -1,4 +1,6 @@
-import {FLOORS,LADDER_X,getStation,CAT_PORT,CAT_BOWL} from './layout.js';
+import {FLOORS,LADDER_X,getStation,CAT_PORT,CAT_BOWL,CAT_SOFA,LOUNGE_SEAT} from './layout.js';
+import {CAT_RISE_TIME} from './cat-rest.js';
+import {CABIN_PACE} from './pace.js';
 
 export class CrewMotion {
   constructor({floor=1,x=360,walkSpeed=54,climbSpeed=38}={}) {
@@ -34,18 +36,24 @@ export class CrewMotion {
 }
 
 export class CatMotion extends CrewMotion {
-  constructor(options={}){super({floor:0,x:1035,walkSpeed:36,...options});this.z=CAT_PORT.walkZ;this.portalWalkDistance=0;this.portal=null;this.destination=null;this.onDestination=null;}
-  get busy(){return Boolean(this.portal)||super.busy;}
+  constructor(options={}){super({floor:0,x:1035,walkSpeed:36,...options});this.onSofa=this.floor===0&&this.x>=CAT_SOFA.seatX;this.elevation=this.onSofa?LOUNGE_SEAT.top:0;this.z=this.onSofa?LOUNGE_SEAT.centerDepth:CAT_PORT.walkZ;this.hop=null;this.portalWalkDistance=0;this.portal=null;this.destination=null;this.onDestination=null;}
+  get busy(){return Boolean(this.portal||this.hop)||super.busy;}
   get climbing(){return false;}
   get hidden(){return this.portal?.phase==='transit';}
   goTo(target,onArrive){
     if(!target||!FLOORS[target.floor])return;
     this.commandVersion++;this.destination={floor:target.floor,x:target.x};this.onDestination=onArrive||null;
     // Finish an occupied passage before following a changed destination.
-    if(!this.portal)this.plan();
+    if(!this.portal&&!this.hop)this.plan();
   }
   plan(){
     if(!this.destination)return;
+    const wantsSofa=this.destination.floor===0&&this.destination.x>=CAT_SOFA.seatX;
+    if(this.onSofa!==wantsSofa&&this.floor===0){
+      const up=!this.onSofa;
+      this.queue=[{type:'walk',x:up?CAT_SOFA.floorX:CAT_SOFA.seatX}];
+      this.onArrive=()=>{this.facing=up?1:-1;this.hop={up,phase:'prepare',age:0,duration:.14};};return;
+    }
     const crossing=this.destination.floor!==this.floor;
     this.queue=[{type:'walk',x:crossing?CAT_PORT.x:this.destination.x}];
     this.onArrive=()=>{
@@ -54,6 +62,23 @@ export class CatMotion extends CrewMotion {
     };
   }
   update(dt){
+    if(this.hop){
+      while(dt>0&&this.hop){
+        const h=this.hop,step=Math.min(dt,h.duration-h.age);h.age+=step;dt-=step;
+        if(h.phase==='flight'){
+          const t=h.age/h.duration,from=h.up?CAT_SOFA.floorX:CAT_SOFA.seatX,to=h.up?CAT_SOFA.seatX:CAT_SOFA.floorX;
+          this.x=from+(to-from)*t;
+          this.z=(h.up?CAT_PORT.walkZ:LOUNGE_SEAT.centerDepth)+(h.up?1:-1)*(LOUNGE_SEAT.centerDepth-CAT_PORT.walkZ)*t;
+          this.elevation=(h.up?LOUNGE_SEAT.top*t:LOUNGE_SEAT.top*(1-t))+4*(h.up?.30:.20)*t*(1-t);
+        }
+        if(h.age<h.duration)break;
+        h.age=0;
+        if(h.phase==='prepare'){h.phase='flight';h.duration=.56;}
+        else if(h.phase==='flight'){h.phase='land';h.duration=.18;this.onSofa=h.up;this.elevation=h.up?LOUNGE_SEAT.top:0;this.z=h.up?LOUNGE_SEAT.centerDepth:CAT_PORT.walkZ;}
+        else{this.hop=null;this.plan();}
+      }
+      if(dt<=0||this.hop)return;
+    }
     if(!this.portal){super.update(dt);return;}
     while(dt>0&&this.portal){
       const p=this.portal,step=Math.min(dt,p.duration-p.age);p.age+=step;dt-=step;
@@ -113,19 +138,86 @@ export class Supplies {
 }
 
 export class CatRoutine {
-  constructor(care){this.care=care;this.motion=new CatMotion();this.hunger=68;this.mode='sleep';this.modeTime=0;this.remaining=10;this.wanderIndex=0;}
-  rest(mode,duration){this.mode=mode;this.modeTime=0;this.remaining=duration;}
-  update(dt){
-    this.modeTime+=dt;this.hunger=Math.max(0,this.hunger-dt*.36);this.motion.update(dt);
-    if(this.mode==='fetch'||this.motion.busy)return;
-    if(this.hunger<42&&this.care.has('catfood')){this.fetch();return;}
-    this.remaining-=dt;if(this.remaining>0)return;
-    if(this.mode==='eat'){this.rest('groom',7);return;}
-    const places=[{floor:0,x:840},{floor:1,x:940},{floor:2,x:1155},{floor:1,x:510},{floor:0,x:1060}];
-    const target=places[this.wanderIndex++%places.length];this.mode='walk';this.modeTime=0;this.motion.goTo(target,()=>this.rest(this.wanderIndex%2?'groom':'sleep',12+this.wanderIndex%3*4));
+  constructor(care,{random=Math.random}={}){
+    this.care=care;this.random=random;this.motion=new CatMotion();
+    this.hunger=this.between(48,90);this.energy=this.between(35,80);this.groomNeed=this.between(20,80);this.curiosity=this.between(30,90);
+    this.mode='sleep';this.modeTime=0;this.remaining=this.between(8,16);this.pendingMove=null;this.companion=null;this.followLeft=0;this.retargetIn=0;
   }
-  fetch(){if(this.mode==='fetch')return;this.mode='fetch';this.modeTime=0;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX},()=>{if(this.care.take('catfood')){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});}
+  between(min,max){return min+(max-min)*this.random();}
+  canPlayLounge(){return this.motion.floor===0&&!this.motion.portal&&!this.motion.hop&&this.hunger>35&&this.energy>25&&this.mode!=='fetch'&&!this.pendingMove&&Math.abs(this.motion.x-CAT_SOFA.seatX)<220;}
+  inviteLounge(brain){
+    this.playHost=brain;
+    this.depart(()=>{
+      if(this.playHost!==brain||!brain.isSeatedInLounge()||brain.leisure!=='cat')return;
+      this.mode='joinPlay';this.modeTime=0;
+      this.motion.goTo({floor:0,x:CAT_SOFA.seatX},()=>{
+        if(this.playHost===brain&&brain.isSeatedInLounge()&&brain.leisure==='cat'){this.motion.facing=1;this.rest('play',40);}
+        else this.rest('look',6);
+      });
+    },'play');
+  }
+  rest(mode,duration){this.mode=mode;this.modeTime=0;this.remaining=duration;this.motion.walkSpeed=36;this.pendingMove=null;}
+  depart(run,kind){
+    if(!this.motion.busy&&['sleep','look','eat','groom'].includes(this.mode)&&this.remaining>0){
+      this.pendingMove={run,kind};this.remaining=Math.min(this.remaining,CAT_RISE_TIME);return;
+    }
+    run();
+  }
+  canFollow(){
+    const actor=this.companion;
+    return actor?.busy&&!actor.climbing&&!actor.waitingForHatch&&actor.floor===this.motion.floor&&!this.motion.onSofa&&!this.motion.portal&&!this.motion.hop&&(actor.x-this.motion.x)*actor.facing>40;
+  }
+  follow(){
+    this.depart(()=>{if(!this.canFollow()){this.rest('look',6);return;}this.mode='follow';this.modeTime=0;this.followLeft=this.between(8,18);this.retargetIn=0;},'follow');
+  }
+  endFollow(){this.motion.goTo({floor:this.motion.floor,x:this.motion.x});this.rest('look',this.between(5,9));}
+  choose(){
+    // Fulfil actual needs, but sample their weights instead of repeating a fixed tour.
+    const choices=[['fetch',this.care.has('catfood')&&this.hunger<70?(100-this.hunger)**2/100:0],['sleep',1+(100-this.energy)**2/100],['groom',1+this.groomNeed**2/100],['look',12+this.curiosity*.15],['follow',this.canFollow()?18:0],['walk',5+this.curiosity**2/100]];
+    let draw=this.random()*choices.reduce((sum,[,weight])=>sum+weight,0),mode='walk';
+    for(const [candidate,weight]of choices){draw-=weight;if(draw<0){mode=candidate;break;}}
+    if(mode==='fetch'){this.fetch();return;}
+    if(mode==='follow'){this.follow();return;}
+    if(mode!=='walk'){this.rest(mode,this.between(mode==='sleep'?12:6,mode==='sleep'?25:13));return;}
+    const places=[{floor:0,x:840},{floor:1,x:940},{floor:2,x:1155},{floor:1,x:510},{floor:0,x:1060}].filter(place=>place.floor!==this.motion.floor||Math.abs(place.x-this.motion.x)>40);
+    const target=places[Math.floor(this.random()*places.length)];
+    this.depart(()=>{this.mode='walk';this.modeTime=0;
+      this.motion.goTo(target,()=>{const rest=this.random()<.35?'look':this.random()<(100-this.energy)/(100-this.energy+this.groomNeed+1)?'sleep':'groom';this.rest(rest,this.between(7,18));});
+    },'walk');
+  }
+  update(dt,actor=null){
+    if(dt<=0)return;
+    this.companion=actor;
+    const bounded=value=>Math.max(0,Math.min(100,value)),resting=!this.motion.busy;
+    this.modeTime+=dt;this.hunger=bounded(this.hunger-dt*.36*CABIN_PACE.catDecay);
+    this.energy=bounded(this.energy+dt*(resting&&this.mode==='sleep'?3:-.25*CABIN_PACE.catDecay));
+    this.groomNeed=bounded(this.groomNeed+dt*(resting&&this.mode==='groom'?-4:.22*CABIN_PACE.catDecay));
+    this.curiosity=bounded(this.curiosity+dt*(this.motion.busy?-.8:.3));
+    this.motion.update(dt);
+    if(this.mode==='play'){
+      if(this.playHost?.isSeatedInLounge()&&this.playHost.leisure==='cat'&&this.hunger>25){this.remaining=5;this.curiosity=bounded(this.curiosity-dt*2);return;}
+      this.playHost=null;this.rest('look',5);return;
+    }
+    if(this.mode==='follow'){
+      this.followLeft-=dt;this.retargetIn-=dt;
+      if(!actor?.busy||actor.climbing||actor.waitingForHatch||actor.floor!==this.motion.floor||this.followLeft<=0||this.hunger<25||(actor.x-this.motion.x)*actor.facing<25){this.endFollow();return;}
+      this.motion.walkSpeed=Math.min(68,actor.walkSpeed*1.12);
+      if(this.retargetIn<=0){
+        const x=Math.max(170,Math.min(this.motion.floor===0?CAT_SOFA.floorX:1220,actor.x-actor.facing*48));
+        if(Math.abs(x-this.motion.x)>12)this.motion.goTo({floor:actor.floor,x});
+        this.retargetIn=.6;
+      }
+      return;
+    }
+    if(this.mode==='fetch'||this.motion.busy)return;
+    if(this.pendingMove){this.remaining-=dt;if(this.remaining<=0){const {run}=this.pendingMove;this.pendingMove=null;run();}return;}
+    if(this.hunger<25&&this.care.has('catfood')){this.fetch();return;}
+    this.remaining-=dt;if(this.remaining>0)return;
+    if(this.mode==='eat')this.groomNeed=Math.min(100,this.groomNeed+25);
+    this.choose();
+  }
+  fetch(){if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=36;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX},()=>{if(this.care.take('catfood')){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
 }
 
-export function currentAction(brain){return brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null;}
+export function currentAction(brain){return brain.bathroom?.id??(brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
 export {FLOORS,getStation};
