@@ -148,17 +148,23 @@ function hatch(parent,animated,m,x,y) {
   box(parent,m.metal,x,y+1.15,-.55,1.86,2.08,.14,.11);
   box(parent,m.black,x,y+1.15,-.455,1.70,1.92,.025,.06);
   const door=new THREE.Group();door.position.set(x-.85,y,-.43);animated.add(door);
+  door.name='Vertical supply shutter';door.userData.closedY=y;
   box(door,m.enamel,.85,1.15,0,1.7,1.92,.10,.10);
   box(door,m.dark,.85,1.63,.065,.6,.40,.025,.05);
-  const wheel=new THREE.Mesh(new THREE.TorusGeometry(.26,.033,10,36),m.red);wheel.position.set(.85,.96,.18);door.add(wheel);
-  for(let i=0;i<4;i++){const a=i*Math.PI/2;rod(door,m.red,[.85,.96,.18],[.85+Math.cos(a)*.25,.96+Math.sin(a)*.25,.18],.022);}
+  box(door,m.dark,.85,.96,.057,.45,.12,.016,.012);
+  box(door,m.metal,.85,.98,.07,.30,.028,.024,.007);
+  // The panel retracts into an overhead wall pocket, not through the next deck.
+  const pocketLip=new THREE.Plane(new THREE.Vector3(0,-1,0),y+2.12);
+  door.traverse(part=>{if(part.isMesh){part.material=part.material.clone();part.material.clippingPlanes=[pocketLip];part.material.clipShadows=true;}});
+  for(const side of [-1,1])box(parent,m.metal,x+side*.91,y+1.17,-.36,.065,2.02,.15,.012);
+  box(parent,m.dark,x,y+2.17,-.28,1.96,.14,.30,.025);
   for(const side of [-1,1]){box(parent,m.dark,x+side*.91,y+.52,-.36,.12,.15,.13);box(parent,m.dark,x+side*.91,y+1.84,-.36,.12,.15,.13);}
   label(parent,'SUPPLY / 07',x,y+2.47,-.32,1.74,.26,{fg:'#e2c174',size:52});
   box(parent,m.dark,x,y+.32,.32,2.15,.55,.73,.04);
   box(parent,m.metal,x,y+.64,.32,2.27,.065,.84,.02);
   for(let i=0;i<15;i++)box(parent,i%2?m.black:m.yellow,x-1.03+i*.146,y+.285,.705,.146,.14,.015);
   const lamp=new THREE.MeshBasicMaterial({color:0x4b6658,toneMapped:false});
-  box(animated,lamp,x,y+2.25,-.30,.62,.065,.05,.014);
+  box(animated,lamp,x,y+2.25,-.08,.62,.065,.05,.014);
   return{door,lamp};
 }
 function engine(parent,m,x,y) {

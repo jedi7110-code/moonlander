@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Supplies,CrewMotion,getStation,currentAction} from '../src/obs/state.js';
 import {CabinBrain} from '../src/obs/brain.js';
-import {cargoPose,hatchOpening,animateDelivery} from '../src/obs/delivery.js';
+import {cargoPose,hatchOpening,animateDelivery,HATCH_TRAVEL} from '../src/obs/delivery.js';
 import {Group,MeshBasicMaterial} from 'three';
 
 function crew(options={}){
@@ -72,9 +72,20 @@ test('cargo lands on the tray without clipping and the door closes after unloadi
     assert.equal(cargoPose(2.1,i).y,0);
   }
   assert.equal(hatchOpening(0),0);assert.equal(hatchOpening(1),1);assert.equal(hatchOpening(4),0);
+  assert.equal(hatchOpening(.32),1);
   const ship={hatchDoor:new Group(),hatchLamp:new MeshBasicMaterial(),cargo:[new Group(),new Group(),new Group()]};
   const care=new Supplies();animateDelivery(ship,care);assert.ok(ship.cargo.every(g=>!g.visible));
   care.take('water');care.request();care.transmit();care.update(16.4);animateDelivery(ship,care);
   const first=ship.cargo.map(g=>g.position.toArray());animateDelivery(ship,care);assert.deepEqual(ship.cargo.map(g=>g.position.toArray()),first);
-  care.update(3);animateDelivery(ship,care);assert.ok(ship.cargo.every(g=>g.visible&&g.position.y===.675));assert.equal(Math.abs(ship.hatchDoor.rotation.y),0);
+  care.update(3);animateDelivery(ship,care);assert.ok(ship.cargo.every(g=>g.visible&&g.position.y===.675));assert.equal(Math.abs(ship.hatchDoor.rotation.y),0);assert.equal(ship.hatchDoor.position.y,0);
+});
+test('supply shutter slides upward without swinging and preserves its mounting position',()=>{
+  const ship={hatchDoor:new Group(),hatchLamp:new MeshBasicMaterial(),cargo:[]};ship.hatchDoor.position.set(4,2,-.43);ship.hatchDoor.userData.closedY=2;
+  const care={phase:'unloading',delivery:{age:0}};
+  for(const age of [0,.08,.16,.32,.65,2,2.8,3.25,4]){
+    care.delivery.age=age;animateDelivery(ship,care);
+    assert.equal(ship.hatchDoor.position.x,4);assert.equal(ship.hatchDoor.position.z,-.43);
+    assert.equal(ship.hatchDoor.rotation.y,0);assert.equal(ship.hatchDoor.position.y,2+HATCH_TRAVEL*hatchOpening(age));
+  }
+  for(let i=0;i<3;i++){const pose=cargoPose(.65+i*.18,i);assert.ok(Math.abs((i-1)*.70+pose.x)+.305<.85);assert.ok(.675+pose.y+.715<2.15);}
 });
