@@ -71,7 +71,8 @@ test('accepting Milo’s invitation opens a real match only after arriving at th
   for(let i=0;i<120;i++){c.actor.update(1/60);c.brain.update(1/60);}
   assert.equal(c.opened,1);assert.equal(c.brain.state,'playingGame');assert.equal(currentAction(c.brain),'lounge');
   const needs={...c.brain.needs},hour=c.brain.hour;c.brain.update(600);assert.deepEqual(c.brain.needs,needs);assert.equal(c.brain.hour,hour);
-  c.brain.finishGame();assert.equal(c.brain.state,'idle');assert.equal(c.brain.gamePending,false);
+  c.brain.finishGame();assert.equal(c.brain.state,'leavingLounge');assert.equal(c.brain.gamePending,false);
+  c.brain.update(2.8);assert.equal(c.brain.state,'idle');
 });
 test('retargeting cancels a pending match and never opens it from a stale arrival',()=>{
   const c=cabin();c.brain.requestGame();c.brain._go(getStation('eva'));

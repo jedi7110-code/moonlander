@@ -6,6 +6,7 @@ import {CrewHealth} from './health.js';
 import {BathroomVisit} from './bathroom.js';
 import {PlantBed} from './plant-state.js';
 import {CABIN_PACE} from './pace.js';
+import {LOUNGE_EXIT_SECONDS} from './lounge-exit.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 export const isChessRequest=text=>/チェス|chess|ゲーム|\bgame\b|\bplay\b|遊ぼ|遊び|遊んで/i.test(text);
@@ -29,6 +30,7 @@ export class CabinBrain extends Brain {
   _decayMul(need){return super._decayMul(need)*CABIN_PACE.needDecay;}
   update(dt){
     if(this.state==='playingGame')return;
+    const exit=this.loungeExit;
     this.plants.update(dt);
     this.bathroom?.update(dt);
     this.health.update(dt,{needs:this.needs,activity:this.state==='performing'?this.cur?.id:null,moving:this.actor.busy,climbing:this.actor.climbing});
@@ -39,6 +41,10 @@ export class CabinBrain extends Brain {
       for(const [need,rate]of [['energy',.6],['thirst',.35],['hygiene',.55]])this.needs[need]=Math.max(0,this.needs[need]-dt*rate);
     }
     super.update(dt);
+    if(exit&&this.loungeExit===exit){
+      exit.age=Math.min(LOUNGE_EXIT_SECONDS,exit.age+dt);
+      if(exit.age>=LOUNGE_EXIT_SECONDS){this.loungeExit=null;this.leisure=null;super._endPerform();this.finishDeparture();}
+    }
     if(this.health.needsCare){this.sick=true;this.mood='sick';}
     if((this.health.critical||(this.health.needsCare&&exercising))&&this.actStation!=='medical')this._go(getStation('medical'));
     if(this.state==='orderingSupply'&&this.care.phase!=='transmitting')this._toIdle();
@@ -107,6 +113,7 @@ export class CabinBrain extends Brain {
     if(['eva','airlock','innerHatch'].includes(station.id))this.scene.obsUI?.inspectEVA?.(station.id);
   }
   _endPerform(){
+    if(this.cur?.id==='lounge'){this.beginLoungeExit();return;}
     if(this.cur?.id==='plant'){
       const count=this.plants.harvest(this.care);this.plants.tend();
       this.scene.obsUI?.plantResult?.(count);
@@ -121,12 +128,19 @@ export class CabinBrain extends Brain {
     this.finishDeparture();
   }
   deferDeparture(callback){
+    if(this.loungeExit||this.isSeatedInLounge()){
+      this.afterActivity=callback;this.beginLoungeExit();return true;
+    }
     if(!this.bathroom&&!(this.state==='performing'&&['galley','hydro'].includes(this.cur?.id)))return false;
     this.afterActivity=callback;
     if(this.bathroom){this.state='leavingBathroom';this.recoverNeed=null;this.bathroom.requestExit();}
     return true;
   }
   finishDeparture(){const callback=this.afterActivity;this.afterActivity=null;callback?.();}
+  beginLoungeExit(){
+    if(!this.loungeExit)this.loungeExit={age:0,leisure:this.leisure,actionTime:Math.max(0,(this.curDurSec??0)-(this.performT??0)),duration:this.curDurSec??32};
+    this.state='leavingLounge';this.actKey='perform';this.actStation='lounge';this.recoverNeed=null;
+  }
   requestSupplies(){
     if(this.deferDeparture(()=>this.requestSupplies()))return true;
     if(this.health.critical){this._go(getStation('medical'));return false;}
@@ -150,7 +164,7 @@ export class CabinBrain extends Brain {
     return super.requestCommand();
   }
   requestGame(){
-    if(this.deferDeparture(()=>this.requestGame()))return true;
+    if(!this.isSeatedInLounge()&&this.deferDeparture(()=>this.requestGame()))return true;
     if(this.health.urgent){this.scene.obsUI?.healthEvent?.({type:'restricted',kind:this.health.condition.kind,stage:this.health.stage});this._go(getStation('medical'));return false;}
     if(this.gamePending||this.state==='playingGame')return false;
     if(this.isSeatedInLounge()){
@@ -161,6 +175,7 @@ export class CabinBrain extends Brain {
   }
   isSeatedInLounge(){return this.state==='performing'&&this.cur?.id==='lounge'&&!this.actor.busy;}
   clickLounge(){
+    if(this.loungeExit)return 'pending';
     if(this.isSeatedInLounge())return this.requestGame()?'chess':'blocked';
     if(this.gamePending||this.state==='playingGame')return 'pending';
     if(this.state==='goingTo'&&this.cur?.id==='lounge')return 'moving';
@@ -168,7 +183,7 @@ export class CabinBrain extends Brain {
   }
   finishGame(){
     if(this.state!=='playingGame')return;
-    this.cur=null;this.recoverNeed=null;this.actor.setSymbol('');this.wantCoolT=30;this._toIdle();
+    this.leisure=null;this.actor.setSymbol('');this.wantCoolT=30;this.beginLoungeExit();
   }
   acknowledge(){
     if(this.isCalling()&&this.want?.kind==='play'){

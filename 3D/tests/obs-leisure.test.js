@@ -24,7 +24,7 @@ test('first lounge click rests, en-route clicks do not queue chess, seated click
 test('random lounge activities vary between visits and never launch a game on their own',()=>{
   const {brain,opened}=setup(()=>.99);brain.catRoutine={canPlayLounge:()=>true,inviteLounge(){}};
   const modes=[];
-  for(let i=0;i<5;i++){brain._startPerform(getStation('lounge'));modes.push(brain.leisure);assert.ok(brain.curDurSec>=32);brain._endPerform();}
+  for(let i=0;i<5;i++){brain._startPerform(getStation('lounge'));modes.push(brain.leisure);assert.ok(brain.curDurSec>=32);brain._endPerform();brain.update(2.8);}
   assert.equal(modes[0],'cat');assert.ok(modes.includes('music'));assert.ok(modes.every((m,i)=>!i||m!==modes[i-1]));assert.equal(opened(),0);
   brain.catRoutine.canPlayLounge=()=>false;brain._startPerform(getStation('lounge'));assert.notEqual(brain.leisure,'cat');
 });

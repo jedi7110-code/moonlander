@@ -12,6 +12,7 @@ import {createDiningProps,applyDiningPose,resetDiningPose,diningPhase,placeHand,
 import {applyWalkingPose} from './walking.js';
 import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose} from './leisure.js';
+import {applyLoungeExit} from './lounge-exit.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
@@ -104,7 +105,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
   root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,walkDistance=time*1.188,actionTime=time,actionDuration,knock=0,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,walkDistance=time*1.188,actionTime=time,actionDuration,knock=0,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   resetDiningPose(root);
   for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
@@ -136,6 +137,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   }
   if(walking)applyWalkingPose(root,walkDistance);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
+  if(loungeExit)applyLoungeExit(root,loungeExit);
   if(knock>0)for(const {arm,elbow}of arms){arm.rotation.x=-1.5;elbow.rotation.x=-.5-Math.sin(knock*22)*.25;}
   if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top);
   if(action==='gym'&&!moving)applyCyclingPose(root,actionTime);

@@ -13,6 +13,7 @@ import {animateAirlock} from './eva.js';
 import {animateMedical,medicalRecline,medicalReadings,MED_BED} from './medical.js';
 import {BUNK_BED,reclineProgress} from './recline.js';
 import {diningPhase,DINING_APPROACH} from './dining.js';
+import {loungeExitPose} from './lounge-exit.js';
 
 export class ObservationView {
   static async create(canvas){const [m,head]=await Promise.all([materials(),loadMiloHead()]);return new ObservationView(canvas,m,head);}
@@ -69,14 +70,14 @@ export class ObservationView {
   setFrustum(){const half=this.viewHeight/2,aspect=this.width/this.height;this.camera.left=-half*aspect;this.camera.right=half*aspect;this.camera.top=half;this.camera.bottom=-half;this.camera.updateProjectionMatrix();}
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null){
     const action=currentAction(brain),catMotion=catRoutine.motion;
-    const actionTime=brain.state==='performing'?brain.curDurSec-brain.performT:time;
+    const actionTime=brain.loungeExit?.actionTime??(brain.state==='performing'?brain.curDurSec-brain.performT:time);
     if(action==='gym')animateGym(this.ship.gym,actionTime);
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
     this.milo.position.set(positionX(actor.x),positionY(actor.y),actor.climbing?.48:.78);
     const bathroom=brain.bathroom?.pose;
     if(action==='plant')this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
     if(['galley','hydro'].includes(action))this.milo.position.z=.78-DINING_APPROACH*diningPhase(actionTime,brain.curDurSec).approach;
-    animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,actionTime,actionDuration:brain.curDurSec,knock:actor.knockTime,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.state==='performing'?brain.leisure:null,catReady:catRoutine.mode==='play'});
+    animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,actionTime,actionDuration:brain.curDurSec,knock:actor.knockTime,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit});
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
       fixture.door.rotation.y=brain.bathroom?.id===id?(bathroom?.opening??0)*Math.PI/2:0;
     }
@@ -92,7 +93,7 @@ export class ObservationView {
     const hop=catMotion.hop?{...catMotion.hop,yaw:Math.atan2((positionX(CAT_SOFA.seatX)-positionX(CAT_SOFA.floorX))*(catMotion.hop.up?1:-1),(LOUNGE_SEAT.centerDepth-CAT_PORT.walkZ)*(catMotion.hop.up?1:-1))}:null;
     this.cat.position.set(positionX(catMotion.x),positionY(catMotion.y)+catMotion.elevation,catMotion.z);this.cat.visible=!catMotion.hidden;
     animateCat(this.cat,{time,moving:catMoving,climbing:false,facing:catMotion.facing,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance,passage,hop,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining});
-    if(action==='lounge'&&!actor.busy)this.milo.position.z=LOUNGE_SEAT.depth;
+    if(action==='lounge'&&!actor.busy)this.milo.position.z=brain.loungeExit?loungeExitPose(brain.loungeExit.age).depth:LOUNGE_SEAT.depth;
     if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
     if(action==='gym')this.milo.position.z=BIKE.depth;
     if(action==='medical')this.milo.position.z=THREE.MathUtils.lerp(.78,MED_BED.depth,medicalRecline(actionTime,brain.curDurSec));
