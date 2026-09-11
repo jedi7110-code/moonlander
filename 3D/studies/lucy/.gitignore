@@ -1,0 +1,10 @@
+__pycache__/
+local/
+source/
+*.blend
+*.blend1
+*.glb
+*.gltf
+*.fbx
+*.rar
+lucy-preview.html
