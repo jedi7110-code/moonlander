@@ -10,6 +10,7 @@ import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
 import {AirlockPassage} from './airlock.js';
 import {Sprout} from 'lucide';
 import {PLANT} from './layout.js';
+import {healthDisplay} from './health-display.js';
 
 const $=id=>document.getElementById(id);
 const icons={Sprout,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
@@ -39,7 +40,7 @@ const scene={
     flashMonitor(){$('call-alert').animate([{opacity:.6},{opacity:1}],{duration:350});},
     showWant(text){$('call-text').textContent=text.replace(t('want_hint'),'');$('call-alert').hidden=false;},
     hideWant(){$('call-alert').hidden=true;},
-    openGame(){pendingHQ=false;dismissMessage();view?.setMode('milo');chess.show();audio.pause(true);},
+    openGame(){pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');chess.show();audio.pause(true);},
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     healthEvent(event){
       if(event.type==='onset'){
@@ -75,8 +76,9 @@ care.onDeliver=()=>{feedback.notify('hatch','delivered');showMessage(words('食�
 
 const needElements={};
 for(const key of Object.keys(brain.statusNeeds)){
-  const item=document.createElement('div');item.className='need';item.dataset.need=key;
-  const row=document.createElement('div'),name=document.createElement('span'),value=document.createElement('b'),meter=document.createElement('progress');meter.max=100;
+  const item=document.createElement(key==='health'?'button':'div');item.className='need';item.dataset.need=key;
+  if(key==='health'){item.id='health-toggle';item.type='button';item.setAttribute('aria-controls','health-alert');item.setAttribute('aria-expanded','false');item.setAttribute('aria-haspopup','dialog');}
+  const row=document.createElement(key==='health'?'span':'div'),name=document.createElement('span'),value=document.createElement('b'),meter=document.createElement('progress');row.className='need-row';meter.max=100;
   row.append(name,value);item.append(row,meter);$('needs').append(item);needElements[key]={item,name,value,meter};
 }
 function updateHUD(){
@@ -112,15 +114,24 @@ function updateHUD(){
   }
 }
 function updateHealthHUD(){
-  const health=brain.health,stage=health.stage,medical=brain.actStation==='medical',exam=currentAction(brain)==='medical',course=health.treatment;
-  const states={warning:['要手当て','Needs treatment'],urgent:['悪化','Deteriorating'],critical:['緊急','Critical'],treating:['治療中','Treating'],recovering:['回復中','Recovering']};
-  $('health-alert').hidden=stage==='healthy';$('health-alert').dataset.stage=stage;
-  const symptom=health.condition?.kind==='injury'?words('左腕の怪我','Left arm injury'):health.condition?words('発熱','Fever'):words('健康状態','Health');
-  const title=stage==='healthy'?'':`${symptom} / ${words(...states[stage])}`;
-  if($('health-title').textContent!==title)$('health-title').textContent=title;
-  const seconds=course?Math.max(0,Math.ceil(course.duration-course.elapsed)):0;
-  $('health-detail').textContent=course?words(`処置完了まで ${seconds}秒`,`Treatment completes in ${seconds}s`):exam?words('健康状態を測定中','Checking vital signs'):medical?words('医療区画へ移動中','En route to medical bay'):stage==='recovering'?words('処置済み。経過観察中','Treated. Under observation'):health.critical?words('作業中止・医療区画へ移動','Work stopped. Medical care required'):health.urgent?words('移動能力が低下','Mobility reduced'):words('症状が続いている','Symptoms persist');
-  $('seek-treatment').disabled=medical;$('treatment-label').textContent=medical?(course?words('治療中','Treating'):exam?words('健診中','Checking'):words('移動中','En route')):words('医療区画へ','Medical bay');
+  const medical=brain.actStation==='medical',display=healthDisplay(brain.health,{lang:getLang(),medical,exam:currentAction(brain)==='medical'}),nodes=needElements.health;
+  nodes.name.textContent=display.label;nodes.item.dataset.stage=display.stage;
+  nodes.item.setAttribute('aria-label',`${display.title}, ${Math.round(brain.health.value)}/100`);
+  $('health-alert').dataset.stage=display.stage;
+  if($('health-title').textContent!==display.title)$('health-title').textContent=display.title;
+  $('health-detail').textContent=display.detail;
+  $('seek-treatment').disabled=medical;$('treatment-label').textContent=display.treatmentLabel;
+  if(!$('health-alert').hidden)positionHealthDetails();
+}
+function positionHealthDetails(){
+  const panel=$('health-alert'),parent=panel.parentElement.getBoundingClientRect(),anchor=$('health-toggle').getBoundingClientRect();
+  panel.style.left=`${Math.max(12,Math.min(anchor.right-parent.left-panel.offsetWidth,parent.width-panel.offsetWidth-12))}px`;
+  panel.style.maxHeight=`${Math.max(80,innerHeight-parent.bottom-18)}px`;
+}
+function setHealthDetails(open,restoreFocus=false){
+  $('health-alert').hidden=!open;$('health-toggle').setAttribute('aria-expanded',String(open));
+  if(open){positionHealthDetails();$('dismiss-health').focus({preventScroll:true});}
+  else if(restoreFocus)$('health-toggle').focus({preventScroll:true});
 }
 function localize(){
   document.documentElement.lang=getLang();document.querySelectorAll('[data-ja]').forEach(el=>el.textContent=el.dataset[getLang()]);
@@ -129,6 +140,7 @@ function localize(){
   for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['obs-fullscreen','全画面','Fullscreen'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   const pauseLabel=paused?words('再開','Resume'):words('一時停止','Pause');$('obs-pause').setAttribute('aria-label',pauseLabel);$('obs-pause').dataset.tip=pauseLabel;
   $('play-chess').setAttribute('aria-label',words('マイロとチェス','Play chess with Milo'));$('play-chess').dataset.tip=words('マイロとチェス','Play chess with Milo');
+  $('dismiss-health').setAttribute('aria-label',words('閉じる','Close'));
   if(chess.open)chess.render();
   if(brain.isCalling())scene.obsUI.showWant(brain._wantText());updateHUD();
 }
@@ -186,7 +198,12 @@ $('obs-chat').addEventListener('submit',event=>{
   if(actor.commandVersion!==version)confirmOrder(brain.actStation);$('obs-input').value='';audio.tone(330,.08,.02);updateHUD();
 });
 $('play-chess').addEventListener('click',requestGame);
-$('seek-treatment').addEventListener('click',()=>useStation('medical'));
+$('health-toggle').addEventListener('click',()=>setHealthDetails($('health-alert').hidden));
+$('dismiss-health').addEventListener('click',()=>setHealthDetails(false,true));
+$('seek-treatment').addEventListener('click',()=>{useStation('medical');setHealthDetails(false,true);});
+document.addEventListener('pointerdown',event=>{if(!$('health-alert').hidden&&!$('health-alert').contains(event.target)&&!$('health-toggle').contains(event.target))setHealthDetails(false);});
+document.addEventListener('focusin',event=>{if(!$('health-alert').hidden&&!$('health-alert').contains(event.target)&&!$('health-toggle').contains(event.target))setHealthDetails(false);});
+window.addEventListener('resize',()=>{if(!$('health-alert').hidden)positionHealthDetails();});
 $('dismiss-dialogue').addEventListener('click',dismissMessage);
 $('acknowledge').addEventListener('click',acknowledge);
 $('hq-message').addEventListener('click',headquarters);
@@ -197,6 +214,7 @@ $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').a
 if(!document.fullscreenEnabled)$('obs-fullscreen').hidden=true;
 $('obs-fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('observation').requestFullscreen();}catch{showMessage(words('全画面に切り替えられませんでした。','Fullscreen is unavailable.'),'SYSTEM');}});
 document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&!$('health-alert').hidden){event.preventDefault();setHealthDetails(false,true);return;}
   if(chess.open)return;
   if(event.target.closest('input,textarea,button')||event.metaKey||event.ctrlKey||event.altKey)return;
   const supply={f:'food',w:'water',c:'catfood'}[event.key.toLowerCase()];

@@ -25,11 +25,11 @@
       <div class="crew-state"><span class="crew-tag">01</span><div><strong data-ja="マイロ・ジャービス" data-en="MILO JARVIS">マイロ・ジャービス</strong><span id="milo-activity">船内待機</span></div><span id="milo-mood" class="mood-indicator">良好</span></div>
       <div id="needs" class="needs"></div>
       <div class="cat-state"><i data-lucide="cat"></i><div><strong data-ja="ルーシー" data-en="Lucy">ルーシー</strong><span id="cat-activity">くつろいでいる</span></div></div>
-    </section>
-    <section id="health-alert" class="health-alert" aria-label="健康状態" hidden>
-      <i data-lucide="heart-pulse" aria-hidden="true"></i>
-      <div><strong id="health-title" role="status" aria-live="polite"></strong><span id="health-detail"></span></div>
-      <button id="seek-treatment"><i data-lucide="cross" aria-hidden="true"></i><span id="treatment-label">医療区画へ</span></button>
+      <section id="health-alert" class="health-alert" role="dialog" aria-labelledby="health-title" hidden>
+        <div class="health-heading"><i data-lucide="heart-pulse" aria-hidden="true"></i><strong id="health-title" aria-live="polite"></strong><button id="dismiss-health" class="icon-button" aria-label="閉じる"><i data-lucide="x" aria-hidden="true"></i></button></div>
+        <p id="health-detail"></p>
+        <button id="seek-treatment"><i data-lucide="cross" aria-hidden="true"></i><span id="treatment-label">医療区画へ</span></button>
+      </section>
     </section>
     <section id="viewport" aria-label="母艦タライロンの遠心重力生活区画の断面">
       <canvas id="ship-view" aria-label="遠心重力生活区画の三層。マイロと船内猫ルーシーが暮らしている" tabindex="0"></canvas>

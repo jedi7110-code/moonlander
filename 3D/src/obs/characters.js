@@ -11,6 +11,7 @@ import {applyCatHop} from './cat-hop.js';
 import {restWeight,applyCatSitting} from './cat-rest.js';
 import {createDiningProps,applyDiningPose,resetDiningPose,diningPhase,placeHand,DINING_APPROACH} from './dining.js';
 import {applyWalkingPose} from './walking.js';
+import {applyCallingPose} from './calling.js';
 import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose} from './leisure.js';
 import {applyLoungeExit,applyLoungeEntry} from './lounge-exit.js';
@@ -106,7 +107,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
   root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,walkDistance=time*1.188,actionTime=time,actionDuration,knock=0,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   if(action==='medical'&&!moving)root.userData.medicalStartYaw??=root.rotation.y;
   else delete root.userData.medicalStartYaw;
@@ -118,7 +119,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   body.position.x=0;body.position.z=0;body.rotation.set(0,0,0);chest.scale.x=1+Math.sin(time*1.6)*.006;
   chest.rotation.set(0,0,0);chest.position.set(0,0,0);head.position.set(0,1.637,-.009);
   const dining=['galley','hydro'].includes(action)&&!moving;
-  const desired=bathroom?THREE.MathUtils.lerp((facing||1)*Math.PI/2,bathroom.yaw,bathroom.turn):dining||climbing?Math.PI:walking||waiting?facing*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
+  const calling=callingTime!==null&&!moving&&!action;
+  const desired=bathroom?THREE.MathUtils.lerp((facing||1)*Math.PI/2,bathroom.yaw,bathroom.turn):dining||climbing||calling?Math.PI:walking||waiting?facing*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
   root.rotation.y+=Math.atan2(Math.sin(desired-root.rotation.y),Math.cos(desired-root.rotation.y))*.12;
   head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
   for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
@@ -139,10 +141,10 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     boot.rotation.set(seated?-(leg.rotation.x+knee.rotation.x):0,0,0);
   }
   if(walking)applyWalkingPose(root,walkDistance);
+  applyCallingPose(root,calling?callingTime:null,dt);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
   if(loungeExit)applyLoungeExit(root,loungeExit);
   if(loungeEntry)applyLoungeEntry(root,loungeEntry);
-  if(knock>0)for(const {arm,elbow}of arms){arm.rotation.x=-1.5;elbow.rotation.x=-.5-Math.sin(knock*22)*.25;}
   if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top);
   if(action==='gym'&&!moving){if(gymVisit)applyGymVisitPose(root,gymVisit);else applyCyclingPose(root,actionTime);}
   if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration,root.userData.medicalStartYaw);
