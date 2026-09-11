@@ -3,6 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {createIcons,Play,Pause} from 'lucide';
+import {TailVariation,TAIL_POSES} from './tail-variation.js';
 
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({canvas:$('view'),antialias:true,preserveDrawingBuffer:true});
@@ -15,17 +16,35 @@ const environment=new RoomEnvironment();const pmrem=new THREE.PMREMGenerator(ren
 scene.add(new THREE.HemisphereLight(0xffffff,0x687275,2.2));
 const key=new THREE.DirectionalLight(0xfff8ee,3);key.position.set(-.6,1,.5);key.castShadow=true;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-.6,right:.6,top:.6,bottom:-.6,near:.01,far:3});key.shadow.normalBias=.0004;key.shadow.bias=-.00005;scene.add(key);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(50,50),new THREE.MeshStandardMaterial({color:0xb7c1c1,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.001;ground.receiveShadow=true;scene.add(ground);
-let model,mixer,helper,active;let paused=false;const actions={};
+let model,mixer,helper;let paused=false,selectedMotion='Rest',walkAmount=0;const actions={};
+const tailVariation=new TailVariation();
 const bytes=Uint8Array.from(atob(window.LUCY_MODEL),c=>c.charCodeAt(0));
 const gltf=await new GLTFLoader().parseAsync(bytes.buffer,'');
 model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;o.material.envMapIntensity=.35;}});scene.add(model);
 helper=new THREE.SkeletonHelper(model);helper.material.depthTest=false;helper.material.transparent=true;helper.material.opacity=.8;helper.visible=false;scene.add(helper);
 mixer=new THREE.AnimationMixer(model);for(const c of gltf.animations)actions[c.name]=mixer.clipAction(c);
 function motion(name){
-  for(const action of Object.values(actions))action.stop();
-  if(name==='Rest'){model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.pose();});active=null;}
-  else{active=actions[name];active.reset().play();mixer.update(0);}
+  const wasRest=selectedMotion==='Rest',wasWalking=selectedMotion==='Walk';
+  selectedMotion=name;
+  if(name==='Rest'){mixer.stopAllAction();model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.pose();});}
+  else{
+    if(wasRest)for(const action of Object.values(actions))action.reset().play();
+    if(name==='Walk'&&!wasWalking){tailVariation.reset();for(const clip of TAIL_POSES)actions[clip].time=0;}
+    if(wasRest||paused)walkAmount=name==='Walk'?1:0;
+    applyWeights();mixer.update(0);
+  }
   document.querySelectorAll('[data-motion]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.motion===name));
+}
+function applyWeights(){
+  actions.Idle.setEffectiveWeight(1-walkAmount);
+  TAIL_POSES.forEach((name,i)=>actions[name].setEffectiveWeight(walkAmount*tailVariation.weights[i]));
+}
+function advance(dt){
+  if(selectedMotion==='Rest')return;
+  if(selectedMotion==='Walk')tailVariation.update(dt);
+  const target=selectedMotion==='Walk'?1:0;
+  walkAmount+=(target-walkAmount)*(1-Math.exp(-dt/ .18));
+  applyWeights();mixer.update(dt);model.updateMatrixWorld(true);
 }
 document.querySelectorAll('[data-motion]').forEach(b=>b.onclick=()=>motion(b.dataset.motion));
 $('bones').onchange=()=>helper.visible=$('bones').checked;
@@ -40,7 +59,10 @@ function icons(){$('pause').innerHTML=`<i data-lucide="${paused?'play':'pause'}"
 $('pause').onclick=()=>{paused=!paused;icons();};icons();motion('Walk');view();
 function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();view();}
 addEventListener('resize',resize);resize();
-window.lucyCombined={model,mixer,helper,scene,camera,renderer,actions,motion,pause(value){paused=value;icons();},setTime(t){mixer.setTime(t);model.updateMatrixWorld(true);}};
+window.lucyCombined={model,mixer,helper,scene,camera,renderer,actions,motion,tailVariation,advance,pause(value){paused=value;icons();},setTime(t){
+  if(selectedMotion==='Rest')return;
+  walkAmount=selectedMotion==='Walk'?1:0;applyWeights();mixer.setTime(t);model.updateMatrixWorld(true);
+}};
 let last=performance.now();
-function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;if(!paused)mixer.update(dt);controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);}
+function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;if(!paused)advance(dt);controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);}
 requestAnimationFrame(frame);

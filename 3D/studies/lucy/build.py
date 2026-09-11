@@ -135,6 +135,11 @@ for v in skin.data.vertices:
         if ay<=y<=by:
             t=(y-ay)/(by-ay);skin.vertex_groups[a].add([v.index],1-t,'REPLACE');skin.vertex_groups[b].add([v.index],t,'REPLACE');break
     else:skin.vertex_groups['tail5'].add([v.index],1,'REPLACE')
+# Small facial islands must travel with the skull when the neck lowers.
+for v in skin.data.vertices:
+    if v.co.y<-.223:
+        for g in list(v.groups):skin.vertex_groups[g.group].remove([v.index])
+        skin.vertex_groups['Bone.004'].add([v.index],1,'REPLACE')
 
 mat=bpy.data.materials.new('Neutral inspection coat');mat.use_nodes=True
 mat.name='Lucy calico coat'
@@ -199,11 +204,13 @@ def sitting():
     shift('CONTROLLER',(0,0,-.025));rotate('pelvis',(1,0,0),-.36);rotate('Bone.002',(1,0,0),.22)
     for side in ['L','R']:shift('leg3_control_'+side,(0,-.025,0))
 actions=[]
-for name,count in [('Idle',91),('Walk',37),('Sleep',91),('Eat',61),('Sit',181),('Groom',145),('Crouch',31),('Jump',31)]:
+verified_names={'Idle','Walk','WalkLevel','WalkLow'}
+tail_curves={'Walk':[.88,.32,.37,.44,.49],'WalkLevel':[-.13,-.10,.03,.16,.18],'WalkLow':[-.62,-.22,.20,.34,.30]}
+for name,count in [('Idle',91),('Walk',37),('WalkLevel',37),('WalkLow',37),('Sleep',91),('Eat',61),('Sit',181),('Groom',145),('Crouch',31),('Jump',31)]:
     action=bpy.data.actions.new(name);action.use_fake_user=True;arm.animation_data_create();arm.animation_data.action=action
     for frame in range(1,count+1):
         scene.frame_set(frame);reset();phase=(frame-1)/(count-1)
-        if name=='Walk':
+        if name.startswith('Walk'):
             for side,rear,offset in [('L',True,0),('L',False,-.24),('R',True,-.5),('R',False,-.74)]:
                 t=(phase+offset)%1
                 if t<.64:y=-.056+.112*t/.64;z=0
@@ -214,6 +221,8 @@ for name,count in [('Idle',91),('Walk',37),('Sleep',91),('Eat',61),('Sit',181),(
                     rotate(('feet_' if rear else 'paw3_')+side,(1,0,0),(.24 if rear else .35)*math.sin(math.pi*s)**2)
                 shift(('leg3_control_' if rear else 'paw_control_')+side,(0,y,z))
             shift('CONTROLLER',(0,0,-.016+.0008*math.cos(phase*math.tau*2)))
+            rotate('Bone.002',(1,0,0),.35)
+            rotate('Bone.004',(1,0,0),-.26)
         elif name=='Sleep':
             shift('CONTROLLER',(0,0,-.080+.0005*math.sin(phase*math.tau)));rotate('Bone.002',(1,0,0),.30);rotate('Bone.004',(1,0,0),.16)
             for side in ['L','R']:
@@ -231,10 +240,12 @@ for name,count in [('Idle',91),('Walk',37),('Sleep',91),('Eat',61),('Sit',181),(
             shift('CONTROLLER',(0,0,-.012))
             for side in ['L','R']:shift('paw_control_'+side,(0,.015,.040));shift('leg3_control_'+side,(0,-.020,.025))
         else:shift('CONTROLLER',(0,0,.0004*math.sin(phase*math.tau)))
-        if name in ['Idle','Walk']:rotate('Bone.004',(0,0,1),.035*math.sin(phase*math.tau))
+        if name=='Idle' or name.startswith('Walk'):
+            head=arm.pose.bones['Bone.004']
+            head.rotation_quaternion @= Quaternion(head.bone.matrix_local.to_3x3().inverted()@Vector((0,0,1)),.035*math.sin(phase*math.tau))
         for i in range(1,6):
             if name in ['Sleep','Sit','Groom']:rotate('tail'+str(i),(0,0,1),.22+.025*math.sin(phase*math.tau-i*.4))
-            else:rotate('tail'+str(i),(1,0,0),[.88,.32,.37,.44,.49][i-1]+.013*math.sin(phase*math.tau-i*.4))
+            else:rotate('tail'+str(i),(1,0,0),tail_curves.get(name,tail_curves['Walk'])[i-1]+.013*math.sin(phase*math.tau-i*.4))
         for p in arm.pose.bones:
             p.keyframe_insert('location',frame=frame);p.keyframe_insert('rotation_quaternion',frame=frame);p.keyframe_insert('scale',frame=frame)
     actions.append(action)
@@ -254,9 +265,11 @@ for ids in [bpy.data.images,bpy.data.materials,bpy.data.meshes,bpy.data.particle
         if block.users==0:ids.remove(block)
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'lucy-combined.blend'))
 # Other poses stay as editable drafts in Blender; the web preview contains verified locomotion only.
-draft_names=[a.name for a in actions[2:]]
-for a in actions[2:]:bpy.data.actions.remove(a)
-actions=actions[:2]
+draft_names=[a.name for a in actions if a.name not in verified_names]
+verified_actions=[a for a in actions if a.name in verified_names]
+for a in actions:
+    if a.name not in verified_names:bpy.data.actions.remove(a)
+actions=verified_actions
 arm.select_set(True);skin.select_set(True)
 bpy.ops.export_scene.gltf(filepath=str(OUT/'lucy-combined.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_force_sampling=True,export_apply=False,export_extras=False,export_anim_slide_to_zero=True)
 report={'mesh_vertices':len(skin.data.vertices),'mesh_triangles':sum(len(p.vertices)-2 for p in skin.data.polygons),'bones':len(arm.data.bones),'clips':[a.name for a in actions],'unweighted_vertices':len(missing),'rest_max_error_m':rest_error,'glb_bytes':(OUT/'lucy-combined.glb').stat().st_size}
