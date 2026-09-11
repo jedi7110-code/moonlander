@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {Box3,MeshStandardMaterial,Vector3} from 'three';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {BUNK_BED,reclineProgress} from '../src/obs/recline.js';
-import {MED_BED} from '../src/obs/medical.js';
+import {MED_BED,medicalDuration} from '../src/obs/medical.js';
+import {BunkVisit} from '../src/obs/bunk-visit.js';
 
 const character=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 const pose=(root,action,time,duration=9)=>{
@@ -11,17 +12,16 @@ const pose=(root,action,time,duration=9)=>{
   root.updateMatrixWorld(true);
 };
 
-test('sleep uses the examination pose, with only the support height changed',()=>{
-  const sleeper=character(),patient=character();
-  for(const time of [0,.25,1,2,4.5,7,8,9]){
-    pose(sleeper,'bunk',time);pose(patient,'medical',time);
-    const a=sleeper.userData,b=patient.userData,progress=reclineProgress(time,9);
-    assert.deepEqual(a.body.rotation.toArray(),b.body.rotation.toArray());
-    assert.deepEqual(sleeper.rotation.toArray(),patient.rotation.toArray());
-    assert.ok(Math.abs(b.body.position.y-a.body.position.y-(MED_BED.top-BUNK_BED.top)*progress)<1e-10);
-    for(const key of ['arms','legs'])for(let i=0;i<2;i++)for(const joint of key==='arms'?['arm','elbow']:['leg','knee','boot']){
-      assert.deepEqual(a[key][i][joint].rotation.toArray(),b[key][i][joint].rotation.toArray());
-    }
+test('sleep and examination retain the same supine pose on their different supports',()=>{
+  const sleeper=character(),patient=character(),visit=new BunkVisit();visit.update(30);
+  animateMilo(sleeper,{action:'bunk',moving:false,time:0,bunkVisit:visit});pose(patient,'medical',17,medicalDuration());
+  const a=sleeper.userData,b=patient.userData;
+  assert.deepEqual(a.body.rotation.toArray(),b.body.rotation.toArray());
+  assert.deepEqual(sleeper.rotation.toArray(),patient.rotation.toArray());
+  assert.ok(Math.abs(b.body.position.y-a.body.position.y-(MED_BED.examTop-BUNK_BED.top))<1e-10);
+  for(const key of ['arms','legs'])for(let i=0;i<2;i++)for(const joint of key==='arms'?['arm','elbow']:['leg','knee','boot']){
+    const aa=a[key][i][joint].rotation,bb=b[key][i][joint].rotation;
+    for(const axis of ['x','y','z'])assert.ok(Math.abs(aa[axis]-bb[axis])<1e-9);
   }
 });
 

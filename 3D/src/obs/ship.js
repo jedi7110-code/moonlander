@@ -7,7 +7,7 @@ import {createPlantRack} from './plants.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
-import {BUNK_BED} from './recline.js';
+import {createBunk} from './bunk.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 export const positionX=x=>(x-700)*.022;
@@ -78,18 +78,6 @@ function cupboard(parent,m,x,y,z,w=1.25,h=1.85) {
   box(parent,m.dark,x,y+h/2,z,w,h,.62,.04);
   for(const side of [-1,1]){panel(parent,m,x+side*w*.245,y+h/2,z+.35,w*.475,h-.07);box(parent,m.black,x+side*.075,y+h*.52,z+.42,.03,.2,.04,.01);grille(parent,m,x+side*w*.245,y+.25,z+.414,w*.33,.2);}
 }
-function bunk(parent,m,x,y) {
-  const {depth,top,length,width}=BUNK_BED;
-  box(parent,m.dark,x,y+.32,depth,2.4,.20,1.3,.04);box(parent,m.cushion,x,y+.45,depth,length,.18,width,.07);
-  box(parent,m.olive,x+.32,y+top-.05,depth+.01,1.60,.10,1.13,.03);
-  box(parent,m.cloth,x-.87,y+.59,-.25,.47,.18,.91,.08);
-  for(let i=0;i<10;i++)rod(parent,m.olive,[x-.36+i*.14,y+.597,-.79],[x-.34+i*.14,y+.60,.25],.008);
-  box(parent,m.dark,x,y+1.67,-.66,2.5,.13,.73,.035);
-  for(const side of [-1,1])box(parent,m.dark,x+side*1.21,y+.96,-.80,.06,1.57,.06);
-  panel(parent,m,x,y+1.04,-1.07,2.29,.74,m.cushion);
-  box(parent,m.yellow,x-.86,y+1.52,-.63,.27,.17,.2,.015);box(parent,m.lamp,x-.86,y+1.47,-.50,.19,.025,.05);
-  label(parent,'PERSONAL / M. JARVIS',x,y+1.94,-.94,2.20,.28,{size:48});
-}
 export function createLoungeTable(m){
   const root=new THREE.Group(),top=LOUNGE_SEAT.top+.32,thickness=.08,underside=top-thickness;
   root.name='Lounge table';
@@ -159,7 +147,7 @@ function hatch(parent,animated,m,x,y) {
   for(const side of [-1,1])box(parent,m.metal,x+side*.91,y+1.17,-.36,.065,2.02,.15,.012);
   box(parent,m.dark,x,y+2.17,-.28,1.96,.14,.30,.025);
   for(const side of [-1,1]){box(parent,m.dark,x+side*.91,y+.52,-.36,.12,.15,.13);box(parent,m.dark,x+side*.91,y+1.84,-.36,.12,.15,.13);}
-  label(parent,'SUPPLY / 07',x,y+2.47,-.32,1.74,.26,{fg:'#e2c174',size:52});
+  label(parent,'SUPPLY HATCH',x,y+2.47,-.32,1.74,.26,{fg:'#e2c174',size:52});
   box(parent,m.dark,x,y+.32,.32,2.15,.55,.73,.04);
   box(parent,m.metal,x,y+.64,.32,2.27,.065,.84,.02);
   for(let i=0;i<15;i++)box(parent,i%2?m.black:m.yellow,x-1.03+i*.146,y+.285,.705,.146,.14,.015);
@@ -210,7 +198,8 @@ export function buildShip(m) {
       box(staticRoot,m.metal,0,y-.013,-.12,1.16,.025,3.25);
     }
     box(staticRoot,m.dark,0,y-.18,1.56,26.22,.38,.20,.02);
-    label(staticRoot,`${String(level+1).padStart(2,'0')} / ${['HABITATION','OPERATIONS','ENGINEERING'][level]}`,-9.65,y-.17,1.78,4.8,.30,{fg:'#d4dbcc',size:48});
+    box(staticRoot,m.dark,-1.55,y+2.30,-1.43,1.36,.21,.045,.012);
+    label(staticRoot,`${String(level+1).padStart(2,'0')} / ${['HABITATION','OPERATIONS','LIFE SUPPORT'][level]}`,-1.55,y+2.30,-1.40,1.30,.16,{fg:'#d4dbcc',size:48});
     for(let xx=-12.8;xx<12.8;xx+=.42){
       for(const zz of [.1,.8,-.75])if(Math.abs(xx)>.50)box(staticRoot,m.rubber,xx,y+.005,zz,.18,.012,.021);
       box(staticRoot,m.rubber,xx,y-.19,1.68,.20,.105,.012,.009);
@@ -230,20 +219,17 @@ export function buildShip(m) {
       box(staticRoot,m.enamel,xx,y+1.50,-1.035,.16,2.98,.10,.02);
       box(staticRoot,m.red,xx,y+1.15,-.958,.06,.45,.04,.01);
     }
-    const deckLight=new THREE.PointLight(level===1?0xb4dcdb:0xffebc7,45,20,2);deckLight.position.set(-5,y+2.3,.6);animated.add(deckLight);
+    const deckLight=new THREE.PointLight(level===1?0xb4dcdb:0xffebc7,level===0?12:45,20,2);deckLight.position.set(-5,y+2.3,.6);animated.add(deckLight);
     const secondLight=new THREE.PointLight(0xe6ebe4,32,17,2);secondLight.position.set(6,y+2.3,.6);animated.add(secondLight);
   });
   for(const [level,y]of FLOOR_Y.entries())catPort(staticRoot,m,positionX(CAT_PORT.x),y,level);
   // The upper shaft is a visible continuation, not an additional playable deck.
   staticRoot.add(createAccessLadder(m));
-  box(staticRoot,m.dark,6.3,9.02,-.98,2.85,.32,.10,.014);
-  label(staticRoot,'01 / HABITATION',6.3,9.02,-.924,2.8,.30,{size:48});
-  box(staticRoot,m.dark,5.72,2.72,1.69,2.85,.28,.12,.014);
-  label(staticRoot,'03 / ENGINEERING',5.72,2.72,1.756,2.8,.26,{size:48});
 
   const top=FLOOR_Y[0],mid=FLOOR_Y[1];
   const bathrooms={shower:plumbing(staticRoot,animated,m,positionX(240),top,'shower'),toilet:plumbing(staticRoot,animated,m,positionX(380),top,'toilet')};
-  bunk(staticRoot,m,positionX(510),top);cupboard(staticRoot,m,2.1,top,-1.14,1.54,2.31);
+  const bunk=createBunk(m);bunk.root.position.set(positionX(510),top,0);animated.add(bunk.root);
+  cupboard(staticRoot,m,2.1,top,-1.14,1.54,2.31);
   const lounge=createLounge(m);lounge.position.y=top;staticRoot.add(lounge);
   const loungeBounds=new THREE.Box3().setFromObject(lounge).expandByScalar(.06);
   cupboard(staticRoot,m,11.55,top,-1.11,1.35,2.35);
@@ -256,6 +242,7 @@ export function buildShip(m) {
   for(let i=0;i<4;i++){screen(staticRoot,-4.57,mid+.79+i*.42,-1.30,1.16,.27,i+8);}
   for(let i=0;i<4;i++)gauge(staticRoot,m,-4.99+i*.27,mid+2.39,-1.24,.084);
   const medical=createMedicalBay(m,mid);staticRoot.add(medical.root);
+  animated.attach(medical.bed);animated.attach(medical.rig.root);
   const evaBay=createEVABay(m,mid);staticRoot.add(evaBay.root);
   const innerDoor=evaBay.innerHatch.userData.door,innerSignal=evaBay.innerHatch.userData.signal;
   animated.attach(innerDoor);
@@ -282,8 +269,6 @@ export function buildShip(m) {
   foodDock.spoon.position.set(galleyX-.17,1.039,.10);foodDock.spoon.visible=true;foodDock.bite.visible=false;
   waterDock.mug.position.set(hydroX-.17,1.134,.16);waterDock.mug.rotation.y=Math.PI;waterDock.mug.visible=true;
   const gym=createGym(m,positionX(GYM.x));animated.add(gym.root);
-  box(staticRoot,m.dark,positionX(GYM.x),2.72,1.69,2.35,.28,.12,.014);
-  label(staticRoot,'GYM / ERGOMETER',positionX(GYM.x),2.72,1.756,2.3,.26,{fg:'#c2d3c7',size:48});
   panel(staticRoot,m,positionX(GYM.x)-.70,.97,-1.36,.57,.93,m.dark);
   for(let i=0;i<3;i++){
     const y=.69+i*.28,x=positionX(GYM.x)-.70;
@@ -326,5 +311,5 @@ export function buildShip(m) {
     if(id!=='lounge')group.position.z=1.75;
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
-  return {staticMesh:batchStatic(staticRoot),animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants};
+  return {staticMesh:batchStatic(staticRoot),animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk};
 }

@@ -1,14 +1,35 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,rod,pipe,label} from './materials.js';
 import {MEDICAL} from './layout.js';
-import {reclineProgress,applyReclinedPose} from './recline.js';
+import {applyBedTransferPose} from './bed-pose.js';
+import {createMedicalRig,animateMedicalRig} from './medical-rig.js';
 
-export const MED_BED={x:(MEDICAL.x-700)*.022,depth:-.22,top:.86,length:2.78,width:1.06,transition:2};
-export function medicalRecline(time,duration=MEDICAL.dur/1000){
-  return reclineProgress(time,duration,MED_BED.transition);
+export const MED_BED={x:(MEDICAL.x-700)*.022,depth:-.22,top:.62,examTop:.86,length:2.78,width:1.06,transition:10.05};
+export const MED_TRANSFER={walkDepth:.78,standingDepth:.78,seatDepth:.22};
+export const medicalDuration=(course=MEDICAL.dur/1000)=>course+MED_BED.transition*2;
+export function medicalEntryTime(time,duration=medicalDuration()){
+  return Math.max(0,Math.min(time,duration-time,MED_BED.transition));
 }
-export function applyMedicalPose(root,time,duration){
-  applyReclinedPose(root,medicalRecline(time,duration),MED_BED.top);
+export function medicalTransferPose(time,duration=medicalDuration()){
+  const t=medicalEntryTime(time,duration),reverse=time>duration/2;
+  const seat=THREE.MathUtils.smoothstep(t,1,2.8),recline=THREE.MathUtils.smoothstep(t,5.05,8.05);
+  const elevation=(MED_BED.examTop-MED_BED.top)*THREE.MathUtils.smoothstep(t,3.15,4.75);
+  const extension=THREE.MathUtils.smoothstep(t,8.05,10.05);
+  const turn=THREE.MathUtils.smoothstep(recline,.24,.72),approach=THREE.MathUtils.smoothstep(t,0,1);
+  const stages=t<1?'approaching':t<2.8?'sitting':t<3.15?'settled':t<4.75?'elevating':t<5.05?'raised':t<8.05?'lowering':t<10.05?'deploying':'examining';
+  const phase=reverse?({approaching:'departing',sitting:'standing',settled:'seated',elevating:'descending',lowering:'rising',deploying:'stowing'}[stages]??stages):stages;
+  const depth=THREE.MathUtils.lerp(THREE.MathUtils.lerp(MED_TRANSFER.standingDepth,MED_TRANSFER.seatDepth,seat),MED_BED.depth,turn);
+  return{phase,age:t,seat,recline,turn,approach,depth,elevation,extension};
+}
+export const medicalExitTime=exit=>exit.actionDuration-exit.entryTime+exit.age;
+export function medicalRecline(time,duration=medicalDuration()){
+  return medicalTransferPose(time,duration).recline;
+}
+export function applyMedicalPose(root,time,duration,startYaw=0){
+  const pose=medicalTransferPose(time,duration);
+  applyBedTransferPose(root,pose,{...MED_TRANSFER,top:MED_BED.top},startYaw);
+  root.userData.body.position.y+=pose.elevation;
+  if(pose.phase==='departing')root.rotation.y=startYaw+Math.atan2(Math.sin(-startYaw),Math.cos(-startYaw))*pose.approach;
 }
 
 // Fictional instrument values; checkups and treatment never refill food, water or energy.
@@ -37,8 +58,6 @@ export function createMedicalBay(m,y){
   const root=new THREE.Group();root.name='Medical bay';const {x,depth,top,length,width}=MED_BED;
   box(root,m.enamel,4.15,y+1.40,-1.49,5.04,2.65,.10,.035);
   box(root,m.teal,4.15,y+2.45,-1.425,5.02,.075,.02);
-  box(root,m.dark,4.62,y+2.80,1.69,2.65,.30,.12,.012);
-  label(root,'MEDICAL / 02',4.62,y+2.80,1.756,2.60,.26,{fg:'#dce6df',bg:'#335653',size:49});
   // Sealed supply cabinet, with a green first-aid mark distinct from the EVA bay.
   box(root,m.dark,2.14,y+1.24,-.90,1.28,2.46,1.04,.045);
   for(const side of [-1,1]){
@@ -50,42 +69,58 @@ export function createMedicalBay(m,y){
   box(root,m.white,2.14,y+1.77,-.266,.105,.35,.013);
   box(root,m.white,2.14,y+1.77,-.258,.35,.105,.013);
   label(root,'MED SUPPLIES',2.14,y+2.26,-.25,1.04,.18,{size:47});
-  label(root,'SEALED / 04',2.14,y+.30,-.25,.92,.17,{size:47});
+  label(root,'SEALED',2.14,y+.30,-.25,.92,.17,{size:47});
   const bed=new THREE.Group();bed.name='Examination couch';bed.position.set(x,y,depth);root.add(bed);
+  const pistons=[];
   for(const xx of [-.82,.82]){
     box(bed,m.dark,xx,.09,0,.49,.13,.87,.025);
-    cylinder(bed,m.metal,xx,.39,0,.09,.52,.09,24);
-    cylinder(bed,m.enamel,xx,.28,0,.14,.32,.14,24);
+    pistons.push(cylinder(bed,m.metal,xx,.13+(top-.34)/2,0,.09,top-.34,.09,24));
+    cylinder(bed,m.enamel,xx,.22,0,.14,.18,.14,24);
   }
-  box(bed,m.dark,0,top-.22,0,length+.10,.15,width+.07,.045);
-  box(bed,m.enamel,0,top-.13,0,length+.16,.09,width+.10,.035);
-  box(bed,m.teal,0,top-.045,0,length,.09,width,.045);
-  box(bed,m.cloth,-.08,top+.004,0,length-.18,.016,width-.10,.018);
-  box(bed,m.cloth,-.90,top+.07,0,.43,.13,.77,.05);
-  for(const zz of [-width/2-.03,width/2+.03]){
-    for(const xx of [-.6,.55])rod(bed,m.metal,[xx,top-.18,zz],[xx,top+.19,zz],.023);
-    rod(bed,m.metal,[-.6,top+.19,zz],[.55,top+.19,zz],.025);
-  }
-  box(bed,m.dark,.76,top-.135,width/2+.075,.47,.085,.025,.01);
-  for(let i=0;i<3;i++)box(bed,i===2?m.teal:m.white,.62+i*.14,top-.13,width/2+.092,.055,.037,.012,.004);
+  const platform=new THREE.Group();platform.name='Elevating patient platform';bed.add(platform);
+  box(platform,m.dark,0,top-.22,0,length+.10,.15,width+.07,.045);
+  box(platform,m.enamel,0,top-.13,0,length+.16,.09,width+.10,.035);
+  box(platform,m.teal,0,top-.045,0,length,.09,width,.045);
+  box(platform,m.cloth,-.08,top+.004,0,length-.18,.016,width-.10,.018);
+  box(platform,m.cloth,-.90,top+.07,0,.43,.13,.77,.05);
+  const rail=new THREE.Group();rail.name='Rear safety rail';platform.add(rail);
+  const zz=-width/2-.03;
+  for(const xx of [-.6,.55])rod(rail,m.metal,[xx,top-.18,zz],[xx,top+.19,zz],.023);
+  rod(rail,m.metal,[-.6,top+.19,zz],[.55,top+.19,zz],.025);
+  box(platform,m.dark,.76,top-.135,width/2+.075,.47,.085,.025,.01);
+  for(let i=0;i<3;i++)box(platform,i===2?m.teal:m.white,.62+i*.14,top-.13,width/2+.092,.055,.037,.012,.004);
   pipe(root,m.rubber,[[x+.85,y+.4,-.35],[x+1.1,y+.22,-1.1],[x+1.1,y+1.4,-1.36]],.024);
   const display=monitor(root,m,3.87,y+1.81);
-  // Articulated examination light and a wall-mounted diagnostic head.
-  box(root,m.dark,5.8,y+2.25,-1.32,.25,.28,.20,.024);
-  rod(root,m.metal,[5.8,y+2.25,-1.18],[5.53,y+2.48,-.68],.035);
-  rod(root,m.metal,[5.53,y+2.48,-.68],[5.02,y+2.23,-.03],.028);
-  for(const [xx,yy,zz]of [[5.8,2.25,-1.18],[5.53,2.48,-.68],[5.02,2.23,-.03]])ball(root,m.dark,xx,y+yy,zz,.064,.064,.064);
-  box(root,m.enamel,4.97,y+2.17,-.01,.65,.12,.40,.04);
-  box(root,m.coolLamp,4.97,y+2.10,-.01,.54,.023,.31,.02);
+  const rig=createMedicalRig(m,{x,y,depth,top:MED_BED.examTop});root.add(rig.root);
+  // Wall-side diagnostic cartridges and gas services stay behind the patient.
+  for(const xx of [5.08,5.48]){
+    box(root,m.dark,xx,y+1.96,-1.20,.32,.77,.24,.025);
+    for(let i=0;i<3;i++){
+      box(root,m.enamel,xx,y+2.21-i*.22,-1.06,.27,.17,.065,.012);
+      box(root,m.dark,xx+.025,y+2.21-i*.22,-1.020,.14,.022,.018,.004);
+      box(root,m.teal,xx-.091,y+2.21-i*.22,-1.019,.025,.032,.010,.002);
+    }
+    cylinder(root,m.teal,xx,y+1.61,-1.04,.04,.04,.04,16).rotation.x=Math.PI/2;
+  }
+  box(root,m.enamel,4.39,y+1.33,-1.30,1.15,.24,.12,.014);
+  for(let i=0;i<4;i++){
+    cylinder(root,i%2?m.metal:m.teal,4.03+i*.24,y+1.33,-1.20,.062,.085,.062,20).rotation.x=Math.PI/2;
+    pipe(root,m.rubber,[[4.03+i*.24,y+1.27,-1.18],[4.08+i*.24,y+.96,-1.17],[4.16+i*.24,y+1.05,-1.14]],.015);
+  }
   box(root,m.dark,6.14,y+1.63,-1.25,.45,.81,.25,.025);
   label(root,'AUTO\nSCAN',6.14,y+1.68,-1.10,.32,.24,{size:56});
   const lampMaterial=new THREE.MeshBasicMaterial({color:0x485e58,toneMapped:false});
   box(root,lampMaterial,6.14,y+1.96,-1.10,.22,.055,.025,.007);
   for(const side of [-1,1])pipe(root,m.rubber,[[6.14+side*.09,y+1.30,-1.13],[6.14+side*.16,y+1.11,-1.10],[6.3+side*.1,y+1.23,-1.09]],.014);
-  return{root,bed,display,lampMaterial};
+  return{root,bed,platform,pistons,rig,display,lampMaterial};
 }
 
-export function animateMedical(bay,time,active,readings,{duration=MEDICAL.dur/1000,treating=false,alert=false}={}){
+export function animateMedical(bay,time,active,readings,{duration=medicalDuration(),treating=false,alert=false,patient=null,scanTime=time}={}){
+  const pose=medicalTransferPose(active?time:0,duration),pistonHeight=MED_BED.top-.34+pose.elevation;
+  bay.platform.position.y=pose.elevation;
+  for(const piston of bay.pistons){piston.position.y=.13+pistonHeight/2;piston.scale.y=pistonHeight/(MED_BED.top-.34);}
+  const scanAge=THREE.MathUtils.clamp(scanTime-MED_BED.transition,0,duration-2*MED_BED.transition);
+  animateMedicalRig(bay.rig,pose,scanAge,{patient,scanning:active&&pose.phase==='examining'});
   const phase=active?time<MED_BED.transition?'POSITIONING':time>duration-MED_BED.transition?'COMPLETE':treating?'TREATING':'ACQUIRING':readings?'LAST CHECK':'STANDBY';
   bay.lampMaterial.color.setHex(alert&&!active?0xf17d68:['ACQUIRING','TREATING'].includes(phase)?0x85e3af:active?0xf3bd62:0x485e58);
   const live=['ACQUIRING','TREATING'].includes(phase);

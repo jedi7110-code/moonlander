@@ -68,7 +68,7 @@ function cabin(){
 test('accepting Milo’s invitation opens a real match only after arriving at the lounge',()=>{
   const c=cabin();c.brain.state='knocking';c.brain.want={kind:'play'};
   c.brain.acknowledge();assert.equal(c.brain.gamePending,true);assert.equal(c.opened,0);
-  for(let i=0;i<120;i++){c.actor.update(1/60);c.brain.update(1/60);}
+  for(let i=0;i<300;i++){c.actor.update(1/60);c.brain.update(1/60);}
   assert.equal(c.opened,1);assert.equal(c.brain.state,'playingGame');assert.equal(currentAction(c.brain),'lounge');
   const needs={...c.brain.needs},hour=c.brain.hour;c.brain.update(600);assert.deepEqual(c.brain.needs,needs);assert.equal(c.brain.hour,hour);
   c.brain.finishGame();assert.equal(c.brain.state,'leavingLounge');assert.equal(c.brain.gamePending,false);

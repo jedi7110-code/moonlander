@@ -36,14 +36,14 @@ export class CrewHealth {
     this.condition=null;this.treatment=null;this.cooldown=180;this.exposure=0;
     this.nextIncident=this.clock+240+this.random()*120;this.lastStage=this.stage;this.emit('recovered');return true;
   }
-  update(dt,{needs,activity=null,moving=false,climbing=false}={}){
+  update(dt,{needs,activity=null,moving=false,climbing=false,treatmentTime=dt}={}){
     if(!(dt>0))return;
     this.clock+=dt;this.cooldown=Math.max(0,this.cooldown-dt);this.bandageTime=Math.max(0,this.bandageTime-dt);
     if(this.condition){
       this.condition.age+=dt;
       if(this.treatment){
-        this.treatment.elapsed+=dt;
-        if(this.treatment.elapsed>2)this.value=Math.min(94,this.value+dt*2.0);
+        this.treatment.elapsed+=treatmentTime;
+        if(this.treatment.elapsed>2)this.value=Math.min(94,this.value+treatmentTime*2.0);
       }else{
         const strain=Math.max(0,30-needs.energy)+Math.max(0,25-needs.thirst);
         this.value=clamp(this.value-dt*((this.condition.kind==='fever'?.16:.11)+strain*.006+(activity==='gym'?.25:0)));

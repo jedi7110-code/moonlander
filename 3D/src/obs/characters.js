@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import {ball,box,cylinder,pipe,rod} from './materials.js';
 import {createCatEar,createCatTail,animateCatTail,createCatLegSkin,updateCatLegSkins} from './cat-anatomy.js';
 import {createCatSkull,createCatEyes,createCatMuzzle,updateCatEyes,catFaceSurface} from './cat-face.js';
-import {applyCyclingPose} from './gym.js';
-import {applyMedicalPose} from './medical.js';
-import {BUNK_BED,reclineProgress,applyReclinedPose} from './recline.js';
+import {applyCyclingPose,applyGymVisitPose} from './gym.js';
+import {applyMedicalPose,medicalExitTime} from './medical.js';
+import {BUNK_BED,reclineProgress,applyReclinedPose,reclineExitProgress} from './recline.js';
+import {applyBunkVisitPose} from './bunk-pose.js';
 import {applyCatGrooming} from './cat-groom.js';
 import {applyCatHop} from './cat-hop.js';
 import {restWeight,applyCatSitting} from './cat-rest.js';
@@ -12,7 +13,7 @@ import {createDiningProps,applyDiningPose,resetDiningPose,diningPhase,placeHand,
 import {applyWalkingPose} from './walking.js';
 import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose} from './leisure.js';
-import {applyLoungeExit} from './lounge-exit.js';
+import {applyLoungeExit,applyLoungeEntry} from './lounge-exit.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
@@ -105,8 +106,10 @@ export function createMilo(m,headModel=new THREE.Group()) {
   root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,walkDistance=time*1.188,actionTime=time,actionDuration,knock=0,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,walkDistance=time*1.188,actionTime=time,actionDuration,knock=0,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
+  if(action==='medical'&&!moving)root.userData.medicalStartYaw??=root.rotation.y;
+  else delete root.userData.medicalStartYaw;
   resetDiningPose(root);
   for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
   const stride=time*(climbing?5.4:6.5),walking=moving&&!climbing&&!waiting;
@@ -123,8 +126,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.rotation.set(0,0,0);
     if(seated){arm.rotation.x=-.65;elbow.rotation.x=-.8;}
   }
-  for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.x=climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0;
-    knee.rotation.x=climbing?.9+Math.sin(stride-side*Math.PI/2)*.4:0;
+  for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.set(climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0,0,0,'XYZ');
+    knee.rotation.set(climbing?.9+Math.sin(stride-side*Math.PI/2)*.4:0,0,0);
     if(seated){
       if(action==='lounge'){
         body.position.y=LOUNGE_SEAT.top-(.988-.134);
@@ -133,15 +136,19 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
         knee.rotation.x=-leg.rotation.x;
       }else{leg.rotation.x=-1.15;knee.rotation.x=1.30;body.position.y=-.254;}
     }
-    boot.rotation.x=seated?-(leg.rotation.x+knee.rotation.x):0;
+    boot.rotation.set(seated?-(leg.rotation.x+knee.rotation.x):0,0,0);
   }
   if(walking)applyWalkingPose(root,walkDistance);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
   if(loungeExit)applyLoungeExit(root,loungeExit);
+  if(loungeEntry)applyLoungeEntry(root,loungeEntry);
   if(knock>0)for(const {arm,elbow}of arms){arm.rotation.x=-1.5;elbow.rotation.x=-.5-Math.sin(knock*22)*.25;}
   if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top);
-  if(action==='gym'&&!moving)applyCyclingPose(root,actionTime);
-  if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration);
+  if(action==='gym'&&!moving){if(gymVisit)applyGymVisitPose(root,gymVisit);else applyCyclingPose(root,actionTime);}
+  if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration,root.userData.medicalStartYaw);
+  if(reclineExit?.id==='medical')applyMedicalPose(root,medicalExitTime(reclineExit),reclineExit.actionDuration,root.userData.medicalStartYaw);
+  else if(reclineExit)applyReclinedPose(root,reclineExitProgress(reclineExit),BUNK_BED.top);
+  if(bunkVisit)applyBunkVisitPose(root,bunkVisit);
   if(action==='plant'&&!moving){
     const weight=THREE.MathUtils.smoothstep(Math.min(actionTime,(actionDuration??9)-actionTime),0,1.2);
     for(const {arm,elbow,side,hand}of arms){
@@ -206,15 +213,15 @@ export function createCat(m) {
     createCatLegSkin(leg,rear?m.furBody:m.furLight);legs.push(leg);
   }
   const tail=createCatTail(m.furTail);body.add(tail);
-  root.userData={body,neck,head,ears,eyes,legs,tail,tongue,groom:{weight:0,time:0,lastTime:null,side:-1}};root.name='Ship cat';
+  root.userData={body,neck,head,ears,eyes,legs,tail,tongue,groom:{weight:0,time:0,lastTime:null,side:-1}};root.name='Lucy';
   applyCatLegPose(root,{distance:0,moving:false,resting:false});updateCatLegSkins(root);return root;
 }
 
-export function animateCat(root,{time,moving,climbing,facing,mode,walkDistance=time*.792,passage=null,hop=null,actionTime=time,remaining=Infinity}) {
+export function animateCat(root,{time,moving,climbing,facing,mode,walkDistance=time*.792,passage=null,hop=null,actionTime=time,remaining=Infinity,playRelease=null}) {
   const {body,neck,head,ears,eyes,tail}=root.userData;
   // Gait works in model coordinates; incoming travel is measured in ship coordinates.
   walkDistance/=root.scale.x;
-  const quiet=!moving&&!passage&&!hop,sleep=mode==='sleep'&&quiet?restWeight(actionTime,remaining,2.2):0,eat=mode==='eat'&&quiet?restWeight(actionTime,remaining,1.6):0,sitting=mode==='look'&&quiet?restWeight(actionTime,remaining,1.5):0;
+  const quiet=!moving&&!passage&&!hop,sleep=mode==='sleep'&&quiet?restWeight(actionTime,remaining,2.2):0,eat=mode==='eat'&&quiet?restWeight(actionTime,remaining,1.6):0,sitting=['look','play'].includes(mode)&&quiet?restWeight(actionTime,remaining,1.5):0;
   const resting=sleep>.5;body.rotation.set(0,0,0);body.scale.set(1,1-.04*sleep,1-.08*sleep);body.position.y=-.17*sleep+(moving?Math.sin(walkDistance/.50*Math.PI*4)*.004:Math.sin(time*2.3)*.003)*(1-sleep);
   eyes.forEach(eye=>eye.scale.y=THREE.MathUtils.lerp(1-Math.pow(Math.max(0,Math.sin(time*.42)),60)*.9,.08,sleep));
   const direction=hop?.yaw??(climbing?Math.PI:facing*Math.PI/2);
@@ -230,10 +237,13 @@ export function animateCat(root,{time,moving,climbing,facing,mode,walkDistance=t
   applyCatSitting(root,sitting,actionTime);
   if(mode==='play'&&quiet){
     const weight=restWeight(actionTime,remaining,1.5);
-    applyCatSitting(root,weight,0);head.rotation.set(-.16*weight,Math.sin(time*2.1)*.12*weight,0);
+    const release=playRelease?THREE.MathUtils.smoothstep(playRelease.age,0,1.2):0;
+    const playTime=playRelease?time-playRelease.age:time;
+    applyCatSitting(root,weight,0);head.rotation.set(THREE.MathUtils.lerp(-.16*weight,.04*Math.sin(1.5*.7)*weight,release),Math.sin(playTime*2.1)*.12*weight*(1-release),0);
     const paw=root.userData.legs.find(leg=>!leg.rear&&leg.side===-1);
-    const reach=Math.max(0,Math.sin(time*2.1));
-    placeCatPaw(paw,paw.side*.101,.08+reach*.14*weight,.16+reach*.13*weight);
+    const reach=Math.max(0,Math.sin(playTime*2.1)),c=Math.cos(body.rotation.x),s=Math.sin(body.rotation.x);
+    const floorY=.036-body.position.y,floorZ=THREE.MathUtils.lerp(.205,.10,weight);
+    placeCatPaw(paw,paw.side*.101,THREE.MathUtils.lerp(.08+reach*.14*weight,floorY*c+floorZ*s,release),THREE.MathUtils.lerp(.16+reach*.13*weight,-floorY*s+floorZ*c,release));
   }
   applyCatHop(root,hop);
   updateCatEyes(eyes);

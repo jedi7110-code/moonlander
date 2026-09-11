@@ -4,6 +4,7 @@ import {Brain} from '../../js/obs/brain.js?v=15';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,CatRoutine,getStation} from '../src/obs/state.js';
 import {CABIN_PACE} from '../src/obs/pace.js';
+import {BUNK_TRANSITION_DECAY} from '../src/obs/bunk-visit.js';
 
 const setup=()=>{
   const care=new Supplies(),actor=new CrewMotion(),scene={time:{delayedCall(){}},sound:{add(){return{play(){},once(_event,fn){fn();},destroy(){}};}},obsUI:{hideWant(){},showWant(){},flashMonitor(){}}};
@@ -29,8 +30,14 @@ test('cat appetite slows without stretching movement or sleep recovery',()=>{
 });
 test('low physical needs shorten leisure and postpone exercise',()=>{
   const {brain}=setup();brain.needs.hunger=40;brain._startPerform(getStation('lounge'));assert.equal(brain.curDurSec,8);
-  brain._endPerform();brain.update(2.8);Object.keys(brain.needs).forEach(key=>brain.needs[key]=80);brain.needs.hygiene=20;brain.exercise=1;
+  brain.update(2.4);brain._endPerform();brain.update(2.8);Object.keys(brain.needs).forEach(key=>brain.needs[key]=80);brain.needs.hygiene=20;brain.exercise=1;
   brain._choose();assert.equal(brain.actStation,'shower');
+});
+test('capsule boarding has a reduced depletion budget without speeding up the motion',()=>{
+  const {brain}=setup();brain._startPerform(getStation('bunk'));
+  const multiplier=brain._decayMul('hunger');brain.update(1);
+  assert.equal(brain.bunkVisit.phase,'opening');assert.equal(brain.bunkVisit.age,0);
+  brain.bunkVisit=null;assert.ok(Math.abs(multiplier/brain._decayMul('hunger')-BUNK_TRANSITION_DECAY)<1e-9);
 });
 test('a ten-minute autonomous routine can serve all basic needs without starvation',()=>{
   const results=[];

@@ -158,6 +158,7 @@ export class CatRoutine {
   }
   rest(mode,duration){this.mode=mode;this.modeTime=0;this.remaining=duration;this.motion.walkSpeed=36;this.pendingMove=null;}
   depart(run,kind){
+    if(this.mode==='play'&&!this.motion.busy){this.pendingMove={run,kind};this.playHost=null;this.playRelease??={age:0};return;}
     if(!this.motion.busy&&['sleep','look','eat','groom'].includes(this.mode)&&this.remaining>0){
       this.pendingMove={run,kind};this.remaining=Math.min(this.remaining,CAT_RISE_TIME);return;
     }
@@ -195,8 +196,13 @@ export class CatRoutine {
     this.curiosity=bounded(this.curiosity+dt*(this.motion.busy?-.8:.3));
     this.motion.update(dt);
     if(this.mode==='play'){
+      if(this.playRelease){
+        this.playRelease.age=Math.min(1.2,this.playRelease.age+dt);
+        if(this.playRelease.age===1.2){this.playRelease=null;this.mode='look';this.modeTime=Math.min(this.modeTime,1.5);this.remaining=this.pendingMove?CAT_RISE_TIME:5;}
+        return;
+      }
       if(this.playHost?.isSeatedInLounge()&&this.playHost.leisure==='cat'&&this.hunger>25){this.remaining=5;this.curiosity=bounded(this.curiosity-dt*2);return;}
-      this.playHost=null;this.rest('look',5);return;
+      this.playHost=null;this.playRelease={age:0};return;
     }
     if(this.mode==='follow'){
       this.followLeft-=dt;this.retargetIn-=dt;
@@ -219,5 +225,5 @@ export class CatRoutine {
   fetch(){if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=36;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX},()=>{if(this.care.take('catfood')){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
 }
 
-export function currentAction(brain){return brain.bathroom?.id??(brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
+export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
 export {FLOORS,getStation};

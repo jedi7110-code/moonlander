@@ -129,11 +129,7 @@ export function createEVABay(m,y){
   EVA_BAY.suitX.forEach((x,index)=>{
     const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.scale.y=.90;root.add(suit);suits.push(suit);
   });
-  box(root,m.dark,9.05,y+2.78,1.69,3.35,.30,.12,.014);
-  label(root,'EVA / SUIT SERVICE',9.05,y+2.78,1.756,3.31,.26,{size:48});
   const hatch=createEVAHatch(m,y),innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
-  label(root,'INNER',EVA_BAY.innerX-.15,y+2.81,1.80,.84,.24,{size:61});
-  label(root,'EVA / OUTER',EVA_BAY.hatchX-.62,y+2.81,1.80,1.48,.24,{size:48});
   return{root,suits,hatch,innerHatch};
 }
 

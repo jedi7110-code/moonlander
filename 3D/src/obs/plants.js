@@ -63,7 +63,7 @@ export function createPlantRack(m,x){
     rod(root,m.black,[side*1.35,.18,-.83],[side*1.35,2.43,-.83],.028);
   }
   box(root,m.dark,0,2.38,-.35,2.60,.19,.09,.01);
-  label(root,'BOTANICS / 03',0,2.38,-.29,2.60,.19,{size:40});
+  label(root,'HYDROPONICS',0,2.38,-.29,2.60,.19,{size:40});
   const recovery=waterRecovery(root,m),rows=[];
   for(let i=0;i<3;i++){
     const y=1.80-i*.62,plants=[];

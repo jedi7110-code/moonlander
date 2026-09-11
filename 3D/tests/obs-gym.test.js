@@ -7,6 +7,7 @@ import {getStation as originalStation} from '../../js/obs/layout.js?v=15';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {BIKE,createGym,animateGym,pedalPosition} from '../src/obs/gym.js';
 import {CABIN_PACE} from '../src/obs/pace.js';
+import {GymVisit,GYM_MOUNT_SECONDS} from '../src/obs/gym-visit.js';
 
 function setup(){const actor=new CrewMotion({floor:2,x:840}),care=new Supplies(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care});return{actor,brain,care};}
 test('the gym is a 3D-only station and leaves the six original needs intact',()=>{
@@ -22,12 +23,53 @@ test('exercise deficiency causes an autonomous visit without overriding urgent p
 });
 test('cycling replenishes exercise but consumes energy, water and hygiene',()=>{
   const {brain,actor}=setup();brain.exercise=20;brain._go(getStation('gym'));actor.update(1/60);
-  assert.equal(currentAction(brain),'gym');const before={...brain.needs};
+  assert.equal(currentAction(brain),'gym');brain.health.nextIncident=Infinity;
+  const mounting=brain.exercise;brain.update(GYM_MOUNT_SECONDS);assert.ok(brain.exercise<mounting);
+  const before={...brain.needs};
   for(let i=0;i<8*60;i++)brain.update(1/60);
   assert.ok(brain.exercise>=69);
   for(const [key,rate]of [['energy',.6],['thirst',.35],['hygiene',.55]])assert.ok(brain.needs[key]<before[key]-8*rate);
   assert.equal(brain.needs.exercise,undefined);
   brain._go(getStation('galley'));const stopped=brain.exercise;brain.update(1);assert.ok(brain.exercise<stopped);
+});
+
+test('mount, coast and dismount finish before the latest walking order is executed',()=>{
+  const {brain,actor}=setup();brain.health.nextIncident=Infinity;brain._go(getStation('gym'));actor.update(1/60);
+  brain.update(1);brain._go(getStation('hydro'));brain._go(getStation('galley'));
+  assert.equal(brain.state,'leavingGym');assert.equal(actor.busy,false);
+  brain.update(3);assert.equal(actor.busy,false);assert.equal(currentAction(brain),'gym');
+  brain.update(4);assert.equal(brain.gymVisit,null);assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
+});
+
+test('pedals start and stop smoothly, stay parked, and freeze on zero time',()=>{
+  const visit=new GymVisit();visit.update(GYM_MOUNT_SECONDS);assert.equal(visit.pedalTime,0);
+  visit.update(.01);assert.ok(visit.pedalTime<.00001);visit.update(2);
+  const start=visit.pedalTime;visit.requestExit();visit.update(.6);const mid=visit.pedalTime;
+  visit.update(.6);const end=visit.pedalTime;assert.ok(mid-start>end-mid);
+  visit.update(1);assert.equal(visit.pedalTime,end);const pose=visit.pose;visit.update(0);assert.deepEqual(visit.pose,pose);
+  const next=new GymVisit({pedalTime:end});assert.equal(next.pedalTime,end);
+});
+
+test('gym transitions keep limbs continuous and cycling contacts stay on the equipment',()=>{
+  const material=new MeshStandardMaterial(),root=createMilo(new Proxy({},{get:()=>material})),visit=new GymVisit();visit.startYaw=Math.PI/2;
+  let previous=null;
+  for(let i=0;i<=720;i++){
+    if(i===420)visit.requestExit();
+    const pose=visit.pose;root.position.z=pose.depth;
+    animateMilo(root,{action:'gym',moving:false,facing:1,time:i/60,actionTime:i/60,gymVisit:visit});root.updateMatrixWorld(true);
+    const nodes=[root.userData.hips,root.userData.head,...root.userData.legs.map(r=>r.boot),...root.userData.arms.map(r=>r.hand)];
+    const positions=nodes.map(n=>n.getWorldPosition(new Vector3()));
+    if(previous)for(let j=0;j<positions.length;j++)assert.ok(positions[j].distanceTo(previous[j])<.045,`joint ${j} at ${i/60}: ${positions[j].distanceTo(previous[j])}`);
+    previous=positions;
+    for(const {boot,side}of root.userData.legs){
+      const sole=boot.localToWorld(new Vector3(0,-.107,.024));assert.ok(sole.y>-.008,`floor at ${i/60}: ${sole.y}`);
+      if(visit.phase==='cycle'){
+        const pedal=pedalPosition(visit.pedalTime,side),target=new Vector3(pedal.z,pedal.y+.0175,BIKE.depth-pedal.x);
+        assert.ok(sole.distanceTo(target)<1e-5);
+      }
+    }
+    visit.update(1/60);
+  }
 });
 test('exercise chat routes to the gym and preserves already dispatched supply orders',()=>{
   const {brain,care}=setup();care.take('food');care.request();care.transmit();care.update(3);

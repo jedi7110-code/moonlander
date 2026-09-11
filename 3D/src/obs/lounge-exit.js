@@ -3,6 +3,16 @@ import {LOUNGE_SEAT} from './layout.js';
 import {hingeAngles} from './gym.js';
 
 export const LOUNGE_EXIT_SECONDS=2.8;
+export const LOUNGE_ENTRY_SECONDS=2.4;
+export const loungeEntryAge=age=>2.8-2.15*Math.min(1,age/LOUNGE_ENTRY_SECONDS);
+export function applyLoungeEntry(root,entry){
+  const {head,chest,arms}=root.userData;
+  const targets=[head,chest,...arms.flatMap(r=>[r.arm,r.elbow,r.hand])].map(node=>({node,position:node.position.clone(),rotation:node.quaternion.clone()}));
+  applyLoungeExit(root,{age:loungeEntryAge(entry.age)});
+  const settle=THREE.MathUtils.smoothstep(entry.age,1.8,LOUNGE_ENTRY_SECONDS);
+  for(const {node,position,rotation}of targets){node.position.lerp(position,settle);node.quaternion.slerp(rotation,settle);}
+  for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
+}
 const smooth=(t,a,b)=>THREE.MathUtils.smoothstep(t,a,b);
 export function loungeExitPose(age){
   const rise=smooth(age,.8,2),step=smooth(age,2,2.8);

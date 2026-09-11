@@ -1,12 +1,15 @@
 import {Brain} from '../../../js/obs/brain.js?v=15';
 import {getStation} from './state.js';
 import {getLang} from '../../../js/obs/i18n.js?v=15';
-import {medicalReadings} from './medical.js';
+import {medicalReadings,medicalEntryTime,medicalDuration,MED_BED} from './medical.js';
 import {CrewHealth} from './health.js';
 import {BathroomVisit} from './bathroom.js';
 import {PlantBed} from './plant-state.js';
 import {CABIN_PACE} from './pace.js';
-import {LOUNGE_EXIT_SECONDS} from './lounge-exit.js';
+import {LOUNGE_EXIT_SECONDS,LOUNGE_ENTRY_SECONDS} from './lounge-exit.js';
+import {reclineProgress,RECLINE_EXIT_SECONDS} from './recline.js';
+import {GymVisit} from './gym-visit.js';
+import {BunkVisit,BUNK_TRANSITION_DECAY} from './bunk-visit.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 export const isChessRequest=text=>/チェス|chess|ゲーム|\bgame\b|\bplay\b|遊ぼ|遊び|遊んで/i.test(text);
@@ -27,13 +30,24 @@ export class CabinBrain extends Brain {
     this.dayMs=CABIN_PACE.dayMs;this.clock=8*this.dayMs/24;
   }
   get statusNeeds(){return{...this.needs,exercise:this.exercise,health:this.health.value};}
-  _decayMul(need){return super._decayMul(need)*CABIN_PACE.needDecay;}
+  _decayMul(need){
+    // Give the added entry/exit animation a small needs budget, without rushing its motion.
+    const boarding=this.bunkVisit&&this.bunkVisit.phase!=='sleeping';
+    const medicalBoarding=this.reclineExit?.id==='medical'||(this.cur?.id==='medical'&&this.state==='performing'&&medicalEntryTime(this.curDurSec-this.performT,this.curDurSec)<MED_BED.transition);
+    return super._decayMul(need)*CABIN_PACE.needDecay*(boarding ? BUNK_TRANSITION_DECAY : medicalBoarding ? .14 : 1);
+  }
   update(dt){
     if(this.state==='playingGame')return;
     const exit=this.loungeExit;
+    const gym=this.gymVisit;
+    const bunk=this.bunkVisit;
+    const entry=this.loungeEntry,recline=this.reclineExit;
     this.plants.update(dt);
     this.bathroom?.update(dt);
-    this.health.update(dt,{needs:this.needs,activity:this.state==='performing'?this.cur?.id:null,moving:this.actor.busy,climbing:this.actor.climbing});
+    const medicalActive=this.state==='performing'&&this.cur?.id==='medical';
+    const medicalTime=medicalActive?this.curDurSec-this.performT:0;
+    const treatmentTime=medicalActive?Math.max(0,Math.min(medicalTime+dt,this.curDurSec-MED_BED.transition)-Math.max(medicalTime,MED_BED.transition)):0;
+    this.health.update(dt,{needs:this.needs,activity:this.state==='performing'?this.cur?.id:null,moving:this.actor.busy,climbing:this.actor.climbing,treatmentTime});
     this.actor.walkSpeed=this.baseWalkSpeed*this.health.speedFactor;this.actor.climbSpeed=this.baseClimbSpeed*this.health.speedFactor;
     const exercising=this.state==='performing'&&this.cur?.id==='gym';
     this.exercise=Math.max(0,Math.min(100,this.exercise+dt*(exercising?100/16:-.20*CABIN_PACE.needDecay)));
@@ -41,12 +55,28 @@ export class CabinBrain extends Brain {
       for(const [need,rate]of [['energy',.6],['thirst',.35],['hygiene',.55]])this.needs[need]=Math.max(0,this.needs[need]-dt*rate);
     }
     super.update(dt);
+    if(this.bunkVisit?.phase==='sleeping'&&this.needs.energy>=100)this._endPerform();
+    if(gym&&this.gymVisit===gym)gym.update(dt);
+    if(bunk&&this.bunkVisit===bunk)bunk.update(dt);
+    if(entry&&entry===this.loungeEntry){
+      entry.age=Math.min(LOUNGE_ENTRY_SECONDS,entry.age+dt);
+      if(entry.age===LOUNGE_ENTRY_SECONDS){
+        this.loungeEntry=null;
+        if(this.gamePending&&!this.afterActivity)this._startPerform(this.cur,true);
+        else{this.state='performing';if(this.afterActivity)this.beginLoungeExit();else if(this.leisure==='cat')this.catRoutine?.inviteLounge(this);}
+      }
+    }
+    if(recline&&recline===this.reclineExit){
+      const duration=recline.duration??RECLINE_EXIT_SECONDS;
+      recline.age=Math.min(duration,recline.age+dt);
+      if(recline.age===duration){this.reclineExit=null;super._endPerform();this.finishDeparture();}
+    }
     if(exit&&this.loungeExit===exit){
       exit.age=Math.min(LOUNGE_EXIT_SECONDS,exit.age+dt);
       if(exit.age>=LOUNGE_EXIT_SECONDS){this.loungeExit=null;this.leisure=null;super._endPerform();this.finishDeparture();}
     }
     if(this.health.needsCare){this.sick=true;this.mood='sick';}
-    if((this.health.critical||(this.health.needsCare&&exercising))&&this.actStation!=='medical')this._go(getStation('medical'));
+    if((this.health.critical||(this.health.needsCare&&this.gymVisit))&&this.actStation!=='medical')this._go(getStation('medical'));
     if(this.state==='orderingSupply'&&this.care.phase!=='transmitting')this._toIdle();
   }
   _maybeWant(){
@@ -67,9 +97,10 @@ export class CabinBrain extends Brain {
   _usable(station){return station.id!=='stereo'&&!(station.id==='gym'&&this.health.needsCare)&&super._usable(station);}
   _go(station){
     station=getStation(station?.id);if(!station)return false;
+    if(station.id==='medical'&&this.state==='performing'&&this.cur?.id==='medical')return true;
     if(this.deferDeparture(()=>this._go(station)))return true;
     if(station.id!=='lounge')this.nextLeisure=null;
-    if(station.id==='medical'&&this.actStation==='medical')return true;
+    if(station.id==='medical'&&this.actStation==='medical'&&!this.reclineExit)return true;
     if((this.health.critical&&station.id!=='medical')||(this.health.needsCare&&station.id==='gym')){
       this.scene.obsUI?.healthEvent?.({type:'restricted',stage:this.health.stage,kind:this.health.condition.kind});
       if(this.actStation!=='medical')this._go(getStation('medical'));return false;
@@ -82,7 +113,22 @@ export class CabinBrain extends Brain {
     this.actor.goTo(station,()=>this._startPerform(station));
     return true;
   }
-  _startPerform(station){
+  _startPerform(station,seated=false){
+    if(station.id==='bunk'&&!this.bunkVisit){
+      this.cur=station;this.state='enteringBunk';this.actKey='perform';this.actStation='bunk';this.recoverNeed=null;
+      this.bunkVisit=new BunkVisit({
+        entered:()=>super._startPerform(station),
+        exited:()=>{this.bunkVisit=null;super._endPerform();this.finishDeparture();}
+      });return;
+    }
+    const enteringLounge=station.id==='lounge'&&!seated&&!this.isSeatedInLounge();
+    if(station.id==='gym'&&!this.gymVisit){
+      this.cur=station;this.state='mountingGym';this.actKey='perform';this.actStation='gym';this.recoverNeed=null;
+      this.gymVisit=new GymVisit({pedalTime:this.gymPedalTime??0,
+        entered:()=>super._startPerform({...station,need:null}),
+        exited:()=>{this.gymPedalTime=this.gymVisit.pedalTime;this.gymVisit=null;super._endPerform();this.finishDeparture();}
+      });return;
+    }
     if(station.id==='lounge'&&!this.gamePending){
       const options=['tablet','music',...(this.catRoutine?.canPlayLounge()?['cat']:[])].filter(mode=>mode!==this.lastLeisure);
       this.leisure=this.nextLeisure??options[Math.floor(this.random()*options.length)];this.nextLeisure=null;this.lastLeisure=this.leisure;
@@ -96,7 +142,7 @@ export class CabinBrain extends Brain {
         exited:()=>{this.bathroom=null;super._endPerform();this.finishDeparture();}
       });return;
     }
-    if(this.gamePending&&station.id==='lounge'){
+    if(this.gamePending&&station.id==='lounge'&&!enteringLounge){
       this.gamePending=false;this.state='playingGame';this.actKey='perform';this.actStation='lounge';this.cur=station;
       this.actor.setSymbol('');this.scene.obsUI?.openGame?.();return;
     }
@@ -105,14 +151,18 @@ export class CabinBrain extends Brain {
     }
     // The shared brain owns six needs; exercise is maintained only in the 3D cabin.
     if(station.id==='medical'){
-      station={...station,dur:this.health.duration*1000};this.cur=station;this.health.beginTreatment();
+      station={...station,dur:medicalDuration(this.health.duration)*1000};this.cur=station;this.health.beginTreatment();
       this.medicalSample=medicalReadings(this.needs,this.health);
     }
     super._startPerform(station.id==='gym'?{...station,need:null}:station);
-    if(station.id==='lounge'&&this.leisure==='cat')this.catRoutine.inviteLounge(this);
+    if(enteringLounge){this.cur=station;this.loungeEntry={age:0};this.state='enteringLounge';}
+    else if(station.id==='lounge'&&this.leisure==='cat')this.catRoutine.inviteLounge(this);
     if(['eva','airlock','innerHatch'].includes(station.id))this.scene.obsUI?.inspectEVA?.(station.id);
   }
   _endPerform(){
+    if(this.bunkVisit){this.state='leavingBunk';this.recoverNeed=null;this.bunkVisit.requestExit();return;}
+    if(this.loungeEntry){this.afterActivity??=()=>{};return;}
+    if(this.gymVisit){this.state='leavingGym';this.recoverNeed=null;this.gymVisit.requestExit();return;}
     if(this.cur?.id==='lounge'){this.beginLoungeExit();return;}
     if(this.cur?.id==='plant'){
       const count=this.plants.harvest(this.care);this.plants.tend();
@@ -128,6 +178,19 @@ export class CabinBrain extends Brain {
     this.finishDeparture();
   }
   deferDeparture(callback){
+    if(this.bunkVisit){this.afterActivity=callback;this.state='leavingBunk';this.recoverNeed=null;this.bunkVisit.requestExit();return true;}
+    if(this.loungeEntry){this.afterActivity=callback;return true;}
+    if(this.reclineExit){this.afterActivity=callback;return true;}
+    if(this.state==='performing'&&['bunk','medical'].includes(this.cur?.id)){
+      const time=this.curDurSec-this.performT;
+      this.reclineExit={id:this.cur.id,age:0,actionTime:time,progress:reclineProgress(time,this.curDurSec)};
+      if(this.cur.id==='medical'){
+        const entryTime=medicalEntryTime(time,this.curDurSec);
+        Object.assign(this.reclineExit,{entryTime,actionDuration:this.curDurSec,duration:entryTime});
+      }
+      this.afterActivity=callback;this.state='leavingRecline';this.recoverNeed=null;this.health.cancelTreatment();return true;
+    }
+    if(this.gymVisit){this.afterActivity=callback;this.state='leavingGym';this.recoverNeed=null;this.gymVisit.requestExit();return true;}
     if(this.loungeExit||this.isSeatedInLounge()){
       this.afterActivity=callback;this.beginLoungeExit();return true;
     }
@@ -175,7 +238,7 @@ export class CabinBrain extends Brain {
   }
   isSeatedInLounge(){return this.state==='performing'&&this.cur?.id==='lounge'&&!this.actor.busy;}
   clickLounge(){
-    if(this.loungeExit)return 'pending';
+    if(this.loungeExit||this.loungeEntry)return 'pending';
     if(this.isSeatedInLounge())return this.requestGame()?'chess':'blocked';
     if(this.gamePending||this.state==='playingGame')return 'pending';
     if(this.state==='goingTo'&&this.cur?.id==='lounge')return 'moving';

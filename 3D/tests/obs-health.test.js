@@ -5,7 +5,7 @@ import {CrewHealth} from '../src/obs/health.js';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,currentAction,getStation,FLOORS} from '../src/obs/state.js';
 import {MEDICAL} from '../src/obs/layout.js';
-import {medicalReadings,medicalRecline} from '../src/obs/medical.js';
+import {medicalReadings,medicalRecline,medicalDuration,MED_BED} from '../src/obs/medical.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 
 const needs={energy:80,thirst:80,hunger:80,hygiene:80};
@@ -55,7 +55,8 @@ test('treatment must finish, cancellation keeps the condition and completion giv
 test('extended treatment stays reclined after the old 14-second checkup limit; fever readings settle',()=>{
   const health=new CrewHealth();health.startCondition('fever');health.value=29;health.beginTreatment();
   assert.equal(health.treatment.duration,36);assert.equal(medicalRecline(20,36),1);
-  assert.equal(medicalRecline(35,36),.5);assert.equal(medicalRecline(36,36),0);
+  const duration=medicalDuration(36);
+  assert.ok(Math.abs(medicalRecline(duration-6.55,duration)-.5)<1e-10);assert.equal(medicalRecline(duration-1,duration),0);assert.equal(medicalRecline(duration,duration),0);
   const hot=medicalReadings(needs,health);health.update(20,{needs});const cooler=medicalReadings(needs,health);
   assert.ok(cooler.temperature<hot.temperature);assert.ok(cooler.pulse<hot.pulse);
 });
@@ -64,7 +65,8 @@ test('medical commands are idempotent and a full treatment produces one result w
   brain.handleChat('治療して');actor.update(1/60);assert.equal(currentAction(brain),'medical');
   advance(brain,5);const elapsed=brain.health.treatment.elapsed,version=actor.commandVersion;
   brain.handleChat('医療区画へ');assert.equal(actor.commandVersion,version);assert.equal(brain.health.treatment.elapsed,elapsed);
-  const before={...brain.needs};advance(brain,20);
+  assert.equal(elapsed,0,'boarding must not count toward treatment');
+  const before={...brain.needs};advance(brain,brain.performT+.1);
   assert.equal(brain.health.needsCare,false);assert.equal(reports.length,1);assert.equal(reports[0].treated,true);
   assert.equal(events.filter(e=>e.type==='recovered').length,1);assert.deepEqual(care.supplies,care.capacity);
   for(const key in before)assert.ok(brain.needs[key]<=before[key]);
@@ -73,7 +75,7 @@ test('interrupted medical treatment is not reported as complete and resumes with
   const {brain,actor,reports}=setup();brain.health.startCondition('fever');brain._go(MEDICAL);actor.update(1/60);
   advance(brain,5);brain._go(getStation('hydro'));assert.equal(brain.health.treatment,null);
   assert.equal(brain.health.needsCare,true);assert.equal(reports.length,0);
-  brain._go(MEDICAL);actor.update(1/60);assert.equal(brain.health.treatment.elapsed,0);
+  brain._go(MEDICAL);brain.update(brain.reclineExit.duration);actor.update(1/60);assert.equal(brain.health.treatment.elapsed,0);
 });
 test('urgent illness refuses chess and prioritizes care; critical illness refuses other orders',()=>{
   const {brain,care}=setup();brain.health.startCondition('fever');brain.health.value=54;
@@ -89,6 +91,8 @@ test('a gym injury stops exercise, and critical care does not cancel an already 
   brain._go(gym);actor.update(1/60);assert.equal(currentAction(brain),'gym');
   care.take('food');care.request();care.transmit();care.update(3);assert.equal(care.phase,'inbound');
   brain.health.startCondition('injury');brain.update(1/60);
+  assert.equal(brain.state,'leavingGym');assert.equal(actor.busy,false);
+  for(let i=0;i<8*60;i++)brain.update(1/60);
   assert.equal(brain.actStation,'medical');assert.equal(care.phase,'inbound');
   assert.equal(brain.health.treatment,null);
 });

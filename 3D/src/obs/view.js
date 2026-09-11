@@ -10,10 +10,11 @@ import {animateDelivery} from './delivery.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT} from './layout.js';
 import {animateAirlock} from './eva.js';
-import {animateMedical,medicalRecline,medicalReadings,MED_BED} from './medical.js';
-import {BUNK_BED,reclineProgress} from './recline.js';
+import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
+import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
+import {animateBunk} from './bunk.js';
 import {diningPhase,DINING_APPROACH} from './dining.js';
-import {loungeExitPose} from './lounge-exit.js';
+import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 
 export class ObservationView {
   static async create(canvas){const [m,head]=await Promise.all([materials(),loadMiloHead()]);return new ObservationView(canvas,m,head);}
@@ -70,14 +71,17 @@ export class ObservationView {
   setFrustum(){const half=this.viewHeight/2,aspect=this.width/this.height;this.camera.left=-half*aspect;this.camera.right=half*aspect;this.camera.top=half;this.camera.bottom=-half;this.camera.updateProjectionMatrix();}
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null){
     const action=currentAction(brain),catMotion=catRoutine.motion;
-    const actionTime=brain.loungeExit?.actionTime??(brain.state==='performing'?brain.curDurSec-brain.performT:time);
-    if(action==='gym')animateGym(this.ship.gym,actionTime);
+    const actionTime=brain.reclineExit?.actionTime??brain.loungeExit?.actionTime??(brain.loungeEntry?0:brain.state==='performing'?brain.curDurSec-brain.performT:time);
+    animateGym(this.ship.gym,brain.gymVisit?.pedalTime??brain.gymPedalTime??0);
+    animateBunk(this.ship.bunk,brain.bunkVisit?.pose);
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
     this.milo.position.set(positionX(actor.x),positionY(actor.y),actor.climbing?.48:.78);
     const bathroom=brain.bathroom?.pose;
     if(action==='plant')this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
     if(['galley','hydro'].includes(action))this.milo.position.z=.78-DINING_APPROACH*diningPhase(actionTime,brain.curDurSec).approach;
-    animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,actionTime,actionDuration:brain.curDurSec,knock:actor.knockTime,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit});
+    if(brain.gymVisit)brain.gymVisit.startYaw??=this.milo.rotation.y;
+    if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
+    animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,actionTime,actionDuration:brain.curDurSec,knock:actor.knockTime,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
       fixture.door.rotation.y=brain.bathroom?.id===id?(bathroom?.opening??0)*Math.PI/2:0;
     }
@@ -87,16 +91,18 @@ export class ObservationView {
       docks.meal.visible=care.has('food');
     }
     const treating=Boolean(brain.health.treatment);
-    animateMedical(this.ship.medical,actionTime,action==='medical',action==='medical'?(treating?medicalReadings(brain.needs,brain.health):brain.medicalSample):brain.lastMedicalReport,{duration:brain.curDurSec,treating,alert:brain.health.needsCare});
+    const medicalTime=brain.reclineExit?.id==='medical'?medicalExitTime(brain.reclineExit):actionTime;
+    animateMedical(this.ship.medical,medicalTime,action==='medical',action==='medical'?(treating?medicalReadings(brain.needs,brain.health):brain.medicalSample):brain.lastMedicalReport,{duration:brain.curDurSec,treating,alert:brain.health.needsCare,patient:this.milo,scanTime:brain.reclineExit?.id==='medical'?brain.reclineExit.actionTime:medicalTime});
     if(airlock)animateAirlock(this.ship.innerDoor,this.ship.innerSignal,airlock.opening);
     const passage=catMotion.passagePose,catMoving=passage?['enter','exit'].includes(passage.phase):catMotion.busy;
     const hop=catMotion.hop?{...catMotion.hop,yaw:Math.atan2((positionX(CAT_SOFA.seatX)-positionX(CAT_SOFA.floorX))*(catMotion.hop.up?1:-1),(LOUNGE_SEAT.centerDepth-CAT_PORT.walkZ)*(catMotion.hop.up?1:-1))}:null;
     this.cat.position.set(positionX(catMotion.x),positionY(catMotion.y)+catMotion.elevation,catMotion.z);this.cat.visible=!catMotion.hidden;
-    animateCat(this.cat,{time,moving:catMoving,climbing:false,facing:catMotion.facing,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance,passage,hop,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining});
-    if(action==='lounge'&&!actor.busy)this.milo.position.z=brain.loungeExit?loungeExitPose(brain.loungeExit.age).depth:LOUNGE_SEAT.depth;
+    animateCat(this.cat,{time,moving:catMoving,climbing:false,facing:catMotion.facing,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance,passage,hop,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
+    if(action==='lounge'&&!actor.busy)this.milo.position.z=brain.loungeEntry?loungeExitPose(loungeEntryAge(brain.loungeEntry.age)).depth:brain.loungeExit?loungeExitPose(brain.loungeExit.age).depth:LOUNGE_SEAT.depth;
     if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
-    if(action==='gym')this.milo.position.z=BIKE.depth;
-    if(action==='medical')this.milo.position.z=THREE.MathUtils.lerp(.78,MED_BED.depth,medicalRecline(actionTime,brain.curDurSec));
+    if(action==='gym')this.milo.position.z=brain.gymVisit?.pose.depth??BIKE.depth;
+    if(brain.reclineExit?.id==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineExitProgress(brain.reclineExit));
+    if(brain.bunkVisit)this.milo.position.z=brain.bunkVisit.pose.depth;
     if(!paused)this.ship.fan.children.slice(1).forEach(blade=>blade.rotation.z+=dt*3.0);
     animateDelivery(this.ship,care,this.reducedMotion);
     this.ship.foodGroup.visible=care.has('catfood')||catRoutine.mode==='eat';

@@ -16,6 +16,7 @@ test('first lounge click rests, en-route clicks do not queue chess, seated click
   assert.equal(brain.clickLounge(),'relax');assert.equal(brain.gamePending,false);
   assert.equal(brain.clickLounge(),'moving');assert.equal(opened(),0);
   for(let i=0;i<120;i++)actor.update(1/60);
+  assert.equal(brain.clickLounge(),'pending');assert.equal(brain.isSeatedInLounge(),false);brain.update(2.4);
   assert.ok(brain.isSeatedInLounge());assert.equal(brain.leisure,'tablet');assert.equal(opened(),0);
   const version=actor.commandVersion;
   assert.equal(brain.clickLounge(),'chess');assert.equal(opened(),1);assert.equal(actor.commandVersion,version);
@@ -24,17 +25,18 @@ test('first lounge click rests, en-route clicks do not queue chess, seated click
 test('random lounge activities vary between visits and never launch a game on their own',()=>{
   const {brain,opened}=setup(()=>.99);brain.catRoutine={canPlayLounge:()=>true,inviteLounge(){}};
   const modes=[];
-  for(let i=0;i<5;i++){brain._startPerform(getStation('lounge'));modes.push(brain.leisure);assert.ok(brain.curDurSec>=32);brain._endPerform();brain.update(2.8);}
+  for(let i=0;i<5;i++){brain._startPerform(getStation('lounge'));brain.update(2.4);modes.push(brain.leisure);assert.ok(brain.curDurSec>=32);brain._endPerform();brain.update(2.8);}
   assert.equal(modes[0],'cat');assert.ok(modes.includes('music'));assert.ok(modes.every((m,i)=>!i||m!==modes[i-1]));assert.equal(opened(),0);
   brain.catRoutine.canPlayLounge=()=>false;brain._startPerform(getStation('lounge'));assert.notEqual(brain.leisure,'cat');
 });
 test('cat joins using the existing sofa hop and stops playing when chess starts',()=>{
   const {brain,care,actor}=setup(()=>.99),cat=new CatRoutine(care,{random:()=>.5});brain.catRoutine=cat;
   cat.hunger=80;cat.energy=80;brain.actor.x=getStation('lounge').x;
-  brain._startPerform(getStation('lounge'));assert.equal(brain.leisure,'cat');
+  brain._startPerform(getStation('lounge'));brain.update(2.4);assert.equal(brain.leisure,'cat');
   for(let i=0;i<1200&&cat.mode!=='play';i++)cat.update(1/60,actor);
   assert.equal(cat.mode,'play');assert.ok(cat.motion.onSofa);assert.equal(cat.motion.floor,0);
-  brain.requestGame();cat.update(1/60,actor);assert.equal(cat.mode,'look');assert.equal(cat.playHost,null);
+  brain.requestGame();cat.update(1/60,actor);assert.equal(cat.mode,'play');assert.ok(cat.playRelease);assert.equal(cat.playHost,null);
+  cat.update(1.2,actor);assert.equal(cat.mode,'look');
 });
 test('leisure props only appear in their mode and animations remain finite',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),root=createMilo(m),cat=createCat(m);

@@ -38,6 +38,41 @@ export function applyCyclingPose(root,time){
   }
 }
 
+export function applyGymVisitPose(root,visit){
+  const pose=visit.pose,{weight,grip,nearFoot,farFoot,pedalTime,turn}=pose;
+  visit.startYaw??=root.rotation.y;
+  const delta=Math.atan2(Math.sin(Math.PI/2-visit.startYaw),Math.cos(Math.PI/2-visit.startYaw));
+  root.rotation.y=visit.startYaw+delta*turn;
+  if(turn<1)return;
+  const {body,chest,head,arms,legs}=root.userData;
+  body.position.y=BIKE.bodyLift*farFoot-.04*Math.sin(Math.PI*weight);
+  const lean=.14*grip,pivot=1.08,offset=-.48*(1-weight);
+  chest.rotation.x=lean;chest.position.set(0,pivot*(1-Math.cos(lean)),-pivot*Math.sin(lean));
+  head.position.set(0,pivot+(1.637-pivot)*Math.cos(lean)+.009*Math.sin(lean),(1.637-pivot)*Math.sin(lean)-.009*Math.cos(lean));
+  head.rotation.set(-.04*grip,0,0);
+  for(const {leg,knee,boot,side}of legs){
+    const blend=side<0?nearFoot:farFoot,pedal=pedalPosition(pedalTime,side);
+    const target=new THREE.Vector3(-.48+side*.100,.107,.013).lerp(new THREE.Vector3(pedal.x,pedal.y+.1245,pedal.z-.024),blend);
+    target.y+=Math.sin(Math.PI*blend)*.10;
+    leg.position.x=side*THREE.MathUtils.lerp(.100,.14,blend);
+    const dx=target.x-offset-leg.position.x,dy=target.y-body.position.y-leg.position.y,dz=target.z;
+    const yaw=Math.atan2(dx,dz),angles=hingeAngles(dy,Math.hypot(dx,dz),.435,Math.hypot(.425,.013));
+    leg.rotation.set(angles.upper,yaw,0,'YXZ');knee.rotation.set(angles.lower+Math.atan2(.013,.425),0,0);
+    boot.quaternion.copy(leg.quaternion).multiply(knee.quaternion).invert();
+  }
+  for(const rig of arms){
+    const {arm,elbow,hand,side}=rig;
+    arm.position.y=pivot+(1.488-pivot)*Math.cos(lean);arm.position.z=(1.488-pivot)*Math.sin(lean);
+    const idle=new THREE.Vector3(side*.222,.905,.036);
+    const target=idle.lerp(new THREE.Vector3(side*.207-offset,BIKE.gripY-.007-body.position.y,BIKE.gripZ-.045),grip);
+    const d=target.sub(arm.position),yaw=Math.atan2(d.x,d.z),angles=hingeAngles(d.y,Math.hypot(d.x,d.z),.310,.274,-1);
+    arm.rotation.set(angles.upper,yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
+    const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2*grip,0,0));
+    hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(rotation);
+    for(const finger of rig.fingers){finger.rotation.x=.6*grip;for(const link of finger.userData.links)link.rotation.x=1.05*grip;}
+  }
+}
+
 export function createGym(m,x){
   const root=new THREE.Group();root.name='Ship gym';root.position.set(x,0,BIKE.depth);root.rotation.y=Math.PI/2;
   box(root,m.rubber,0,.019,.28,1.12,.035,1.86,.02);
