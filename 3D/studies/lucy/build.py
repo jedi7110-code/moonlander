@@ -200,6 +200,36 @@ def shift(name,xyz):
 def rotate(name,axis,angle):
     p=arm.pose.bones[name];p.rotation_quaternion=Quaternion(p.bone.matrix_local.to_3x3().inverted()@Vector(axis),angle)
 
+def walking_rear_paws(phase):
+    bpy.context.view_layer.update()
+    for side,offset in [('L',0),('R',-.5)]:
+        t=(phase+offset)%1
+        if t<=.64:continue
+        s=(t-.64)/.36
+        extension=smooth(.20,.50,s)*(1-smooth(.62,.95,s))
+        paw=arm.pose.bones['feet_'+side]
+        rest=paw.bone.tail_local-paw.bone.head_local
+        lower=arm.pose.bones['leg3_'+side]
+        direction=lower.tail-lower.head
+        # Follow the metatarsus in profile, without adding an inward toe twist.
+        angle=math.atan2(rest.y*direction.z-rest.z*direction.y,rest.y*direction.y+rest.z*direction.z)
+        rotate(paw.name,(1,0,0),angle*extension)
+
+def walking_tail_sway(phase):
+    bpy.context.view_layer.update()
+    chain=[arm.pose.bones['tail'+str(i)] for i in range(1,6)]
+    baseline=[p.matrix.to_quaternion() for p in chain]
+    parent_rotation=chain[0].parent.matrix.to_quaternion()
+    # Set absolute segment directions so lateral bends do not accumulate into a wag.
+    for i,(p,orientation) in enumerate(zip(chain,baseline)):
+        direction=orientation@Vector((0,1,0))
+        axis=direction.cross(Vector((1,0,0))).normalized()
+        sway=(.070+.010*i)*math.cos(math.tau*(phase-.24-i*.055/1.2))
+        target=Quaternion(axis,sway)@orientation
+        rest=p.parent.bone.matrix_local.to_quaternion().inverted()@p.bone.matrix_local.to_quaternion()
+        p.rotation_quaternion=(parent_rotation@rest).inverted()@target
+        parent_rotation=target
+
 def sitting():
     shift('CONTROLLER',(0,0,-.025));rotate('pelvis',(1,0,0),-.36);rotate('Bone.002',(1,0,0),.22)
     for side in ['L','R']:shift('leg3_control_'+side,(0,-.025,0))
@@ -212,15 +242,24 @@ for name,count in [('Idle',91),('Walk',37),('WalkLevel',37),('WalkLow',37),('Sle
         scene.frame_set(frame);reset();phase=(frame-1)/(count-1)
         if name.startswith('Walk'):
             for side,rear,offset in [('L',True,0),('L',False,-.24),('R',True,-.5),('R',False,-.74)]:
-                t=(phase+offset)%1
+                t=(phase+offset)%1;sign=1 if side=='L' else -1
+                # Narrow tracks stay fixed during stance; only the lifted paw arcs outward.
+                x=sign*((.012 if rear else .010)-.027)
                 if t<.64:y=-.056+.112*t/.64;z=0
                 else:
                     s=(t-.64)/.36
                     y=.056+.063*s-.525*s*s+.350*s*s*s
                     z=.020*math.sin(math.pi*s)**1.5
-                    rotate(('feet_' if rear else 'paw3_')+side,(1,0,0),(.24 if rear else .35)*math.sin(math.pi*s)**2)
-                shift(('leg3_control_' if rear else 'paw_control_')+side,(0,y,z))
-            shift('CONTROLLER',(0,0,-.016+.0008*math.cos(phase*math.tau*2)))
+                    x+=sign*.003*math.sin(math.pi*s)**2
+                    if not rear:
+                        fold=smooth(.08,.44,s)*(1-smooth(.50,.90,s))
+                        rotate('paw3_'+side,(1,0,0),1.55*fold)
+                shift(('leg3_control_' if rear else 'paw_control_')+side,(x,y,z))
+                # Keep elbows/hocks under the body, not flared toward the old wide poles.
+                shift(('leg2_pole2_' if rear else 'paw_pole_')+side,(-sign*(.025 if rear else .045),0,0))
+                if not rear:
+                    shift('paw1_'+side,(-sign*.0035,-.006*math.cos(t*math.tau),.002*math.sin(t*math.tau)))
+            shift('CONTROLLER',(0,0,-.012+.0008*math.cos(phase*math.tau*2)))
             rotate('Bone.002',(1,0,0),.35)
             rotate('Bone.004',(1,0,0),-.26)
         elif name=='Sleep':
@@ -246,6 +285,9 @@ for name,count in [('Idle',91),('Walk',37),('WalkLevel',37),('WalkLow',37),('Sle
         for i in range(1,6):
             if name in ['Sleep','Sit','Groom']:rotate('tail'+str(i),(0,0,1),.22+.025*math.sin(phase*math.tau-i*.4))
             else:rotate('tail'+str(i),(1,0,0),tail_curves.get(name,tail_curves['Walk'])[i-1]+.013*math.sin(phase*math.tau-i*.4))
+        if name.startswith('Walk'):
+            walking_rear_paws(phase)
+            walking_tail_sway(phase)
         for p in arm.pose.bones:
             p.keyframe_insert('location',frame=frame);p.keyframe_insert('rotation_quaternion',frame=frame);p.keyframe_insert('scale',frame=frame)
     actions.append(action)
