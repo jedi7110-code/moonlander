@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MeshStandardMaterial,Vector3} from 'three';
 import {createCat,animateCat} from '../src/obs/characters.js';
-import {CatRoutine,CatMotion,CrewMotion,Supplies} from '../src/obs/state.js';
+import {CatRoutine,CatMotion,CrewMotion,Supplies,CAT_WALK_SPEED} from '../src/obs/state.js';
 import {catLookDirection} from '../src/obs/cat-rest.js';
 
 const make=()=>createCat(new Proxy({},{get:()=>new MeshStandardMaterial()}));
@@ -52,8 +52,8 @@ function followers(){
 test('following trails a walking Milo on the same deck and ends when he stops',()=>{
   const {actor,cat}=followers();assert.equal(cat.mode,'follow');
   for(let i=0;i<240;i++){actor.update(1/60);cat.update(1/60,actor);assert.ok(actor.x-cat.motion.x>25);assert.equal(cat.motion.portal,null);}
-  assert.ok(cat.motion.x>650);assert.equal(cat.mode,'follow');
-  actor.queue=[];cat.update(.1,actor);assert.equal(cat.mode,'look');assert.equal(cat.motion.walkSpeed,36);
+  assert.ok(cat.motion.x>500+CAT_WALK_SPEED*1.6*3.8);assert.equal(cat.mode,'follow');
+  actor.queue=[];cat.update(.1,actor);assert.equal(cat.mode,'look');assert.equal(cat.motion.walkSpeed,CAT_WALK_SPEED);
 });
 test('following never chases Milo onto a ladder, and manual feeding cancels it',()=>{
   const {actor,cat}=followers();actor.queue=[{type:'climb',floor:2,y:870}];cat.update(.1,actor);assert.equal(cat.mode,'look');assert.equal(cat.motion.climbing,false);

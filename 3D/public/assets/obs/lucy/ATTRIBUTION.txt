@@ -1,0 +1,15 @@
+Lucy cabin model.
+
+Surface: Low poly cat #46138 by snippysnappets (Free3D).
+https://free3d.com/3d-model/low-poly-cat-46138.html
+Recorded license: Personal Use License (source page checked 2026-09-11).
+
+Rig: Domestic cat (rigged) by Pawel Walasiewicz (BlenderKit).
+https://www.blendkit.com/asset-gallery-detail/6b3bbcc7-db99-4424-9436-8e6678ee9354/
+
+Calico coloring, fitted rig, walking and cabin animation adaptations in
+3D/studies/lucy and 3D/src/obs/lucy.js.
+
+Published at the project owner's request on 2026-09-13.
+The source authors retain their rights. The recorded source license above
+has not been changed by the project's adaptations or publication request.

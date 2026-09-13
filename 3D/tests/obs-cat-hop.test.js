@@ -10,7 +10,7 @@ for(const up of [true,false])test(`cat hops ${up?'onto':'off'} the sofa and land
   const cat=new CatMotion({floor:0,x:up?CAT_SOFA.floorX:CAT_SOFA.seatX}),phases=[];
   let arrived=0,peak=0,airSteps=0;
   cat.goTo({floor:0,x:up?CAT_SOFA.seatX:CAT_SOFA.floorX},()=>arrived++);
-  for(let i=0;i<180;i++){
+  for(let i=0;i<6*120;i++){
     const distance=cat.walkDistance;cat.update(1/120);peak=Math.max(peak,cat.elevation);
     if(cat.hop){if(phases.at(-1)!==cat.hop.phase)phases.push(cat.hop.phase);assert.equal(arrived,0);
       if(cat.hop.phase==='flight'){airSteps++;assert.equal(cat.walkDistance,distance);}
@@ -22,7 +22,7 @@ for(const up of [true,false])test(`cat hops ${up?'onto':'off'} the sofa and land
 });
 test('retargeting a jump finishes the landing before reversing, including pause',()=>{
   const cat=new CatMotion({floor:0,x:CAT_SOFA.floorX});let old=0,latest=0;
-  cat.goTo({floor:0,x:1060},()=>old++);advance(cat,.4);
+  cat.goTo({floor:0,x:1060},()=>old++);advance(cat,(CAT_PORT.walkZ-CAT_SOFA.approachZ)/(cat.walkSpeed*.022)+.4);
   const position=[cat.x,cat.elevation,cat.z],age=cat.hop.age;
   cat.update(0);cat.goTo({floor:2,x:800},()=>latest++);
   assert.deepEqual([cat.x,cat.elevation,cat.z],position);assert.equal(cat.hop.age,age);

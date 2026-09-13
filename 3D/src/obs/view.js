@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials} from './materials.js';
 import {buildShip,positionX,positionY,HABITAT_VIEW} from './ship.js';
-import {createMilo,createCat,animateMilo,animateCat} from './characters.js';
+import {createMilo,animateMilo} from './characters.js';
+import {loadLucy,createLucy,animateLucy,disposeLucy} from './lucy.js';
 import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
 import {loadMiloHead} from './head.js';
 import {animateDelivery} from './delivery.js';
 import {animateGym,BIKE} from './gym.js';
-import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT} from './layout.js';
+import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
 import {animateAirlock} from './eva.js';
 import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
 import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
@@ -17,8 +18,8 @@ import {diningPhase,DINING_APPROACH} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 
 export class ObservationView {
-  static async create(canvas){const [m,head]=await Promise.all([materials(),loadMiloHead()]);return new ObservationView(canvas,m,head);}
-  constructor(canvas,m,head){
+  static async create(canvas){const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy()]);return new ObservationView(canvas,m,head,lucy);}
+  constructor(canvas,m,head,lucy){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.localClippingEnabled=true;
@@ -31,7 +32,7 @@ export class ObservationView {
     const key=new THREE.DirectionalLight(0xffefd5,2.5);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(0xb9d0d8,.80);fill.position.set(12,7,9);this.scene.add(fill);
     this.ship=buildShip(m);this.scene.add(this.ship.staticMesh,this.ship.animated);
-    this.milo=createMilo(m,head);this.cat=createCat(m);this.scene.add(this.milo,this.cat);
+    this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
     this.camera=new THREE.OrthographicCamera(-16,16,8,-8,.1,150);this.camera.position.set(0,6.7,40);this.camera.lookAt(0,5.0,0);
     this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -64,10 +65,28 @@ export class ObservationView {
     this.bind('pointercancel',e=>{if(drag&&e.pointerId!==drag.pointerId)return;drag=null;this.hover(null);});
     this.bind('lostpointercapture',e=>{if(drag&&e.pointerId!==drag.pointerId)return;drag=null;this.hover(null);});
     this.bind('pointerleave',()=>this.hover(null));
-    this.bind('wheel',e=>{e.preventDefault();this.changeZoom(e.deltaY<0?1.15:1/1.15);},{passive:false});
+    this.bind('wheel',e=>{if(e.deltaY===0)return;e.preventDefault();this.changeZoom(e.deltaY<0?1.15:1/1.15,e);},{passive:false});
   }
   setMode(mode){this.hover(null);this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
-  changeZoom(ratio){this.hover(null);this.zoom=THREE.MathUtils.clamp(this.zoom*ratio,.8,5);const base=this.mode==='all'||this.mode==='manual'?this.fitHeight:this.mode==='cat'?3.3:5.3;this.targetHeight=THREE.MathUtils.clamp(base/this.zoom,1.9,this.fitHeight*1.25);}
+  changeZoom(ratio,pointer=null){
+    if(!Number.isFinite(ratio)||ratio<=0||ratio===1)return;
+    const height=THREE.MathUtils.clamp((this.targetHeight??this.viewHeight)/ratio,1.9,this.fitHeight*1.25);
+    if(height===this.targetHeight)return;
+    this.hover(null);
+    if(pointer){
+      const rect=this.canvas.getBoundingClientRect();if(rect.width<=0||rect.height<=0)return;
+      const x=(pointer.clientX-rect.left)/rect.width*2-1,y=1-(pointer.clientY-rect.top)/rect.height*2;
+      const up=new THREE.Vector3(0,1,0).applyQuaternion(this.camera.quaternion);
+      const delta=(this.viewHeight-height)/2;
+      // Center and scale use the same easing, so the anchor stays fixed on every frame.
+      this.targetCenter.copy(this.center);
+      this.targetCenter.x+=x*delta*rect.width/rect.height;
+      this.targetCenter.y+=y*delta/up.y;
+      if(this.mode!=='manual'){this.mode='manual';this.onModeChange?.(this.mode);}
+    }
+    const base=this.mode==='all'||this.mode==='manual'?this.fitHeight:this.mode==='cat'?3.3:5.3;
+    this.targetHeight=height;this.zoom=base/height;
+  }
   setFrustum(){const half=this.viewHeight/2,aspect=this.width/this.height;this.camera.left=-half*aspect;this.camera.right=half*aspect;this.camera.top=half;this.camera.bottom=-half;this.camera.updateProjectionMatrix();}
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null){
     const action=currentAction(brain),catMotion=catRoutine.motion;
@@ -75,13 +94,13 @@ export class ObservationView {
     animateGym(this.ship.gym,brain.gymVisit?.pedalTime??brain.gymPedalTime??0);
     animateBunk(this.ship.bunk,brain.bunkVisit?.pose);
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
-    this.milo.position.set(positionX(actor.x),positionY(actor.y),actor.climbing?.48:.78);
+    this.milo.position.set(positionX(actor.x),positionY(actor.y),actor.climbing?.48:CABIN_AISLE.crewZ);
     const bathroom=brain.bathroom?.pose;
     if(action==='plant')this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
     if(['galley','hydro'].includes(action))this.milo.position.z=.78-DINING_APPROACH*diningPhase(actionTime,brain.curDurSec).approach;
     if(brain.gymVisit)brain.gymVisit.startYaw??=this.milo.rotation.y;
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
-    animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
+    animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch||actor.waitingForCat,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
       fixture.door.rotation.y=brain.bathroom?.id===id?(bathroom?.opening??0)*Math.PI/2:0;
     }
@@ -94,10 +113,10 @@ export class ObservationView {
     const medicalTime=brain.reclineExit?.id==='medical'?medicalExitTime(brain.reclineExit):actionTime;
     animateMedical(this.ship.medical,medicalTime,action==='medical',action==='medical'?(treating?medicalReadings(brain.needs,brain.health):brain.medicalSample):brain.lastMedicalReport,{duration:brain.curDurSec,treating,alert:brain.health.needsCare,patient:this.milo,scanTime:brain.reclineExit?.id==='medical'?brain.reclineExit.actionTime:medicalTime});
     if(airlock)animateAirlock(this.ship.innerDoor,this.ship.innerSignal,airlock.opening);
-    const passage=catMotion.passagePose,catMoving=passage?['enter','exit'].includes(passage.phase):catMotion.busy;
-    const hop=catMotion.hop?{...catMotion.hop,yaw:Math.atan2((positionX(CAT_SOFA.seatX)-positionX(CAT_SOFA.floorX))*(catMotion.hop.up?1:-1),(LOUNGE_SEAT.centerDepth-CAT_PORT.walkZ)*(catMotion.hop.up?1:-1))}:null;
+    const passage=catMotion.passagePose,catMoving=!catMotion.waitingForCrew&&(passage?['enter','exit'].includes(passage.phase):catMotion.busy);
+    const hop=catMotion.hop?{...catMotion.hop,yaw:Math.atan2((positionX(CAT_SOFA.seatX)-positionX(CAT_SOFA.floorX))*(catMotion.hop.up?1:-1),(LOUNGE_SEAT.centerDepth-CAT_SOFA.approachZ)*(catMotion.hop.up?1:-1))}:null;
     this.cat.position.set(positionX(catMotion.x),positionY(catMotion.y)+catMotion.elevation,catMotion.z);this.cat.visible=!catMotion.hidden;
-    animateCat(this.cat,{time,moving:catMoving,climbing:false,facing:catMotion.facing,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance,passage,hop,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
+    animateLucy(this.cat,{time,dt:paused?0:dt,moving:catMoving,facing:catMotion.facing,yaw:catMotion.laneYaw,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance+catMotion.depthWalkDistance,passage,hop,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
     if(action==='lounge'&&!actor.busy)this.milo.position.z=brain.loungeEntry?loungeExitPose(loungeEntryAge(brain.loungeEntry.age)).depth:brain.loungeExit?loungeExitPose(brain.loungeExit.age).depth:LOUNGE_SEAT.depth;
     if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
     if(action==='gym')this.milo.position.z=brain.gymVisit?.pose.depth??BIKE.depth;
@@ -116,5 +135,5 @@ export class ObservationView {
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
     this.camera.position.set(this.center.x,this.center.y+1.6,40);this.camera.lookAt(this.center.x,this.center.y,0);this.renderer.render(this.scene,this.camera);
   }
-  dispose(){this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

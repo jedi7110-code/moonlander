@@ -3,7 +3,7 @@ import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinChess} from './chess-ui.js';
 import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
-import {CrewMotion,Supplies,CatRoutine,getStation,currentAction} from './state.js';
+import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
 import {ObservationView} from './view.js';
 import {CabinAudio} from './audio.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
@@ -241,7 +241,7 @@ async function start(){
       if(!paused&&!document.hidden&&!chess.open){
         accumulator+=dt;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!chess.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);if(!actor.waitingForHatch)actor.update(step);cat.update(step,actor);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+        while(accumulator>=1/60&&!chess.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);advanceCabinTraffic(actor,cat,step);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
       if(!document.hidden){feedback.update(dt,brain,actor,paused||chess.open);view.render(dt,elapsed,actor,brain,cat,care,paused||chess.open,airlock);}

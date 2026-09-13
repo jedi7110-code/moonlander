@@ -1,7 +1,7 @@
 # Lucy: Biological Study
 
 2026-09-11に確認したルーシーの体型・三毛模様・歩行・尻尾を再現する調整コードです。
-ゲーム本体への差し替えはまだ行っていません。
+2026-09-13に本編へ接続し、ユーザーの公開指示により本編用GLBも配布対象にしました。
 
 ## 確定した形
 
@@ -28,6 +28,23 @@ Web用GLBには `Idle`、`Walk`、`WalkLevel`、`WalkLow` を含みます。
 確認画面ではそれらを重ね合わせ、足運びを変えずに尻尾を切り替えます。
 Blenderファイル内の寝る・食べる等のポーズは調整途中です。
 
+## 本編への接続
+
+`export-cabin.py` は確認済みの `.blend` から、表面と4つの待機・歩行クリップを変えずに本編用GLBを作ります。
+寝る・食べる・座る・毛づくろい・遊ぶ・しゃがむ・跳ぶの7動作とまばたきを追加しています。
+本編の `src/obs/lucy.js` で移動距離に歩行位相を合わせ、休息の入り・終わりを補間し、足の接地をIKで補正します。
+壁裏通路では壁面でクリップし、既存のジャンプ・食器・追従・休息の行動制御を使用します。
+
+```sh
+blender --background --factory-startup --disable-autoexec --python studies/lucy/export-cabin.py
+cp studies/lucy/local/cabin/lucy-cabin.glb public/assets/obs/lucy/lucy-cabin.glb
+npm run build
+```
+
+本編用GLBは `public/assets/obs/lucy/` と生成済み `dist/assets/obs/lucy/` の両方でGit管理します。元素材・Blender編集データ・参考写真・ローカル確認画面は引き続き `local/` に保持します。
+動作検証: `node --test tests/obs-lucy.test.js`。接地、寝起き、食器位置、停止を調べます。元のプレビューと本編の表面・歩行データの一致検証は、ローカルの `lucy-combined.glb` がある環境で追加実行します。
+本編プレビューを起動して `node studies/lucy/verify-cabin.cjs` を実行すると、食事・ソファー上下・壁通路・クリック追従・一時停止を確認し、PCとスマートフォン幅の画像を `local/cabin/qa/` に保存します。URLは `CABIN_URL`、Playwrightの場所は `PLAYWRIGHT_MODULE` で指定できます。
+
 ## ファイル
 
 - `build.py`: 外側と骨格の組み合わせ、配色、変形設定、モーション、GLB出力。
@@ -35,6 +52,8 @@ Blenderファイル内の寝る・食べる等のポーズは調整途中です�
 - `tail-variation.js`: 尻尾のランダム選択、保持時間、滑らかな切り替え。
 - `build-preview.mjs`: ローカルGLBを埋め込んだ、単体で開けるHTMLを作成。
 - `verify.cjs`: 全メッシュの変形、接地、PC・スマートフォン表示を検証。
+- `export-cabin.py`: 確認済みの外形・歩行を維持して本編用モーションを追加。
+- `verify-cabin.cjs`: 本編の実際の行動制御・描画・操作・画面サイズを検証。
 
 ## ローカル再現
 
@@ -94,4 +113,4 @@ node studies/lucy/build-preview.mjs
 - 骨格: Pawel Walasiewicz, [Domestic cat (rigged) / BlenderKit](https://www.blendkit.com/asset-gallery-detail/6b3bbcc7-db99-4424-9436-8e6678ee9354/)
 
 素材の出典・利用条件は `local/SOURCES.md` にも記録しています。
-素材を含む生成物の公開は、この調整コードのプッシュとは別の扱いです。
+配布する本編用GLBにも `ATTRIBUTION.txt` を添付しています。出典ページで記録した利用条件は変更していません。ユーザーの公開指示は、原作者による利用条件の変更を意味しません。

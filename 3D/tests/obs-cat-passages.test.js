@@ -7,7 +7,7 @@ import {createCat,animateCat} from '../src/obs/characters.js';
 
 const advance=(motion,seconds)=>{for(let i=0;i<seconds*60;i++)motion.update(1/60);};
 test('same-deck routes stay on the floor without using a passage',()=>{
-  const cat=new CatMotion({floor:0,x:800});let arrived=0;cat.goTo({floor:0,x:850},()=>arrived++);advance(cat,2);
+  const cat=new CatMotion({floor:0,x:800});let arrived=0;cat.goTo({floor:0,x:850},()=>arrived++);advance(cat,50/cat.walkSpeed+.1);
   assert.equal(arrived,1);assert.equal(cat.x,850);assert.equal(cat.y,FLOORS[0].y);assert.equal(cat.portal,null);assert.equal(cat.z,CAT_PORT.walkZ);
 });
 test('floor changes enter a wall, hide for transit, and emerge before walking away',()=>{

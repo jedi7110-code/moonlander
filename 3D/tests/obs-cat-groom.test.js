@@ -4,7 +4,7 @@ import {Box3,MeshStandardMaterial,Vector3} from 'three';
 import {createCat,animateCat} from '../src/obs/characters.js';
 import {groomingSequence} from '../src/obs/cat-groom.js';
 import {CatRoutine,Supplies} from '../src/obs/state.js';
-import {CAT_BOWL,CAT_SCALE} from '../src/obs/layout.js';
+import {CAT_BOWL,CAT_SCALE,CAT_PORT} from '../src/obs/layout.js';
 
 const makeCat=()=>{const material=new MeshStandardMaterial();return createCat(new Proxy({},{get:()=>material}));};
 function poseAt(root,until,facing=1){
@@ -52,7 +52,8 @@ test('entering a cat passage overrides grooming and preserves its low-clearance 
 test('every rest starts its own animation clock; feeding and pause keep the routine coherent',()=>{
   const cat=new CatRoutine(new Supplies());cat.rest('groom',16);cat.update(2);assert.equal(cat.modeTime,2);
   cat.update(0);assert.equal(cat.modeTime,2);cat.fetch();assert.equal(cat.pendingMove.kind,'fetch');assert.equal(cat.modeTime,2);
-  for(let i=0;i<45*60&&cat.mode!=='eat';i++)cat.update(1/60);
+  const laneDetour=2*(CAT_PORT.walkZ-CAT_BOWL.depth)/(cat.motion.walkSpeed*.022);
+  for(let i=0;i<(45+laneDetour)*60&&cat.mode!=='eat';i++)cat.update(1/60);
   assert.equal(cat.mode,'eat');assert.equal(cat.modeTime,0);assert.equal(cat.motion.x,CAT_BOWL.approachX);
   for(let i=0;i<9*60&&cat.mode==='eat';i++)cat.update(1/60);
   assert.ok(['groom','sleep','look','walk'].includes(cat.mode));assert.equal(cat.modeTime,0);

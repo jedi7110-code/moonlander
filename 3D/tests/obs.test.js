@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {CrewMotion,Supplies,CatRoutine,FLOORS,currentAction} from '../src/obs/state.js';
 import {Brain} from '../../js/obs/brain.js?v=15';
 import {MeshStandardMaterial,Box3,Vector3} from 'three';
-import {CAT_BOWL,LOUNGE_SEAT,getStation} from '../src/obs/layout.js';
+import {CAT_BOWL,CAT_PORT,LOUNGE_SEAT,getStation} from '../src/obs/layout.js';
 import {positionX,createAccessLadder,createLoungeTable,HABITAT_VIEW} from '../src/obs/ship.js';
 import {createMilo,createCat,animateMilo,animateCat} from '../src/obs/characters.js';
 import {StationFeedback,SIGNAL_COLORS} from '../src/obs/feedback.js';
@@ -91,7 +91,8 @@ test('supplies are finite and never regenerate without an order',()=>{
 });
 test('cat eats only on reaching the bowl and consumes one delivery',()=>{
   const care=new Supplies(),cat=new CatRoutine(care);cat.fetch();cat.update(1);assert.equal(care.has('catfood'),true);
-  for(let i=0;i<45*60&&cat.mode!=='eat';i++)cat.update(1/60);
+  const laneDetour=2*(CAT_PORT.walkZ-CAT_BOWL.depth)/(cat.motion.walkSpeed*.022);
+  for(let i=0;i<(45+laneDetour)*60&&cat.mode!=='eat';i++)cat.update(1/60);
   assert.equal(cat.mode,'eat');assert.equal(cat.motion.floor,CAT_BOWL.floor);assert.equal(cat.motion.x,CAT_BOWL.approachX);assert.equal(cat.motion.facing,-1);assert.equal(care.supplies.catfood,2);assert.equal(cat.hunger,100);
 });
 test('the bowl is between the galley and water station, with the cat eating beside it',()=>{

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {createDiningProps} from './dining.js';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
-import {GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,LOUNGE_SEAT} from './layout.js';
+import {GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
 import {createPlantRack} from './plants.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
@@ -13,6 +13,25 @@ export const FLOOR_Y=[6.784,3.392,0];
 export const positionX=x=>(x-700)*.022;
 export const positionY=y=>(870-y)*.016;
 export const HABITAT_VIEW={centerY:6.6,minHeight:15.2,panMinY:0,panMaxY:13.4};
+
+export function createDeckFloor(m,y,level){
+  const root=new THREE.Group();root.name='Deck floor '+level;
+  const {deckBack:back,deckFront:front}=CABIN_AISLE,depth=front-back,center=(front+back)/2;
+  for(const side of [-1,1]){
+    box(root,m.dark,side*6.73,y-.17,center,12.37,.32,depth,.025);
+    box(root,m.metal,side*6.73,y-.013,center,12.3,.025,depth-.13);
+  }
+  // Leave the ladder well open, but carry the cat's front aisle across it.
+  const bridgeBack=level===2?back:.94,bridgeDepth=front-bridgeBack,bridgeZ=(front+bridgeBack)/2;
+  box(root,m.dark,0,y-.17,bridgeZ,1.09,.32,bridgeDepth,.025);
+  box(root,m.metal,0,y-.013,bridgeZ,1.16,.025,bridgeDepth-.13);
+  box(root,m.dark,0,y-.18,front-.01,26.22,.38,.20,.02);
+  for(let x=-12.8;x<12.8;x+=.42){
+    for(const z of [-.75,.1,.8,CABIN_AISLE.catZ])if(Math.abs(x)>.50||z>.94||level===2)box(root,m.rubber,x,y+.005,z,.18,.012,.021);
+    box(root,m.rubber,x,y-.19,front+.11,.20,.105,.012,.009);
+  }
+  return root;
+}
 
 export function createAccessLadder(m){
   const root=new THREE.Group();root.name='Interdeck access shaft';
@@ -189,21 +208,9 @@ export function buildShip(m) {
     pipe(staticRoot,m.dark,[[side*13.63,.20,-.65],[side*13.65,1,-.65],[side*13.65,8.8,-.65],[side*13.15,10.1,-.65]],.115);
   }
   FLOOR_Y.forEach((y,level)=>{
-    for(const side of [-1,1]){
-      box(staticRoot,m.dark,side*6.73,y-.17,-.12,12.37,.32,3.38,.025);
-      box(staticRoot,m.metal,side*6.73,y-.013,-.12,12.3,.025,3.25);
-    }
-    if(level===2){
-      box(staticRoot,m.dark,0,y-.17,-.12,1.09,.32,3.38,.025);
-      box(staticRoot,m.metal,0,y-.013,-.12,1.16,.025,3.25);
-    }
-    box(staticRoot,m.dark,0,y-.18,1.56,26.22,.38,.20,.02);
+    staticRoot.add(createDeckFloor(m,y,level));
     box(staticRoot,m.dark,-1.55,y+2.30,-1.43,1.36,.21,.045,.012);
     label(staticRoot,`${String(level+1).padStart(2,'0')} / ${['HABITATION','OPERATIONS','LIFE SUPPORT'][level]}`,-1.55,y+2.30,-1.40,1.30,.16,{fg:'#d4dbcc',size:48});
-    for(let xx=-12.8;xx<12.8;xx+=.42){
-      for(const zz of [.1,.8,-.75])if(Math.abs(xx)>.50)box(staticRoot,m.rubber,xx,y+.005,zz,.18,.012,.021);
-      box(staticRoot,m.rubber,xx,y-.19,1.68,.20,.105,.012,.009);
-    }
     for(let xx=-11.8;xx<12.5;xx+=1.52){
       panel(staticRoot,m,xx,y+1.44,-1.70,1.48,2.70,level===1?m.dark:m.enamel);
       if(level===0&&Math.abs(xx)<1.265)continue;
