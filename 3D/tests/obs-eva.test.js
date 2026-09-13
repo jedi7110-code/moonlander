@@ -42,6 +42,30 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
   }
   assert.ok(new Box3().setFromObject(bay.hatch).min.x>bounds[2].max.x);
   assert.ok(new Box3().setFromObject(bay.innerHatch).max.x<bounds[0].min.x);
+  assert.deepEqual(bay.suits.map(suit=>suit.userData.colorway),['white','red','white']);
+  const clothColors=bay.suits.map(suit=>suit.getObjectByName('Tailored pressure garment').material.color.getHex());
+  assert.equal(clothColors[0],clothColors[2]);assert.notEqual(clothColors[0],clothColors[1]);
+  assert.equal(material.color.getHex(),0xffffff,'suit colors must not recolor shared cabin materials');
+  for(const suit of bay.suits){
+    assert.ok(suit.getObjectByName('Life support backpack'));
+    assert.ok(suit.getObjectByName('Chest service panel'));
+    assert.ok(suit.getObjectByName('Restraint harness'));
+  }
+  const rackBounds=new Box3().setFromObject(bay.equipmentRack);
+  assert.ok(rackBounds.min.x>bounds[2].max.x,'weapon rack is to the right of all three suits');
+  assert.ok(rackBounds.max.x<new Box3().setFromObject(bay.hatch).min.x,'rack does not intrude into the outer hatch');
+  assert.ok(rackBounds.max.z<.5,'rack stays against the wall, behind the walking lane');
+  assert.equal(bay.equipmentRack.userData.weapons.length,3);
+  let previous=null;
+  for(const [index,weapon]of bay.equipmentRack.userData.weapons.entries()){
+    const box=new Box3().setFromObject(weapon);assert.equal(weapon.userData.rackSlot,index+1);
+    assert.ok(box.max.y-box.min.y>1.2);assert.ok(box.max.x-box.min.x<.5);
+    if(previous)assert.ok(box.min.x>previous.max.x,'three stored weapons have separate silhouettes');previous=box;
+    weapon.traverse(mesh=>{
+      if(!mesh.geometry)return;
+      for(const key of ['position','normal','uv'])for(const value of mesh.geometry.attributes[key].array)assert.ok(Number.isFinite(value));
+    });
+  }
   assert.ok(bay.hatch.getObjectByName('Sealed pressure door'));assert.equal(bay.hatch.rotation.y,EVA_BAY.hatchYaw);
   for(const hatch of [bay.hatch,bay.innerHatch]){
     const normal=new Vector3(0,0,1).applyQuaternion(hatch.quaternion);

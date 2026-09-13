@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Group,MeshStandardMaterial,Raycaster,Vector3} from 'three';
+import {Group,MeshStandardMaterial,Plane,Raycaster,Vector3} from 'three';
 import {label,batchStatic} from '../src/obs/materials.js';
 import {buildShip} from '../src/obs/ship.js';
 
@@ -51,9 +51,12 @@ test('front-facing signs stay clear of fixtures, ceiling beams and one another',
     // Door-leaf and bicycle-console labels intentionally face sideways in this cutaway.
     if(normal.z<.8)continue;
     checked++;sign.geometry.computeBoundingBox();const {min,max}=sign.geometry.boundingBox;
+    const plane=new Plane().setFromNormalAndCoplanarPoint(normal,new Vector3().fromBufferAttribute(sign.geometry.attributes.position,0).applyMatrix4(sign.matrixWorld));
     for(let column=0;column<=32;column++)for(const v of [.05,.5,.95]){
       const u=.02+column*.03;
       const point=new Vector3(min.x+(max.x-min.x)*u,min.y+(max.y-min.y)*v,(min.z+max.z)/2).applyMatrix4(sign.matrixWorld);
+      // Turned suit labels are planar, but their world-space bounds have nonzero depth.
+      plane.projectPoint(point,point);
       const origin=point.clone().add(new Vector3(0,1.6,40));ray.set(origin,point.clone().sub(origin).normalize());
       const hit=ray.intersectObjects(objects,false)[0];
       assert.ok(!hit||hit.distance>=origin.distanceTo(point)-.0001,`${sign.name} is obstructed at ${u}, ${v}`);

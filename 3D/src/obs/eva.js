@@ -1,68 +1,15 @@
 import * as THREE from 'three';
-import {box,ball,cylinder,pipe,rod,label} from './materials.js';
+import {box,ball,cylinder,rod,label} from './materials.js';
 import {EVA_PASSAGE} from './layout.js';
-import {createEVAHelmet} from './eva-helmet.js';
+import {hangingSuit} from './eva-suit.js';
+import {createEquipmentRack} from './eva-equipment.js';
+export {hangingSuit} from './eva-suit.js';
 
 export const EVA_BAY={suitX:[7.85,9.05,10.25],suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:-.12};
 
 function ring(parent,material,x,y,z,r,tube=.025){
   const mesh=new THREE.Mesh(new THREE.TorusGeometry(r,tube,8,32),material);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
 }
-function paddedLimb(parent,m,a,b,r){
-  rod(parent,m.evaCloth,a,b,r);
-  ball(parent,m.evaCloth,...a,r*1.05,r*1.1,r*1.05);
-  ball(parent,m.evaCloth,...b,r*.95,r,r*.95);
-  const from=new THREE.Vector3(...a),to=new THREE.Vector3(...b),axis=to.clone().sub(from).normalize();
-  for(let i=0;i<3;i++){
-    const point=from.clone().lerp(to,.55+i*.14),crease=ring(parent,m.cloth,point.x,point.y,point.z,r*.97,.014);
-    crease.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),axis);
-  }
-}
-
-export function hangingSuit(m,index){
-  const suit=new THREE.Group();suit.name=`EVA suit ${index+1}`;suit.userData.suitNumber=index+1;
-  // The backpack is held by the rack; slack sleeves and raised boots show storage, not a wearer.
-  box(suit,m.dark,0,1.33,-.25,.50,.73,.23,.06);
-  box(suit,m.enamel,0,1.34,-.39,.45,.62,.08,.035);
-  for(const side of [-1,1]){
-    cylinder(suit,m.metal,side*.16,1.28,-.41,.068,.45,.068,16);
-    box(suit,m.dark,side*.19,1.66,-.3,.07,.17,.19,.016);
-  }
-  box(suit,m.evaCloth,0,1.28,0,.53,.62,.39,.14);
-  ball(suit,m.evaCloth,0,1.02,0,.255,.23,.19);
-  cylinder(suit,m.rubber,0,.985,0,.237,.075,.237,28).scale.z=.79;
-  for(const side of [-1,1]){
-    const hip=[side*.135,.94,-.015],knee=[side*.16,.56,.015],ankle=[side*.17,.22,.025];
-    paddedLimb(suit,m,hip,knee,.125);paddedLimb(suit,m,knee,ankle,.111);
-    box(suit,m.dark,side*.16,.55,.117,.15,.16,.055,.035);
-    cylinder(suit,m.dark,side*.17,.22,.025,.115,.10,.115,24);
-    box(suit,m.evaCloth,side*.17,.105,.075,.215,.22,.34,.058);
-    box(suit,m.rubber,side*.17,.035,.085,.228,.065,.36,.025);
-    for(let j=0;j<3;j++)box(suit,m.dark,side*.17,.10+j*.036,.236,.16,.013,.018,.004);
-    const shoulder=[side*.29,1.49,-.005],elbow=[side*.405,1.17,.01],wrist=[side*.42,.91,.06];
-    paddedLimb(suit,m,shoulder,elbow,.112);paddedLimb(suit,m,elbow,wrist,.092);
-    const band=rod(suit,index===1?m.yellow:m.red,[side*.365,1.325,.001],[side*.38,1.28,.004],.115);
-    band.name='Identification band';
-    cylinder(suit,m.metal,side*.42,.87,.06,.096,.071,.096,24);
-    ball(suit,m.evaCloth,side*.422,.75,.083,.086,.117,.064);
-    ball(suit,m.evaCloth,side*.35,.783,.105,.037,.067,.04);
-    for(let j=0;j<3;j++)rod(suit,m.cloth,[side*.422-.043+j*.029,.72,.142],[side*.422-.043+j*.029,.787,.142],.005);
-  }
-  cylinder(suit,m.metal,0,1.66,0,.185,.095,.185,32);
-  cylinder(suit,m.rubber,0,1.707,0,.172,.028,.172,32);
-  suit.add(createEVAHelmet(m));
-  box(suit,m.dark,0,1.37,.214,.32,.27,.072,.035);
-  box(suit,m.enamel,0,1.39,.258,.285,.214,.03,.025);
-  for(const side of [-1,1]){
-    const socket=cylinder(suit,side<0?m.teal:m.red,side*.086,1.395,.283,.034,.025,.034,16);socket.rotation.x=Math.PI/2;
-  }
-  label(suit,`EVA-${String(index+1).padStart(2,'0')}`,0,1.51,.281,.23,.065,{size:65,fg:'#182426',bg:'#d4d8c9'});
-  pipe(suit,m.rubber,[[-.12,1.29,.263],[-.23,1.18,.26],[-.25,1.08,.12],[-.25,1.19,-.23]],.037);
-  pipe(suit,m.metal,[[.28,1.66,-.23],[.23,2.27,-.23],[0,2.35,-.23],[0,2.40,-.23]],.022);
-  pipe(suit,m.metal,[[0,2.38,-.23],[0,2.48,-.23],[0,2.5,-.34],[0,2.43,-.4]],.022);
-  return suit;
-}
-
 function chamfer(w,h,r){
   return new THREE.Shape([
     new THREE.Vector2(-w/2+r,-h/2),new THREE.Vector2(w/2-r,-h/2),new THREE.Vector2(w/2,-h/2+r),new THREE.Vector2(w/2,h/2-r),
@@ -127,10 +74,11 @@ export function createEVABay(m,y){
   box(root,m.dark,9.05,y+.12,-.69,3.71,.12,1.25,.025);
   for(let i=0;i<25;i++)box(root,m.metal,7.34+i*.141,y+.186,-.68,.075,.013,1.06);
   EVA_BAY.suitX.forEach((x,index)=>{
-    const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.scale.y=.90;root.add(suit);suits.push(suit);
+    const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.scale.y=.90;suit.rotation.y=(index-1)*.16;root.add(suit);suits.push(suit);
   });
   const hatch=createEVAHatch(m,y),innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
-  return{root,suits,hatch,innerHatch};
+  const equipmentRack=createEquipmentRack(m,y);root.add(equipmentRack);
+  return{root,suits,hatch,innerHatch,equipmentRack};
 }
 
 export function animateAirlock(door,signal,opening){
