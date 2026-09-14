@@ -74,7 +74,7 @@ export function createEVABay(m,y){
   box(root,m.dark,9.05,y+.12,-.69,3.71,.12,1.25,.025);
   for(let i=0;i<25;i++)box(root,m.metal,7.34+i*.141,y+.186,-.68,.075,.013,1.06);
   EVA_BAY.suitX.forEach((x,index)=>{
-    const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.scale.y=.90;suit.rotation.y=(index-1)*.16;root.add(suit);suits.push(suit);
+    const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.rotation.y=(index-1)*.16;root.add(suit);suits.push(suit);
   });
   const hatch=createEVAHatch(m,y),innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
   const equipmentRack=createEquipmentRack(m,y);root.add(equipmentRack);

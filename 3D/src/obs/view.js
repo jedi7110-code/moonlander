@@ -11,6 +11,7 @@ import {animateDelivery} from './delivery.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
 import {animateAirlock} from './eva.js';
+import {loadEVAGarment} from './eva-garment.js';
 import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
 import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
 import {animateBunk} from './bunk.js';
@@ -18,7 +19,7 @@ import {diningPhase,DINING_APPROACH} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 
 export class ObservationView {
-  static async create(canvas){const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy()]);return new ObservationView(canvas,m,head,lucy);}
+  static async create(canvas){const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment()]);return new ObservationView(canvas,m,head,lucy);}
   constructor(canvas,m,head,lucy){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
