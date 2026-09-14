@@ -5,7 +5,7 @@ import math
 import sys
 from pathlib import Path
 import bpy
-from mathutils import Quaternion, Vector
+from mathutils import Matrix, Quaternion, Vector
 
 LOCAL = Path(__file__).resolve().parent / 'local'
 parser = argparse.ArgumentParser()
@@ -46,8 +46,86 @@ def seated():
     rotate('Bone.001', (1, 0, 0), .23)
     rotate('Bone.002', (1, 0, 0), .54)
     for side, sign in [('L', 1), ('R', -1)]:
-        shift('leg3_control_' + side, (sign * .005, -.034, 0))
+        shift('leg3_control_' + side, (sign * .005, -.060, 0))
         shift('paw_control_' + side, (0, .018, 0))
+
+# Keep the approved walking surface and the jaw intact. Fill the breast above
+# the foreleg roots, not the underside of the head or the upper throat.
+def smooth(a, b, value):
+    t = max(0, min(1, (value - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+
+reset()
+seated()
+bpy.context.view_layer.update()
+chest = skin.shape_key_add(name='SitChest')
+belly = skin.shape_key_add(name='SitBelly')
+paws = skin.shape_key_add(name='SitPaws')
+coat_indices = {i for p in skin.data.polygons if skin.data.materials[p.material_index].name == 'Lucy calico coat' for i in p.vertices}
+to_arm = arm.matrix_world.inverted() @ skin.matrix_world
+to_skin = to_arm.inverted()
+belly_offsets = {}
+belly_ground = {}
+for vertex in skin.data.vertices:
+    if vertex.index not in coat_indices:
+        continue
+    x, y, z = vertex.co
+    # Broaden the resting hind paws and lower the raised upper surface while
+    # retaining the sole height. This is separate from moving the leg targets.
+    paw = smooth(-.060, -.015, y) * (1 - smooth(.023, .058, z))
+    if y < -.240:
+        continue
+    deform = Matrix(((0, 0, 0, 0),) * 4)
+    for group in vertex.groups:
+        bone = arm.pose.bones.get(skin.vertex_groups[group.group].name)
+        if bone and bone.bone.use_deform:
+            deform += (bone.matrix @ bone.bone.matrix_local.inverted()) * group.weight
+    local_deform = to_skin @ deform @ to_arm
+    posed = local_deform @ vertex.co
+    paw *= 1 - smooth(.028, .052, posed.z)
+    paw_offset = Vector((x * .06, -max(0, .022 - y) * .14, -max(0, posed.z - .008) * .55)) * paw
+    paws.data[vertex.index].co += local_deform.to_3x3().inverted_safe() @ paw_offset
+    # Sitting compresses the abdomen into a broad, low volume behind the
+    # forelegs. Keep the breast, head, feet and tail out of this correction.
+    # Inflate the continuous ventral surface in bind space: inverse skinning
+    # around the folded hip can introduce creases as the seated pose animates.
+    abdomen = smooth(-.145, -.085, y) * (1 - smooth(.035, .095, y))
+    abdomen *= smooth(.045, .080, z) * (1 - smooth(.115, .170, z))
+    belly_offset = Vector((x * .26, 0, -.018)) * abdomen
+    belly_offsets[vertex.index] = belly_offset
+    belly_ground[vertex.index] = smooth(.018, .050, posed.z)
+    # Locate the breast in the seated pose, not by a standing neck band: that
+    # band crosses the upper back once the spine has folded into a sitting cat.
+    weight = smooth(.075, .130, posed.z) * (1 - smooth(.145, .220, posed.z))
+    weight *= smooth(.070, .115, -posed.y) * (1 - smooth(.025, .059, abs(posed.x)))
+    weight *= smooth(-.240, -.180, y)
+    if weight < 1e-5:
+        continue
+    offset = local_deform.to_3x3().inverted_safe() @ Vector((x * .07 * weight, -.030 * weight, 0))
+    chest.data[vertex.index].co += offset
+# Spread the abdominal compression across the connected surface instead of
+# leaving a local bump where the abdomen meets the thigh and foreleg weights.
+neighbors = [[] for _ in skin.data.vertices]
+for edge in skin.data.edges:
+    a, b = edge.vertices
+    neighbors[a].append(b)
+    neighbors[b].append(a)
+for _ in range(16):
+    relaxed = {}
+    for i, value in belly_offsets.items():
+        vertex = skin.data.vertices[i]
+        if vertex.co.y < -.145 or vertex.co.z < .045 or not neighbors[i]:
+            relaxed[i] = Vector((0, 0, 0))
+        else:
+            mean = sum((belly_offsets.get(j, Vector((0, 0, 0))) for j in neighbors[i]), Vector((0, 0, 0))) / len(neighbors[i])
+            relaxed[i] = value.lerp(mean, .5)
+    belly_offsets = relaxed
+for i, value in belly_offsets.items():
+    belly.data[i].co += value * belly_ground[i]
+chest.value = 0
+belly.value = 0
+paws.value = 0
+reset()
 
 scene = bpy.context.scene
 scene.render.fps = 30

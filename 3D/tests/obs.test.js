@@ -46,7 +46,7 @@ test('the scanned head retains its face, normals and UVs after the shoulder crop
   const bytes=await readFile(new URL('../public/assets/obs/head/LeePerrySmith.glb',import.meta.url));
   const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   const source=gltf.scene.getObjectByName('LeePerrySmith').geometry,geometry=headGeometry(source);
-  assert.ok(geometry.boundingBox.min.y>=-1.05);assert.ok(geometry.boundingBox.max.y>3.9);
+  assert.ok(Math.abs(geometry.boundingBox.min.y+1.95)<1e-6);assert.ok(geometry.boundingBox.max.y>3.9);
   assert.ok(geometry.attributes.position.count>20000);assert.ok(source.index);
   for(const name of ['position','normal','uv'])for(const number of geometry.attributes[name].array)assert.ok(Number.isFinite(number));
   assert.equal(geometry.attributes.normal.count,geometry.attributes.position.count);
@@ -61,12 +61,29 @@ test('the scanned head retains its face, normals and UVs after the shoulder crop
         for(const axis of ['X','Y','Z'])assert.equal(reshaped['get'+axis](output),original['get'+axis](vertex),'the face and upper skull stay unchanged');
         for(const axis of ['X','Y','Z'])assert.equal(normals['get'+axis](output),source.attributes.normal['get'+axis](vertex));
       }else assert.ok(Math.abs(Math.hypot(normals.getX(output),normals.getY(output),normals.getZ(output))-1)<1e-5);
-      if(y>0&&y<.65&&z<-.5){assert.ok(reshaped.getZ(output)>z+.015,'the taper continues above the old nape bulge');napeVertices++;}
+      if(y>0&&y<.65&&z<-.5){assert.ok(reshaped.getZ(output)>z+.009,'the gentler taper continues above the old nape bulge');napeVertices++;}
       for(const axis of ['X','Y'])assert.equal(geometry.attributes.uv['get'+axis](output),source.attributes.uv['get'+axis](vertex));
       output++;
     }
   }
   assert.ok(napeVertices>50);
+  for(const height of [-1.05,-1.5]){
+    const ring=[];
+    for(let i=0;i<reshaped.count;i++)if(Math.abs(reshaped.getY(i)-height)<.02)ring.push(i);
+    const width=(Math.max(...ring.map(i=>reshaped.getX(i)))-Math.min(...ring.map(i=>reshaped.getX(i))))*.055;
+    const depth=(Math.max(...ring.map(i=>reshaped.getZ(i)))-Math.min(...ring.map(i=>reshaped.getZ(i))))*.055;
+    assert.ok(width>.11&&depth>.10,`the adult neck must retain width and depth at ${height}: ${width}, ${depth}`);
+    assert.ok(width<.17&&depth<.16,'the neck must not become broader than the jaw');
+  }
+  // The only lower-neck boundary is tucked inside the collar. No loose edges
+  // may remain at the old jaw crop or between the extension's rows.
+  const edges=new Map(),key=v=>[reshaped.getX(v),reshaped.getY(v),reshaped.getZ(v)].map(n=>Math.round(n*1e4)).join(',');
+  for(let i=0;i<reshaped.count;i+=3)for(let j=0;j<3;j++){
+    const a=i+j,b=i+(j+1)%3,k=[key(a),key(b)].sort().join('|');
+    if(key(a)===key(b))continue;
+    const entry=edges.get(k)||{count:0,y:(reshaped.getY(a)+reshaped.getY(b))/2};entry.count++;edges.set(k,entry);
+  }
+  assert.equal([...edges.values()].filter(e=>e.count===1&&e.y>-1.94&&e.y<-.95).length,0,'the scan-to-neck extension cannot have saw-toothed open edges');
   geometry.dispose();gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
 });
 test('crew walks to ladder, changes decks, and invokes arrival once',()=>{
@@ -135,7 +152,7 @@ test('Milo has adult limb proportions and grounded boots when standing or sittin
   }
   animateMilo(milo,{action:null,moving:false,climbing:false,time:0,facing:1});milo.updateMatrixWorld(true);
   for(const {hand}of milo.userData.arms){const bounds=new Box3().setFromObject(hand);assert.ok(bounds.min.y>.70&&bounds.min.y<.80);}
-  const torso=milo.getObjectByName('Continuous shoulders and torso');assert.ok(torso);assert.ok(milo.getObjectByName('Fitted tank top'));
+  const torso=milo.getObjectByName('Continuous shoulders and torso');assert.ok(torso);assert.ok(milo.getObjectByName('Crew neck T-shirt'));
 });
 test('lounge thighs and shins clear the cushion while hips remain supported and boots stay grounded',()=>{
   const material=new MeshStandardMaterial(),milo=createMilo(new Proxy({},{get:()=>material}));

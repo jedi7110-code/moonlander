@@ -106,7 +106,15 @@ export function animateLucy(root,{time=0,dt=null,moving=false,facing=1,yaw=null,
     bone.quaternion.copy(rotation);
   });
   const blink=Math.max(weights.Sleep,Math.pow(Math.max(0,Math.sin(time*1.1)),32)*.94);
-  s.model.traverse(mesh=>{const index=mesh.morphTargetDictionary?.Blink;if(index!==undefined)mesh.morphTargetInfluences[index]=blink;});
+  s.model.traverse(mesh=>{
+    const index=mesh.morphTargetDictionary?.Blink;if(index!==undefined)mesh.morphTargetInfluences[index]=blink;
+    const chest=mesh.morphTargetDictionary?.SitChest;
+    if(chest!==undefined)mesh.morphTargetInfluences[chest]=weights.Sit+weights.Groom+weights.Play;
+    const belly=mesh.morphTargetDictionary?.SitBelly;
+    if(belly!==undefined)mesh.morphTargetInfluences[belly]=weights.Sit+weights.Groom+weights.Play;
+    const paws=mesh.morphTargetDictionary?.SitPaws;
+    if(paws!==undefined)mesh.morphTargetInfluences[paws]=weights.Sit+weights.Groom+weights.Play;
+  });
   const direction=passage?.yaw??hop?.yaw??yaw??facing*Math.PI/2;
   if(!s.initialized)root.rotation.y=direction;
   else root.rotation.y+=Math.atan2(Math.sin(direction-root.rotation.y),Math.cos(direction-root.rotation.y))*(1-Math.exp(-dt*10));

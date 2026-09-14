@@ -12,6 +12,7 @@ import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
 import {animateAirlock} from './eva.js';
 import {loadEVAGarment} from './eva-garment.js';
+import {loadMiloBody} from './milo-body.js';
 import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
 import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
 import {animateBunk} from './bunk.js';
@@ -19,7 +20,7 @@ import {diningPhase,DINING_APPROACH} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 
 export class ObservationView {
-  static async create(canvas){const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment()]);return new ObservationView(canvas,m,head,lucy);}
+  static async create(canvas){const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment(),loadMiloBody()]);return new ObservationView(canvas,m,head,lucy);}
   constructor(canvas,m,head,lucy){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
@@ -136,5 +137,5 @@ export class ObservationView {
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
     this.camera.position.set(this.center.x,this.center.y+1.6,40);this.camera.lookAt(this.center.x,this.center.y,0);this.renderer.render(this.scene,this.camera);
   }
-  dispose(){disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

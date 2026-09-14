@@ -10,21 +10,60 @@ export function headGeometry(source){
   const indexed=source.clone(),position=indexed.attributes.position,indices=indexed.index.array,kept=[];
   // Remove the scan's shoulders below the existing character's neck joint.
   for(let i=0;i<indices.length;i+=3)if([indices[i],indices[i+1],indices[i+2]].every(v=>position.getY(v)>=-1.05))kept.push(indices[i],indices[i+1],indices[i+2]);
-  // Carry the taper up the nape instead of ending it abruptly below the skull.
+  // Keep a gentle nape transition without narrowing an adult neck into a stem.
+  // The jaw/face is excluded by the front mask and stays unchanged.
+  const neckWidthTaper=.12,neckDepthTaper=.38;
   const normal=indexed.attributes.normal;
   for(let i=0;i<position.count;i++){
     const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
     const height=1-THREE.MathUtils.smoothstep(y,-1.05,.85),rear=1-THREE.MathUtils.smoothstep(z,.5,1.6),blend=height*rear;
     if(!blend)continue;
-    const sx=1-.32*blend,sz=1-.62*blend;
+    const sx=1-neckWidthTaper*blend,sz=1-neckDepthTaper*blend;
     position.setXYZ(i,x*sx,y,z*sz);
     // Inverse-transpose of the tapered surface, including its changing slope.
     const dy=-smoothstepSlope(y,-1.05,.85)*rear,dz=-height*smoothstepSlope(z,.5,1.6);
-    const nx=normal.getX(i)/sx,nz=(normal.getZ(i)+.32*x*dz*nx)/(sz-.62*z*dz);
-    const ny=normal.getY(i)+.32*x*dy*nx+.62*z*dy*nz,length=Math.hypot(nx,ny,nz)||1;
+    const nx=normal.getX(i)/sx,nz=(normal.getZ(i)+neckWidthTaper*x*dz*nx)/(sz-neckDepthTaper*z*dz);
+    const ny=normal.getY(i)+neckWidthTaper*x*dy*nx+neckDepthTaper*z*dy*nz,length=Math.hypot(nx,ny,nz)||1;
     normal.setXYZ(i,nx/length,ny/length,nz/length);
   }
-  indexed.setIndex(kept);const geometry=indexed.toNonIndexed();indexed.dispose();geometry.computeBoundingBox();geometry.computeBoundingSphere();return geometry;
+  indexed.setIndex(kept);const geometry=indexed.toNonIndexed();
+  const attributes=['position','normal','uv'],arrays=Object.fromEntries(attributes.map(name=>[name,Array.from(geometry.attributes[name].array)]));
+  const vertex=i=>Object.fromEntries(attributes.map(name=>{const a=indexed.attributes[name];return[name,Array.from(a.array.slice(i*a.itemSize,(i+1)*a.itemSize))];}));
+  const interpolate=(a,b,t)=>Object.fromEntries(attributes.map(name=>[name,a[name].map((v,i)=>THREE.MathUtils.lerp(v,b[name][i],t))]));
+  const emit=(...triangle)=>{for(const v of triangle)for(const name of attributes)arrays[name].push(...v[name]);};
+  const cut=-1.05,segments=[];
+  // Clip crossing triangles at the plane instead of dropping whole faces.
+  // The old crop left a saw-toothed edge immediately under the jaw.
+  for(let i=0;i<indices.length;i+=3){
+    const triangle=[indices[i],indices[i+1],indices[i+2]].map(vertex);
+    if(triangle.every(v=>v.position[1]>=cut)||triangle.every(v=>v.position[1]<cut))continue;
+    const polygon=[];
+    for(let j=0;j<3;j++){
+      const a=triangle[j],b=triangle[(j+1)%3],inside=a.position[1]>=cut,next=b.position[1]>=cut;
+      if(inside)polygon.push(a);
+      if(inside!==next){const v=interpolate(a,b,(cut-a.position[1])/(b.position[1]-a.position[1]));v.position[1]=cut;polygon.push(v);}
+    }
+    for(let j=1;j<polygon.length-1;j++)emit(polygon[0],polygon[j],polygon[j+1]);
+    for(let j=0;j<polygon.length;j++){
+      const a=polygon[j],b=polygon[(j+1)%polygon.length];
+      if(a.position[1]===cut&&b.position[1]===cut)segments.push([a,b]);
+    }
+  }
+  // Continue the scan down inside the T-shirt collar. This hides the overlap
+  // beneath fabric rather than ending two different necks under the chin.
+  const lower=(v,t)=>{
+    const angle=Math.atan2(v.position[2],v.position[0]),blend=THREE.MathUtils.smoothstep(t,0,1);
+    const out=interpolate(v,v,0);
+    out.position=[THREE.MathUtils.lerp(v.position[0],Math.cos(angle)*1.34,blend),cut-.90*t,THREE.MathUtils.lerp(v.position[2],Math.sin(angle)*1.22,blend)];
+    const n=new THREE.Vector3(...v.normal).lerp(new THREE.Vector3(Math.cos(angle),0,Math.sin(angle)),blend).normalize();out.normal=n.toArray();
+    return out;
+  };
+  for(const [a,b]of segments)for(let row=0;row<8;row++){
+    const at=lower(a,row/8),bt=lower(b,row/8),ab=lower(a,(row+1)/8),bb=lower(b,(row+1)/8);
+    emit(bt,at,ab);emit(bt,ab,bb);
+  }
+  for(const name of attributes)geometry.setAttribute(name,new THREE.Float32BufferAttribute(arrays[name],name==='uv'?2:3));
+  indexed.dispose();geometry.computeBoundingBox();geometry.computeBoundingSphere();return geometry;
 }
 
 function eye(parent,x,y,z){
@@ -37,8 +76,8 @@ function eye(parent,x,y,z){
   }
 }
 
-export async function loadMiloHead(){
-  const base=`${import.meta.env.BASE_URL}assets/obs/head/`,loader=new THREE.TextureLoader();
+export async function loadMiloHead(base=`${import.meta.env.BASE_URL}assets/obs/head/`){
+  const loader=new THREE.TextureLoader();
   const [gltf,map,normalMap]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg')]);
   map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;normalMap.anisotropy=4;
   const material=new THREE.MeshStandardMaterial({color:0xd2c8bd,map,normalMap,normalScale:new THREE.Vector2(.45,.45),roughness:.74,metalness:0,envMapIntensity:.3});

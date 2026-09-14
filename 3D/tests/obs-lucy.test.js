@@ -102,3 +102,86 @@ test('the slept-in model closes its eyes and releases them on waking',async()=>{
   animateLucy(cat,{time:4,dt:.05,mode:'sleep',actionTime:4,remaining:0});
   assert(eyes.every(m=>m.morphTargetInfluences[m.morphTargetDictionary.Blink]<.01));
 });
+
+test('seated hind paws flatten toward the floor without changing the forepaws or walking surface',async()=>{
+  const cat=createLucy(await asset());
+  animateLucy(cat,{dt:.1,time:9,mode:'look',actionTime:9,remaining:100,yaw:0});
+  const morphs=[];cat.traverse(m=>{const index=m.morphTargetDictionary?.SitPaws;if(index!==undefined)morphs.push({m,index});});
+  assert(morphs.length>0&&morphs.every(({m,index})=>m.morphTargetInfluences[index]===1));
+  const flat=positions(cat);morphs.forEach(({m,index})=>m.morphTargetInfluences[index]=0);
+  const raised=positions(cat);
+  assert(Math.max(...flat.map((p,i)=>raised[i].y-p.y))>.004,'lower the raised rear-paw surface, not only move the foot target');
+  assert(flat.every(p=>p.y>-.001),'flattened hind paws must not enter the floor');
+  for(const {m,index} of morphs){
+    const p=m.geometry.attributes.position,d=m.geometry.morphAttributes.position[index];
+    for(let i=0;i<p.count;i++)if(p.getZ(i)>.060||p.getY(i)>.058){
+      const delta=new Vector3().fromBufferAttribute(d,i);
+      if(!m.geometry.morphTargetsRelative)delta.sub(new Vector3().fromBufferAttribute(p,i));
+      assert(delta.length()<1e-7,'only the low hind-paw surface may change');
+    }
+  }
+  for(const mode of ['idle','walk','eat','sleep']){
+    animateLucy(cat,{dt:.1,time:4,mode,moving:mode==='walk',actionTime:4,remaining:100,yaw:0});
+    assert(morphs.every(({m,index})=>m.morphTargetInfluences[index]===0));
+  }
+});
+
+test('sitting rounds the abdomen independently of the breast and releases it when standing',async()=>{
+  const cat=createLucy(await asset());
+  animateLucy(cat,{dt:.1,time:9,mode:'look',actionTime:9,remaining:100,yaw:0});
+  const morphs=[];cat.traverse(m=>{const index=m.morphTargetDictionary?.SitBelly;if(index!==undefined)morphs.push({m,index});});
+  assert(morphs.length>0);
+  assert(morphs.every(({m,index})=>m.morphTargetInfluences[index]===1));
+  const full=positions(cat);morphs.forEach(({m,index})=>m.morphTargetInfluences[index]=0);
+  const base=positions(cat);
+  const forward=Math.max(...full.map((p,i)=>p.z-base[i].z));
+  const width=Math.max(...full.map((p,i)=>Math.abs(p.x)-Math.abs(base[i].x)));
+  assert(forward>.025&&forward<.065,'the seated abdomen must fill forward without an oversized pouch');
+  assert(width>.002,'the abdomen needs volume across the flanks as well as forward');
+  for(const {m,index} of morphs){
+    const p=m.geometry.attributes.position,d=m.geometry.morphAttributes.position[index];
+    for(let i=0;i<p.count;i++)if(p.getZ(i)>.145||p.getY(i)<.045){
+      const delta=new Vector3().fromBufferAttribute(d,i);
+      if(!m.geometry.morphTargetsRelative)delta.sub(new Vector3().fromBufferAttribute(p,i));
+      assert(delta.length()<1e-7,'the belly correction must leave chest, head and feet unchanged');
+    }
+  }
+  assert(full.every(p=>p.y>-.001));
+  for(const mode of ['idle','walk','eat','sleep']){
+    animateLucy(cat,{dt:.1,time:4,mode,moving:mode==='walk',actionTime:4,remaining:100,yaw:0});
+    assert(morphs.every(({m,index})=>m.morphTargetInfluences[index]===0));
+  }
+});
+
+test('sitting fills the breast above the forelegs without inflating the jaw, and brings hind paws forward',async()=>{
+  const cat=createLucy(await asset());
+  animateLucy(cat,{dt:.1,time:9,mode:'look',actionTime:9,remaining:100,yaw:0});
+  const morphs=[];cat.traverse(m=>{const index=m.morphTargetDictionary?.SitChest;if(index!==undefined)morphs.push({m,index});});
+  assert(morphs.length>0,'the seated chest correction must be exported');
+  assert(morphs.every(({m,index})=>m.morphTargetInfluences[index]===1));
+  const seated=positions(cat);morphs.forEach(({m,index})=>m.morphTargetInfluences[index]=0);
+  const original=positions(cat);
+  const extension=Math.max(...seated.map((p,i)=>p.z-original[i].z));
+  assert(extension>.025&&extension<.06,'the breast must fill forward above the forelegs without an isolated oversized bulge');
+  assert(Math.max(...seated.map((p,i)=>Math.abs(original[i].y-p.y)))<.015,'the correction must not create a hanging pouch below the jaw');
+  let jawVertices=0;
+  for(const {m,index}of morphs){
+    const base=m.geometry.attributes.position,target=m.geometry.morphAttributes.position[index];
+    for(let i=0;i<base.count;i++)if(base.getZ(i)>.240){
+      const delta=new Vector3().fromBufferAttribute(target,i);
+      if(!m.geometry.morphTargetsRelative)delta.sub(new Vector3().fromBufferAttribute(base,i));
+      assert(delta.length()<1e-7,'head and upper throat vertices must stay unchanged');jawVertices++;
+    }
+  }
+  assert(jawVertices>100);
+  for(const side of ['L','R']){
+    const foot=cat.getObjectByName('feet_'+side).getWorldPosition(new Vector3());
+    const hip=cat.getObjectByName('leg1_'+side).getWorldPosition(new Vector3());
+    assert(foot.z-hip.z>.045,'hind paws must be visible in front of the haunches');
+    assert(Math.abs(foot.y-.0162)<.002,'hind paws stay planted');
+  }
+  for(const mode of ['idle','walk','eat','sleep']){
+    animateLucy(cat,{dt:.1,time:4,mode,moving:mode==='walk',actionTime:4,remaining:100,yaw:0});
+    assert(morphs.every(({m,index})=>m.morphTargetInfluences[index]===0),'the seated chest must not change other silhouettes');
+  }
+});

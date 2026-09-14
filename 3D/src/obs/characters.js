@@ -16,6 +16,7 @@ import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose} from './leisure.js';
 import {applyLoungeExit,applyLoungeEntry} from './lounge-exit.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
+import {attachMiloBody} from './milo-body.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
 function limb(parent,mat,length,profile,depth=1) {
@@ -43,17 +44,11 @@ function surface(parent,material,rows,columns,position){
 function torso(parent,m){
   const skin=surface(parent,m.skin,60,64,(t,u)=>{const y=1.025+t*.60,a=u*Math.PI*2;return[Math.sin(a)*torsoRadius(y,1),y,Math.cos(a)*torsoRadius(y,2)];});skin.name='Continuous shoulders and torso';
   const cloth=surface(parent,m.cloth,40,96,(t,u)=>{
-    const a=u*Math.PI*2,s=Math.sin(a),c=Math.cos(a),side=Math.abs(s),strap=Math.exp(-Math.pow((side-.78)/.21,4));
-    const top=c>=0?1.345+.11*side*side+.113*strap-.15*Math.pow(side,8):1.435+.035*side+.065*strap-.14*Math.pow(side,8);
+    const a=u*Math.PI*2,s=Math.sin(a),c=Math.cos(a),side=Math.abs(s);
+    const top=c>=0?1.535+.045*side:1.558+.025*side;
     const y=1.045+t*(top-1.045),fold=(Math.sin(a*11+y*27)+Math.sin(a*17-y*12))*.0012*Math.sin(t*Math.PI);
     return[s*(torsoRadius(y,1)+.005+fold),y,c*(torsoRadius(y,2)+.005+fold)];
-  });cloth.name='Fitted tank top';
-  // Flat fabric straps sit on the shoulder surface instead of floating tubes.
-  for(const side of [-1,1])surface(parent,m.cloth,32,8,(t,u)=>{
-    const x=side*.126+(u-.5)*.043,z=.096-t*.192;let low=1.30,high=1.58;
-    for(let i=0;i<16;i++){const mid=(low+high)/2;if(x*x/torsoRadius(mid,1)**2+z*z/torsoRadius(mid,2)**2>1)high=mid;else low=mid;}
-    return[x,(low+high)/2+.005,z];
-  });
+  });cloth.name='Crew neck T-shirt';
   return skin;
 }
 
@@ -61,15 +56,16 @@ export function createMilo(m,headModel=new THREE.Group()) {
   const root=new THREE.Group(),body=joint(root,0,0,0);
   const pants=m.olive.clone();pants.map=null;pants.bumpScale=.0015;pants.color.setHex(0x4a5338);
   const hips=ball(body,pants,0,.988,0,.177,.134,.119);
-  box(body,m.rubber,0,1.074,.002,.331,.038,.225,.012);
-  box(body,m.metal,0,1.073,.122,.043,.029,.011,.004);
-  for(const x of [-.137,-.063,.063,.137])box(body,pants,x,1.072,.117,.02,.058,.014,.005);
+  box(body,m.rubber,0,1.074,.002,.365,.038,.285,.020);
+  box(body,m.metal,0,1.073,.149,.043,.029,.011,.004);
+  for(const x of [-.151,-.063,.063,.151])box(body,pants,x,1.072,.145,.02,.058,.014,.005).name='Cargo belt loop';
   const chest=joint(body,0,0,0),neck=torso(chest,m);
   const head=headModel;head.position.set(0,1.637,-.009);body.add(head);
   const arms=[],legs=[];
   for(const side of [-1,1]){
     const arm=joint(body,side*.207,1.488,0);arm.rotation.z=side*.025;
     const upper=limb(arm,m.skin,.365,[[0,0],[.025,.028],[.09,.048],[.19,.060],[.35,.059],[.55,.051],[.8,.043],[1,.035]],.92);upper.position.y=.055;
+    const sleeve=limb(arm,m.cloth,.215,[[0,.033],[.12,.056],[.35,.072],[.7,.068],[1,.062]],.96);sleeve.position.y=.025;sleeve.name='T-shirt short sleeve';
     const elbow=joint(arm,0,-.310,0);
     ball(elbow,m.skin,0,0,0,.035,.039,.032);
     limb(elbow,m.skin,.276,[[0,.034],[.17,.045],[.37,.047],[.62,.037],[.87,.027],[1,.025]],.89);
@@ -86,8 +82,8 @@ export function createMilo(m,headModel=new THREE.Group()) {
     const thumb=joint(hand,-side*.029,-.051,.025);ball(thumb,m.skin,0,0,0,.011,.037,.013);
     const leg=joint(body,side*.100,.970,0);
     limb(leg,pants,.435,[[0,.087],[.12,.098],[.34,.095],[.66,.081],[.9,.065],[1,.064]],1.05);
-    box(leg,pants,side*.078,-.21,.009,.044,.154,.132,.012);
-    box(leg,pants,side*.098,-.145,.011,.017,.032,.139,.005);
+    box(leg,pants,side*.101,-.21,.009,.044,.154,.132,.012).name='Cargo pocket';
+    box(leg,pants,side*.121,-.145,.011,.017,.032,.139,.005).name='Cargo pocket flap';
     const knee=joint(leg,0,-.435,0);
     ball(knee,pants,0,0,0,.064,.065,.064);
     limb(knee,pants,.425,[[0,.064],[.15,.072],[.36,.071],[.64,.060],[.90,.054],[1,.061]],.98);
@@ -99,12 +95,14 @@ export function createMilo(m,headModel=new THREE.Group()) {
     for(let i=0;i<4;i++)rod(boot,m.dark,[-.036,.039,.005+i*.02],[.036,.037,.005+i*.02],.0035);
     arms.push({arm,elbow,hand,fingers,thumb,side});legs.push({leg,knee,boot,side});
   }
+  const headParts=new Set();head.traverse(o=>headParts.add(o));
+  const legacy=[];body.traverse(o=>{if(o.isMesh&&!headParts.has(o)&&!o.name.startsWith('Cargo ')&&[m.skin,m.cloth,pants].includes(o.material))legacy.push(o);});
   const dining=createDiningProps(body,m),{mug}=dining;
   const bandage=new THREE.Group();bandage.position.y=-.13;arms[0].elbow.add(bandage);bandage.visible=false;
   cylinder(bandage,m.cloth,0,0,0,.049,.105,.049,24);
   for(const y of [-.037,-.013,.013,.037])cylinder(bandage,m.white,0,y,0,.050,.009,.050,24);
   const leisure=createLeisureProps(body,m);
-  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';return root;
+  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);return root;
 }
 
 export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
@@ -123,7 +121,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   const desired=bathroom?THREE.MathUtils.lerp((facing||1)*Math.PI/2,bathroom.yaw,bathroom.turn):dining||climbing||calling?Math.PI:walking||waiting?facing*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
   root.rotation.y+=Math.atan2(Math.sin(desired-root.rotation.y),Math.cos(desired-root.rotation.y))*.12;
   head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
-  for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
+  for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,root.userData.bodySkin?side*Math.PI/2:0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
     elbow.rotation.set(climbing?-.70:-.08,0,0);
     fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.rotation.set(0,0,0);
     if(seated){arm.rotation.x=-.65;elbow.rotation.x=-.8;}
@@ -184,6 +182,9 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     }
     body.position.y=0;applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
+  root.userData.updateWristTwists?.();
+  // Raycast bounds must follow the current pose, not the first observed pose.
+  if(root.userData.bodySkin){root.userData.bodySkin.boundingBox=null;root.userData.bodySkin.boundingSphere=null;}
 }
 
 function coatBall(parent,material,x,y,z,w,h,d){
