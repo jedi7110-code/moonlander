@@ -25,8 +25,8 @@ function transitionIK(model){
   return new CCDIKSolver(meshes[0],iks);
 }
 
-export async function loadLucy(){
-  return new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}${LUCY.asset}`);
+export async function loadLucy(version=''){
+  return new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}${LUCY.asset}${version?`?v=${encodeURIComponent(version)}`:''}`);
 }
 
 export function disposeLucy(root){
@@ -108,12 +108,20 @@ export function animateLucy(root,{time=0,dt=null,moving=false,facing=1,yaw=null,
   const blink=Math.max(weights.Sleep,Math.pow(Math.max(0,Math.sin(time*1.1)),32)*.94);
   s.model.traverse(mesh=>{
     const index=mesh.morphTargetDictionary?.Blink;if(index!==undefined)mesh.morphTargetInfluences[index]=blink;
-    const chest=mesh.morphTargetDictionary?.SitChest;
+    const face=mesh.morphTargetDictionary?.FaceRefine;
+    if(face!==undefined)mesh.morphTargetInfluences[face]=1;
+    const chest=mesh.morphTargetDictionary?.SitRuff;
     if(chest!==undefined)mesh.morphTargetInfluences[chest]=weights.Sit+weights.Groom+weights.Play;
     const belly=mesh.morphTargetDictionary?.SitBelly;
     if(belly!==undefined)mesh.morphTargetInfluences[belly]=weights.Sit+weights.Groom+weights.Play;
     const paws=mesh.morphTargetDictionary?.SitPaws;
     if(paws!==undefined)mesh.morphTargetInfluences[paws]=weights.Sit+weights.Groom+weights.Play;
+    const shoulders=mesh.morphTargetDictionary?.SitShoulders;
+    if(shoulders!==undefined)mesh.morphTargetInfluences[shoulders]=weights.Sit+weights.Groom+weights.Play;
+    for(const name of ['SitSurface','SitHocks','SitFlanks','SitOutline']){
+      const correction=mesh.morphTargetDictionary?.[name];
+      if(correction!==undefined)mesh.morphTargetInfluences[correction]=weights.Sit+weights.Groom+weights.Play;
+    }
   });
   const direction=passage?.yaw??hop?.yaw??yaw??facing*Math.PI/2;
   if(!s.initialized)root.rotation.y=direction;

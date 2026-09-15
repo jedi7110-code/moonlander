@@ -153,24 +153,25 @@ test('sitting rounds the abdomen independently of the breast and releases it whe
   }
 });
 
-test('sitting fills the breast above the forelegs without inflating the jaw, and brings hind paws forward',async()=>{
+test('sitting restores the selected neck-to-chest ruff and keeps the later hind-paw placement',async()=>{
   const cat=createLucy(await asset());
   animateLucy(cat,{dt:.1,time:9,mode:'look',actionTime:9,remaining:100,yaw:0});
-  const morphs=[];cat.traverse(m=>{const index=m.morphTargetDictionary?.SitChest;if(index!==undefined)morphs.push({m,index});});
+  const morphs=[];cat.traverse(m=>{const index=m.morphTargetDictionary?.SitRuff;if(index!==undefined)morphs.push({m,index});});
   assert(morphs.length>0,'the seated chest correction must be exported');
   assert(morphs.every(({m,index})=>m.morphTargetInfluences[index]===1));
   const seated=positions(cat);morphs.forEach(({m,index})=>m.morphTargetInfluences[index]=0);
   const original=positions(cat);
   const extension=Math.max(...seated.map((p,i)=>p.z-original[i].z));
-  assert(extension>.025&&extension<.06,'the breast must fill forward above the forelegs without an isolated oversized bulge');
-  assert(Math.max(...seated.map((p,i)=>Math.abs(original[i].y-p.y)))<.015,'the correction must not create a hanging pouch below the jaw');
+  assert(extension>.02&&extension<.06,'the selected ruff fills forward toward the chest');
+  const depth=Math.max(...seated.map((p,i)=>original[i].y-p.y));
+  assert(depth>.015&&depth<.04,'the original selected ruff adds depth below the neck');
   let jawVertices=0;
   for(const {m,index}of morphs){
     const base=m.geometry.attributes.position,target=m.geometry.morphAttributes.position[index];
-    for(let i=0;i<base.count;i++)if(base.getZ(i)>.240){
+    for(let i=0;i<base.count;i++)if(base.getZ(i)>.266){
       const delta=new Vector3().fromBufferAttribute(target,i);
       if(!m.geometry.morphTargetsRelative)delta.sub(new Vector3().fromBufferAttribute(base,i));
-      assert(delta.length()<1e-7,'head and upper throat vertices must stay unchanged');jawVertices++;
+      assert(delta.length()<1e-7,'the muzzle must stay unchanged');jawVertices++;
     }
   }
   assert(jawVertices>100);

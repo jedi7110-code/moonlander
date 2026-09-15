@@ -4,6 +4,7 @@ source/
 *.blend
 *.blend1
 *.glb
+!assets/*.glb
 *.gltf
 *.fbx
 *.rar

@@ -18,7 +18,7 @@ const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
 const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
-const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care),audio=new CabinAudio();
+const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
 let paused=false,elapsed=0,view=null,frame=0,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
 const timers=[];
@@ -89,9 +89,9 @@ function updateHUD(){
   if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);
   if(!paused&&brain.loungeExit)$('milo-activity').textContent=words('ラウンジから立ち上がる','Getting up from the lounge');
   updateHealthHUD();
-  const catStates={play:['マイロと遊んでいる','Playing with Milo'],joinPlay:['マイロのそばへ','Joining Milo'],sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],look:['周りを見ている','Looking around'],follow:['マイロについて歩く','Following Milo'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
+  const catStates={play:['マイロと遊んでいる','Playing with Milo'],joinPlay:['マイロのそばへ','Joining Milo'],sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],look:['周りを見ている','Looking around'],stretch:['伸びをしている','Stretching'],prone:['伏せて休んでいる','Resting on belly'],follow:['マイロについて歩く','Following Milo'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
   const passage=cat.motion.portal;
-  $('cat-activity').textContent=passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...catStates[cat.mode]);
+  $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...catStates[cat.mode]);
   for(const [key,stock]of Object.entries(care.supplies)){
     $('stock-'+key).textContent=`${stock}/${care.capacity[key]}`;
     const button=document.querySelector(`[data-use="${key}"]`),labels={food:['食事','Eat'],water:['水を飲む','Drink'],catfood:['ルーシーに餌を出す','Feed Lucy']};

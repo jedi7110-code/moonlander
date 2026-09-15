@@ -23,7 +23,7 @@ test('cats start on the sofa, but later choices, durations and destinations vary
     durations.add(cat.remaining);cat.remaining=0;cat.choose();modes.add(cat.mode);
     if(cat.mode==='walk')destinations.add(JSON.stringify(cat.motion.destination));
   }
-  assert.deepEqual([...modes].sort(),['fetch','groom','look','sleep','walk']);assert.ok(destinations.size>=4);assert.ok(durations.size>100);
+  assert.deepEqual([...modes].sort(),['fetch','groom','look','prone','sleep','stretch','walk']);assert.ok(destinations.size>=4);assert.ok(durations.size>100);
 });
 test('cat needs respond to activities, pause freezes them, and severe hunger overrides chance',()=>{
   const care=new Supplies(),cat=new CatRoutine(care,{random:seeded(40)});

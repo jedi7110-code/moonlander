@@ -10,6 +10,9 @@ from mathutils import Matrix, Quaternion, Vector
 LOCAL = Path(__file__).resolve().parent / 'local'
 parser = argparse.ArgumentParser()
 parser.add_argument('--out', type=Path, default=LOCAL / 'cabin')
+sleep_options = parser.add_mutually_exclusive_group()
+sleep_options.add_argument('--sleep-curl', action='store_true', help='Study-only curled sleeping pose')
+sleep_options.add_argument('--sleep-side', action='store_true', help='Study-only relaxed side sleeping pose; viewer rolls the whole rig')
 args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
 args.out.mkdir(parents=True, exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=str(LOCAL / 'lucy-combined.blend'), load_ui=False, use_scripts=False)
@@ -40,6 +43,12 @@ def rotate(name, axis, angle):
     bone = arm.pose.bones[name]
     bone.rotation_quaternion = Quaternion(bone.bone.matrix_local.to_3x3().inverted() @ Vector(axis), angle)
 
+def turn_world(name, axis, angle):
+    bpy.context.view_layer.update()
+    bone = arm.pose.bones[name]
+    pivot = Matrix.Translation(bone.head)
+    bone.matrix = pivot @ Quaternion(Vector(axis), angle).to_matrix().to_4x4() @ pivot.inverted() @ bone.matrix
+
 def seated():
     shift('CONTROLLER', (0, 0, -.103))
     rotate('pelvis', (1, 0, 0), -.95)
@@ -49,8 +58,8 @@ def seated():
         shift('leg3_control_' + side, (sign * .005, -.060, 0))
         shift('paw_control_' + side, (0, .018, 0))
 
-# Keep the approved walking surface and the jaw intact. Fill the breast above
-# the foreleg roots, not the underside of the head or the upper throat.
+# Place the ruff between the throat and chest. Keep the later seated belly
+# and grounded hind-paw corrections independent and unchanged.
 def smooth(a, b, value):
     t = max(0, min(1, (value - a) / (b - a)))
     return t * t * (3 - 2 * t)
@@ -58,23 +67,30 @@ def smooth(a, b, value):
 reset()
 seated()
 bpy.context.view_layer.update()
-chest = skin.shape_key_add(name='SitChest')
+chest = skin.shape_key_add(name='SitRuff')
 belly = skin.shape_key_add(name='SitBelly')
 paws = skin.shape_key_add(name='SitPaws')
+shoulders = skin.shape_key_add(name='SitShoulders')
+face = skin.shape_key_add(name='FaceRefine')
 coat_indices = {i for p in skin.data.polygons if skin.data.materials[p.material_index].name == 'Lucy calico coat' for i in p.vertices}
 to_arm = arm.matrix_world.inverted() @ skin.matrix_world
 to_skin = to_arm.inverted()
 belly_offsets = {}
 belly_ground = {}
 for vertex in skin.data.vertices:
+    x, y, z = vertex.co
+    # One continuous horizontal remap for coat, sockets, eyes and whiskers:
+    # slightly slimmer cheeks, with a little extra inward spacing at the eyes.
+    # Do not move the eyes independently out of their sockets. Height/depth
+    # and the blink delta are unchanged; the neck transition fades smoothly.
+    head = (1 - smooth(-.215, -.170, y)) * smooth(.125, .165, z)
+    inward = math.copysign(.0012 * smooth(0, .012, abs(x)), x)
+    face.data[vertex.index].co.x -= (x * .07 + inward) * head
     if vertex.index not in coat_indices:
         continue
-    x, y, z = vertex.co
     # Broaden the resting hind paws and lower the raised upper surface while
     # retaining the sole height. This is separate from moving the leg targets.
     paw = smooth(-.060, -.015, y) * (1 - smooth(.023, .058, z))
-    if y < -.240:
-        continue
     deform = Matrix(((0, 0, 0, 0),) * 4)
     for group in vertex.groups:
         bone = arm.pose.bones.get(skin.vertex_groups[group.group].name)
@@ -82,6 +98,14 @@ for vertex in skin.data.vertices:
             deform += (bone.matrix @ bone.bone.matrix_local.inverted()) * group.weight
     local_deform = to_skin @ deform @ to_arm
     posed = local_deform @ vertex.co
+    # The seated upper trunk must not flare sideways like human shoulders.
+    # Narrow its sides, not the central ruff's forward depth. Fade above the
+    # planted forelegs and below the head; preserve the low abdomen/haunches.
+    shoulder = smooth(-.230, -.185, y) * (1 - smooth(-.055, .010, y))
+    shoulder *= smooth(.065, .120, posed.z) * (1 - smooth(.175, .215, posed.z))
+    shoulder *= smooth(.010, .030, abs(x))
+    shoulder_offset = Vector((-posed.x * .34 * shoulder, 0, 0))
+    shoulders.data[vertex.index].co += local_deform.to_3x3().inverted_safe() @ shoulder_offset
     paw *= 1 - smooth(.028, .052, posed.z)
     paw_offset = Vector((x * .06, -max(0, .022 - y) * .14, -max(0, posed.z - .008) * .55)) * paw
     paws.data[vertex.index].co += local_deform.to_3x3().inverted_safe() @ paw_offset
@@ -94,14 +118,13 @@ for vertex in skin.data.vertices:
     belly_offset = Vector((x * .26, 0, -.018)) * abdomen
     belly_offsets[vertex.index] = belly_offset
     belly_ground[vertex.index] = smooth(.018, .050, posed.z)
-    # Locate the breast in the seated pose, not by a standing neck band: that
-    # band crosses the upper back once the spine has folded into a sitting cat.
-    weight = smooth(.075, .130, posed.z) * (1 - smooth(.145, .220, posed.z))
-    weight *= smooth(.070, .115, -posed.y) * (1 - smooth(.025, .059, abs(posed.x)))
-    weight *= smooth(-.240, -.180, y)
+    # Move the original ruff back/down off the jaw toward the throat root.
+    weight = smooth(-.244, -.196, y) * (1 - smooth(-.120, -.055, y))
+    weight *= smooth(.080, .112, z) * (1 - smooth(.150, .185, z))
+    weight *= 1 - smooth(.027, .062, abs(x))
     if weight < 1e-5:
         continue
-    offset = local_deform.to_3x3().inverted_safe() @ Vector((x * .07 * weight, -.030 * weight, 0))
+    offset = local_deform.to_3x3().inverted_safe() @ Vector((0, -.020 * weight, -.016 * weight))
     chest.data[vertex.index].co += offset
 # Spread the abdominal compression across the connected surface instead of
 # leaving a local bump where the abdomen meets the thigh and foreleg weights.
@@ -122,9 +145,12 @@ for _ in range(16):
     belly_offsets = relaxed
 for i, value in belly_offsets.items():
     belly.data[i].co += value * belly_ground[i]
+
 chest.value = 0
 belly.value = 0
 paws.value = 0
+shoulders.value = 0
+face.value = 0
 reset()
 
 scene = bpy.context.scene
@@ -147,6 +173,66 @@ for name, frames in specs:
             for side, sign in [('L', 1), ('R', -1)]:
                 shift('paw_control_' + side, (sign * .003, -.022, 0))
                 shift('leg3_control_' + side, (sign * .010, -.048, 0))
+            if args.sleep_side:
+                # Relax the limbs without folding or scaling the spine. The
+                # complete rig is laid on its side by the study presentation.
+                reset()
+                rotate('pelvis', (1, 0, 0), -.06)
+                rotate('Bone.001', (1, 0, 0), .04)
+                rotate('Bone.002', (1, 0, 0), .12)
+                rotate('Bone.004', (1, 0, 0), .10)
+                turn_world('Bone.002', (0, 0, 1), -.22)
+                turn_world('Bone.004', (0, 1, 0), -.20)
+                for side, sign in [('L', 1), ('R', -1)]:
+                    # Offset the upper legs so all four paws do not stack.
+                    shift('paw_control_' + side, (-.050 if side == 'L' else -.010, -.075 if side == 'L' else -.050, .032 if side == 'L' else .022))
+                    shift('leg3_control_' + side, (-.045 if side == 'L' else -.008, .075 if side == 'L' else .055, .026))
+                bpy.context.view_layer.update()
+                for side in ['L', 'R']:
+                    # Relax the toes along the metatarsus instead of keeping
+                    # the walking pose's hooked, floor-facing ankle.
+                    paw = arm.pose.bones['feet_' + side]
+                    rest = paw.bone.tail_local - paw.bone.head_local
+                    lower = arm.pose.bones['leg3_' + side]
+                    direction = lower.tail - lower.head
+                    angle = math.atan2(rest.y * direction.z - rest.z * direction.y, rest.y * direction.y + rest.z * direction.z)
+                    rotate(paw.name, (1, 0, 0), angle * .8)
+            if args.sleep_curl:
+                # Curve the spine around the tucked limbs and settle onto one
+                # flank, rather than lowering an otherwise straight back.
+                shift('CONTROLLER', (0, 0, -.104 + .0004 * math.sin(phase * math.tau)))
+                rotate('pelvis', (0, 0, 1), -.65)
+                pb = arm.pose.bones['pelvis']
+                pb.rotation_quaternion @= Quaternion(pb.bone.matrix_local.to_3x3().inverted() @ Vector((0, 1, 0)), .45)
+                rotate('Bone.001', (0, 0, 1), 0)
+                rotate('Bone.002', (0, 0, 1), 0)
+                rotate('Bone.004', (0, 0, 1), 0)
+                turn_world('Bone.001', (0, 0, 1), 1.15)
+                turn_world('Bone.002', (0, 0, 1), 1.10)
+                arm.pose.bones['Bone.001'].scale.y = .80
+                arm.pose.bones['Bone.002'].scale.y = .60
+                bpy.context.view_layer.update()
+                neck = arm.pose.bones['Bone.002']
+                down_axis = (neck.tail - neck.head).cross(Vector((0, 0, -1))).normalized()
+                turn_world('Bone.002', down_axis, .45)
+                turn_world('Bone.004', down_axis, -.15)
+                bpy.context.view_layer.update()
+                head = arm.pose.bones['Bone.004']
+                # Keep the head rigid while the tucked neck shortens.
+                head.matrix = Matrix.LocRotScale(head.head, head.matrix.to_quaternion(), Vector((1, 1, 1)))
+                bpy.context.view_layer.update()
+                mouth = head.matrix @ head.bone.matrix_local.inverted() @ Vector((0, -.267, .168))
+                hip = arm.pose.bones['pelvis'].head
+                for side, sign in [('L', 1), ('R', -1)]:
+                    shoulder = arm.pose.bones['paw1_' + side].head
+                    target = mouth.lerp(shoulder, .25) + Vector((sign * .012, .010, -.014))
+                    target.z = max(.010, target.z)
+                    control = arm.pose.bones['paw_control_' + side]
+                    shift(control.name, target - control.bone.head_local)
+                    target = hip.lerp(mouth, .25) + Vector((sign * .013, -.012, 0))
+                    target.z = .012
+                    control = arm.pose.bones['leg3_control_' + side]
+                    shift(control.name, target - control.bone.head_local)
         elif name == 'Eat':
             shift('CONTROLLER', (0, 0, -.009))
             rotate('Bone.001', (1, 0, 0), .13)
@@ -190,12 +276,24 @@ for name, frames in specs:
                 shift('paw_control_' + side, (0, .022, .035))
                 shift('leg3_control_' + side, (0, -.025, .032))
         for i in range(1, 6):
-            if name in ['Sleep', 'Sit', 'Groom', 'Play']:
+            if name == 'Sleep' and args.sleep_side:
+                rotate('tail' + str(i), (1, 0, 0), [-.13, -.10, .03, .16, .18][i - 1])
+                turn_world('tail' + str(i), (0, 0, 1), [.32, .0, -.10, -.10, -.05][i - 1])
+            elif name in ['Sleep', 'Sit', 'Groom', 'Play']:
                 rotate('tail' + str(i), (0, 0, 1), .40 + .012 * math.sin(phase * math.tau - i * .4))
                 bone = arm.pose.bones['tail' + str(i)]
                 axis = bone.bone.matrix_local.to_3x3().inverted() @ Vector((1, 0, 0))
                 pitches = [-.30, .08, .16, .12, .06] if name == 'Sleep' else [.90, .12, .15, .12, .06]
                 bone.rotation_quaternion @= Quaternion(axis, pitches[i - 1])
+                if name == 'Sleep' and args.sleep_curl:
+                    bpy.context.view_layer.update()
+                    angle = .45 - .55 * (i - 1)
+                    x, y = math.cos(angle), math.sin(angle)
+                    current = bone.tail - bone.head
+                    drop = max(-.5, min(.5, (.012 - bone.head.z) / max(current.length * (6 - i), .001)))
+                    desired = Vector((x, y, drop)).normalized()
+                    pivot = Matrix.Translation(bone.head)
+                    bone.matrix = pivot @ current.normalized().rotation_difference(desired).to_matrix().to_4x4() @ pivot.inverted() @ bone.matrix
             else:
                 rotate('tail' + str(i), (1, 0, 0), [-.13, -.10, .03, .16, .18][i - 1])
         for bone in arm.pose.bones:
