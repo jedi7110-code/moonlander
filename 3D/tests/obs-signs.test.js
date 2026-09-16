@@ -28,7 +28,7 @@ test('sign textures preserve plate proportions and fit text without stretching o
 });
 
 test('front-facing signs stay clear of fixtures, ceiling beams and one another',()=>{
-  const ctx={fillRect(){},fillText(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
+  const ctx={scale(){},fillRect(){},fillText(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},drawImage(){},createLinearGradient(){return{addColorStop(){}};},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
   const material=new MeshStandardMaterial();let ship;
   globalThis.document={createElement:()=>({getContext:()=>ctx})};
   try{ship=buildShip(new Proxy({},{get:()=>material}));}finally{delete globalThis.document;}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {PlantBed} from '../src/obs/plant-state.js';
 import {CabinBrain} from '../src/obs/brain.js';
 import {Supplies,CrewMotion,getStation} from '../src/obs/state.js';
-import {MeshStandardMaterial,Box3} from 'three';
+import {MeshStandardMaterial,Box3,Vector3} from 'three';
 import {createPlantRack,animatePlants} from '../src/obs/plants.js';
 
 test('three beds grow at staggered rates and stop at maturity',()=>{
@@ -46,6 +46,14 @@ test('recovery fixtures stay inside the service bay and the sight tube carries m
   try{rack=createPlantRack(m,0);}finally{delete globalThis.document;}
   for(const name of ['Humidity recovery hood','Condensate tray','Condensate sight tube','Replaceable filter cartridge','Enclosed UV treatment','Nutrient conductivity sensor','Nutrient reservoir'])assert.ok(rack.root.getObjectByName(name),name);
   const bounds=new Box3().setFromObject(rack.root);assert.ok(bounds.max.x<2.6);assert.ok(bounds.max.y<2.7);
+  assert.equal(rack.rows.length,3);
+  for(const [i,row]of rack.rows.entries()){
+    assert.ok(row.growLight.isRectAreaLight&&row.growLight.intensity>0);
+    assert.ok(row.growLight.width>2,'the light spans the full vegetable row');
+    assert.ok(row.growLight.position.y>row.plants[0].position.y+.3);
+    assert.ok(new Vector3(0,0,-1).applyQuaternion(row.growLight.quaternion).y<-.99,'grow lights face down onto leaves');
+    assert.ok(rack.root.getObjectByName(`Grow light diffuser ${i+1}`));
+  }
   const bed=new PlantBed();animatePlants(rack,bed,0);const start=rack.recovery.drops[0].position.y;
   animatePlants(rack,bed,1);assert.ok(rack.recovery.drops[0].position.y<start);assert.equal(rack.recovery.rotor.rotation.z,-3.2);
   for(let t=0;t<20;t+=.1){animatePlants(rack,bed,t);for(const drop of rack.recovery.drops)assert.ok(drop.position.y>=.55&&drop.position.y<=.83);}

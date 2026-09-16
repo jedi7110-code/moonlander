@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {BathroomVisit} from '../src/obs/bathroom.js';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,getStation} from '../src/obs/state.js';
+import {Box3,Group,MeshStandardMaterial} from 'three';
+import {createBathroom,FLOOR_Y} from '../src/obs/ship.js';
+import {animateVerticalShutter} from '../src/obs/shutter.js';
 
 const scene={time:{delayedCall(){}},obsUI:{hideWant(){}}};
 const setup=id=>{
@@ -10,6 +13,26 @@ const setup=id=>{
  const care=new Supplies(),brain=new CabinBrain(scene,actor,{care,name:'MILO'});brain.health.nextEventIn=Infinity;
  return{actor,brain,care,tick(seconds){for(let i=0;i<seconds*120;i++){actor.update(1/120);brain.update(1/120);}}};
 };
+for(const id of ['shower','toilet'])test(`${id}: the vertical shutter clears passage and retracts behind a fixed ceiling lip`,()=>{
+ const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),fixed=new Group(),animated=new Group(),floor=FLOOR_Y[0];
+ const ctx={fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
+ globalThis.document={createElement:()=>({getContext:()=>ctx})};
+ let fixture;try{fixture=createBathroom(fixed,animated,m,-7,floor,id);}finally{delete globalThis.document;}
+ const {door}=fixture,initial=door.position.clone(),visit=new BathroomVisit(id),bounds=new Box3();let exited=false;
+ for(let frame=0;!visit.done&&frame<1200;frame++){
+  const pose=visit.pose;animateVerticalShutter(door,pose.opening);animated.updateMatrixWorld(true);
+  assert.equal(door.position.x,initial.x);assert.equal(door.position.z,initial.z);
+  assert.deepEqual(door.rotation.toArray().slice(0,3),[0,0,0]);
+  bounds.setFromObject(door);
+  if(pose.moving)assert.ok(bounds.min.y>floor+2.48,'the whole panel must clear the opening before entry or exit');
+  door.traverse(part=>{if(!part.isMesh)return;assert.equal(part.material.clippingPlanes[0].constant,floor+2.48);assert.equal(part.material.clipShadows,true);assert.notEqual(part.material,material);});
+  if(visit.phase==='use'&&!exited){visit.requestExit();exited=true;}
+  visit.update(1/120);
+ }
+ assert.ok(visit.done&&exited);animateVerticalShutter(door,visit.pose.opening);assert.equal(door.position.y,floor);
+ assert.equal(material.clippingPlanes,null,'fixed walls keep their unclipped materials');
+ for(const root of [fixed,animated])root.traverse(part=>part.geometry?.dispose());material.dispose();
+});
 for(const id of ['shower','toilet'])test(`${id}: opens, enters, shuts, uses, exits and shuts without teleporting`,()=>{
  let started=0,ended=0;const visit=new BathroomVisit(id,{entered:()=>started++,exited:()=>ended++}),phases=[];
  let previous=.78;

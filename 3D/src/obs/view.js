@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,limitCabinLights} from './lighting.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials} from './materials.js';
 import {buildShip,positionX,positionY,HABITAT_VIEW} from './ship.js';
@@ -8,6 +9,7 @@ import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
 import {loadMiloHead} from './head.js';
 import {animateDelivery} from './delivery.js';
+import {animateVerticalShutter} from './shutter.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
 import {animateAirlock} from './eva.js';
@@ -25,20 +27,20 @@ export class ObservationView {
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.localClippingEnabled=true;
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.35;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,CABIN_PIXEL_RATIO));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.28;
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     const pmrem=new THREE.PMREMGenerator(this.renderer),environment=new RoomEnvironment();
     this.envTarget=pmrem.fromScene(environment,.04);this.scene.environment=this.envTarget.texture;environment.dispose();pmrem.dispose();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=.24;});
     this.scene.add(new THREE.HemisphereLight(0xdce9ed,0x2e3432,1.05));
-    const key=new THREE.DirectionalLight(0xffefd5,2.5);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
+    const key=new THREE.DirectionalLight(0xffefd5,2.5);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(0xb9d0d8,.80);fill.position.set(12,7,9);this.scene.add(fill);
-    this.ship=buildShip(m);this.scene.add(this.ship.staticMesh,this.ship.animated);
+    this.ship=buildShip(m);limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
     this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
-    this.camera=new THREE.OrthographicCamera(-16,16,8,-8,.1,150);this.camera.position.set(0,6.7,40);this.camera.lookAt(0,5.0,0);
+    this.camera=new THREE.PerspectiveCamera(24,1,.1,150);
     this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.resize=()=>{const r=canvas.getBoundingClientRect();this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
+    this.resize=()=>{const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;this.zoomAnchor=null;this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
     this.observer=new ResizeObserver(this.resize);this.observer.observe(canvas);this.resize();this.viewHeight=this.targetHeight;this.setFrustum();
     this.listeners=[];this.bindControls();
     const stars=new Float32Array(420*3);for(let i=0;i<420;i++){stars[i*3]=(Math.sin(i*162.2)*.5)*90;stars[i*3+1]=(Math.sin(i*714.1)*.5)*52+5;stars[i*3+2]=-9-Math.abs(Math.sin(i))*10;}
@@ -61,7 +63,7 @@ export class ObservationView {
   hoverTarget(target){this.hover(target?.type==='station'?target.id:null);if(target?.type==='character')this.canvas.style.cursor='zoom-in';}
   bindControls(){
     let drag=null;
-    this.bind('pointerdown',e=>{if(e.button!==0||e.isPrimary===false||drag)return;drag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,cx:this.targetCenter.x,cy:this.targetCenter.y,target:this.targetAt(e),moved:false};this.canvas.setPointerCapture(e.pointerId);});
+    this.bind('pointerdown',e=>{if(e.button!==0||e.isPrimary===false||drag)return;this.zoomAnchor=null;drag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,cx:this.targetCenter.x,cy:this.targetCenter.y,target:this.targetAt(e),moved:false};this.canvas.setPointerCapture(e.pointerId);});
     this.bind('pointermove',e=>{if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-13,13);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,HABITAT_VIEW.panMinY,HABITAT_VIEW.panMaxY);}});
     this.bind('pointerup',e=>{if(!drag||e.pointerId!==drag.pointerId)return;const {target,moved}=drag;drag=null;this.hover(null);if(moved||!target)return;if(target.type==='character')this.setMode(target.id);else this.onStation?.(target.id);});
     this.bind('pointercancel',e=>{if(drag&&e.pointerId!==drag.pointerId)return;drag=null;this.hover(null);});
@@ -69,7 +71,7 @@ export class ObservationView {
     this.bind('pointerleave',()=>this.hover(null));
     this.bind('wheel',e=>{if(e.deltaY===0)return;e.preventDefault();this.changeZoom(e.deltaY<0?1.15:1/1.15,e);},{passive:false});
   }
-  setMode(mode){this.hover(null);this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
+  setMode(mode){this.hover(null);this.zoomAnchor=null;this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
   changeZoom(ratio,pointer=null){
     if(!Number.isFinite(ratio)||ratio<=0||ratio===1)return;
     const height=THREE.MathUtils.clamp((this.targetHeight??this.viewHeight)/ratio,1.9,this.fitHeight*1.25);
@@ -78,18 +80,41 @@ export class ObservationView {
     if(pointer){
       const rect=this.canvas.getBoundingClientRect();if(rect.width<=0||rect.height<=0)return;
       const x=(pointer.clientX-rect.left)/rect.width*2-1,y=1-(pointer.clientY-rect.top)/rect.height*2;
-      const up=new THREE.Vector3(0,1,0).applyQuaternion(this.camera.quaternion);
-      const delta=(this.viewHeight-height)/2;
-      // Center and scale use the same easing, so the anchor stays fixed on every frame.
+      const ndc=new THREE.Vector2(x,y),plane=new THREE.Plane(new THREE.Vector3(0,0,1),-this.center.z);
+      const ray=new THREE.Raycaster();ray.setFromCamera(ndc,this.camera);
+      this.zoomAnchor={ndc,plane,point:ray.ray.intersectPlane(plane,new THREE.Vector3()),ray};
+      // Pin the focus plane; other depths retain their natural perspective shift.
       this.targetCenter.copy(this.center);
-      this.targetCenter.x+=x*delta*rect.width/rect.height;
-      this.targetCenter.y+=y*delta/up.y;
       if(this.mode!=='manual'){this.mode='manual';this.onModeChange?.(this.mode);}
-    }
+    }else this.zoomAnchor=null;
     const base=this.mode==='all'||this.mode==='manual'?this.fitHeight:this.mode==='cat'?3.3:5.3;
     this.targetHeight=height;this.zoom=base/height;
   }
-  setFrustum(){const half=this.viewHeight/2,aspect=this.width/this.height;this.camera.left=-half*aspect;this.camera.right=half*aspect;this.camera.top=half;this.camera.bottom=-half;this.camera.updateProjectionMatrix();}
+  setFrustum(){
+    const distance=40;
+    this.camera.aspect=this.width/this.height;
+    this.camera.fov=THREE.MathUtils.radToDeg(2*Math.atan(this.viewHeight/(2*distance)));
+    this.camera.updateProjectionMatrix();
+    const pose=()=>{
+      const x=this.reducedMotion?0:THREE.MathUtils.clamp(this.center.x*.32,-4,4);
+      const y=this.reducedMotion?1.6:THREE.MathUtils.clamp(1.6+(this.center.y-HABITAT_VIEW.centerY)*.22,.25,3);
+      this.camera.position.set(this.center.x+x,this.center.y+y,this.center.z+Math.sqrt(distance*distance-x*x-y*y));
+      this.camera.lookAt(this.center);this.camera.updateMatrixWorld(true);
+    };
+    pose();
+    const anchor=this.zoomAnchor;
+    if(!anchor?.point)return;
+    // Correct the small orbit-induced drift without extra scene raycasts or render passes.
+    const hit=new THREE.Vector3();
+    for(let i=0;i<8;i++){
+      anchor.ray.setFromCamera(anchor.ndc,this.camera);
+      if(!anchor.ray.ray.intersectPlane(anchor.plane,hit))break;
+      const dx=anchor.point.x-hit.x,dy=anchor.point.y-hit.y;
+      if(Math.abs(dx)+Math.abs(dy)<1e-10)break;
+      this.center.x+=dx;this.center.y+=dy;pose();
+    }
+    this.targetCenter.copy(this.center);
+  }
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null){
     const action=currentAction(brain),catMotion=catRoutine.motion;
     const actionTime=brain.reclineExit?.actionTime??brain.loungeExit?.actionTime??(brain.loungeEntry?0:brain.state==='performing'?brain.curDurSec-brain.performT:time);
@@ -104,7 +129,7 @@ export class ObservationView {
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
     animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch||actor.waitingForCat,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
-      fixture.door.rotation.y=brain.bathroom?.id===id?(bathroom?.opening??0)*Math.PI/2:0;
+      animateVerticalShutter(fixture.door,brain.bathroom?.id===id?(bathroom?.opening??0):0);
     }
     for(const [id,docks]of Object.entries(this.ship.diningDocks)){
       docks.mug.visible=id==='hydro'&&action!==id;
@@ -135,7 +160,7 @@ export class ObservationView {
     if(this.mode==='milo')this.targetCenter.copy(this.milo.position).add(new THREE.Vector3(0,.9,0));
     if(this.mode==='cat')this.targetCenter.copy(this.cat.position).add(new THREE.Vector3(0,.37*this.cat.scale.y,0));
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
-    this.camera.position.set(this.center.x,this.center.y+1.6,40);this.camera.lookAt(this.center.x,this.center.y,0);this.renderer.render(this.scene,this.camera);
+    this.renderer.render(this.scene,this.camera);
   }
   dispose(){this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

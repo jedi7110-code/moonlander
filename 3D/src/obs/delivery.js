@@ -1,3 +1,5 @@
+import {animateVerticalShutter} from './shutter.js';
+
 const clamp=value=>Math.max(0,Math.min(1,value));
 const smooth=value=>{const t=clamp(value);return t*t*(3-2*t);};
 
@@ -15,8 +17,7 @@ export function cargoPose(age,index){
 export function animateDelivery(ship,care,reducedMotion=false){
   const unloading=care.phase==='unloading',age=care.delivery?.age||0;
   const opening=unloading?(reducedMotion&&age<2.8?1:hatchOpening(age)):0;
-  ship.hatchDoor.rotation.set(0,0,0);
-  ship.hatchDoor.position.y=(ship.hatchDoor.userData.closedY??0)+HATCH_TRAVEL*opening;
+  animateVerticalShutter(ship.hatchDoor,opening,HATCH_TRAVEL);
   ship.hatchLamp.color.setHex(unloading?0x85e3af:care.delivery?0xf3bd62:0x4b6658);
   ship.cargo.forEach((group,index)=>{
     const pose=unloading?cargoPose(reducedMotion?(age<2.1?0:2.5):age,index):{visible:care.lastDelivery!==null,y:0,z:0,tilt:0};

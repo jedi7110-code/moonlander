@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 const segments=64,bandWidth=.020,bandThickness=.0022;
 function mesh(parent,geometry,material,name){
@@ -12,6 +13,10 @@ function faceTexture(){
   if(typeof document==='undefined')return null;
   const canvas=document.createElement('canvas');canvas.width=canvas.height=512;
   const c=canvas.getContext('2d');c.translate(256,256);
+  c.fillStyle='#697477';c.beginPath();c.arc(0,0,256,0,Math.PI*2);c.fill();
+  c.strokeStyle='#bdc6c6';c.lineWidth=3;c.beginPath();c.arc(0,0,252,0,Math.PI*2);c.stroke();
+  // Bake the bezel rim into the same face image; keep the original dial size.
+  c.scale(.955,.955);
   c.fillStyle='#14191b';c.beginPath();c.arc(0,0,255,0,Math.PI*2);c.fill();
   c.fillStyle='#394548';c.beginPath();c.arc(0,0,252,Math.PI,Math.PI*2);c.arc(0,0,203,Math.PI*2,Math.PI,true);c.closePath();c.fill();
   c.strokeStyle='#818b8c';c.lineWidth=2;c.beginPath();c.arc(0,0,202,0,Math.PI*2);c.stroke();
@@ -82,16 +87,14 @@ export function attachMiloWatch(root){
   const radii=wristSections(skin,watch)??[0,1].map(()=>Array.from({length:segments},(_,i)=>1/Math.hypot(Math.cos(i/segments*Math.PI*2)/.029,Math.sin(i/segments*Math.PI*2)/.024)));
   const rubber=new THREE.MeshStandardMaterial({color:0x222829,roughness:.88,side:THREE.DoubleSide});
   const steel=new THREE.MeshStandardMaterial({color:0xa8b1b3,metalness:.82,roughness:.29});
-  const darkSteel=new THREE.MeshStandardMaterial({color:0x434d50,metalness:.65,roughness:.38});
   const lume=new THREE.MeshStandardMaterial({color:0xe8efcf,roughness:.4,metalness:.12});
   const red=new THREE.MeshStandardMaterial({color:0xc84b37,roughness:.38,metalness:.22});
   mesh(watch,strapGeometry(radii),rubber,'Fitted graphite watch strap');
   const caseGroup=new THREE.Group();caseGroup.name='GMT case 42 mm';watch.add(caseGroup);
   caseGroup.rotation.z=Math.PI/2;
   caseGroup.position.z=Math.max(radii[0][16],radii[1][16])+.001;
-  disc(caseGroup,.021,.008,.0025,steel,'Brushed steel case');
-  disc(caseGroup,.0217,.002,.0073,darkSteel,'24-hour bezel');
-  const face=mesh(caseGroup,new THREE.CircleGeometry(.0208,64),new THREE.MeshStandardMaterial({color:0xffffff,map:faceTexture(),roughness:.55,metalness:.12}),'GMT dial and 24-hour scale');face.position.z=.0084;
+  disc(caseGroup,.0217,.010,.0033,steel,'Brushed steel case');
+  const face=mesh(caseGroup,new THREE.CircleGeometry(.0217,64),new THREE.MeshStandardMaterial({color:0xffffff,map:faceTexture(),roughness:.55,metalness:.12}),'GMT dial and bezel image');face.position.z=.0084;
   for(const x of [-.008,.008])for(const y of [-.021,.021]){
     const lug=mesh(caseGroup,new THREE.BoxGeometry(.0045,.009,.006),steel,'Case lug');
     lug.position.set(x,y,-.003);lug.rotation.x=-Math.sign(y)*.55;
@@ -101,6 +104,13 @@ export function attachMiloWatch(root){
   const hour=hand(caseGroup,'Hour hand',.010,.0019,.0090,lume),minute=hand(caseGroup,'Minute hand',.015,.0011,.0093,lume);
   const second=hand(caseGroup,'Sweeping seconds',.0158,.00035,.0096,red);
   disc(caseGroup,.0012,.0007,.010,steel,'Hand pinion');
+  // Only the hands move relative to the case. Batch all rigid steel in case space.
+  const parts=caseGroup.children.filter(part=>part.isMesh&&part.material===steel);
+  const geometries=parts.map(part=>{part.updateMatrix();return part.geometry.clone().applyMatrix4(part.matrix);});
+  const housing=mergeGeometries(geometries);
+  for(const part of parts){caseGroup.remove(part);part.geometry.dispose();}
+  for(const geometry of geometries)geometry.dispose();
+  mesh(caseGroup,housing,steel,'Unified steel watch housing');
   root.userData.watch={group:watch,parent,hour,minute,second,gmt,radii,side:-1};updateMiloWatch(root,0);
   left.hand.quaternion.copy(previous);root.userData.updateWristTwists?.();root.updateMatrixWorld(true);
   return watch;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {CABIN_LIGHT_COLOR} from './lighting.js';
 import {createDiningProps} from './dining.js';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
@@ -8,11 +9,16 @@ import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
 import {createBunk} from './bunk.js';
+import {industrialMaterials,addIndustrialDeck,addWorkLights} from './industrial.js';
+import {BULKHEAD_GATE,gateWall,createBulkheadGate} from './bulkhead-gate.js';
+import {addCabinDressing} from './cabin-dressing.js';
+import {configureVerticalShutter} from './shutter.js';
+import {HATCH_TRAVEL} from './delivery.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 export const positionX=x=>(x-700)*.022;
 export const positionY=y=>(870-y)*.016;
-export const HABITAT_VIEW={centerY:6.6,minHeight:15.2,panMinY:0,panMaxY:13.4};
+export const HABITAT_VIEW={centerY:6.35,minHeight:16.1,panMinY:-.6,panMaxY:13.4};
 
 export function createDeckFloor(m,y,level){
   const root=new THREE.Group();root.name='Deck floor '+level;
@@ -35,16 +41,32 @@ export function createDeckFloor(m,y,level){
 
 export function createAccessLadder(m){
   const root=new THREE.Group();root.name='Interdeck access shaft';
+  const lights=new THREE.Group();lights.name='Ladder work lights';root.add(lights);
+  const diffuser=new THREE.MeshBasicMaterial({name:'Ladder light diffuser',color:CABIN_LIGHT_COLOR,toneMapped:false});
   const bottom=.08,top=13.14;
   panel(root,m,0,6.65,-1.46,1.12,13.3,m.dark);
   for(const side of [-1,1]){
     rod(root,m.yellow,[side*.36,bottom,.03],[side*.36,top,.03],.045);
     box(root,m.dark,side*.56,6.7,-.5,.18,13.4,1.45,.02);
     box(root,m.metal,side*.64,11.93,-.32,.10,2.75,1.83,.016);
-    for(const y of [11.04,12.12]){
-      box(root,m.dark,side*.53,y,.26,.095,.22,.05,.012);
-      box(root,m.lamp,side*.53,y,.292,.031,.13,.015,.005);
+    // A matched pair every four rungs lights hands and feet along the entire shaft.
+    for(let i=0;i<12;i++){
+      const y=.54+i*1.12,sconce=new THREE.Group();sconce.name='Inward ladder light housing';
+      sconce.position.set(side*.53,y,.24);sconce.lookAt(0,y-.08,.03);root.add(sconce);
+      box(sconce,m.dark,0,0,0,.14,.28,.10,.012);
+      box(sconce,m.metal,0,0,.054,.10,.23,.015);
+      box(sconce,diffuser,0,0,.064,.065,.19,.012).name='Ladder light lens';
+      box(root,diffuser,side*.53,y,.33,.040,.16,.014).name='Ladder front light lens';
+      for(const x of [-.063,.063])box(sconce,m.dark,x,0,.073,.018,.28,.065);
+      const light=new THREE.SpotLight(CABIN_LIGHT_COLOR,2.4,1.8,1.06,.72,2);
+      light.name='Ladder hand and foot light';light.position.set(side*.46,y-.01,.21);
+      light.target.position.set(0,y-.08,.03);lights.add(light,light.target);
     }
+  }
+  // Four shared, shadow-free sources light all the paired fixtures along the shaft.
+  for(let i=0;i<4;i++){
+    const light=new THREE.PointLight(CABIN_LIGHT_COLOR,4,4.2,2);
+    light.name='Ladder shaft fill';light.position.set(0,1.66+i*3.36,.40);lights.add(light);
   }
   // Keep rung spacing continuous through the opening toward the rotation axis.
   for(let i=0;i<=46;i++){
@@ -131,7 +153,7 @@ export function createStationInteraction(id,bounds,pickMaterial){
   group.children.forEach(part=>{part.castShadow=false;part.receiveShadow=false;part.renderOrder=8;});
   return{mesh,group,material};
 }
-function plumbing(parent,animated,m,x,y,type) {
+export function createBathroom(parent,animated,m,x,y,type) {
   box(parent,m.dark,x,y+1.29,-1.20,1.66,2.59,.12,.04);
   for(const side of [-1,1])box(parent,m.white,x+side*.79,y+1.29,-.34,.10,2.59,1.80,.025);
   box(parent,m.white,x,y+2.54,-.34,1.66,.10,1.80,.025);
@@ -141,12 +163,19 @@ function plumbing(parent,animated,m,x,y,type) {
     const seat=new THREE.Mesh(new THREE.TorusGeometry(.22,.045,12,36),m.dark);seat.rotation.x=Math.PI/2;seat.position.set(x,y+.49,-.72);parent.add(seat);
   }else pipe(parent,m.metal,[[x+.5,y+.4,-1.08],[x+.5,y+2.15,-1.08],[x,y+2.15,-.85]],.025);
   const door=new THREE.Group();door.position.set(x-.735,y,.44);animated.add(door);
+  door.name=`Vertical ${type} shutter`;
   panel(door,m,.735,1.3,0,1.47,2.46,m.white);
   panel(door,m,.735,1.55,.09,.85,1.03,m.dark);
   box(door,m.black,1.295,1.17,.14,.06,.30,.05,.012);
   label(door,type==='shower'?'SHOWER':'WC',.735,2.25,.16,.94,.26,{size:65});
   const lamp=ball(door,m.green,1.285,1.62,.16,.026,.026,.016);lamp.name=type+'Lamp';
   grille(door,m,.735,.36,.15,1.08,.27);
+  configureVerticalShutter(door,{closedY:y,top:y+2.48,travel:2.50});
+  for(const side of [-1,1]){
+    box(parent,m.metal,x+side*.787,y+1.27,.59,.055,2.43,.15,.012);
+    for(const h of [.32,2.19])box(parent,m.dark,x+side*.787,y+h,.61,.10,.13,.12);
+  }
+  box(parent,m.dark,x,y+2.51,.56,1.70,.15,.34,.025).name=`${type} shutter pocket`;
   pipe(parent,m.metal,[[x-.72,y+2.8,-.87],[x-.72,y+2.67,-.87],[x,y+2.67,-.87],[x,y+2.6,-.87]],.035);
   return{door,lamp};
 }
@@ -155,14 +184,13 @@ function hatch(parent,animated,m,x,y) {
   box(parent,m.metal,x,y+1.15,-.55,1.86,2.08,.14,.11);
   box(parent,m.black,x,y+1.15,-.455,1.70,1.92,.025,.06);
   const door=new THREE.Group();door.position.set(x-.85,y,-.43);animated.add(door);
-  door.name='Vertical supply shutter';door.userData.closedY=y;
+  door.name='Vertical supply shutter';
   box(door,m.enamel,.85,1.15,0,1.7,1.92,.10,.10);
   box(door,m.dark,.85,1.63,.065,.6,.40,.025,.05);
   box(door,m.dark,.85,.96,.057,.45,.12,.016,.012);
   box(door,m.metal,.85,.98,.07,.30,.028,.024,.007);
   // The panel retracts into an overhead wall pocket, not through the next deck.
-  const pocketLip=new THREE.Plane(new THREE.Vector3(0,-1,0),y+2.12);
-  door.traverse(part=>{if(part.isMesh){part.material=part.material.clone();part.material.clippingPlanes=[pocketLip];part.material.clipShadows=true;}});
+  configureVerticalShutter(door,{closedY:y,top:y+2.12,travel:HATCH_TRAVEL});
   for(const side of [-1,1])box(parent,m.metal,x+side*.91,y+1.17,-.36,.065,2.02,.15,.012);
   box(parent,m.dark,x,y+2.17,-.28,1.96,.14,.30,.025);
   for(const side of [-1,1]){box(parent,m.dark,x+side*.91,y+.52,-.36,.12,.15,.13);box(parent,m.dark,x+side*.91,y+1.84,-.36,.12,.15,.13);}
@@ -185,18 +213,16 @@ function engine(parent,m,x,y) {
   for(const side of [-1,1]){const valve=new THREE.Mesh(new THREE.TorusGeometry(.15,.018,8,20),m.red);valve.position.set(x+side*.9,y+1.04,-.20);parent.add(valve);}
 }
 
-export function buildShip(m) {
+export function buildShip(sourceMaterials) {
+  const m=industrialMaterials(sourceMaterials);
   const staticRoot=new THREE.Group(),animated=new THREE.Group(),targets=[];
-  box(staticRoot,m.dark,0,4.94,-.28,26.8,10.69,3.2,.3);
+  gateWall(staticRoot,m.dark,{left:-13.4,right:13.4,bottom:-.405,top:10.285,z:-2.175,depth:.19});
   // Interior faces sit in front of the hull's back surface; the viewing wall is removed.
-  box(staticRoot,m.enamel,0,5,-1.98,26.30,10.20,.22,.14);
+  gateWall(staticRoot,m.enamel,{left:-13.15,right:13.15,bottom:-.10,top:10.10,z:-2.09,depth:.22});
   for(const side of [-1,1]){
     box(staticRoot,m.dark,side*7,10.31,-.12,12.9,.26,3.6,.05);
     box(staticRoot,m.enamel,side*6.925,10.48,-.14,12.75,.19,3.46,.035);
   }
-  // The enclosing block is only a back plate, not a solid volume.
-  staticRoot.children[0].scale.z=.19;
-  staticRoot.children[0].position.z=-2.08;
   for(const side of [-1,1]){
     // The operations deck ends at a recessed airlock instead of a solid side wall.
     const spans=side===1?[[-.365,FLOOR_Y[1]],[FLOOR_Y[0]-.15,10.245]]:[[-.365,10.245]];
@@ -209,14 +235,13 @@ export function buildShip(m) {
   }
   FLOOR_Y.forEach((y,level)=>{
     staticRoot.add(createDeckFloor(m,y,level));
-    box(staticRoot,m.dark,-1.55,y+2.30,-1.43,1.36,.21,.045,.012);
-    label(staticRoot,`${String(level+1).padStart(2,'0')} / ${['HABITATION','OPERATIONS','LIFE SUPPORT'][level]}`,-1.55,y+2.30,-1.40,1.30,.16,{fg:'#d4dbcc',size:48});
+    const signX=level===0?BULKHEAD_GATE.x:-1.55,signY=y+(level===0?2.79:2.30),signZ=level===0?1.40:-1.43;
+    box(staticRoot,m.dark,signX,signY,signZ,1.36,.21,.045,.012);
+    label(staticRoot,`${String(level+1).padStart(2,'0')} / ${['HABITATION','OPERATIONS','LIFE SUPPORT'][level]}`,signX,signY,signZ+.03,1.30,.16,{fg:'#d4dbcc',size:48});
     for(let xx=-11.8;xx<12.5;xx+=1.52){
-      panel(staticRoot,m,xx,y+1.44,-1.70,1.48,2.70,level===1?m.dark:m.enamel);
+      if(!(level===0&&xx> -3.0&&xx<-.8))panel(staticRoot,m,xx,y+1.44,-1.70,1.48,2.70,level===1?m.dark:m.enamel);
       if(level===0&&Math.abs(xx)<1.265)continue;
       box(staticRoot,m.dark,xx,y+2.96,-.25,1.43,.17,3.14,.025);
-      box(staticRoot,m.metal,xx,y+2.85,-.36,.82,.13,.44,.02);
-      box(staticRoot,level===1?m.coolLamp:m.lamp,xx,y+2.775,-.36,.73,.025,.31,.015);
     }
     for(const zz of [-1.25,-.94])pipe(staticRoot,zz===-1.25?m.red:m.metal,[[-12.8,y+2.6,zz],[-6,y+2.6,zz],[0,y+2.6,zz],[6,y+2.6,zz],[12.8,y+2.6,zz]],zz===-1.25?.055:.075);
     for(let xx=-12;xx<=12;xx+=2.4){box(staticRoot,m.dark,xx,y+2.60,-1.08,.052,.29,.55);}
@@ -226,15 +251,18 @@ export function buildShip(m) {
       box(staticRoot,m.enamel,xx,y+1.50,-1.035,.16,2.98,.10,.02);
       box(staticRoot,m.red,xx,y+1.15,-.958,.06,.45,.04,.01);
     }
-    const deckLight=new THREE.PointLight(level===1?0xb4dcdb:0xffebc7,level===0?12:45,20,2);deckLight.position.set(-5,y+2.3,.6);animated.add(deckLight);
-    const secondLight=new THREE.PointLight(0xe6ebe4,32,17,2);secondLight.position.set(6,y+2.3,.6);animated.add(secondLight);
+    addIndustrialDeck(staticRoot,m,y,level);
+    addWorkLights(animated,y,level);
   });
+  gateWall(staticRoot,m.enamel,{left:-3.435,right:-.405,bottom:FLOOR_Y[0]+.07,top:FLOOR_Y[0]+2.81,z:-1.68,depth:.12});
+  const gate=createBulkheadGate(m);staticRoot.add(gate.root);animated.add(gate.lights);
   for(const [level,y]of FLOOR_Y.entries())catPort(staticRoot,m,positionX(CAT_PORT.x),y,level);
   // The upper shaft is a visible continuation, not an additional playable deck.
-  staticRoot.add(createAccessLadder(m));
+  const ladder=createAccessLadder(m);staticRoot.add(ladder);
+  animated.attach(ladder.getObjectByName('Ladder work lights'));
 
   const top=FLOOR_Y[0],mid=FLOOR_Y[1];
-  const bathrooms={shower:plumbing(staticRoot,animated,m,positionX(240),top,'shower'),toilet:plumbing(staticRoot,animated,m,positionX(380),top,'toilet')};
+  const bathrooms={shower:createBathroom(staticRoot,animated,m,positionX(240),top,'shower'),toilet:createBathroom(staticRoot,animated,m,positionX(380),top,'toilet')};
   const bunk=createBunk(m);bunk.root.position.set(positionX(510),top,0);animated.add(bunk.root);
   cupboard(staticRoot,m,2.1,top,-1.14,1.54,2.31);
   const lounge=createLounge(m);lounge.position.y=top;staticRoot.add(lounge);
@@ -318,5 +346,6 @@ export function buildShip(m) {
     if(id!=='lounge')group.position.z=1.75;
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
+  addCabinDressing(staticRoot,m,FLOOR_Y);
   return {staticMesh:batchStatic(staticRoot),animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk};
 }

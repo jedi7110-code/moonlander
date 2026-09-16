@@ -1,26 +1,36 @@
 import * as THREE from 'three';
 import {box,cylinder,pipe,rod} from './materials.js';
 import {BUNK_BED,BUNK_TRAY} from './recline.js';
+import {CABIN_WARM_LIGHT_COLOR} from './lighting.js';
 
-export const BUNK_DOME={length:2.42,width:1.36,height:.62,rim:.67,angle:.43,cap:.35,lift:.56};
+export const BUNK_DOME={length:2.42,width:1.36,height:.62*2/3,rim:.67,angle:.43,cap:.50,lift:.56};
 const CLEAR_GLASS=new THREE.Color(0xb9d6cf),SMOKED_GLASS=new THREE.Color(0x18231f);
 
 function capsuleRings(){
-  const d=BUNK_DOME,rings=[],steps=16;
-  for(let i=0;i<=steps;i++){const a=i/steps*Math.PI/2;rings.push([d.cap*(1-Math.cos(a)),Math.sin(a)]);}
-  for(let i=1;i<=24;i++)rings.push([d.cap+(d.length-2*d.cap)*i/24,1]);
-  for(let i=1;i<=steps;i++){const a=i/steps*Math.PI/2;rings.push([d.length-d.cap+d.cap*Math.sin(a),Math.cos(a)]);}
+  const d=BUNK_DOME,rings=[],steps=28;
+  // This meridian rounds the pole and eases both slope and curvature into the barrel.
+  // Each ring carries its analytic tangent so highlights follow the same smooth surface.
+  const end=t=>{
+    const u=1-t,x=d.cap*(1.2*u**3*t**2+4*u**2*t**3+3.6*u*t**4+t**5);
+    const radius=1.5*u**4*t+6.4*u**3*t**2+10*u**2*t**3+5*u*t**4+t**5;
+    const dx=d.cap*(2.4*u**3*t+8.4*u**2*t**2+6.4*u*t**3+1.4*t**4);
+    const dr=1.5*u**4+6.8*u**3*t+10.8*u**2*t**2;
+    return[x,radius,dx,dr];
+  };
+  for(let i=0;i<=steps;i++)rings.push(end(i/steps));
+  for(let i=1;i<=24;i++)rings.push([d.cap+(d.length-2*d.cap)*i/24,1,1,0]);
+  for(let i=1;i<=steps;i++){
+    const [x,radius,dx,dr]=end(1-i/steps);rings.push([d.length-x,radius,dx,-dr]);
+  }
   return rings;
 }
 
 export function createCapsuleGlazing(){
-  const d=BUNK_DOME,rings=capsuleRings(),vertices=[],normals=[],indices=[],na=40;
-  for(const [x,radius]of rings)for(let j=0;j<=na;j++){
+  const d=BUNK_DOME,rings=capsuleRings(),vertices=[],normals=[],indices=[],na=64;
+  for(const [x,radius,dx,dr]of rings)for(let j=0;j<=na;j++){
     const a=j/na*Math.PI,y=Math.sin(a)*d.height*radius,z=Math.cos(a)*d.width/2*radius;
     vertices.push(x,y,z);
-    // Analytic normals join the ellipsoidal ends smoothly to the cylindrical center.
-    const nx=x<d.cap?(x-d.cap)/d.cap**2:x>d.length-d.cap?(x-d.length+d.cap)/d.cap**2:0;
-    const normal=new THREE.Vector3(nx,y/d.height**2,z/(d.width/2)**2).normalize();normals.push(...normal.toArray());
+    const normal=new THREE.Vector3(-dr,dx*Math.sin(a)/d.height,dx*Math.cos(a)/(d.width/2)).normalize();normals.push(...normal.toArray());
   }
   for(let i=0;i<rings.length-1;i++)for(let j=0;j<na;j++){
     const a=i*(na+1)+j,b=a+na+1;
@@ -67,10 +77,10 @@ export function createBunk(m){
     const piston=cylinder(root,m.metal,-d.length/2,.645,z,.036,.05);piston.name='Telescoping hinge post';liftPistons.push(piston);
     const hinge=cylinder(hingeCarriage,m.metal,-d.length/2,d.rim,z,.055,.13);hinge.rotation.x=Math.PI/2;hinge.name='Head hinge';
   }
-  const glow=new THREE.MeshStandardMaterial({color:0xd5b58a,emissive:0xffbf75,emissiveIntensity:.18});
+  const glow=new THREE.MeshStandardMaterial({color:CABIN_WARM_LIGHT_COLOR,emissive:CABIN_WARM_LIGHT_COLOR,emissiveIntensity:.18});
   box(root,m.dark,-.95,.64,depth-.49,.28,.075,.08,.012);
   box(root,glow,-.95,.653,depth-.443,.21,.025,.01,.005);
-  const light=new THREE.PointLight(0xffc387,.65,1.5,2);light.position.set(-.92,.74,depth-.40);root.add(light);
+  const light=new THREE.PointLight(CABIN_WARM_LIGHT_COLOR,.65,1.5,2);light.position.set(-.92,.74,depth-.40);root.add(light);
   return {root,lid,hingeCarriage,liftPistons,light,glow,glass,tray,runners};
 }
 

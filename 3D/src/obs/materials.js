@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 export async function materials() {
   const loader = new THREE.TextureLoader();
   const base=import.meta.env?.BASE_URL??'/3D/';
-  const maps = await Promise.all(['enamel','steel','twill','fur'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`)));
+  const maps = await Promise.all(['enamel','steel','twill','fur','industrial-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`)));
   maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
   const standard = (color, roughness=.65, metalness=.15, more={}) => new THREE.MeshStandardMaterial({color,roughness,metalness,...more});
   const fur=standard(0x252b31,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.003});
@@ -53,6 +53,7 @@ export async function materials() {
   };
   furTail.customProgramCacheKey=()=> 'obs-calico-tail-v1';
   return {
+    shipPaint:standard(0xd3d2c5,.86,.30,{map:maps[4]}),
     enamel: standard(0xd9dedb,.64,.35,{map:maps[0],bumpMap:maps[0],bumpScale:.009}),
     dark:standard(0x343d3e,.66,.6,{map:maps[1]}),
     metal:standard(0xaab8ba,.38,.83,{map:maps[1]}),

@@ -19,7 +19,16 @@ test('Milo wears one fitted GMT watch on the left wrist, with four independent h
   const twelve=new Vector3(0,1,0).applyQuaternion(caseGroup.quaternion);
   assert.ok(twelve.distanceTo(new Vector3(-1,0,0))<1e-9,'the dial is reversed 180 degrees without rotating the fitted strap');
   for(const needle of [w.hour,w.minute,w.second,w.gmt])assert.equal(needle.parent,caseGroup,'all hands turn with the dial');
-  assert.equal(w.group.getObjectByName('Screw-down crown').parent,caseGroup);
+  const housing=w.group.getObjectByName('Unified steel watch housing');
+  assert.equal(housing.parent,caseGroup);
+  housing.geometry.computeBoundingBox();
+  assert.ok(housing.geometry.boundingBox.max.x>=.0239,'the crown is retained in the combined housing');
+  const face=w.group.getObjectByName('GMT dial and bezel image');
+  assert.equal(face.parent,caseGroup);assert.equal(face.geometry.parameters.radius,.0217);
+  assert.equal(w.group.getObjectByName('24-hour bezel'),undefined,'no separate bezel draw remains');
+  const meshes=[];w.group.traverse(part=>{if(part.isMesh)meshes.push(part);});
+  assert.equal(meshes.length,7,'one strap, one housing, one face, and four moving hands');
+  for(const part of meshes)assert.ok([...part.geometry.attributes.position.array].every(Number.isFinite));
   assert.equal(w.group.getObjectByName('Fitted graphite watch strap').parent,w.group);
   for(const ring of w.radii){assert.equal(ring.length,64);assert.ok(ring.every(r=>r>.014&&r<.065));assert.ok(Math.max(...ring)-Math.min(...ring)>.008,'strap must follow the wrist, not a cylinder');}
   assert.equal(new Set([w.hour,w.minute,w.second,w.gmt]).size,4);

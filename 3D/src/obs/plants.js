@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import {box,ball,cylinder,rod,pipe,label} from './materials.js';
+import {CABIN_LIGHT_COLOR} from './lighting.js';
 
 function waterRecovery(root,m){
   const glass=new THREE.MeshStandardMaterial({color:0xc5e1d9,transparent:true,opacity:.23,roughness:.12,metalness:.05,depthWrite:false});
@@ -55,6 +57,7 @@ function leafGeometry(){
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(points,3));geometry.setIndex(indices);geometry.computeVertexNormals();return geometry;
 }
 export function createPlantRack(m,x){
+  if(!THREE.UniformsLib.LTC_HALF_1)RectAreaLightUniformsLib.init();
   const root=new THREE.Group();root.name='Wall vegetable rack';root.position.x=x;
   const leaf=leafGeometry(),greens=[0x39651b,0x254f2a,0x315e28].map(color=>new THREE.MeshStandardMaterial({color,roughness:.84,envMapIntensity:.14,side:THREE.DoubleSide}));
   box(root,m.dark,0,1.27,-1.03,2.90,2.48,.15,.03);
@@ -65,12 +68,17 @@ export function createPlantRack(m,x){
   box(root,m.dark,0,2.38,-.35,2.60,.19,.09,.01);
   label(root,'HYDROPONICS',0,2.38,-.29,2.60,.19,{size:40});
   const recovery=waterRecovery(root,m),rows=[];
+  const growDiffuser=new THREE.MeshBasicMaterial({name:'Full-spectrum grow diffuser',color:CABIN_LIGHT_COLOR,toneMapped:false});
   for(let i=0;i<3;i++){
     const y=1.80-i*.62,plants=[];
     box(root,m.enamel,-.16,y,-.66,2.32,.14,.54,.025);
     box(root,m.dark,-.16,y+.078,-.65,2.22,.014,.42);
     box(root,m.metal,-.16,y+.47,-.66,2.32,.04,.49);
-    box(root,m.lamp,-.16,y+.444,-.60,2.20,.014,.30);
+    box(root,growDiffuser,-.16,y+.444,-.60,2.20,.014,.30).name=`Grow light diffuser ${i+1}`;
+    box(root,growDiffuser,-.16,y+.426,-.393,2.16,.026,.018).name=`Grow light front lens ${i+1}`;
+    const growLight=new THREE.RectAreaLight(CABIN_LIGHT_COLOR,5.5,2.20,.30);
+    growLight.name=`Plant grow light ${i+1}`;growLight.position.set(-.16,y+.431,-.60);growLight.rotation.x=-Math.PI/2;root.add(growLight);
+    for(const z of [-.83,-.39])box(root,m.metal,-.16,y+.452,z,2.32,.06,.025);
     for(const side of [-1,1])rod(root,m.black,[side*1.35,y,-.83],[side*1.18,y,-.70],.020);
     for(let p=0;p<6;p++){
       const plant=new THREE.Group();plant.position.set(-1.08+p*.37,y+.09,-.58);root.add(plant);plants.push(plant);
@@ -92,7 +100,7 @@ export function createPlantRack(m,x){
     for(let k=0;k<8;k++)segments.push(box(root,new THREE.MeshBasicMaterial({color:0x243b31}),1.20,y+.035+k*.040,-.56,.10,.025,.01));
     const lampMat=new THREE.MeshBasicMaterial({color:0x568771});
     const lamp=cylinder(root,lampMat,1.20,y+.425,-.57,.035,.024,.035,16);lamp.rotation.x=Math.PI/2;
-    rows.push({plants,segments,lamp});
+    rows.push({plants,segments,lamp,growLight});
   }
   box(root,m.teal,0,.23,-.80,1.24,.33,.42,.025).name='Nutrient reservoir';
   label(root,'NUTRIENT / RETURN',0,.23,-.585,1.08,.13,{size:40});
