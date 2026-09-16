@@ -181,7 +181,9 @@ test('character limb surfaces face outwards and transforms stay finite',()=>{
     if(mesh.geometry.type==='LatheGeometry')assert.ok(positions.getX(0)*normals.getX(0)+positions.getZ(0)*normals.getZ(0)>=0);
   });
   const milo=createMilo(materials);animateMilo(milo,{action:'bunk',moving:false,time:0,facing:1});
-  animateMilo(milo,{action:null,moving:true,time:1,facing:1});assert.equal(milo.userData.body.position.x,0);
+  animateMilo(milo,{action:null,moving:true,time:1,facing:1});
+  const fresh=createMilo(materials);animateMilo(fresh,{action:null,moving:true,time:1,facing:1});
+  assert.deepEqual(milo.userData.body.position.toArray(),fresh.userData.body.position.toArray());
 });
 test('Milo has adult limb proportions and grounded boots when standing or sitting',()=>{
   const material=new MeshStandardMaterial(),milo=createMilo(new Proxy({},{get:()=>material}));

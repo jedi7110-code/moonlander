@@ -62,7 +62,9 @@ test('couch stays clear of the passage, patient faces upward, and pose resets af
     }
   }
   animateMilo(milo,{action:null,moving:true,facing:-1,time:15});
-  assert.equal(milo.userData.body.rotation.x,0);assert.equal(milo.userData.body.position.z,0);
+  const fresh=createMilo(m);animateMilo(fresh,{action:null,moving:true,facing:-1,time:15});
+  assert.deepEqual(milo.userData.body.quaternion.toArray(),fresh.userData.body.quaternion.toArray());
+  assert.deepEqual(milo.userData.body.position.toArray(),fresh.userData.body.position.toArray());
   animateMedical(bay,0,false,null);assert.equal(bay.display.frame,'STANDBYnull');
   const readings=medicalReadings({energy:80,thirst:80});animateMedical(bay,17,true,readings);
   const version=bay.display.texture.version;animateMedical(bay,17,true,readings);assert.equal(bay.display.texture.version,version);

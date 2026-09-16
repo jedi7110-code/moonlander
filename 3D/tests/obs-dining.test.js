@@ -113,10 +113,19 @@ test('prop paths are continuous, pause with action time, and reset after interru
     pose(root,action,2,6,{health:{needsCare:true,condition:{kind:'injury'}}});
     handAt(root,1,prop,action==='galley'?[.027,.018,.164]:[.097,.067,.019]);
     pose(root,null,0,6,{moving:true});
+    const fresh=character();pose(fresh,null,0,6,{moving:true});
     for(const prop of [dining.mug,dining.spoon,dining.bowl])assert.equal(prop.visible,false);
     for(const {arm,elbow,hand,fingers,side}of root.userData.arms){
-      assert.equal(arm.rotation.y,0);assert.equal(elbow.rotation.y,0);assert.deepEqual(hand.rotation.toArray().slice(0,3),[0,side*Math.PI/2,0]);
-      fingers.forEach(finger=>{assert.equal(finger.rotation.x,0);finger.userData.links.forEach(link=>assert.equal(link.rotation.x,0));});
+      const expected=fresh.userData.arms.find(a=>a.side===side);
+      assert.deepEqual(arm.quaternion.toArray(),expected.arm.quaternion.toArray());
+      assert.deepEqual(elbow.quaternion.toArray(),expected.elbow.quaternion.toArray());
+      assert.deepEqual(hand.rotation.toArray().slice(0,3),[0,side*Math.PI/2,0]);
+      fingers.forEach((finger,i)=>{
+        const rank=side<0?3-i:i;
+        assert.equal(finger.rotation.x,[-.08,-.07,-.06,-.05][rank]);
+        assert.equal(finger.userData.links[0].rotation.x,[.24,.28,.32,.36][rank]);
+        assert.equal(finger.userData.links[1].rotation.x,[.02,.025,.03,.035][rank]);
+      });
     }
   }
 });

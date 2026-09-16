@@ -8,7 +8,7 @@ import {CrewMotion,FLOORS} from '../src/obs/state.js';
 const character=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 function pose(root,distance,facing=1,more={}){
   root.position.set(facing*distance,0,0);root.rotation.y=facing*Math.PI/2;
-  animateMilo(root,{moving:true,climbing:false,facing,walkDistance:distance,time:10,action:null,...more});root.updateMatrixWorld(true);
+  animateMilo(root,{moving:true,climbing:false,facing,walkDistance:distance,walkStyle:'legacy',time:10,action:null,...more});root.updateMatrixWorld(true);
 }
 
 test('a planted foot stays fixed on the floor while the body moves in either direction',()=>{

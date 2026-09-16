@@ -11,12 +11,16 @@ import {applyCatHop} from './cat-hop.js';
 import {restWeight,applyCatSitting} from './cat-rest.js';
 import {createDiningProps,applyDiningPose,resetDiningPose,diningPhase,placeHand,DINING_APPROACH} from './dining.js';
 import {applyWalkingPose} from './walking.js';
+import {applyMocapWalk,miloWalkData} from './mocap-walk.js';
+import {relaxMiloHand} from './milo-hands.js';
+export {relaxMiloHand} from './milo-hands.js';
 import {applyCallingPose} from './calling.js';
 import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose} from './leisure.js';
 import {applyLoungeExit,applyLoungeEntry} from './lounge-exit.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
 import {attachMiloBody} from './milo-body.js';
+import {attachMiloWatch,updateMiloWatch} from './milo-watch.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
 function limb(parent,mat,length,profile,depth=1) {
@@ -159,8 +163,8 @@ export function createMilo(m,headModel=new THREE.Group()) {
     const sleeve=limb(arm,m.cloth,.215,[[0,.033],[.12,.056],[.35,.072],[.7,.068],[1,.062]],.96);sleeve.position.y=.025;sleeve.name='T-shirt short sleeve';
     const elbow=joint(arm,0,-.310,0);
     ball(elbow,m.skin,0,0,0,.035,.039,.032);
-    limb(elbow,m.skin,.276,[[0,.034],[.17,.045],[.37,.047],[.62,.037],[.87,.027],[1,.025]],.89);
-    const hand=joint(elbow,0,-.274,0);
+    limb(elbow,m.skin,.246,[[0,.034],[.17,.045],[.37,.047],[.62,.037],[.87,.027],[1,.025]],.89);
+    const hand=joint(elbow,0,-.244,0);
     ball(hand,m.skin,0,-.045,.007,.034,.054,.022);
     const fingers=[];
     for(let i=0;i<4;i++){
@@ -171,6 +175,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
       finger.userData.links=[middle,tip];fingers.push(finger);
     }
     const thumb=joint(hand,-side*.029,-.051,.025);ball(thumb,m.skin,0,0,0,.011,.037,.013);
+    thumb.userData.ip=joint(thumb,-side*.008,-.023,-.046);
     const leg=joint(body,side*.100,.970,0);
     limb(leg,pants,.435,[[0,.087],[.12,.098],[.34,.095],[.66,.081],[.9,.065],[1,.064]],1.05);
     const knee=joint(leg,0,-.435,0);
@@ -187,10 +192,12 @@ export function createMilo(m,headModel=new THREE.Group()) {
   cylinder(bandage,m.cloth,0,0,0,.049,.105,.049,24);
   for(const y of [-.037,-.013,.013,.037])cylinder(bandage,m.white,0,y,0,.050,.009,.050,24);
   const leisure=createLeisureProps(body,m);
-  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);return root;
+  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);
+  for(const {hand} of arms)hand.scale.multiplyScalar(1.08);
+  root.userData.updateWristTwists?.();attachMiloWatch(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   if(action==='medical'&&!moving)root.userData.medicalStartYaw??=root.rotation.y;
   else delete root.userData.medicalStartYaw;
@@ -208,7 +215,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
   for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,root.userData.bodySkin?side*Math.PI/2:0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
     elbow.rotation.set(climbing?-.70:-.08,0,0);
-    fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.rotation.set(0,0,0);
+    fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.rotation.set(0,0,0);thumb.userData.ip.rotation.set(0,0,0);
+    if(!climbing&&(moving||!action))relaxMiloHand({fingers,thumb,side});
     if(seated){arm.rotation.x=-.65;elbow.rotation.x=-.8;}
   }
   for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.set(climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0,0,0,'XYZ');
@@ -223,7 +231,10 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     }
     boot.rotation.set(seated?-(leg.rotation.x+knee.rotation.x):0,0,0);
   }
-  if(walking)applyWalkingPose(root,walkDistance);
+  if(walking){
+    if(walkStyle==='legacy')applyWalkingPose(root,walkDistance);
+    else applyMocapWalk(root,miloWalkData,walkDistance/miloWalkData.cycleDistance*miloWalkData.duration);
+  }
   applyCallingPose(root,calling?callingTime:null,dt);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
   if(loungeExit)applyLoungeExit(root,loungeExit);
@@ -268,6 +279,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     body.position.y=0;applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
   root.userData.updateWristTwists?.();
+  updateMiloWatch(root,time);
   // Raycast bounds must follow the current pose, not the first observed pose.
   if(root.userData.bodySkin){root.userData.bodySkin.boundingBox=null;root.userData.bodySkin.boundingSphere=null;}
 }

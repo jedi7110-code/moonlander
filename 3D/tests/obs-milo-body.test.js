@@ -12,6 +12,35 @@ await loadMiloBody(`data:application/json;base64,${Buffer.from(JSON.stringify(da
 function character(head){
   const materials={};return createMilo(new Proxy(materials,{get:(o,k)=>o[k]??=(new MeshStandardMaterial())}),head);
 }
+test('tattoos stay attached to the forearm skin and away from clothing and hands',async()=>{
+  const root=character(),skin=root.userData.bodySkin;
+  const {position,tattooUv,tattooMask,armRegion}=skin.geometry.attributes;
+  assert.equal(tattooUv.count,position.count);assert.equal(tattooMask.count,position.count);
+  const sides=[0,0],vertices=[];
+  for(let i=0;i<position.count;i++){
+    const u=tattooUv.getX(i),v=tattooUv.getY(i),mask=tattooMask.getX(i);
+    assert.ok(Number.isFinite(u)&&Number.isFinite(v)&&mask>=0&&mask<=1);
+    if(mask<=.1||u<0||u>1||v<0||v>1)continue;
+    assert.ok(armRegion.getX(i)>.9);
+    assert.ok(position.getY(i)>1.035&&position.getY(i)<1.115);
+    sides[position.getX(i)<0?0:1]++;vertices.push(i);
+  }
+  assert.ok(sides.every(n=>n>3),'both forearms contain tattoo surface vertices');
+  const uvBefore=tattooUv.array.slice(),maskBefore=tattooMask.array.slice();
+  for(const time of [0,.3,.7]){
+    animateMilo(root,{moving:true,climbing:false,facing:1,time,walkDistance:time,action:null});
+    root.updateMatrixWorld(true);skin.skeleton.update();
+    for(const i of vertices){
+      const p=skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(position,i));
+      assert.ok(p.toArray().every(Number.isFinite));
+    }
+  }
+  assert.deepEqual(tattooUv.array,uvBefore);assert.deepEqual(tattooMask.array,maskBefore);
+  for(const name of ['atom','cat']){
+    const image=await readFile(new URL(`../public/assets/obs/milo/tattoo-${name}.jpg`,import.meta.url));
+    assert.equal(image.readUInt16BE(0),0xffd8,'original JPEG reference is packaged');
+  }
+});
 test('the collar follows the scanned neck instead of leaving wide side openings',async()=>{
   const bytes=await readFile(new URL('../public/assets/obs/head/LeePerrySmith.glb',import.meta.url));
   const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
@@ -38,7 +67,7 @@ test('the collar follows the scanned neck instead of leaving wide side openings'
 test('the supplied human surface is one connected mesh across every body joint',()=>{
   const root=character(),skin=root.userData.bodySkin;
   assert.ok(skin?.isSkinnedMesh);assert.equal(root.userData.bodySource,'FinalBaseMesh.obj');
-  assert.equal(skin.skeleton.bones.length,45);
+  assert.equal(skin.skeleton.bones.length,47);
   const parent=Array.from({length:data.positions.length/3},(_,i)=>i),used=new Set();
   function find(i){while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
   for(let i=0;i<data.indices.length;i+=3){
@@ -79,11 +108,33 @@ test('the sample fingers follow the existing grasp controllers',()=>{
   const after=skin.applyBoneTransform(vertex,new Vector3().fromBufferAttribute(p,vertex));
   assert.ok(before.distanceTo(after)>.002,'grasping must deform the visible fingers, not hidden old parts');
 });
+test('thumb IP flexion moves the distal skin without rotating the thumb base',()=>{
+  const root=character(),skin=root.userData.bodySkin,{position,skinIndex,skinWeight}=skin.geometry.attributes;
+  root.updateMatrixWorld(true);skin.skeleton.update();
+  for(const {thumb,side} of root.userData.arms){
+    const id=skin.skeleton.bones.findIndex(b=>b.name===`Milo skin ${side<0?'L':'R'}_thumbIP`);
+    assert.ok(id>=0);
+    const affected=[];
+    for(let i=0;i<position.count;i++)for(let k=0;k<4;k++){
+      if(skinIndex.array[i*4+k]===id&&skinWeight.array[i*4+k]>.5)affected.push(i);
+    }
+    assert.ok(affected.length>5);
+    const before=affected.map(i=>skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(position,i)));
+    const base=thumb.quaternion.clone();thumb.userData.ip.rotation.x=.28;
+    root.updateMatrixWorld(true);skin.skeleton.update();
+    const movement=affected.map((i,k)=>before[k].distanceTo(skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(position,i))));
+    assert.ok(Math.max(...movement)>.003,'the visible distal phalanx must bend');
+    assert.deepEqual(thumb.quaternion.toArray(),base.toArray());
+    thumb.userData.ip.rotation.x=0;root.updateMatrixWorld(true);skin.skeleton.update();
+    for(const [k,i] of affected.entries())assert.ok(before[k].distanceTo(skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(position,i)))<1e-7);
+  }
+});
 test('work trousers retain ease through the calf, knee and thigh',()=>{
-  for(const [height,minWidth,minDepth]of [[.30,.14,.16],[.535,.15,.18],[.72,.17,.20]]){
+  const p=character().userData.bodySkin.geometry.attributes.position;
+  for(const [height,minWidth,minDepth]of [[.30,.14,.16],[.535,.15,.18],[.72,.15,.20]]){
     const section=[];
     for(let i=0;i<data.positions.length/3;i++){
-      const [x,y,z]=data.positions.slice(i*3,i*3+3);
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
       if(x>0&&Math.abs(y-height)<.018&&data.armRegions[i]<.1)section.push([x,z]);
     }
     assert.ok(section.length>12);
@@ -92,6 +143,39 @@ test('work trousers retain ease through the calf, knee and thigh',()=>{
     assert.ok(width>minWidth&&depth>minDepth,`trousers must not follow bare-leg contours at ${height}: ${width}, ${depth}`);
     assert.ok(width<.24&&depth<.29,'ease must not become balloon trousers');
   }
+});
+test('cargo legs follow a straight outer contour and an open, even inner line',()=>{
+  const p=character().userData.bodySkin.geometry.attributes.position;
+  for(const side of [-1,1])for(const height of [.25,.35,.45,.535,.60,.65,.70,.74]){
+    const section=[];
+    for(let i=0;i<p.count;i++)if(data.armRegions[i]<.1&&side*p.getX(i)>0&&Math.abs(p.getY(i)-height)<.012)section.push(side*p.getX(i));
+    assert.ok(section.length>20);
+    const inner=Math.min(...section),outer=Math.max(...section);
+    assert.ok(outer>.175&&outer<.186,`straight outer line at ${height}: ${outer}`);
+    assert.ok(inner>.013&&inner<.028,`even inner line at ${height}: ${inner}`);
+    assert.ok(outer-inner>.15,'retain loose cloth instead of a skin-tight leg');
+  }
+  for(let i=0;i<p.count;i++)if(data.armRegions[i]<.1){
+    const [x,y]=data.positions.slice(i*3,i*3+2);
+    if(y<=.17||(y>=.94&&y<=.96))assert.equal(p.getX(i),Math.fround(x),'boot opening and hips stay connected');
+  }
+});
+test('the crotch has no folded bridge between the legs below the true seam',()=>{
+  const p=character().userData.bodySkin.geometry.attributes.position;
+  let lowestCrossing=Infinity,checked=0;
+  for(let j=0;j<data.indices.length;j+=3){
+    const ids=data.indices.slice(j,j+3),xs=ids.map(i=>p.getX(i));
+    if(Math.min(...xs)<-1e-6&&Math.max(...xs)>1e-6)lowestCrossing=Math.min(lowestCrossing,...ids.map(i=>p.getY(i)));
+  }
+  assert.ok(lowestCrossing>.855&&lowestCrossing<.87,'legs join at the original crotch, not a second bridge beneath it');
+  for(let i=0;i<p.count;i++){
+    const [x,y]=data.positions.slice(i*3,i*3+2);
+    if(Math.abs(x)>=.050||y<=.78||y>=.85||data.armRegions[i]>=.05)continue;
+    const anatomicalX=Math.cos((data.uvs[i*2]-.5)*Math.PI*2);
+    assert.ok(p.getX(i)*anatomicalX>=0,'each inner-thigh vertex stays on its original anatomical side');
+    assert.equal(p.getY(i),Math.fround(y),'unfold the surface without raising the crotch');checked++;
+  }
+  assert.ok(checked>100);
 });
 test('rear clothing connects the shirt hem, waist, seat and thighs without inward notches',()=>{
   const p=character().userData.bodySkin.geometry.attributes.position;
@@ -118,13 +202,13 @@ test('shirt, waistband and hips follow the drawn waist silhouette without changi
     const [x,y,z]=data.positions.slice(i*3,i*3+3);
     if(data.armRegions[i]>.05||y>=1.37)continue;
     const reduction=Math.abs(x)-Math.abs(p.getX(i));
-    assert.ok(reduction>=-1e-7&&reduction<=.030,'reshape the waist without widening or excessively pinching it');
+    if(y>=.94)assert.ok(reduction>=-1e-7&&reduction<=.030,'reshape the waist without widening or excessively pinching it');
     if(y>=1.14&&y<=1.19&&Math.abs(x)>=.165){
       assert.ok(reduction>.020&&reduction<.029,'the drawn waist is visibly narrower, not a 4 mm adjustment');
       if(x<0)left++;else right++;
     }
-    if(y<=.96||y>=1.36){
-      assert.equal(p.getX(i),Math.fround(x),'lower hips and chest retain their width');preserved++;
+    if(y<=.17||(y>=.94&&y<=.96)||y>=1.36){
+      assert.equal(p.getX(i),Math.fround(x),'hips, lower legs and chest outside the cargo adjustment retain their width');preserved++;
     }
     assert.equal(p.getY(i),Math.fround(y));
     if(z>=0)assert.equal(p.getZ(i),Math.fround(z),'leave abdominal depth and shirt ease unchanged');
@@ -140,7 +224,7 @@ test('shirt shoulders retain a convex front-to-back deltoid volume',()=>{
       assert.ok(radius>=1-2e-6&&radius<1.10,'shoulder stays rounded, with only a small lift across the upper hollow');
       rounded++;
       if(Math.abs(p.getZ(i)-data.positions[i*3+2])>.002)depthChanges++;
-    }else if(y<=1.37||x>=.29||(x<=.11&&y<=1.51)){
+    }else if((y<=1.37||x>=.29||(x<=.11&&y<=1.51))&&!(y<1.178&&data.armRegions[i]>.8)){
       assert.equal(p.getY(i),Math.fround(y),'neck and lower body stay unchanged');
     }
     if(x>.11&&x<.29&&y>1.37)assert.ok(new Vector3().fromBufferAttribute(p,i).distanceTo(new Vector3(...data.positions.slice(i*3,i*3+3)))<.04,'shoulder adjustment stays local');
@@ -249,7 +333,8 @@ test('hand proportions and position blend through both wrist joints',()=>{
   const skin=root.userData.bodySkin;
   for(const {side,hand}of root.userData.arms){
     assert.equal(hand.position.z,-.025);
-    assert.deepEqual(hand.scale.toArray(),[1.16,1.05,1.08]);
+    assert.equal(hand.position.y,-.244);
+    assert.deepEqual(hand.scale.toArray(),[1.16,1.05,1.08].map(value=>value*1.08));
     const prefix=side<0?'L':'R';
     for(let j=1;j<=2;j++){
       const driver=skin.skeleton.bones.find(b=>b.name===`Milo skin ${prefix}_wrist${j}`).parent;
@@ -266,7 +351,7 @@ test('the wrist surface fills out gradually without changing the hand mesh',()=>
     const [x,y,z]=data.positions.slice(i*3,i*3+3);
     if(y>.895&&y<.913&&Math.hypot(p.getX(i)-x,p.getZ(i)-z)>.003)expanded++;
     if(y<.855){
-      assert.ok(new Vector3().fromBufferAttribute(p,i).distanceTo(new Vector3(x,y,z))<1e-6);
+      assert.ok(new Vector3().fromBufferAttribute(p,i).distanceTo(new Vector3(x,y+.030,z))<1e-6,'the hand moves up as one piece, retaining its shape');
       unchanged++;
     }
   }
@@ -303,7 +388,7 @@ test('both forearms taper continuously without repeated wrist bulges',()=>{
   for(const side of [-1,1]){
     const sections=[];
     for(let step=0;step<=24;step++){
-      const height=.890+step*.010,points=[];
+      const sourceHeight=.890+step*.010,height=sourceHeight+.030*Math.max(0,Math.min(1,(1.178-sourceHeight)/.274)),points=[];
       for(let k=0;k<data.indices.length;k+=3){
         const ids=data.indices.slice(k,k+3);
         if(ids.some(i=>p.getX(i)*side<.14||data.armRegions[i]<.95))continue;

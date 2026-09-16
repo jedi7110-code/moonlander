@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {ball,rod} from './materials.js';
-import {hingeAngles} from './gym.js';
+import {armHingeAngles} from './gym.js';
 
 const clamp=THREE.MathUtils.clamp,lerp=THREE.MathUtils.lerp;
 const smooth=value=>{const t=clamp(value,0,1);return t*t*(3-2*t);};
@@ -46,9 +46,8 @@ export function createDiningProps(body,m){
 function pointOn(prop,point){return point.clone().applyQuaternion(prop.quaternion).add(prop.position);}
 
 export function placeHand(rig,target,rotation,grip){
-  const {arm,elbow,hand}=rig,offset=target.clone().sub(arm.position);
-  const yaw=Math.atan2(offset.x,offset.z),angles=hingeAngles(offset.y,Math.hypot(offset.x,offset.z),.310,.274,-1);
-  arm.rotation.set(angles.upper,yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
+  const {arm,elbow,hand}=rig,angles=armHingeAngles(rig,target);
+  arm.rotation.set(angles.upper,angles.yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
   hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(rotation);
   for(const [i,finger] of (rig.fingers??[]).entries()){
     finger.rotation.x=-grip*(.45+i*.04);

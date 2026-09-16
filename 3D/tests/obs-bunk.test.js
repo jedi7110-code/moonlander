@@ -48,7 +48,8 @@ test('sleep lowers and rises continuously, then walking resets every pose transf
   }
   pose(milo,'bunk',4.5);
   animateMilo(milo,{action:null,moving:true,climbing:false,facing:1,time:10});
-  assert.deepEqual(milo.userData.body.rotation.toArray().slice(0,3),[0,0,0]);
-  assert.equal(milo.userData.body.position.x,0);assert.equal(milo.userData.body.position.z,0);
+  const fresh=character();animateMilo(fresh,{action:null,moving:true,climbing:false,facing:1,time:10});
+  assert.deepEqual(milo.userData.body.quaternion.toArray(),fresh.userData.body.quaternion.toArray());
+  assert.deepEqual(milo.userData.body.position.toArray(),fresh.userData.body.position.toArray());
   assert.equal(milo.visible,true);assert.equal(milo.userData.mug.visible,false);
 });

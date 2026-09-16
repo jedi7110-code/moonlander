@@ -36,7 +36,7 @@ vec2 miloFrontFolds(vec3 p){
 }
 `;
 
-let bodyData=null;
+let bodyData=null,tattooMaps=null;
 export function sampleMiloNeckline(geometry){
   if(!geometry)return null;
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
@@ -55,7 +55,13 @@ export function sampleMiloNeckline(geometry){
 export async function loadMiloBody(url=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/milo/body.json`){
   if(bodyData)return bodyData;
   const response=await fetch(url);if(!response.ok)throw new Error('Milo body could not be loaded');
-  bodyData=await response.json();return bodyData;
+  const data=await response.json();
+  if(typeof document!=='undefined'){
+    const loader=new THREE.TextureLoader(),base=import.meta.env?.BASE_URL??'/3D/';
+    tattooMaps=await Promise.all(['atom','cat'].map(name=>loader.loadAsync(`${base}assets/obs/milo/tattoo-${name}.jpg`)));
+    for(const map of tattooMaps){map.colorSpace=THREE.NoColorSpace;map.anisotropy=4;}
+  }
+  bodyData=data;return bodyData;
 }
 
 // The animation controllers remain the authoritative joints. Bones live below
@@ -63,6 +69,7 @@ export async function loadMiloBody(url=`${import.meta.env?.BASE_URL??'/3D/'}asse
 export function attachMiloBody(root,m,pants,legacy){
   if(!bodyData)return null;
   const {body,chest,head,arms,legs}=root.userData,data=bodyData;
+  const wristLift=.274+arms[0].hand.position.y,wristHeight=.904+wristLift;
   const drivers={body,chest,head},wrists=[];
   for(let i=0;i<arms.length;i++){
     const prefix=arms[i].side<0?'L':'R';
@@ -81,7 +88,10 @@ export function attachMiloBody(root,m,pants,legacy){
     }
   }
   const bones=data.bones.map(spec=>{const bone=new THREE.Bone();bone.name='Milo skin '+spec.name;drivers[spec.name].add(bone);return bone;});
-  const inverses=data.bones.map(spec=>new THREE.Matrix4().makeTranslation(...spec.target.map(v=>-v)));
+  const inverses=data.bones.map(spec=>{
+    const target=[...spec.target];if(/_(hand|finger|thumb|wrist)/.test(spec.name))target[1]+=wristLift;
+    return new THREE.Matrix4().makeTranslation(...target.map(v=>-v));
+  });
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(data.positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(data.uvs,2));
   geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(data.joints,4));geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(data.weights,4));
@@ -93,8 +103,27 @@ export function attachMiloBody(root,m,pants,legacy){
   const waistHeights=[.96,1.025,1.075,1.10,1.125,1.175,1.225,1.275,1.325,1.36];
   const waistSource=new THREE.CubicInterpolant(waistHeights,[.178,.179,.158,.158,.173,.174,.177,.181,.185,.186],1);
   const waistFit=new THREE.CubicInterpolant(waistHeights,[.178,.170,.156,.153,.150,.149,.157,.175,.184,.186],1);
+  const legHeights=[.17,.22,.30,.40,.535,.65,.72,.77,.82,.87,.94];
+  const legSource=new THREE.CubicInterpolant(legHeights,[.069,.077,.078,.080,.087,.095,.098,.094,.074,.074,.076],1);
+  const legFit=new THREE.CubicInterpolant(legHeights,[.069,.080,.081,.081,.080,.081,.081,.080,.078,.075,.076],1);
   for(let i=0;i<surface.count;i++){
     const x=Math.abs(surface.getX(i)),y=surface.getY(i),z=surface.getZ(i);
+    // Straight cargo legs: fit both edges around each leg, fading before the crotch joins.
+    if(y>.17&&y<.94){
+      const fit=legFit.evaluate(y)[0]/legSource.evaluate(y)[0];
+      const innerBlend=1-smooth(y,.75,.82);
+      const blend=smooth(y,.17,.22)*(1-smooth(y,.87,.94))*(1-smooth(data.armRegions[i],.05,.20));
+      const edgeBlend=THREE.MathUtils.lerp(innerBlend,1,smooth(x,.075,.125));
+      surface.setX(i,Math.sign(surface.getX(i))*(x+(x-.100)*(fit-1)*blend*edgeBlend));
+    }
+    // The source leg envelopes cross the midline below the actual crotch seam.
+    // Original cylindrical UVs retain the anatomical side even where X folded over.
+    if(x<.050&&y>.75&&y<.89&&data.armRegions[i]<.05){
+      const anatomicalX=Math.cos((data.uvs[i*2]-.5)*Math.PI*2);
+      const blend=(1-smooth(x,.015,.050))*smooth(y,.75,.78)*(1-smooth(y,.855,.89));
+      const unfolded=Math.sign(anatomicalX)*Math.max(Math.abs(surface.getX(i)),.016*Math.abs(anatomicalX));
+      surface.setX(i,THREE.MathUtils.lerp(surface.getX(i),unfolded,blend));
+    }
     if(y>.96&&y<1.36){
       const flank=1-smooth(data.armRegions[i],.05,.20);
       const fit=Math.min(1,waistFit.evaluate(y)[0]/waistSource.evaluate(y)[0]);
@@ -185,18 +214,24 @@ export function attachMiloBody(root,m,pants,legacy){
     depth=THREE.MathUtils.lerp(depth,Math.max(depth,seatDepth),rear*seat);
     surface.setZ(i,-depth);
   }
+  // Compress the complete forearm in bind space; translating only the wrist
+  // controllers would bunch up the skin where their weights begin.
+  for(let i=0;i<surface.count;i++){
+    const y=surface.getY(i),weight=smooth(data.armRegions[i],.8,.95);
+    surface.setY(i,y+wristLift*THREE.MathUtils.clamp((1.178-y)/.274,0,1)*weight);
+  }
   geometry.setIndex(data.indices);geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
   // A changing twist has a spatial derivative that ordinary skinned normals
   // miss. Bake normals from the relaxed surface, then undo the joint blend.
   const relaxed=geometry.clone(),relaxedPosition=relaxed.attributes.position;
   for(const [i,{m00,m02,m20,m22,sy,tz,pivot}] of armTransforms){
     const x=surface.getX(i)-pivot,y=surface.getY(i),z=surface.getZ(i);
-    relaxedPosition.setXYZ(i,pivot+m00*x+m02*z,.904+(y-.904)*sy,m20*x+m22*z+tz);
+    relaxedPosition.setXYZ(i,pivot+m00*x+m02*z,wristHeight+(y-wristHeight)*sy,m20*x+m22*z+tz);
   }
   relaxed.computeVertexNormals();
   const normal=new THREE.Vector3(),originalNormal=new THREE.Vector3();
   for(const [i,{m00,m02,m20,m22,sy}] of armTransforms){
-    const y=surface.getY(i),blend=smooth(y,.855,.880)*(1-smooth(y,1.14,1.24));
+    const y=data.positions[i*3+1],blend=smooth(y,.855,.880)*(1-smooth(y,1.14,1.24));
     if(!blend)continue;
     normal.fromBufferAttribute(relaxed.attributes.normal,i);
     const {x,z}=normal,determinant=m00*m22-m02*m20;
@@ -205,14 +240,26 @@ export function attachMiloBody(root,m,pants,legacy){
     geometry.attributes.normal.setXYZ(i,...originalNormal.toArray());
   }
   relaxed.dispose();
+  // Project onto the relaxed outer forearm, then carry the coordinates with
+  // the skin. The tattoo is pigment, not a separate floating decal mesh.
+  const tattooUv=new Float32Array(surface.count*2),tattooMask=new Float32Array(surface.count);
+  for(const [i,{m00,m02,m20,m22,tz,pivot}] of armTransforms){
+    const side=surface.getX(i)<0?-1:1,x=surface.getX(i)-pivot,z=surface.getZ(i),sourceY=data.positions[i*3+1];
+    const t=THREE.MathUtils.clamp((sourceY-.880)/.300,0,1),centerZ=-.036-.039*t+.014*t*t,centerX=-side*.010*smooth(sourceY,.880,1.14);
+    const nx=m00*x+m02*z,nz=m20*x+m22*z+tz,width=side<0?.057:.062,height=side<0?.064:.069;
+    tattooUv[i*2]=.5-side*(nz-centerZ)/width;tattooUv[i*2+1]=.5+(surface.getY(i)-1.075)/height;
+    tattooMask[i]=smooth(side*(nx-centerX),.008,.020)*smooth(data.armRegions[i],.90,.98);
+  }
+  geometry.setAttribute('tattooUv',new THREE.BufferAttribute(tattooUv,2));geometry.setAttribute('tattooMask',new THREE.BufferAttribute(tattooMask,1));
   geometry.setAttribute('armRegion',new THREE.Float32BufferAttribute(data.armRegions,1));
   const material=m.skin.clone(),fabricMap=pants.userData.fabricMap??pants.bumpMap;material.roughness=.84;
   material.side=THREE.DoubleSide;material.shadowSide=THREE.BackSide;
   if(fabricMap){material.bumpMap=fabricMap.clone();material.bumpMap.repeat.set(18,24);material.bumpMap.needsUpdate=true;material.bumpScale=.006;}
   material.onBeforeCompile=shader=>{
+    shader.uniforms.tattooAtom={value:tattooMaps?.[0]??null};shader.uniforms.tattooCat={value:tattooMaps?.[1]??null};shader.uniforms.tattooStrength={value:tattooMaps ? .88 : 0};
     shader.uniforms.shirtColor={value:m.cloth.color};shader.uniforms.trouserColor={value:pants.color};shader.uniforms.trouserMap={value:fabricMap};
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float armRegion; varying float vArmRegion; varying vec3 vBodyPosition; varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <begin_vertex>',`#include <begin_vertex>
-      vBodyPosition=position;vArmRegion=armRegion;vMiloUv=uv;
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float armRegion; attribute vec2 tattooUv; attribute float tattooMask; varying vec2 vTattooUv; varying float vTattooMask; varying float vArmRegion; varying vec3 vBodyPosition; varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <begin_vertex>',`#include <begin_vertex>
+      vBodyPosition=position;vArmRegion=armRegion;vMiloUv=uv;vTattooUv=tattooUv;vTattooMask=tattooMask;
       float trouserVertex=(1.0-smoothstep(1.065,1.085,position.y))*(1.0-smoothstep(.2,.5,armRegion));
       float frontMask=smoothstep(.015,.095,position.z),backMask=smoothstep(.015,.095,-position.z);
       float kneeShape=exp(-pow((position.y-.53)/.16,2.0));
@@ -229,7 +276,7 @@ export function attachMiloBody(root,m,pants,legacy){
       float crotchFold=-frontFolds.x+.30*frontFolds.y;
       transformed+=normal*trouserVertex*(.0009*clothFold+(.0015*kneeShape+.0007*calfShape)*crossFold+.0028*backKneeShape*backKneeFold+.0017*waistShape*waistFold+.0022*crotchShape*crotchFold);
     `);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform vec3 shirtColor;uniform vec3 trouserColor;uniform sampler2D trouserMap;varying float vArmRegion;varying vec3 vBodyPosition;varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <color_fragment>',`#include <color_fragment>
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform vec3 shirtColor;uniform vec3 trouserColor;uniform sampler2D trouserMap;uniform sampler2D tattooAtom;uniform sampler2D tattooCat;uniform float tattooStrength;varying vec2 vTattooUv;varying float vTattooMask;varying float vArmRegion;varying vec3 vBodyPosition;varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <color_fragment>',`#include <color_fragment>
       float side=abs(vBodyPosition.x);
       float neckline=1.563-.020*(vBodyPosition.z+.009)/max(length(vec2(vBodyPosition.x,vBodyPosition.z+.009)),.001);
       if(vBodyPosition.y>neckline)discard;
@@ -299,13 +346,23 @@ export function attachMiloBody(root,m,pants,legacy){
       trouserSurface=mix(trouserSurface,trouserColor*.78,cargoOuter*.62+rearPocket*.55);
       trouserSurface=mix(trouserSurface,trouserColor*.42,garmentLines);
       diffuseColor.rgb=mix(mix(diffuseColor.rgb,shirtColor*(1.0-.09*max(collar,cuff)),shirt),trouserSurface,trousers);
+      float tattooFrame=1.0-smoothstep(.98,1.0,max(abs(vTattooUv.x-.5),abs(vTattooUv.y-.5))*2.0);
+      if(tattooFrame*vTattooMask*tattooStrength>0.001){
+        vec2 uv=clamp(vTattooUv,0.0,1.0);
+        float pigment;
+        if(vBodyPosition.x<0.0) pigment=texture2D(tattooCat,vec2(.15,.13)+uv*vec2(.70,.74)).r;
+        else pigment=texture2D(tattooAtom,vec2(.266,.239)+uv*vec2(.469,.524)).r;
+        float ink=(1.0-smoothstep(.40,.96,pigment))*tattooFrame*vTattooMask*tattooStrength*(1.0-shirt)*(1.0-trousers);
+        vec3 inkColor=diffuseColor.rgb*vec3(.15,.19,.18);
+        diffuseColor.rgb=mix(diffuseColor.rgb,inkColor,ink);
+      }
     `).replace('#include <normal_fragment_maps>',`vec3 smoothBodyNormal=normal;
       #include <normal_fragment_maps>
       float trouserBumpMask=(1.0-smoothstep(1.065,1.085,vBodyPosition.y))*(1.0-smoothstep(.2,.5,vArmRegion));
       normal=normalize(mix(smoothBodyNormal,normal,trouserBumpMask));
     `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.96,trousers);');
   };
-  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-v17';
+  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-v18';
   const mesh=new THREE.SkinnedMesh(geometry,material);mesh.name='Continuous sample-based human body';
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;body.add(mesh);
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});
@@ -317,6 +374,25 @@ export function attachMiloBody(root,m,pants,legacy){
     `);
   };
   mesh.customDepthMaterial.customProgramCacheKey=()=> 'milo-shirt-neckline-shadow-v1';
+  // Split only the distal thumb influence; the palm and thumb base keep their drivers.
+  const indices=geometry.attributes.skinIndex,weights=geometry.attributes.skinWeight;
+  for(const {thumb,side} of arms){
+    const prefix=side<0?'L':'R',baseIndex=data.bones.findIndex(b=>b.name===prefix+'_thumb');
+    const tipIndex=bones.length,bone=new THREE.Bone();bone.name=`Milo skin ${prefix}_thumbIP`;
+    thumb.userData.ip.add(bone);bones.push(bone);
+    const target=new THREE.Vector3(...data.bones[baseIndex].target).add(thumb.userData.ip.position);target.y+=wristLift;
+    inverses.push(new THREE.Matrix4().makeTranslation(-target.x,-target.y,-target.z));
+    for(let i=0;i<surface.count;i++){
+      const influences=Array.from({length:4},(_,k)=>({id:indices.array[i*4+k],weight:weights.array[i*4+k]}));
+      const base=influences.find(p=>p.id===baseIndex&&p.weight>0);
+      if(!base)continue;
+      const bend=1-smooth(data.positions[i*3+1],.823,.838);
+      if(bend===0)continue;
+      influences.push({id:tipIndex,weight:base.weight*bend});base.weight*=1-bend;
+      influences.sort((a,b)=>b.weight-a.weight);
+      for(let k=0;k<4;k++){indices.array[i*4+k]=influences[k].id;weights.array[i*4+k]=influences[k].weight;}
+    }
+  }
   mesh.bind(new THREE.Skeleton(bones,inverses),new THREE.Matrix4());mesh.normalizeSkinWeights();
   for(const surface of legacy)surface.visible=false;
   root.userData.updateWristTwists=()=>{for(const {driver,hand,fraction}of wrists){

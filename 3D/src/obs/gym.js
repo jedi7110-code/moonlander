@@ -17,6 +17,15 @@ export function hingeAngles(y,z,upper,lower,bend=1){
   return{upper:bearing-bend*alpha,lower:bend*beta};
 }
 
+export function armHingeAngles({arm,elbow,hand},target){
+  const offset=target.clone().sub(arm.position),upper=-elbow.position.y,lower=Math.hypot(hand.position.y,hand.position.z);
+  const reach=upper+lower-1e-5,distance=offset.length();
+  // Let the shoulder follow a distant grip instead of stretching the forearm.
+  if(distance>reach){arm.position.addScaledVector(offset,(distance-reach)/distance);offset.subVectors(target,arm.position);}
+  const angles=hingeAngles(offset.y,Math.hypot(offset.x,offset.z),upper,lower,-1);
+  return {...angles,lower:angles.lower+Math.atan2(hand.position.z,-hand.position.y),yaw:Math.atan2(offset.x,offset.z)};
+}
+
 export function applyCyclingPose(root,time){
   const {body,chest,head,arms,legs}=root.userData,lean=.14,pivot=1.08;
   root.rotation.y=Math.PI/2;body.position.set(0,BIKE.bodyLift,0);
@@ -32,9 +41,10 @@ export function applyCyclingPose(root,time){
   }
   for(const {arm,elbow,hand}of arms){
     arm.position.y=pivot+(1.488-pivot)*Math.cos(lean);arm.position.z=(1.488-pivot)*Math.sin(lean);
-    const targetY=BIKE.gripY-.007-BIKE.bodyLift-arm.position.y,targetZ=BIKE.gripZ-.045-arm.position.z;
-    const angles=hingeAngles(targetY,targetZ,.310,.274,-1);
-    arm.rotation.set(angles.upper,0,0);elbow.rotation.x=angles.lower;hand.rotation.x=-Math.PI/2-angles.upper-angles.lower;
+    const target=new THREE.Vector3(arm.position.x,BIKE.gripY-.007*hand.scale.z-BIKE.bodyLift,BIKE.gripZ-.045*hand.scale.y);
+    const angles=armHingeAngles({arm,elbow,hand},target);
+    arm.rotation.set(angles.upper,angles.yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
+    hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2));
   }
 }
 
@@ -63,10 +73,10 @@ export function applyGymVisitPose(root,visit){
   for(const rig of arms){
     const {arm,elbow,hand,side}=rig;
     arm.position.y=pivot+(1.488-pivot)*Math.cos(lean);arm.position.z=(1.488-pivot)*Math.sin(lean);
-    const idle=new THREE.Vector3(side*.222,.905,.036);
-    const target=idle.lerp(new THREE.Vector3(side*.207-offset,BIKE.gripY-.007-body.position.y,BIKE.gripZ-.045),grip);
-    const d=target.sub(arm.position),yaw=Math.atan2(d.x,d.z),angles=hingeAngles(d.y,Math.hypot(d.x,d.z),.310,.274,-1);
-    arm.rotation.set(angles.upper,yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
+    const idle=new THREE.Vector3(side*.222,1.488+elbow.position.y+hand.position.y+.001,.036);
+    const target=idle.lerp(new THREE.Vector3(side*.207-offset,BIKE.gripY-.007*hand.scale.z-body.position.y,BIKE.gripZ-.045*hand.scale.y),grip);
+    const angles=armHingeAngles(rig,target);
+    arm.rotation.set(angles.upper,angles.yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
     const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2*grip,0,0));
     hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(rotation);
     for(const finger of rig.fingers){finger.rotation.x=.6*grip;for(const link of finger.userData.links)link.rotation.x=1.05*grip;}
