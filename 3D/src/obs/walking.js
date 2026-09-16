@@ -19,7 +19,7 @@ export function walkingFoot(distance,side){
     pitch=.36-.56*smooth(t);
   }
   // Roll around the heel/toe contact without dragging the planted sole along the floor.
-  const pivotZ=pitch<0?-.106:.154,pivotY=-.107;
+  const pivotZ=pitch<0?-.098:.180,pivotY=-.107;
   const y=WALK.floor+lift-(Math.cos(pitch)*pivotY-Math.sin(pitch)*pivotZ);
   z+=pivotZ-(Math.sin(pitch)*pivotY+Math.cos(pitch)*pivotZ);
   return{phase,planted,y,z,pitch,lift,pivotZ};

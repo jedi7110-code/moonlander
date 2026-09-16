@@ -3,13 +3,48 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {CrewMotion,Supplies,CatRoutine,FLOORS,currentAction} from '../src/obs/state.js';
 import {Brain} from '../../js/obs/brain.js?v=15';
-import {MeshStandardMaterial,Box3,Vector3} from 'three';
+import {MeshStandardMaterial,Mesh,Raycaster,Box3,Vector3} from 'three';
 import {CAT_BOWL,CAT_PORT,LOUNGE_SEAT,getStation} from '../src/obs/layout.js';
 import {positionX,createAccessLadder,createLoungeTable,HABITAT_VIEW} from '../src/obs/ship.js';
 import {createMilo,createCat,animateMilo,animateCat} from '../src/obs/characters.js';
 import {StationFeedback,SIGNAL_COLORS} from '../src/obs/feedback.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {headGeometry} from '../src/obs/head.js';
+import {headGeometry,createMiloEye,MILO_EYE_OPENINGS} from '../src/obs/head.js';
+
+test('Milo eye openings follow the marked inner corners and relaxed lids',()=>{
+  const [left,right]=MILO_EYE_OPENINGS;
+  assert.ok(left.x>-.77&&left.x<-.70&&right.x>.48&&right.x<.55,'both eyes move towards the nose');
+  assert.ok(Math.abs((left.x+right.x)/2+.11)<1e-6,'eyes stay centered around the scanned face midline');
+  assert.ok(left.x+left.halfWidth>-.49&&right.x-right.halfWidth<.27,'inner corners reach the original lid corners');
+  for(const eye of MILO_EYE_OPENINGS)assert.ok(eye.halfHeight<.095&&eye.halfWidth<.28,'lids no longer expose a wide round eyeball');
+});
+
+test('Milo eye surfaces meet the scanned eyelids without holes from oblique views',async()=>{
+  const bytes=await readFile(new URL('../public/assets/obs/head/LeePerrySmith.glb',import.meta.url));
+  const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  const source=gltf.scene.getObjectByName('LeePerrySmith').geometry,scan=new Mesh(source,new MeshStandardMaterial());
+  const ray=new Raycaster(),point=new Vector3();
+  const openings=MILO_EYE_OPENINGS,eyes=openings.map(opening=>createMiloEye(source,opening));
+  for(const [index,eye]of eyes.entries()){
+    const {x,y}=openings[index],p=eye.geometry.attributes.position;
+    for(let i=1+15*128;i<1+16*128;i++){
+      point.fromBufferAttribute(p,i);ray.set(new Vector3(point.x,point.y,4),new Vector3(0,0,-1));
+      assert.ok(Math.abs(ray.intersectObject(scan)[0].point.z-point.z)<1e-5,'eye border meets the actual lid depth');
+    }
+    assert.ok(p.getZ(0)>1.88,'eye is no longer recessed deep inside the socket');
+    for(const yaw of [-1.2,-.7,0,.7,1.2])for(const triangle of [0,128+7*256,128+7*256+64,128+7*256+128,128+14*256+192]){
+      point.set(0,0,0);
+      for(let corner=0;corner<3;corner++)point.add(new Vector3().fromBufferAttribute(p,eye.geometry.index.getX(triangle*3+corner)));
+      point.divideScalar(3);const direction=new Vector3(Math.sin(yaw),.15,Math.cos(yaw)).normalize();
+      ray.set(point.clone().addScaledVector(direction,4),direction.negate());
+      const hits=ray.intersectObjects([scan,...eyes]).filter(hit=>hit.object!==scan||hit.point.z<=1.4||!openings.some(({x:cx,y:cy,halfWidth,halfHeight})=>((hit.point.x-cx)/halfWidth)**2+((hit.point.y-cy)/halfHeight)**2<1));
+      assert.ok(hits.length&&hits[0].distance<4.002,'side views hit the eye or eyelid, never the interior of the head');
+    }
+    const shader={uniforms:{},vertexShader:'#include <common>\n#include <begin_vertex>',fragmentShader:'#include <common>\n#include <color_fragment>'};
+    eye.material.onBeforeCompile(shader);assert.deepEqual(shader.uniforms.eyeCenter.value.toArray(),[x,y]);
+    assert.match(shader.fragmentShader,/irisTone/);assert.match(shader.fragmentShader,/pupil/);assert.doesNotMatch(shader.fragmentShader,/discard/);
+  }
+});
 
 function advance(actor,seconds){for(let i=0;i<seconds*60;i++)actor.update(1/60);}
 test('the lounge table clears the seat and its props rest on the top without a gap',()=>{
@@ -67,14 +102,20 @@ test('the scanned head retains its face, normals and UVs after the shoulder crop
     }
   }
   assert.ok(napeVertices>50);
-  for(const height of [-1.05,-1.5]){
+  for(const height of [-1.05,-1.1625]){
     const ring=[];
     for(let i=0;i<reshaped.count;i++)if(Math.abs(reshaped.getY(i)-height)<.02)ring.push(i);
     const width=(Math.max(...ring.map(i=>reshaped.getX(i)))-Math.min(...ring.map(i=>reshaped.getX(i))))*.055;
     const depth=(Math.max(...ring.map(i=>reshaped.getZ(i)))-Math.min(...ring.map(i=>reshaped.getZ(i))))*.055;
     assert.ok(width>.11&&depth>.10,`the adult neck must retain width and depth at ${height}: ${width}, ${depth}`);
     assert.ok(width<.17&&depth<.16,'the neck must not become broader than the jaw');
+    assert.ok(Math.max(...ring.map(i=>reshaped.getZ(i)))>1.30,'front of the neck retains thickness below the jaw');
   }
+  const lower=[];for(let i=0;i<reshaped.count;i++)if(reshaped.getY(i)<-1.949)lower.push(i);
+  assert.ok(lower.length>20);
+  assert.ok(Math.max(...lower.map(i=>Math.abs(reshaped.getX(i))))<1.35,'neck stays inside the single shirt surface without a flared overlay');
+  assert.ok(Math.min(...lower.map(i=>reshaped.getZ(i)))>-1.23);
+  assert.ok(Math.max(...lower.map(i=>reshaped.getZ(i)))<1.43);
   // The only lower-neck boundary is tucked inside the collar. No loose edges
   // may remain at the old jaw crop or between the extension's rows.
   const edges=new Map(),key=v=>[reshaped.getX(v),reshaped.getY(v),reshaped.getZ(v)].map(n=>Math.round(n*1e4)).join(',');
@@ -153,6 +194,37 @@ test('Milo has adult limb proportions and grounded boots when standing or sittin
   animateMilo(milo,{action:null,moving:false,climbing:false,time:0,facing:1});milo.updateMatrixWorld(true);
   for(const {hand}of milo.userData.arms){const bounds=new Box3().setFromObject(hand);assert.ok(bounds.min.y>.70&&bounds.min.y<.80);}
   const torso=milo.getObjectByName('Continuous shoulders and torso');assert.ok(torso);assert.ok(milo.getObjectByName('Crew neck T-shirt'));
+});
+test('Milo wears structured lace-up combat boots instead of plain pull-on boots',()=>{
+  const material=new MeshStandardMaterial(),milo=createMilo(new Proxy({},{get:()=>material}));
+  for(const {boot}of milo.userData.legs){
+    assert.equal(boot.name,'Laced combat boot');
+    const upper=boot.getObjectByName('Continuous leather boot upper');assert.ok(upper);
+    for(const part of ['Boot tongue','Reinforced toe cap','Reinforced heel counter','Laced ankle shaft','Boot lace stay'])assert.equal(boot.getObjectByName(part),undefined);
+    upper.geometry.computeBoundingBox();
+    const sole=boot.getObjectByName('Anatomical combat boot sole'),position=sole.geometry.attributes.position;
+    sole.geometry.computeBoundingBox();
+    const welt=boot.getObjectByName('Foot-shaped stitched boot welt');welt.geometry.computeBoundingBox();
+    assert.ok(sole.geometry.boundingBox.max.y-welt.geometry.boundingBox.min.y>.003,'sole slightly overlaps the welt');
+    for(const lug of boot.getObjectsByProperty('name','Combat boot sole lug')){
+      lug.geometry.computeBoundingBox();
+      assert.ok(lug.position.y+lug.geometry.boundingBox.max.y-sole.geometry.boundingBox.min.y>.002,'tread is embedded in the sole');
+      assert.ok(Math.abs(lug.position.y+lug.geometry.boundingBox.min.y+.107)<1e-6,'tread contact height stays unchanged');
+    }
+    const toeMargin=sole.geometry.boundingBox.max.z-upper.geometry.boundingBox.max.z;
+    const heelMargin=upper.geometry.boundingBox.min.z-sole.geometry.boundingBox.min.z;
+    assert.ok(toeMargin>.004&&toeMargin<.010,'sole has only a narrow lip ahead of the leather toe');
+    assert.ok(heelMargin>.003&&heelMargin<.012,'heel lip stays close to the leather');
+    assert.ok(upper.geometry.boundingBox.min.z>-.095,'heel stays inside the sole instead of bulging backwards');
+    const widthAt=z=>{const xs=[];for(let i=0;i<position.count;i++)if(Math.abs(position.getZ(i)-z)<.012)xs.push(position.getX(i));return Math.max(...xs)-Math.min(...xs);};
+    assert.ok(widthAt(.08)>widthAt(-.03)+.018,'the ball of the foot is wider than the arch');
+    const toe=[];for(let i=0;i<position.count;i++)if(position.getZ(i)>sole.geometry.boundingBox.max.z-.04)toe.push(position.getX(i));
+    assert.ok((Math.max(...toe)+Math.min(...toe))/2*boot.parent.parent.position.x<0,'the big-toe side shapes each sole inward');
+    assert.equal(boot.getObjectsByProperty('name','Metal boot eyelet').length,14);
+    assert.equal(boot.getObjectsByProperty('name','Crossed boot lace').length,12);
+    assert.equal(boot.getObjectsByProperty('name','Tied boot lace loop').length,2);
+    assert.ok(boot.getObjectsByProperty('name','Combat boot sole lug').length>=18);
+  }
 });
 test('lounge thighs and shins clear the cushion while hips remain supported and boots stay grounded',()=>{
   const material=new MeshStandardMaterial(),milo=createMilo(new Proxy({},{get:()=>material}));

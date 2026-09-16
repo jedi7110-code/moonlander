@@ -4,7 +4,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export async function materials() {
   const loader = new THREE.TextureLoader();
-  const maps = await Promise.all(['enamel','steel','twill','fur'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}assets/obs/${name}.webp`)));
+  const base=import.meta.env?.BASE_URL??'/3D/';
+  const maps = await Promise.all(['enamel','steel','twill','fur'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`)));
   maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
   const standard = (color, roughness=.65, metalness=.15, more={}) => new THREE.MeshStandardMaterial({color,roughness,metalness,...more});
   const fur=standard(0x252b31,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.003});

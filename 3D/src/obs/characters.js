@@ -25,6 +25,100 @@ function limb(parent,mat,length,profile,depth=1) {
   const mesh=new THREE.Mesh(geo,mat);mesh.scale.z=depth;mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
 
+function bootFootprint(side,scale=1){
+  const shape=new THREE.Shape(),points=[
+    [0,-.098],[.024,-.094],[.040,-.080],[.051,-.057],[.056,-.027],[.064,.018],[.068,.050],[.064,.088],[.052,.130],[.035,.158],[.010,.177],
+    [-.013,.179],[-.036,.165],[-.053,.141],[-.063,.105],[-.065,.068],[-.063,.030],[-.053,-.016],[-.048,-.047],[-.038,-.078],[-.020,-.094]
+  ].map(([x,z])=>[x*side*scale,z*scale]);
+  const outline=new THREE.CatmullRomCurve3(points.map(([x,z])=>new THREE.Vector3(x,z,0)),true,'centripetal').getPoints(96);
+  shape.moveTo(outline[0].x,outline[0].y);for(const p of outline.slice(1))shape.lineTo(p.x,p.y);shape.closePath();return shape;
+}
+function shapedSole(parent,material,side,{depth,bevel,y,name,scale=1}){
+  const geometry=new THREE.ExtrudeGeometry(bootFootprint(side,scale),{depth,bevelEnabled:true,bevelSegments:2,bevelSize:bevel,bevelThickness:bevel,steps:1});
+  geometry.rotateX(Math.PI/2);geometry.translate(0,y,0);geometry.computeVertexNormals();
+  if(name==='Anatomical combat boot sole'){
+    const p=geometry.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const arch=THREE.MathUtils.smoothstep(p.getZ(i),-.042,-.020)*(1-THREE.MathUtils.smoothstep(p.getZ(i),.012,.040));
+      const bottom=1-THREE.MathUtils.smoothstep(p.getY(i),y-depth+.002,y-.002);
+      p.setY(i,p.getY(i)+.009*arch*bottom);
+    }
+    geometry.computeVertexNormals();
+  }
+  const mesh=new THREE.Mesh(geometry,material);mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+}
+const bootSections=[
+  [-.064,.060,.166,-.090],[-.047,.063,.174,-.092],[-.026,.063,.161,-.092],
+  [-.006,.061,.122,-.091],[.016,.058,.081,-.089],[.040,.057,.060,-.087],
+  [.064,.057,.055,-.084],[.086,.058,.055,-.082],
+];
+function bootSection(y){
+  let i=0;while(i<bootSections.length-2&&y>bootSections[i+1][0])i++;
+  const a=bootSections[i],b=bootSections[i+1],before=bootSections[Math.max(0,i-1)],after=bootSections[Math.min(bootSections.length-1,i+2)];
+  const h=b[0]-a[0],t=THREE.MathUtils.clamp((y-a[0])/h,0,1);
+  return [1,2,3].map(k=>{
+    const ma=(b[k]-before[k])/(b[0]-before[0]),mb=(after[k]-a[k])/(after[0]-a[0]);
+    return THREE.MathUtils.clamp((2*t**3-3*t*t+1)*a[k]+(t**3-2*t*t+t)*h*ma+(-2*t**3+3*t*t)*b[k]+(t**3-t*t)*h*mb,Math.min(a[k],b[k]),Math.max(a[k],b[k]));
+  });
+}
+function bootFront(y,x){
+  const [width,front,rear]=bootSection(y);
+  return (front+rear)/2+(front-rear)/2*Math.sqrt(Math.max(0,1-(x/width)**2));
+}
+let bootGrain=null;
+function bootLeather(){
+  if(!bootGrain){
+    const pixels=new Uint8Array(64*64*4);let seed=2718;
+    for(let i=0;i<pixels.length;i+=4){seed=(Math.imul(seed,1664525)+1013904223)>>>0;pixels[i]=pixels[i+1]=pixels[i+2]=110+(seed>>>26);pixels[i+3]=255;}
+    bootGrain=new THREE.DataTexture(pixels,64,64);bootGrain.wrapS=bootGrain.wrapT=THREE.RepeatWrapping;bootGrain.repeat.set(4,4);bootGrain.magFilter=THREE.LinearFilter;bootGrain.needsUpdate=true;
+  }
+  return new THREE.MeshStandardMaterial({color:0x554735,roughness:.73,metalness:0,bumpMap:bootGrain,bumpScale:.00035});
+}
+function combatBoot(parent,m,side){
+  const boot=joint(parent,0,-.425,.013);boot.name='Laced combat boot';
+  const leather=bootLeather(),welt=leather.clone(),laces=m.cloth.clone();
+  welt.color.setHex(0x736249);laces.color.setHex(0xc4b995);laces.roughness=.88;
+
+  shapedSole(boot,m.rubber,side,{depth:.024,bevel:.003,y:-.073,name:'Anatomical combat boot sole'});
+  shapedSole(boot,welt,side,{depth:.008,bevel:.0015,y:-.064,name:'Foot-shaped stitched boot welt',scale:.985});
+  const lugRows=[[-.073,.021],[-.045,.032],[.046,.047],[.077,.044],[.109,.036],[.137,.026],[.162,.012]];
+  for(const [z,width]of lugRows)for(const x of [-width,0,width]){
+    if(x===0&&Math.abs(z)<.03)continue;
+    const lug=box(boot,m.rubber,x,-.102,z,x===0?.024:.020,.010,.024,.002);lug.name='Combat boot sole lug';
+    lug.rotation.y=x===0?0:-Math.sign(x)*THREE.MathUtils.lerp(.08,.34,THREE.MathUtils.clamp((z+.09)/.23,0,1));
+  }
+
+  const upper=surface(boot,leather,56,64,(t,u)=>{
+    const y=-.064+t*.150,[width,front,rear]=bootSection(y),angle=u*Math.PI*2;
+    return [Math.sin(angle)*width,y,(front+rear)/2+Math.cos(angle)*(front-rear)/2];
+  });upper.name='Continuous leather boot upper';
+
+  const rows=[-.026,-.009,.007,.023,.040,.057,.074].map(y=>[y,bootFront(y,.032)]);
+  for(const [row,[y,z]]of rows.entries()){
+    for(const side of [-1,1]){
+      const eyelet=new THREE.Mesh(new THREE.TorusGeometry(.0052,.0016,6,16),m.metal);
+      eyelet.name='Metal boot eyelet';eyelet.position.set(side*.032,y,z+.002);
+      const slope=(bootFront(y+.001,.032)-bootFront(y-.001,.032))/.002;
+      eyelet.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(side*.4,-slope,1).normalize());
+      eyelet.castShadow=true;boot.add(eyelet);
+    }
+    if(row<rows.length-1){
+      const [nextY,nextZ]=rows[row+1];
+      for(const side of [-1,1]){
+        const midY=(y+nextY)/2;
+        const lace=pipe(boot,laces,[[side*.032,y,z+.005],[0,midY,bootFront(midY,0)+.004],[-side*.032,nextY,nextZ+.005]],.0018);lace.name='Crossed boot lace';
+      }
+    }
+  }
+  const [topY]=rows.at(-1),topZ=bootFront(topY,0);
+  pipe(boot,laces,[[-.032,topY,bootFront(topY,.032)+.005],[0,topY,topZ+.004],[.032,topY,bootFront(topY,.032)+.005]],.0018).name='Tightened top lace';
+  for(const side of [-1,1]){
+    pipe(boot,laces,[[side*.006,topY,topZ+.016],[side*.030,.079,.069],[side*.050,.066,.061],[side*.026,.057,.064],[side*.006,topY,topZ+.016]],.0017).name='Tied boot lace loop';
+    pipe(boot,laces,[[side*.006,topY,topZ+.016],[side*.020,.048,.075],[side*.029,.030,.079]],.0015).name='Boot lace end';
+  }
+  return boot;
+}
+
 const torsoProfile=[[1.025,.165,.105],[1.09,.159,.107],[1.18,.170,.117],[1.28,.190,.128],[1.36,.197,.126],[1.43,.198,.112],[1.48,.200,.093],[1.51,.180,.081],[1.535,.140,.069],[1.555,.082,.061],[1.575,.061,.060],[1.625,.050,.057]];
 function torsoRadius(y,axis){
   let i=0;while(i<torsoProfile.length-2&&y>torsoProfile[i+1][0])i++;
@@ -54,11 +148,8 @@ function torso(parent,m){
 
 export function createMilo(m,headModel=new THREE.Group()) {
   const root=new THREE.Group(),body=joint(root,0,0,0);
-  const pants=m.olive.clone();pants.map=null;pants.bumpScale=.0015;pants.color.setHex(0x4a5338);
+  const pants=m.olive.clone();pants.userData.fabricMap=pants.map;pants.map=null;pants.bumpScale=.004;pants.color.setHex(0x4a5338);pants.roughness=.96;
   const hips=ball(body,pants,0,.988,0,.177,.134,.119);
-  box(body,m.rubber,0,1.074,.002,.365,.038,.285,.020);
-  box(body,m.metal,0,1.073,.149,.043,.029,.011,.004);
-  for(const x of [-.151,-.063,.063,.151])box(body,pants,x,1.072,.145,.02,.058,.014,.005).name='Cargo belt loop';
   const chest=joint(body,0,0,0),neck=torso(chest,m);
   const head=headModel;head.position.set(0,1.637,-.009);body.add(head);
   const arms=[],legs=[];
@@ -82,21 +173,15 @@ export function createMilo(m,headModel=new THREE.Group()) {
     const thumb=joint(hand,-side*.029,-.051,.025);ball(thumb,m.skin,0,0,0,.011,.037,.013);
     const leg=joint(body,side*.100,.970,0);
     limb(leg,pants,.435,[[0,.087],[.12,.098],[.34,.095],[.66,.081],[.9,.065],[1,.064]],1.05);
-    box(leg,pants,side*.101,-.21,.009,.044,.154,.132,.012).name='Cargo pocket';
-    box(leg,pants,side*.121,-.145,.011,.017,.032,.139,.005).name='Cargo pocket flap';
     const knee=joint(leg,0,-.435,0);
     ball(knee,pants,0,0,0,.064,.065,.064);
     limb(knee,pants,.425,[[0,.064],[.15,.072],[.36,.071],[.64,.060],[.90,.054],[1,.061]],.98);
     for(let i=0;i<2;i++)ball(knee,pants,0,-.359-i*.019,0,.062,.010,.063);
-    const boot=joint(knee,0,-.425,.013);
-    box(boot,m.rubber,0,-.005,-.025,.123,.13,.166,.024);
-    ball(boot,m.rubber,0,-.038,.068,.062,.044,.089);
-    box(boot,m.black,0,-.092,.024,.13,.03,.26,.01);
-    for(let i=0;i<4;i++)rod(boot,m.dark,[-.036,.039,.005+i*.02],[.036,.037,.005+i*.02],.0035);
+    const boot=combatBoot(knee,m,side);
     arms.push({arm,elbow,hand,fingers,thumb,side});legs.push({leg,knee,boot,side});
   }
   const headParts=new Set();head.traverse(o=>headParts.add(o));
-  const legacy=[];body.traverse(o=>{if(o.isMesh&&!headParts.has(o)&&!o.name.startsWith('Cargo ')&&[m.skin,m.cloth,pants].includes(o.material))legacy.push(o);});
+  const legacy=[];body.traverse(o=>{if(o.isMesh&&!headParts.has(o)&&[m.skin,m.cloth,pants].includes(o.material))legacy.push(o);});
   const dining=createDiningProps(body,m),{mug}=dining;
   const bandage=new THREE.Group();bandage.position.y=-.13;arms[0].elbow.add(bandage);bandage.visible=false;
   cylinder(bandage,m.cloth,0,0,0,.049,.105,.049,24);
