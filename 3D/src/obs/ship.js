@@ -216,7 +216,8 @@ function engine(parent,m,x,y) {
 export function buildShip(sourceMaterials) {
   const m=industrialMaterials(sourceMaterials);
   const staticRoot=new THREE.Group(),animated=new THREE.Group(),targets=[];
-  gateWall(staticRoot,m.dark,{left:-13.4,right:13.4,bottom:-.405,top:10.285,z:-2.175,depth:.19});
+  // Recess the dark hull behind the lining so their aperture walls cannot coincide.
+  gateWall(staticRoot,m.dark,{left:-13.4,right:13.4,bottom:-.405,top:10.285,z:-2.30,depth:.19});
   // Interior faces sit in front of the hull's back surface; the viewing wall is removed.
   gateWall(staticRoot,m.enamel,{left:-13.15,right:13.15,bottom:-.10,top:10.10,z:-2.09,depth:.22});
   for(const side of [-1,1]){
@@ -254,7 +255,7 @@ export function buildShip(sourceMaterials) {
     addIndustrialDeck(staticRoot,m,y,level);
     addWorkLights(animated,y,level);
   });
-  gateWall(staticRoot,m.enamel,{left:-3.435,right:-.405,bottom:FLOOR_Y[0]+.07,top:FLOOR_Y[0]+2.81,z:-1.68,depth:.12});
+  gateWall(staticRoot,m.enamel,{left:-3.435,right:-.405,bottom:FLOOR_Y[0]+.07,top:FLOOR_Y[0]+2.81,z:-1.68,depth:.12,openingClearance:.02});
   const gate=createBulkheadGate(m);staticRoot.add(gate.root);animated.add(gate.lights);
   for(const [level,y]of FLOOR_Y.entries())catPort(staticRoot,m,positionX(CAT_PORT.x),y,level);
   // The upper shaft is a visible continuation, not an additional playable deck.

@@ -20,9 +20,11 @@ function slab(root,m,shape,z,depth,name){
 }
 
 // Every wall layer has a real aperture. No black decal covers an intact bulkhead.
-export function gateWall(root,material,{left,right,bottom,top,z,depth}){
+export function gateWall(root,material,{left,right,bottom,top,z,depth,openingClearance=0}){
   const shape=path([[left,bottom],[right,bottom],[right,top],[left,top]]);
-  shape.holes.push(path(outline(BULKHEAD_GATE.width,BULKHEAD_GATE.height,BULKHEAD_GATE.bottom).reverse(),THREE.Path));
+  const g=BULKHEAD_GATE;
+  // The trim hides this clearance; only the frame supplies the visible reveal.
+  shape.holes.push(path(outline(g.width+2*openingClearance,g.height+2*openingClearance,g.bottom-openingClearance).reverse(),THREE.Path));
   return slab(root,material,shape,z,depth,'Bulkhead with octagonal opening');
 }
 
@@ -48,8 +50,9 @@ export function createBulkheadGate(m){
   const inner=path(outline(g.width-.12,g.height-.08,g.bottom+.02));
   inner.holes.push(path(outline(g.width-.26,g.height-.22,g.bottom+.09).reverse(),THREE.Path));
   slab(root,m.dark,inner,-2.48,.16,'Rear threshold frame');
-  box(root,m.dark,g.x,y+.014,-3.62,2.36,.16,4.12);
-  box(root,m.metal,g.x,y+.101,-3.62,2.20,.018,4.08);
+  // Recess the floor nose behind the trim face at z=-1.56, including its metal cap.
+  box(root,m.dark,g.x,y+.014,-3.68,2.36,.16,4.12).name='Recessed rear-room floor';
+  box(root,m.metal,g.x,y+.101,-3.68,2.20,.018,4.08).name='Rear-room floor cap';
   for(const z of [-2.1,-2.75,-3.4,-4.05,-4.7,-5.35])box(root,m.rubber,g.x,y+.115,z,2.18,.012,.028);
   for(const side of [-1,1]){
     box(root,m.dark,g.x+side*1.19,y+1.37,-3.76,.15,2.70,4.03);
