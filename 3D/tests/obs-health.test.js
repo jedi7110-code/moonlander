@@ -7,6 +7,7 @@ import {CrewMotion,Supplies,currentAction,getStation,FLOORS} from '../src/obs/st
 import {MEDICAL} from '../src/obs/layout.js';
 import {medicalReadings,medicalRecline,medicalDuration,MED_BED} from '../src/obs/medical.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
+import {GYM_MOUNT_SECONDS,GYM_BRAKE_SECONDS,GYM_DISMOUNT_SECONDS} from '../src/obs/gym-visit.js';
 
 const needs={energy:80,thirst:80,hunger:80,hygiene:80};
 function setup(){
@@ -92,7 +93,7 @@ test('a gym injury stops exercise, and critical care does not cancel an already 
   care.take('food');care.request();care.transmit();care.update(3);assert.equal(care.phase,'inbound');
   brain.health.startCondition('injury');brain.update(1/60);
   assert.equal(brain.state,'leavingGym');assert.equal(actor.busy,false);
-  for(let i=0;i<9*60;i++)brain.update(1/60);
+  for(let i=0;i<(GYM_MOUNT_SECONDS+GYM_BRAKE_SECONDS+GYM_DISMOUNT_SECONDS+.1)*60;i++)brain.update(1/60);
   assert.equal(brain.actStation,'medical');assert.equal(care.phase,'inbound');
   assert.equal(brain.health.treatment,null);
 });

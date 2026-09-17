@@ -5,9 +5,9 @@ import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,currentAction,getStation} from '../src/obs/state.js';
 import {getStation as originalStation} from '../../js/obs/layout.js?v=15';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
-import {BIKE,createGym,animateGym,pedalPosition} from '../src/obs/gym.js';
+import {BIKE,GYM_LEFT_SIDE,createGym,animateGym,pedalPosition,cyclingFootPosition} from '../src/obs/gym.js';
 import {CABIN_PACE} from '../src/obs/pace.js';
-import {GymVisit,GYM_MOUNT_SECONDS} from '../src/obs/gym-visit.js';
+import {GymVisit,GYM_MOUNT_SECONDS,GYM_BRAKE_SECONDS,GYM_DISMOUNT_SECONDS} from '../src/obs/gym-visit.js';
 
 function setup(){const actor=new CrewMotion({floor:2,x:840}),care=new Supplies(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care});return{actor,brain,care};}
 test('the gym is a 3D-only station and leaves the six original needs intact',()=>{
@@ -38,7 +38,7 @@ test('mount, coast and dismount finish before the latest walking order is execut
   brain.update(1);brain._go(getStation('hydro'));brain._go(getStation('galley'));
   assert.equal(brain.state,'leavingGym');assert.equal(actor.busy,false);
   brain.update(3);assert.equal(actor.busy,false);assert.equal(currentAction(brain),'gym');
-  brain.update(GYM_MOUNT_SECONDS);assert.equal(brain.gymVisit,null);assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
+  brain.update(GYM_MOUNT_SECONDS+GYM_BRAKE_SECONDS+GYM_DISMOUNT_SECONDS);assert.equal(brain.gymVisit,null);assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
 });
 
 test('pedals start and stop smoothly, stay parked, and freeze on zero time',()=>{
@@ -53,8 +53,9 @@ test('pedals start and stop smoothly, stay parked, and freeze on zero time',()=>
 test('gym transitions keep limbs continuous and cycling contacts stay on the equipment',()=>{
   const material=new MeshStandardMaterial(),root=createMilo(new Proxy({},{get:()=>material})),visit=new GymVisit();visit.startYaw=Math.PI/2;
   let previous=null;
-  for(let i=0;i<=720;i++){
-    if(i===420)visit.requestExit();
+  const stopFrame=Math.round((GYM_MOUNT_SECONDS+3)*60),endFrame=stopFrame+Math.ceil((GYM_BRAKE_SECONDS+GYM_DISMOUNT_SECONDS+.2)*60);
+  for(let i=0;i<=endFrame;i++){
+    if(i===stopFrame)visit.requestExit();
     const pose=visit.pose;root.position.z=pose.depth;
     animateMilo(root,{action:'gym',moving:false,facing:1,time:i/60,actionTime:i/60,gymVisit:visit});root.updateMatrixWorld(true);
     const nodes=[root.userData.hips,root.userData.head,...root.userData.legs.map(r=>r.boot),...root.userData.arms.map(r=>r.hand)];
@@ -64,7 +65,7 @@ test('gym transitions keep limbs continuous and cycling contacts stay on the equ
     for(const {boot,side}of root.userData.legs){
       const sole=boot.localToWorld(new Vector3(0,-.107,.024));assert.ok(sole.y>-.008,`floor at ${i/60}: ${sole.y}`);
       if(visit.phase==='cycle'){
-        const pedal=pedalPosition(visit.pedalTime,side),target=new Vector3(pedal.z,pedal.y+.0175,BIKE.depth-pedal.x);
+        const p=cyclingFootPosition(visit.pedalTime,side),target=new Vector3(p.z+.024,p.y-.107,BIKE.depth-p.x);
         assert.ok(sole.distanceTo(target)<1e-5);
       }
     }
@@ -79,7 +80,8 @@ test('exercise chat routes to the gym and preserves already dispatched supply or
 });
 test('an autonomous workout completes and returns to the regular needs loop',()=>{
   const {brain,actor}=setup();brain.exercise=15;let exercised=false;
-  for(let i=0;i<28*60;i++){actor.update(1/60);brain.update(1/60);if(currentAction(brain)==='gym')exercised=true;}
+  const duration=3+GYM_MOUNT_SECONDS+getStation('gym').dur/1000+GYM_BRAKE_SECONDS+GYM_DISMOUNT_SECONDS;
+  for(let i=0;i<duration*60;i++){actor.update(1/60);brain.update(1/60);if(currentAction(brain)==='gym')exercised=true;}
   assert.equal(exercised,true);assert.ok(brain.exercise>95);assert.notEqual(currentAction(brain),'gym');
   for(const value of Object.values(brain.statusNeeds))assert.ok(Number.isFinite(value));
 });
@@ -101,13 +103,13 @@ test('feet remain on the pedals and hands on the handlebar throughout a full cyc
     animateMilo(milo,{action:'gym',moving:false,climbing:false,facing:1,time,actionTime:time});animateGym(gym,time);
     milo.updateMatrixWorld(true);gym.root.updateMatrixWorld(true);
     for(const {boot,side}of milo.userData.legs){
-      const foot=boot.localToWorld(new Vector3(0,-.107,.024)),pedal=pedalPosition(time,side);
-      const target=gym.root.localToWorld(new Vector3(pedal.x,pedal.y+.0175,pedal.z));assert.ok(foot.distanceTo(target)<1e-6,`Foot offset: ${foot.distanceTo(target)}`);
-      const actualPedal=gym.cranks.find(crank=>crank.side===side).pedal.localToWorld(new Vector3(0,.0175,0));
+      const foot=boot.localToWorld(new Vector3(0,-.107,.024)),p=cyclingFootPosition(time,side);
+      const target=gym.root.localToWorld(new Vector3(p.x,p.y-.107,p.z+.024));assert.ok(foot.distanceTo(target)<1e-6,`Foot offset: ${foot.distanceTo(target)}`);
+      const actualPedal=gym.cranks.find(crank=>crank.side===side).pedal.localToWorld(new Vector3(side===GYM_LEFT_SIDE?.04:0,.0175,0));
       assert.ok(foot.distanceTo(actualPedal)<1e-6);
     }
     for(const {hand,side}of milo.userData.arms){
-      const palm=hand.localToWorld(new Vector3(0,-.045,.007)),target=gym.root.localToWorld(new Vector3(side*.207,BIKE.gripY,BIKE.gripZ));
+      const palm=hand.localToWorld(new Vector3(0,-.045,.007)),target=gym.root.localToWorld(new Vector3(side===GYM_LEFT_SIDE?.14:-.29,BIKE.gripY,BIKE.gripZ));
       assert.ok(palm.distanceTo(target)<1e-6,`Hand offset: ${palm.distanceTo(target)}`);
     }
   }

@@ -228,7 +228,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,root.userData.bodySkin?side*Math.PI/2:0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
     elbow.rotation.set(climbing?-.70:-.08,0,0);
     fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.position.set(-side*.029,-.051,.025);thumb.rotation.set(0,0,0);thumb.userData.ip.rotation.set(0,0,0);
-    if(!climbing&&(moving||!action))relaxMiloHand({fingers,thumb,side});
+    if(!climbing&&(moving||!action||action==='gym'))relaxMiloHand({fingers,thumb,side});
     if(seated){arm.rotation.x=-.65;elbow.rotation.x=-.8;}
   }
   for(const {leg,knee,boot,side} of legs){leg.position.x=side*.100;leg.rotation.set(climbing?-.6+Math.sin(stride-side*Math.PI/2)*.47:0,0,0,'XYZ');

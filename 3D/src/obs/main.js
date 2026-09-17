@@ -239,7 +239,7 @@ async function start(){
     };
     brain.catRoutine=cat;
     brain.beginWakeUp();
-    view.setMode('milo');
+    view.setMode('all');
     $('loading').hidden=true;
     function tick(now){
       const dt=Math.min((now-previous)/1000,.05);previous=now;
