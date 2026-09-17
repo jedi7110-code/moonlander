@@ -1,6 +1,6 @@
 import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
-import {CabinChess} from './chess-ui.js';
+import {CabinLoungeGames} from './lounge-games.js';
 import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
@@ -40,7 +40,7 @@ const scene={
     flashMonitor(){$('call-alert').animate([{opacity:.6},{opacity:1}],{duration:350});},
     showWant(text){$('call-text').textContent=text.replace(t('want_hint'),'');$('call-alert').hidden=false;},
     hideWant(){$('call-alert').hidden=true;},
-    openGame(){pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');chess.show();audio.pause(true);},
+    openGame(kind){pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');games.show(kind);audio.pause(true);},
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     healthEvent(event){
       if(event.type==='onset'){
@@ -59,7 +59,7 @@ const scene={
   }
 };
 const brain=new CabinBrain(scene,actor,{care,name:'MILO'});
-const chess=new CabinChess({parent:$('observation'),refreshIcons,
+const games=new CabinLoungeGames({parent:$('observation'),refreshIcons,
   onClose(){brain.finishGame();previous=performance.now();accumulator=0;audio.pause(paused||document.hidden);updateHUD();},
   onMove(){audio.tone(340,.07,.02);},
   onResult(){brain.needs.fun=Math.min(100,brain.needs.fun+25);brain.rapport=Math.min(100,brain.rapport+5);}
@@ -84,7 +84,7 @@ for(const key of Object.keys(brain.statusNeeds)){
 function updateHUD(){
   const minutes=Math.floor(brain.hour*60);$('ship-clock').textContent=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
   $('milo-mood').textContent=t('mood_'+brain.mood);
-  $('milo-activity').textContent=chess.open?words('チェスで対局中','Playing chess'):paused?words('一時停止','Paused'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('チェスをしにラウンジへ','Going to the lounge for chess'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
+  $('milo-activity').textContent=games.open?games.title:paused?words('一時停止','Paused'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('ゲームをしにラウンジへ','Going to the lounge to play'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
   if(brain.openingWake)$('milo-activity').textContent=brain.bunkVisit?.phase==='sleeping'?words('ルーシーと眠っている','Sleeping with Lucy'):words('ルーシーと目を覚ます','Waking up with Lucy');
   for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
   if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);
@@ -92,7 +92,7 @@ function updateHUD(){
   updateHealthHUD();
   const catStates={play:['マイロと遊んでいる','Playing with Milo'],joinPlay:['マイロのそばへ','Joining Milo'],sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],look:['周りを見ている','Looking around'],stretch:['伸びをしている','Stretching'],prone:['伏せて休んでいる','Resting on belly'],follow:['マイロについて歩く','Following Milo'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
   const passage=cat.motion.portal;
-  $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...catStates[cat.mode]);
+  $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...(catStates[cat.mode]??['立っている','Standing']));
   if(cat.bunkWake)$('cat-activity').textContent=cat.bunkWake.visit.phase==='sleeping'?words('マイロと眠っている','Sleeping with Milo'):words('マイロと目を覚ます','Waking up with Milo');
   for(const [key,stock]of Object.entries(care.supplies)){
     $('stock-'+key).textContent=`${stock}/${care.capacity[key]}`;
@@ -141,9 +141,9 @@ function localize(){
   $('obs-input').placeholder=words('マイロに話しかける','Talk to Milo');$('obs-input').setAttribute('aria-label',$('obs-input').placeholder);
   for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['obs-fullscreen','全画面','Fullscreen'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   const pauseLabel=paused?words('再開','Resume'):words('一時停止','Pause');$('obs-pause').setAttribute('aria-label',pauseLabel);$('obs-pause').dataset.tip=pauseLabel;
-  $('play-chess').setAttribute('aria-label',words('マイロとチェス','Play chess with Milo'));$('play-chess').dataset.tip=words('マイロとチェス','Play chess with Milo');
+  $('play-chess').setAttribute('aria-label',words('ラウンジゲーム','Lounge games'));$('play-chess').dataset.tip=words('チェス・ポーカー・リバーシ','Chess · Poker · Reversi');
   $('dismiss-health').setAttribute('aria-label',words('閉じる','Close'));
-  if(chess.open)chess.render();
+  if(games.open)games.render();
   if(brain.isCalling())scene.obsUI.showWant(brain._wantText());updateHUD();
 }
 function setPause(next){paused=next;$('obs-pause').innerHTML=`<i data-lucide="${paused?'play':'pause'}"></i>`;$('obs-pause').setAttribute('aria-pressed',String(paused));audio.pause(paused);refreshIcons();localize();}
@@ -151,7 +151,7 @@ function confirmOrder(id){feedback.accept(id);feedback.update(0,brain,actor,paus
 function acknowledge(){const reply=brain.acknowledge();if(brain.gamePending&&paused)setPause(false);showMessage(reply);if(brain.actStation)confirmOrder(brain.actStation);else feedback.notify('console','acknowledged');updateHUD();}
 function requestGame(){
   pendingHQ=false;if(paused)setPause(false);
-  if(brain.requestGame()){showMessage(words('チェスを一局やろう。ラウンジへ行くよ。','Let’s play chess. I will head to the lounge.'));confirmOrder('lounge');}
+  if(brain.requestGame()){showMessage(words('何で遊ぼうか。ラウンジへ行くよ。','What shall we play? I will head to the lounge.'));confirmOrder('lounge');}
   else if(brain.actStation==='medical')confirmOrder('medical');
 }
 function loungeClick(){
@@ -194,7 +194,8 @@ $('obs-chat').addEventListener('submit',event=>{
   let reply;
   if(brain.isCalling()&&brain.want?.kind==='play'){
     if(/^(?:no|nope|あとで|また今度|今は無理|やめとく|いや)[!！。\s]*$/i.test(text))reply=brain.declineGame();
-    else if(isGameAcceptance(text)||isChessRequest(text))reply=brain.acknowledge();
+    else if(isGameAcceptance(text))reply=brain.acknowledge();
+    else if(isChessRequest(text))reply=brain.handleChat(text);
   }else if(brain.isCalling())brain.acknowledge();
   showMessage(reply||brain.handleChat(text));if(brain.gamePending&&paused)setPause(false);
   if(actor.commandVersion!==version)confirmOrder(brain.actStation);$('obs-input').value='';audio.tone(330,.08,.02);updateHUD();
@@ -217,12 +218,12 @@ if(!document.fullscreenEnabled)$('obs-fullscreen').hidden=true;
 $('obs-fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('observation').requestFullscreen();}catch{showMessage(words('全画面に切り替えられませんでした。','Fullscreen is unavailable.'),'SYSTEM');}});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'&&!$('health-alert').hidden){event.preventDefault();setHealthDetails(false,true);return;}
-  if(chess.open)return;
+  if(games.open)return;
   if(event.target.closest('input,textarea,button')||event.metaKey||event.ctrlKey||event.altKey)return;
   const supply={f:'food',w:'water',c:'catfood'}[event.key.toLowerCase()];
   if(supply){event.preventDefault();useSupply(supply);}else if(event.code==='Space'){event.preventDefault();setPause(!paused);}else if(event.key==='Escape'){dismissMessage();view?.setMode('all');}
 });
-document.addEventListener('visibilitychange',()=>{previous=performance.now();accumulator=0;audio.pause(document.hidden||paused||chess.open);});
+document.addEventListener('visibilitychange',()=>{previous=performance.now();accumulator=0;audio.pause(document.hidden||paused||games.open);});
 refreshIcons();localize();
 
 async function start(){
@@ -242,13 +243,13 @@ async function start(){
     $('loading').hidden=true;
     function tick(now){
       const dt=Math.min((now-previous)/1000,.05);previous=now;
-      if(!paused&&!document.hidden&&!chess.open){
+      if(!paused&&!document.hidden&&!games.open){
         accumulator+=dt;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!chess.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);advanceCabinTraffic(actor,cat,step);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);advanceCabinTraffic(actor,cat,step);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
-      if(!document.hidden){feedback.update(dt,brain,actor,paused||chess.open);view.render(dt,elapsed,actor,brain,cat,care,paused||chess.open,airlock);}
+      if(!document.hidden){feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock);}
       hudTime+=dt;if(hudTime>.15){updateHUD();hudTime=0;}
       frame=requestAnimationFrame(tick);
     }
@@ -256,5 +257,5 @@ async function start(){
   }catch(error){console.error(error);$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
 }
 $('ship-view').addEventListener('webglcontextlost',event=>{event.preventDefault();setPause(true);$('obs-error').hidden=false;$('obs-error').textContent=words('映像接続が中断されました。ページを再読み込みしてください。','Graphics connection interrupted. Please reload the page.');});
-window.addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(frame);chess.dispose();view?.dispose();audio.dispose();}});
+window.addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(frame);games.dispose();view?.dispose();audio.dispose();}});
 start();

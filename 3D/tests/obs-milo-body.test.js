@@ -22,7 +22,7 @@ test('tattoos stay attached to the forearm skin and away from clothing and hands
     assert.ok(Number.isFinite(u)&&Number.isFinite(v)&&mask>=0&&mask<=1);
     if(mask<=.1||u<0||u>1||v<0||v>1)continue;
     assert.ok(armRegion.getX(i)>.9);
-    assert.ok(position.getY(i)>1.035&&position.getY(i)<1.115);
+    assert.ok(position.getY(i)>.95&&position.getY(i)<1.16);
     sides[position.getX(i)<0?0:1]++;vertices.push(i);
   }
   assert.ok(sides.every(n=>n>3),'both forearms contain tattoo surface vertices');
@@ -36,9 +36,11 @@ test('tattoos stay attached to the forearm skin and away from clothing and hands
     }
   }
   assert.deepEqual(tattooUv.array,uvBefore);assert.deepEqual(tattooMask.array,maskBefore);
-  for(const name of ['atom','cat']){
-    const image=await readFile(new URL(`../public/assets/obs/milo/tattoo-${name}.jpg`,import.meta.url));
-    assert.equal(image.readUInt16BE(0),0xffd8,'original JPEG reference is packaged');
+  for(const name of ['cosmo-atomic-bold','cat-red']){
+    const image=await readFile(new URL(`../public/assets/obs/milo/tattoo-${name}.png`,import.meta.url));
+    assert.equal(image.subarray(0,8).toString('hex'),'89504e470d0a1a0a','original color PNG is packaged');
+    assert.equal(image.readUInt32BE(16)*3,image.readUInt32BE(20),'keep the supplied 1:3 aspect ratio');
+    if(name==='cosmo-atomic-bold')assert.equal(image[25],6,'cosmos artwork retains its RGBA transparency');
   }
 });
 test('the collar follows the scanned neck instead of leaving wide side openings',async()=>{

@@ -3,17 +3,18 @@ import {getStation,FLOORS} from './state.js';
 import {getLang} from '../../../js/obs/i18n.js?v=15';
 import {medicalReadings,medicalEntryTime,medicalDuration,MED_BED} from './medical.js';
 import {CrewHealth} from './health.js';
-import {BathroomVisit} from './bathroom.js';
+import {BathroomVisit,BATHROOM_TURN_DECAY} from './bathroom.js';
 import {PlantBed} from './plant-state.js';
 import {CABIN_PACE} from './pace.js';
 import {LOUNGE_EXIT_SECONDS,LOUNGE_ENTRY_SECONDS} from './lounge-exit.js';
 import {reclineProgress,RECLINE_EXIT_SECONDS} from './recline.js';
-import {GymVisit} from './gym-visit.js';
+import {GymVisit,GYM_TURN_SECONDS,GYM_TURN_DECAY} from './gym-visit.js';
 import {BunkVisit,BUNK_TRANSITION_DECAY} from './bunk-visit.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 export const OPENING_SLEEP_SECONDS=3;
-export const isChessRequest=text=>/チェス|chess|ゲーム|\bgame\b|\bplay\b|遊ぼ|遊び|遊んで/i.test(text);
+export const requestedGame=text=>/ポーカー|poker/i.test(text)?'poker':/リバーシ|オセロ|reversi|othello/i.test(text)?'reversi':/チェス|chess/i.test(text)?'chess':null;
+export const isChessRequest=text=>Boolean(requestedGame(text))||/ゲーム|\bgame\b|\bplay\b|遊ぼ|遊び|遊んで/i.test(text);
 export const isGameAcceptance=text=>/^(?:yes|yeah|sure|ok|okay|はい|うん|いいよ|いいね|やろう|やる|お願い|それで|了解|付き合う)[!！。\s]*$/i.test(text.trim());
 
 // Keep the 2D behavior intact; the cabin uses local reserves and bulk deliveries.
@@ -53,7 +54,8 @@ export class CabinBrain extends Brain {
     // Give the added entry/exit animation a small needs budget, without rushing its motion.
     const boarding=this.bunkVisit&&this.bunkVisit.phase!=='sleeping';
     const medicalBoarding=this.reclineExit?.id==='medical'||(this.cur?.id==='medical'&&this.state==='performing'&&medicalEntryTime(this.curDurSec-this.performT,this.curDurSec)<MED_BED.transition);
-    return super._decayMul(need)*CABIN_PACE.needDecay*(boarding ? BUNK_TRANSITION_DECAY : medicalBoarding ? .14 : 1);
+    const turning=BATHROOM_TURN_DECAY[this.bathroom?.phase]??(this.gymVisit?.phase==='mount'&&this.gymVisit.age<GYM_TURN_SECONDS?GYM_TURN_DECAY:1);
+    return super._decayMul(need)*CABIN_PACE.needDecay*(boarding ? BUNK_TRANSITION_DECAY : medicalBoarding ? .14 : turning);
   }
   update(dt){
     if(this.state==='playingGame')return;
@@ -169,7 +171,7 @@ export class CabinBrain extends Brain {
     }
     if(this.gamePending&&station.id==='lounge'&&!enteringLounge){
       this.gamePending=false;this.state='playingGame';this.actKey='perform';this.actStation='lounge';this.cur=station;
-      this.actor.setSymbol('');this.scene.obsUI?.openGame?.();return;
+      this.actor.setSymbol('');this.scene.obsUI?.openGame?.(this.gameKind);return;
     }
     if(station.supply&&!this.care.take(station.supply)){
       this.cur=null;this._toIdle();this.requestSupplies();return;
@@ -251,10 +253,11 @@ export class CabinBrain extends Brain {
     this.gamePending=false;
     return super.requestCommand();
   }
-  requestGame(){
-    if(!this.isSeatedInLounge()&&this.deferDeparture(()=>this.requestGame()))return true;
+  requestGame(kind=null){
+    if(!this.isSeatedInLounge()&&this.deferDeparture(()=>this.requestGame(kind)))return true;
     if(this.health.urgent){this.scene.obsUI?.healthEvent?.({type:'restricted',kind:this.health.condition.kind,stage:this.health.stage});this._go(getStation('medical'));return false;}
     if(this.gamePending||this.state==='playingGame')return false;
+    this.gameKind=['chess','poker','reversi'].includes(kind)?kind:null;
     if(this.isSeatedInLounge()){
       this.leisure=null;this.gamePending=true;this.recoverNeed=null;this.want=null;this.socialT=0;this.wantCoolT=30;
       this.scene.obsUI?.hideWant();this._startPerform(getStation('lounge'));return true;
@@ -277,7 +280,7 @@ export class CabinBrain extends Brain {
     if(this.isCalling()&&this.want?.kind==='play'){
       if(!this.requestGame())return this.health.urgent?words('今は先に手当てを受けたい。','I need treatment first.'):words('ラウンジで会おう。','I will meet you in the lounge.');
       this.rapport=Math.min(100,this.rapport+10);
-      return words('チェスにしよう。ラウンジへ行くよ。','Chess, then. I will meet you in the lounge.');
+      return words('ラウンジで遊ぼう。何にするか選んでくれ。','Let’s play in the lounge. Pick a game.');
     }
     return super.acknowledge();
   }
@@ -308,8 +311,8 @@ export class CabinBrain extends Brain {
       this._go(getStation('eva'));return words('宇宙服のラックを点検してくる。','I will check the suit rack.');
     }
     if(isChessRequest(text)){
-      if(!this.requestGame())return this.health.urgent?words('今は先に手当てを受けたい。','I need treatment first.'):words('ラウンジで会おう。','I will meet you in the lounge.');
-      return words('チェスを一局やろう。ラウンジへ行くよ。','Let’s play a game of chess. I will head to the lounge.');
+      if(!this.requestGame(requestedGame(text)))return this.health.urgent?words('今は先に手当てを受けたい。','I need treatment first.'):words('ラウンジで会おう。','I will meet you in the lounge.');
+      return words('一局やろう。ラウンジへ行くよ。','Let’s play a round. I will head to the lounge.');
     }
     if(/運動|ジム|筋トレ|トレーニング|エアロバイク|exercise|work\s?out|gym|cycling/i.test(text)){
       if(!this._go(getStation('gym')))return words('運動は控えて、先に手当てを受ける。','I will skip exercise and get treatment first.');

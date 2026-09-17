@@ -8,6 +8,7 @@ import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 export const CAT_WALK_SPEED=18;
 const CAT_FREE_REST_MODES=new Set(['look','groom','sleep','stretch','prone']);
 const CAT_REST_YAWS=Array.from({length:8},(_,i)=>i*Math.PI/4);
+const CAT_WAKE_PREP_SECONDS=.3,CAT_WAKE_LAND_SECONDS=.45;
 
 export function advanceCabinTraffic(actor,cat,dt){
   if(dt<=0)return;
@@ -55,8 +56,8 @@ export class CatMotion extends CrewMotion {
   face(yaw){
     if(!this.turns)return false;
     if(this.heading===null){this.heading=yaw;return false;}
-    if(this.turn)return true;
-    if(Math.abs(angleDelta(this.heading,yaw))<.035){this.heading+=angleDelta(this.heading,yaw);return false;}
+    if(this.turn){this.pendingHeading=yaw;return true;}
+    if(Math.abs(angleDelta(this.heading,yaw))<1e-7){this.heading+=angleDelta(this.heading,yaw);return false;}
     this.turn=createCatTurn(this.heading,yaw);return true;
   }
   get turnPose(){
@@ -124,7 +125,10 @@ export class CatMotion extends CrewMotion {
     if(dt<=0)return;
     if(this.turn){
       this.turn.age=Math.min(this.turn.duration,this.turn.age+dt);this.heading=sampleCatTurn(this.turn).yaw;
-      if(this.turn.age===this.turn.duration)this.turn=null;
+      if(this.turn.age===this.turn.duration){
+        this.turn=null;
+        if(this.pendingHeading!==undefined){const target=this.pendingHeading;delete this.pendingHeading;this.face(target);}
+      }
       return;
     }
     if(this.turns&&!this.portal){
@@ -172,6 +176,9 @@ export class CatMotion extends CrewMotion {
       if(p.phase==='transit')this.y=FLOORS[p.from].y+(FLOORS[p.to].y-FLOORS[p.from].y)*s;
       if(p.phase==='exit')this.z=CAT_PORT.insideZ+(CAT_PORT.walkZ-CAT_PORT.insideZ)*s;
       if(p.phase==='enter'||p.phase==='exit')this.portalWalkDistance+=Math.abs(this.z-previousZ);
+      // Navigation owns the same heading as the rendered passage. In particular
+      // the final turn-out frame must survive removal of the portal object.
+      this.heading=this.passagePose.yaw;
       if(p.age<p.duration)break;
       p.age=0;
       if(p.phase==='turnIn'){p.phase='enter';p.duration=2.8;return;}
@@ -233,13 +240,21 @@ export class CatRoutine {
     const bunk=getStation('bunk');
     this.motion.floor=bunk.floor;this.motion.x=bunk.x+24;this.motion.y=FLOORS[bunk.floor].y;
     this.motion.queue=[];this.motion.onArrive=null;this.motion.destination=null;this.motion.onDestination=null;
-    this.motion.portal=null;this.motion.hop=null;this.motion.onSofa=false;this.motion.elevation=0;this.motion.z=CAT_PORT.walkZ;
+    this.motion.portal=null;this.motion.hop=null;this.motion.turn=null;delete this.motion.pendingHeading;this.motion.onSofa=false;this.motion.elevation=0;this.motion.z=CAT_PORT.walkZ;
     this.mode='sleep';this.modeTime=4;this.remaining=100;this.pendingMove=null;this.playHost=null;this.playRelease=null;
     this.restYaw=-Math.PI/2;this.motion.heading=this.restYaw;this.bunkWake={visit};
   }
   finishBunkWake(){
     if(!this.bunkWake)return;
-    this.bunkWake=null;this.motion.heading=Math.PI/2;this.motion.facing=1;this.rest('look',6);
+    this.bunkWake=null;this.motion.facing=1;this.rest('look',6);
+  }
+  get bunkHop(){
+    const visit=this.bunkWake?.visit;if(!visit)return null;
+    const prepareAt=BUNK_PHASE_SECONDS.waking-CAT_WAKE_PREP_SECONDS;
+    if(visit.phase==='waking'&&visit.age>=prepareAt)return{up:false,phase:'prepare',age:visit.age-prepareAt,duration:CAT_WAKE_PREP_SECONDS,yaw:0};
+    if(visit.phase==='leaving')return{up:false,phase:'flight',age:visit.age,duration:BUNK_PHASE_SECONDS.leaving,yaw:0};
+    if(visit.phase==='rising'&&visit.age<CAT_WAKE_LAND_SECONDS)return{up:false,phase:'land',age:visit.age,duration:CAT_WAKE_LAND_SECONDS,yaw:0};
+    return null;
   }
   between(min,max){return min+(max-min)*this.random();}
   get poseYaw(){return this.motion.turns?(this.motion.turnPose?.yaw??this.motion.heading):!this.motion.busy&&CAT_FREE_REST_MODES.has(this.mode)?this.restYaw:this.motion.laneYaw;}
@@ -305,8 +320,15 @@ export class CatRoutine {
       const {visit}=this.bunkWake;
       if(visit.phase==='sleeping'){this.mode='sleep';this.modeTime+=dt;this.remaining=100;}
       else if(visit.phase==='waking'){
-        this.mode='sleep';this.modeTime+=dt;this.remaining=Math.max(0,BUNK_PHASE_SECONDS.waking-visit.age);
-      }else{this.mode='look';this.modeTime+=dt;this.remaining=100;}
+        // Rise first, then plant the paws and face the landing before jumping.
+        this.mode='sleep';this.modeTime+=dt;this.remaining=Math.max(0,CAT_RISE_TIME-visit.age);
+        if(visit.age>=CAT_RISE_TIME){
+          const turn=this.bunkWake.turn??=createCatTurn(this.motion.heading,0,{duration:BUNK_PHASE_SECONDS.waking-CAT_RISE_TIME-CAT_WAKE_PREP_SECONDS});
+          turn.age=Math.min(turn.duration,visit.age-CAT_RISE_TIME);
+          this.motion.heading=sampleCatTurn(turn).yaw;
+          this.motion.turn=turn.age<turn.duration?turn:null;
+        }
+      }else{this.mode='idle';this.modeTime=0;this.remaining=100;this.motion.turn=null;this.motion.heading=0;}
       return;
     }
     const bounded=value=>Math.max(0,Math.min(100,value)),resting=!this.motion.busy;

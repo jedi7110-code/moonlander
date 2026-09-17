@@ -1,5 +1,7 @@
 const smooth=(t,a,b)=>{const x=Math.max(0,Math.min(1,(t-a)/(b-a)));return x*x*(3-2*x);};
-export const GYM_MOUNT_SECONDS=3.2;
+export const GYM_TURN_SECONDS=1.6;
+export const GYM_TURN_DECAY=.45/GYM_TURN_SECONDS;
+export const GYM_MOUNT_SECONDS=GYM_TURN_SECONDS+2.75;
 export const GYM_BRAKE_SECONDS=1.2;
 export const GYM_DISMOUNT_SECONDS=2.75;
 
@@ -31,9 +33,9 @@ export class GymVisit {
     }
   }
   get pose(){
-    const t=this.phase==='mount'?Math.max(0,this.age-.45):this.phase==='dismount'?GYM_DISMOUNT_SECONDS-this.age:this.phase==='done'?0:GYM_DISMOUNT_SECONDS;
+    const t=this.phase==='mount'?Math.max(0,this.age-GYM_TURN_SECONDS):this.phase==='dismount'?GYM_DISMOUNT_SECONDS-this.age:this.phase==='done'?0:GYM_DISMOUNT_SECONDS;
     const weight=smooth(t,.65,2.3);
-    return {pedalTime:this.pedalTime,turn:this.phase==='mount'?smooth(this.age,0,.45):1,weight,
+    return {pedalTime:this.pedalTime,turn:this.phase==='mount'?smooth(this.age,0,GYM_TURN_SECONDS):1,weight,
       depth:.78-.48*weight,grip:smooth(t,0,.8),nearFoot:smooth(t,.35,1.3),farFoot:smooth(t,1.35,2.65)};
   }
 }

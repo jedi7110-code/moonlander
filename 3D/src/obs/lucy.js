@@ -57,7 +57,7 @@ export function createLucy(gltf,{random=Math.random}={}){
   return root;
 }
 
-export function animateLucy(root,{time=0,dt=null,moving=false,facing=1,yaw=null,mode='look',walkDistance=0,passage=null,hop=null,actionTime=0,remaining=Infinity,playRelease=null}){
+export function animateLucy(root,{time=0,dt=null,moving=false,facing=1,yaw=null,headingControlled=false,mode='look',walkDistance=0,passage=null,hop=null,actionTime=0,remaining=Infinity,playRelease=null}){
   const s=root.userData;
   dt=dt===null?(s.lastTime===null?0:THREE.MathUtils.clamp(time-s.lastTime,0,.1)):THREE.MathUtils.clamp(dt,0,.1);
   s.lastTime=time;
@@ -124,7 +124,7 @@ export function animateLucy(root,{time=0,dt=null,moving=false,facing=1,yaw=null,
     }
   });
   const direction=passage?.yaw??hop?.yaw??yaw??facing*Math.PI/2;
-  if(!s.initialized)root.rotation.y=direction;
+  if(!s.initialized||headingControlled)root.rotation.y=direction;
   else root.rotation.y+=Math.atan2(Math.sin(direction-root.rotation.y),Math.cos(direction-root.rotation.y))*(1-Math.exp(-dt*10));
   s.initialized=true;root.updateMatrixWorld(true);
 }

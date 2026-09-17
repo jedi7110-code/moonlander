@@ -58,7 +58,7 @@ export async function loadMiloBody(url=`${import.meta.env?.BASE_URL??'/3D/'}asse
   const data=await response.json();
   if(typeof document!=='undefined'){
     const loader=new THREE.TextureLoader(),base=import.meta.env?.BASE_URL??'/3D/';
-    tattooMaps=await Promise.all(['atom','cat'].map(name=>loader.loadAsync(`${base}assets/obs/milo/tattoo-${name}.jpg`)));
+    tattooMaps=await Promise.all(['tattoo-cosmo-atomic-bold.png','tattoo-cat-red.png'].map(name=>loader.loadAsync(`${base}assets/obs/milo/${name}`)));
     for(const map of tattooMaps){map.colorSpace=THREE.NoColorSpace;map.anisotropy=4;}
   }
   bodyData=data;return bodyData;
@@ -246,8 +246,9 @@ export function attachMiloBody(root,m,pants,legacy){
   for(const [i,{m00,m02,m20,m22,tz,pivot}] of armTransforms){
     const side=surface.getX(i)<0?-1:1,x=surface.getX(i)-pivot,z=surface.getZ(i),sourceY=data.positions[i*3+1];
     const t=THREE.MathUtils.clamp((sourceY-.880)/.300,0,1),centerZ=-.036-.039*t+.014*t*t,centerX=-side*.010*smooth(sourceY,.880,1.14);
-    const nx=m00*x+m02*z,nz=m20*x+m22*z+tz,width=side<0?.057:.062,height=side<0?.064:.069;
-    tattooUv[i*2]=.5-side*(nz-centerZ)/width;tattooUv[i*2+1]=.5+(surface.getY(i)-1.075)/height;
+    // Both supplied designs are 1:3, running from elbow toward wrist.
+    const nx=m00*x+m02*z,nz=m20*x+m22*z+tz,width=.070,height=.210;
+    tattooUv[i*2]=.5-side*(nz-centerZ)/width;tattooUv[i*2+1]=.5+(surface.getY(i)-1.055)/height;
     tattooMask[i]=smooth(side*(nx-centerX),.008,.020)*smooth(data.armRegions[i],.90,.98);
   }
   geometry.setAttribute('tattooUv',new THREE.BufferAttribute(tattooUv,2));geometry.setAttribute('tattooMask',new THREE.BufferAttribute(tattooMask,1));
@@ -349,11 +350,13 @@ export function attachMiloBody(root,m,pants,legacy){
       float tattooFrame=1.0-smoothstep(.98,1.0,max(abs(vTattooUv.x-.5),abs(vTattooUv.y-.5))*2.0);
       if(tattooFrame*vTattooMask*tattooStrength>0.001){
         vec2 uv=clamp(vTattooUv,0.0,1.0);
-        float pigment;
-        if(vBodyPosition.x<0.0) pigment=texture2D(tattooCat,vec2(.15,.13)+uv*vec2(.70,.74)).r;
-        else pigment=texture2D(tattooAtom,vec2(.266,.239)+uv*vec2(.469,.524)).r;
-        float ink=(1.0-smoothstep(.40,.96,pigment))*tattooFrame*vTattooMask*tattooStrength*(1.0-shirt)*(1.0-trousers);
-        vec3 inkColor=diffuseColor.rgb*vec3(.15,.19,.18);
+        // Preserve the complete source artwork. Transparent pixels (cosmos)
+        // and white paper (cat) remain bare skin, including antialiased edges.
+        vec4 artwork=vBodyPosition.x<0.0?texture2D(tattooCat,uv):texture2D(tattooAtom,uv);
+        float pigment=min(artwork.r,min(artwork.g,artwork.b));
+        float red=clamp((artwork.r-max(artwork.g,artwork.b))*2.5,0.0,1.0);
+        vec3 inkColor=diffuseColor.rgb*mix(vec3(.15,.19,.18),vec3(.80,.055,.035),red);
+        float ink=artwork.a*(1.0-smoothstep(.40,.96,pigment))*tattooFrame*vTattooMask*tattooStrength*(1.0-shirt)*(1.0-trousers);
         diffuseColor.rgb=mix(diffuseColor.rgb,inkColor,ink);
       }
     `).replace('#include <normal_fragment_maps>',`vec3 smoothBodyNormal=normal;
@@ -362,7 +365,7 @@ export function attachMiloBody(root,m,pants,legacy){
       normal=normalize(mix(smoothBodyNormal,normal,trouserBumpMask));
     `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.96,trousers);');
   };
-  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-v18';
+  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-v20';
   const mesh=new THREE.SkinnedMesh(geometry,material);mesh.name='Continuous sample-based human body';
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;body.add(mesh);
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});

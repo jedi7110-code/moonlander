@@ -78,6 +78,11 @@ async function start(){
       controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(0,.5,3).applyQuaternion(watch.getWorldQuaternion(new THREE.Quaternion())));
       camera.lookAt(target);camera.updateProjectionMatrix();controls.update();return;
     }
+    if(view==='nape'){
+      milo.updateMatrixWorld(true);target.copy(head.localToWorld(new THREE.Vector3(0,-.35,-1.1)));camera.zoom=6;
+      controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(0,.1,-3).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion())));
+      camera.lookAt(target);camera.updateProjectionMatrix();controls.update();return;
+    }
     if(view==='face')el=.04;
     if(view==='ladder-side'){az=1.22;el=.05;}
     if(view==='boots'){az=Math.PI/2;el=.04;}
@@ -93,6 +98,7 @@ async function start(){
   }
   $('view').add(new Option('ブーツ拡大','boots'));
   $('view').add(new Option('顔拡大','face'));
+  $('view').add(new Option('首の後ろ・タトゥー','nape'));
   $('view').add(new Option('腕・手拡大','arms'));
   $('view').add(new Option('端末・横から','tablet-side'));
   $('view').add(new Option('端末・画面側','tablet-screen'));

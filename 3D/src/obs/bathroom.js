@@ -1,5 +1,7 @@
 const smooth=t=>t*t*(3-2*t);
-const phases=[['reach',.4],['open',.7],['enter',1.1],['close',.7],['use',Infinity],['reopen',.7],['leave',1.1],['shut',.7]];
+const phases=[['reach',1.4],['open',.7],['enter',1.1],['close',.7],['use',Infinity],['reopen',1.8],['leave',1.1],['shut',.7]];
+// A longer visual turn must not charge extra hunger/thirst to the visit.
+export const BATHROOM_TURN_DECAY={reach:.4/1.4,reopen:.7/1.8};
 
 export class BathroomVisit {
   constructor(id,{entered,exited}={}){this.id=id;this.index=0;this.age=0;this.entered=entered;this.exited=exited;this.exitRequested=false;this.done=false;}

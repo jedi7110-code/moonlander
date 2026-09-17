@@ -148,14 +148,33 @@ export function createMiloEye(source,{x,y,halfWidth,halfHeight}){
   const eye=new THREE.Mesh(geometry,material);eye.name='Fitted Milo eye surface';eye.receiveShadow=true;return eye;
 }
 
+// Head-local coordinates keep the nape mark attached during every head turn.
+// Mirror the projection axis, not the artwork: it reads normally from behind.
+export const MILO_NAPE_TATTOO={width:1.5,height:.30,centerY:-.35};
+export const NAPE_TATTOO_GLSL=`
+  vec2 napeUv=vec2(.5-vHeadPosition.x/${MILO_NAPE_TATTOO.width.toFixed(4)},.5+(vHeadPosition.y-(${MILO_NAPE_TATTOO.centerY.toFixed(4)}))/${MILO_NAPE_TATTOO.height.toFixed(4)});
+  float napeFrame=1.0-smoothstep(.96,1.0,max(abs(napeUv.x-.5),abs(napeUv.y-.5))*2.0);
+  float napeRear=1.0-smoothstep(-.6,-.35,vHeadPosition.z);
+  if(napeFrame*napeRear>0.001){
+    vec4 mark=texture2D(napeTattoo,vec2(.19,.32)+clamp(napeUv,0.0,1.0)*vec2(.62,.36));
+    float pigment=min(mark.r,min(mark.g,mark.b));
+    float red=clamp((mark.r-max(mark.g,mark.b))*2.5,0.0,1.0);
+    vec3 inkColor=diffuseColor.rgb*mix(vec3(.15,.19,.18),vec3(.80,.055,.035),red);
+    float ink=mark.a*(1.0-smoothstep(.40,.96,pigment))*napeFrame*napeRear*.88;
+    diffuseColor.rgb=mix(diffuseColor.rgb,inkColor,ink);
+  }
+`;
+
 export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/head/`){
   const loader=new THREE.TextureLoader();
-  const [gltf,map,normalMap]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg')]);
+  const [gltf,map,normalMap,napeTattoo]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg'),loader.loadAsync(base+'tattoo-naval-barcode.png')]);
+  napeTattoo.colorSpace=THREE.NoColorSpace;napeTattoo.anisotropy=4;
   map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;normalMap.anisotropy=4;
   const material=new THREE.MeshStandardMaterial({color:0xd2c8bd,map,normalMap,normalScale:new THREE.Vector2(.45,.45),roughness:.74,metalness:0,envMapIntensity:.3});
   const mouthMotion={value:0};
   material.onBeforeCompile=shader=>{
     shader.uniforms.mouthMotion=mouthMotion;
+    shader.uniforms.napeTattoo={value:napeTattoo};
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;\nuniform float mouthMotion;').replace('#include <begin_vertex>',`#include <begin_vertex>
       vHeadPosition = position;
       float lipLine = 0.45 - pow(abs(position.x + 0.11), 2.0) * 0.20;
@@ -164,7 +183,7 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
         * (1.0 - smoothstep(0.55, 0.95, abs(position.x + 0.11)));
       transformed.y -= mouthMotion * 0.20 * jaw;
     `);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;').replace('#include <color_fragment>',`#include <color_fragment>
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;\nuniform sampler2D napeTattoo;').replace('#include <color_fragment>',`#include <color_fragment>
       ${eyeOpeningMask}
       ${HAIRLINE_GLSL}
       float hairMask = smoothstep(hairline - 0.16, hairline + 0.10, vHeadPosition.y);
@@ -180,9 +199,10 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
       float facialHair = max(beard * (1.0 - lips), moustache);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.033, 0.026, 0.020), facialHair * (0.42 + grain * 0.22));
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.022, 0.018, 0.015) * (0.75 + grain * 0.45), hairMask);
+      ${NAPE_TATTOO_GLSL}
     `);
   };
-  material.customProgramCacheKey=()=> 'obs-milo-scan-v8';
+  material.customProgramCacheKey=()=> 'obs-milo-scan-v9-nape-tattoo';
   const source=gltf.scene.getObjectByName('LeePerrySmith');
   if(!source?.isMesh)throw new Error('Milo head mesh is missing');
   const group=new THREE.Group(),mesh=new THREE.Mesh(headGeometry(source.geometry),material);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);

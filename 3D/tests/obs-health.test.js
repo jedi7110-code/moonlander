@@ -92,7 +92,7 @@ test('a gym injury stops exercise, and critical care does not cancel an already 
   care.take('food');care.request();care.transmit();care.update(3);assert.equal(care.phase,'inbound');
   brain.health.startCondition('injury');brain.update(1/60);
   assert.equal(brain.state,'leavingGym');assert.equal(actor.busy,false);
-  for(let i=0;i<8*60;i++)brain.update(1/60);
+  for(let i=0;i<9*60;i++)brain.update(1/60);
   assert.equal(brain.actStation,'medical');assert.equal(care.phase,'inbound');
   assert.equal(brain.health.treatment,null);
 });

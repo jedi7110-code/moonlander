@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {angleDelta,turnTowards} from './heading.js';
 import {ball,box,cylinder,pipe,rod} from './materials.js';
 import {createCatEar,createCatTail,animateCatTail,createCatLegSkin,updateCatLegSkins} from './cat-anatomy.js';
 import {createCatSkull,createCatEyes,createCatMuzzle,updateCatEyes,catFaceSurface} from './cat-face.js';
@@ -206,6 +207,10 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   setTabletHandFit(root,action==='lounge'&&!moving&&leisure==='tablet');
   if(action==='medical'&&!moving)root.userData.medicalStartYaw??=root.rotation.y;
   else delete root.userData.medicalStartYaw;
+  if(bathroom)root.userData.bathroomStartYaw??=root.rotation.y;
+  else delete root.userData.bathroomStartYaw;
+  if(action==='bunk'&&!moving)root.userData.bunkStartYaw??=root.rotation.y;
+  else delete root.userData.bunkStartYaw;
   resetDiningPose(root);
   for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
   const stride=time*(climbing?5.4:6.5),walking=moving&&!climbing&&!waiting;
@@ -215,8 +220,10 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   chest.rotation.set(0,0,0);chest.position.set(0,0,0);head.position.set(0,1.637,-.009);
   const dining=['galley','hydro'].includes(action)&&!moving;
   const calling=callingTime!==null&&!moving&&!action;
-  const desired=bathroom?THREE.MathUtils.lerp((facing||1)*Math.PI/2,bathroom.yaw,bathroom.turn):dining||climbing||calling?Math.PI:walking||waiting?facing*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
-  root.rotation.y+=Math.atan2(Math.sin(desired-root.rotation.y),Math.cos(desired-root.rotation.y))*.12;
+  const desired=bathroom?root.userData.bathroomStartYaw+angleDelta(root.userData.bathroomStartYaw,bathroom.yaw??0)*(bathroom.turn??1):dining||climbing||calling?Math.PI:walking||waiting?(facing||1)*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
+  const authored=bathroom||bunkVisit||gymVisit||(action==='medical'&&!moving)||reclineExit||(action==='bunk'&&!moving);
+  if(authored)delete root.userData.headingTurn;
+  else turnTowards(root,desired,dt);
   head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
   for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,root.userData.bodySkin?side*Math.PI/2:0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
     elbow.rotation.set(climbing?-.70:-.08,0,0);
@@ -249,11 +256,11 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     const rise=loungeExit?loungeExitPose(loungeExit.age).rise:loungeEntry?loungeExitPose(loungeEntryAge(loungeEntry.age)).rise:0;
     applySeatedLegSpread(root,1-rise);
   }
-  if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top);
+  if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top,root.userData.bunkStartYaw);
   if(action==='gym'&&!moving){if(gymVisit)applyGymVisitPose(root,gymVisit);else applyCyclingPose(root,actionTime);}
   if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration,root.userData.medicalStartYaw);
   if(reclineExit?.id==='medical')applyMedicalPose(root,medicalExitTime(reclineExit),reclineExit.actionDuration,root.userData.medicalStartYaw);
-  else if(reclineExit)applyReclinedPose(root,reclineExitProgress(reclineExit),BUNK_BED.top);
+  else if(reclineExit)applyReclinedPose(root,reclineExitProgress(reclineExit),BUNK_BED.top,root.userData.bunkStartYaw);
   if(bunkVisit)applyBunkVisitPose(root,bunkVisit);
   else if(action==='bunk'&&!moving)applySleepingHands(root,reclineExit?reclineExitProgress(reclineExit):reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition));
   if(action==='plant'&&!moving){

@@ -44,22 +44,22 @@ for(const id of ['shower','toilet'])test(`${id}: opens, enters, shuts, uses, exi
  }
  assert.equal(started,1);assert.equal(visit.phase,'use');assert.equal(visit.pose.opening,0);
  visit.update(0);assert.equal(visit.phase,'use');visit.requestExit();
- for(let i=0;i<120*3;i++)visit.update(1/120);
+ for(let i=0;i<120*4;i++)visit.update(1/120);
  assert.equal(ended,1);assert.equal(visit.pose.depth,.78);assert.equal(visit.pose.opening,0);
  assert.deepEqual(phases,['reach','open','enter','close','use']);
 });
 test('using the bathroom starts only once its door is closed; a new order waits for exit',()=>{
  const {actor,brain,tick}=setup('shower');brain._go(getStation('shower'));tick(1);
  assert.equal(brain.state,'enteringBathroom');assert.equal(brain.recoverNeed,null);
- tick(2);assert.equal(brain.state,'performing');assert.equal(brain.bathroom.phase,'use');
+ tick(3);assert.equal(brain.state,'performing');assert.equal(brain.bathroom.phase,'use');
  brain._go(getStation('hydro'));assert.equal(actor.busy,false);const y=actor.y;
  tick(1);assert.equal(actor.y,y);assert.equal(brain.actStation,'shower');
- tick(2);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');assert.equal(actor.busy,true);
+ tick(3);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');assert.equal(actor.busy,true);
 });
 test('an order during entry does not interrupt passage through the door',()=>{
  const {brain,tick}=setup('toilet');brain._go(getStation('toilet'));tick(1.5);
  const depth=brain.bathroom.pose.depth;brain._go(getStation('galley'));assert.equal(brain.bathroom.pose.depth,depth);
- brain._go(getStation('hydro'));tick(5);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');
+ brain._go(getStation('hydro'));tick(6.5);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');
 });
 test('dining finishes returning its utensils before a new order starts',()=>{
  const {brain,care,tick}=setup('galley');brain._go(getStation('galley'));tick(1);

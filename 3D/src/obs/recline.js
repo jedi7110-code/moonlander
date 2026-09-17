@@ -12,10 +12,10 @@ export function reclineProgress(time,duration,transition=2){
 export const RECLINE_EXIT_SECONDS=2;
 export function reclineExitProgress(exit){return exit.progress*(1-THREE.MathUtils.smoothstep(exit.age,0,RECLINE_EXIT_SECONDS));}
 
-export function applyReclinedPose(root,progress,top){
+export function applyReclinedPose(root,progress,top,startYaw=Math.PI/2){
   const angle=-Math.PI/2*progress,hip=.988;
   const {body,head,arms,legs}=root.userData;
-  root.rotation.y=Math.PI/2;
+  root.rotation.y=startYaw+Math.atan2(Math.sin(Math.PI/2-startYaw),Math.cos(Math.PI/2-startYaw))*THREE.MathUtils.smoothstep(progress,0,.3);
   // Pivot at the hips, keeping the back on the support instead of rotating about the feet.
   body.rotation.x=angle;
   const seated=THREE.MathUtils.smoothstep(progress,0,.3);

@@ -38,7 +38,7 @@ test('mount, coast and dismount finish before the latest walking order is execut
   brain.update(1);brain._go(getStation('hydro'));brain._go(getStation('galley'));
   assert.equal(brain.state,'leavingGym');assert.equal(actor.busy,false);
   brain.update(3);assert.equal(actor.busy,false);assert.equal(currentAction(brain),'gym');
-  brain.update(4);assert.equal(brain.gymVisit,null);assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
+  brain.update(GYM_MOUNT_SECONDS);assert.equal(brain.gymVisit,null);assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
 });
 
 test('pedals start and stop smoothly, stay parked, and freeze on zero time',()=>{
@@ -79,7 +79,7 @@ test('exercise chat routes to the gym and preserves already dispatched supply or
 });
 test('an autonomous workout completes and returns to the regular needs loop',()=>{
   const {brain,actor}=setup();brain.exercise=15;let exercised=false;
-  for(let i=0;i<25*60;i++){actor.update(1/60);brain.update(1/60);if(currentAction(brain)==='gym')exercised=true;}
+  for(let i=0;i<28*60;i++){actor.update(1/60);brain.update(1/60);if(currentAction(brain)==='gym')exercised=true;}
   assert.equal(exercised,true);assert.ok(brain.exercise>95);assert.notEqual(currentAction(brain),'gym');
   for(const value of Object.values(brain.statusNeeds))assert.ok(Number.isFinite(value));
 });

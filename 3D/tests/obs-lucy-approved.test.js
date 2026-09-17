@@ -10,6 +10,8 @@ import {createLucy,animateLucy} from '../src/obs/lucy.js';
 import {addLucyWhiskerPads} from '../studies/lucy/whisker-pads.js';
 import {createStretchStudy} from '../studies/lucy/stretch-study.js';
 import {createProneStudy} from '../studies/lucy/prone-study.js';
+import {CatRoutine,Supplies} from '../src/obs/state.js';
+import {BunkVisit} from '../src/obs/bunk-visit.js';
 const directory=new URL('../public/assets/obs/lucy/',import.meta.url);
 async function create(){
   const read=name=>fs.readFileSync(new URL(name,directory)),bytes=read('lucy-cabin.glb'),binary=read('lucy-groom.bin');
@@ -23,6 +25,28 @@ function bounds(root){
     m.skeleton?.update();for(let i=0;i<m.geometry.attributes.position.count;i++)points.push(m.getVertexPosition(i,p).applyMatrix4(m.matrixWorld).clone());
   });return points;
 }
+test('the rendered wake-up retains the navigation heading through rise, turn, jump and rest',async()=>{
+  const root=await create(),cat=new CatRoutine(new Supplies(),{turns:true,random:()=>.5}),visit=new BunkVisit({startAsleep:true});
+  cat.beginBunkWake(visit);
+  let previousYaw=null,previousHead=null,maxHeadStep=0,seam='';
+  const frame=time=>{
+    const hop=cat.bunkHop;
+    animateCabinLucy(root,{time,dt:1/60,mode:cat.mode,actionTime:cat.modeTime,remaining:cat.remaining,
+      yaw:cat.poseYaw,headingControlled:true,turn:cat.motion.turnPose,hop});
+    assert(Math.abs(Math.atan2(Math.sin(root.rotation.y-cat.poseYaw),Math.cos(root.rotation.y-cat.poseYaw)))<1e-10);
+    if(previousYaw!==null)assert(Math.abs(Math.atan2(Math.sin(root.rotation.y-previousYaw),Math.cos(root.rotation.y-previousYaw)))<.08);
+    const head=root.getObjectByName('Bone004').getWorldPosition(new Vector3());
+    if(previousHead&&head.distanceTo(previousHead)>maxHeadStep){maxHeadStep=head.distanceTo(previousHead);seam=`${time} ${visit.phase}`;}
+    previousHead=head;previousYaw=root.rotation.y;
+  };
+  frame(0);visit.requestExit();
+  // Match the game loop: cat navigation ticks before the crew's bunk visit.
+  for(let i=1;i<=420;i++){cat.update(1/60);visit.update(1/60);frame(i/60);}
+  cat.finishBunkWake();
+  for(let i=421;i<=650;i++){cat.update(1/60);frame(i/60);}
+  assert(maxHeadStep<.04,`wake pose seam: ${maxHeadStep} at ${seam}`);
+  disposeCabinLucy(root);
+});
 test('stepping turns keep their skin above the floor and move continuously',async()=>{
   const cat=await create();cat.position.set(2,3,.8);
   for(const angle of [Math.PI/4,Math.PI/2,Math.PI,-Math.PI]){
