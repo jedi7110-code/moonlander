@@ -1,8 +1,19 @@
 import * as THREE from 'three';
 import {box,ball,rod} from './materials.js';
 import {placeHand} from './dining.js';
+import {applyTabletHands} from './tablet-pose.js';
 
 export const LEISURE_LABELS={tablet:['パッド端末を読んでいる','Reading on a tablet'],music:['音楽を聴いている','Listening to music'],cat:['猫と遊んでいる','Playing with the cat']};
+
+export function applyDeskHands(root,top=.80,reach=.47){
+  const {body,arms}=root.userData;
+  const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,0));
+  for(const rig of arms){
+    placeHand(rig,new THREE.Vector3(rig.side*.22,top+.044-body.position.y,reach),rotation,0);
+    for(const finger of rig.fingers)finger.rotation.x=-.08;
+    rig.thumb.rotation.set(0,0,0);
+  }
+}
 
 export function createLeisureProps(body,m){
   const tablet=new THREE.Group(),phones=new THREE.Group(),toy=new THREE.Group();
@@ -31,10 +42,14 @@ export function applyLeisurePose(root,mode,time,duration=36,catReady=false){
   const {leisure,head,arms}=root.userData,{tablet,phones,toy,lines}=leisure;
   const ease=THREE.MathUtils.smoothstep(Math.min(time,duration-time),0,1.5);
   if(mode==='tablet'){
-    tablet.visible=true;tablet.position.set(0,1.08+.24*ease,.29);tablet.rotation.x=-.35-.50*ease;
+    const lean=.32,pivot=1.0,{chest}=root.userData;
+    chest.rotation.x=lean;chest.position.set(0,pivot*(1-Math.cos(lean)),-pivot*Math.sin(lean));
+    head.position.set(0,pivot+(1.637-pivot)*Math.cos(lean)+.009*Math.sin(lean),(1.637-pivot)*Math.sin(lean)-.009*Math.cos(lean));
+    for(const {arm,side}of arms)arm.position.set(side*.207,pivot+(1.488-pivot)*Math.cos(lean),(1.488-pivot)*Math.sin(lean));
+    tablet.visible=true;tablet.position.set(0,1.32,.46);tablet.rotation.x=-1.12;
     lines.position.z=-.003*(time%8);
     head.rotation.set(.26*ease,.035*Math.sin(time*.6),0);
-    for(const rig of arms)placeHand(rig,new THREE.Vector3(rig.side*.124,tablet.position.y-.015,.30),new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,rig.side*.3)),.6);
+    applyTabletHands(root);
   }else if(mode==='music'){
     head.rotation.set(.035*Math.sin(time*2.4),.03*Math.sin(time*.6),.025*Math.sin(time*1.2));
     phones.visible=true;phones.position.copy(head.position).add(new THREE.Vector3(0,.094,-.008).applyQuaternion(head.quaternion));phones.quaternion.copy(head.quaternion);

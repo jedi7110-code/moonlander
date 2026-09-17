@@ -2,7 +2,51 @@ import * as THREE from 'three';
 import {box,ball,cylinder,pipe,rod} from './materials.js';
 
 const up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
-const samples=25,linkLength=.98;
+const samples=81,linkLength=.98;
+
+function scanTarget(mesh,rig,sweep){
+  if(!mesh.isSkinnedMesh)return mesh;
+  let cached=rig.surfaces.get(mesh);
+  if(!cached||cached.source!==mesh.geometry){
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',mesh.geometry.attributes.position.clone());
+    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.geometry.index?.count??mesh.geometry.attributes.position.count),1));
+    cached={source:mesh.geometry,mesh:new THREE.Mesh(geometry,mesh.material),transform:new THREE.Matrix4()};
+    rig.surfaces.set(mesh,cached);
+  }
+  // Deform each vertex once per scan, not once for every ray/triangle. This
+  // CPU-only surface is never rendered and follows the same skin as the GPU.
+  const target=cached.mesh,positions=target.geometry.attributes.position;
+  rig.surfaceTransform.copy(rig.root.matrixWorld).invert().multiply(mesh.matrixWorld);
+  mesh.skeleton.update();
+  const bones=mesh.skeleton.boneMatrices,version=mesh.geometry.attributes.position.version;
+  if(!cached.bones||version!==cached.version||!cached.transform.equals(rig.surfaceTransform)||bones.some((value,i)=>value!==cached.bones[i])){
+    cached.transform.copy(rig.surfaceTransform);
+    for(let i=0;i<positions.count;i++){
+      mesh.getVertexPosition(i,rig.point).applyMatrix4(cached.transform);positions.setXYZ(i,rig.point.x,rig.point.y,rig.point.z);
+    }
+    cached.bones??=new Float32Array(bones.length);cached.bones.set(bones);cached.version=version;
+    target.geometry.computeBoundingBox();target.geometry.computeBoundingSphere();
+  }
+  // Only triangles crossing this scan plane can meet its downward rays.
+  // Keep material groups while culling the rest before the per-sample raycasts.
+  const source=mesh.geometry,index=source.index,filtered=target.geometry.index;
+  const groups=source.groups.length?source.groups:[{start:0,count:index?.count??positions.count,materialIndex:0}];
+  let count=0;target.geometry.clearGroups();
+  for(const group of groups){
+    const start=count,end=Math.min(group.start+group.count,source.drawRange.start+source.drawRange.count);
+    for(let i=Math.max(group.start,source.drawRange.start);i<end;i+=3){
+      const a=index?index.getX(i):i,b=index?index.getX(i+1):i+1,c=index?index.getX(i+2):i+2;
+      const ax=positions.getX(a),bx=positions.getX(b),cx=positions.getX(c);
+      if(Math.min(ax,bx,cx)>sweep||Math.max(ax,bx,cx)<sweep)continue;
+      filtered.setX(count++,a);filtered.setX(count++,b);filtered.setX(count++,c);
+    }
+    target.geometry.addGroup(start,count-start,group.materialIndex);
+  }
+  target.geometry.setDrawRange(0,count);
+  target.material=mesh.material;target.matrixWorld.copy(rig.root.matrixWorld);
+  return target;
+}
 
 function boom(parent,m){
   const root=new THREE.Group();parent.add(root);
@@ -62,7 +106,7 @@ export function createMedicalRig(m,{x,y,depth,top}){
   const fan=new THREE.Mesh(fanGeometry,new THREE.MeshBasicMaterial({color:0x42ff78,transparent:true,opacity:.045,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false,toneMapped:false}));
   const stripe=new THREE.Mesh(stripeGeometry,new THREE.MeshBasicMaterial({color:0x67ff8c,transparent:true,opacity:.94,side:THREE.DoubleSide,depthWrite:false,toneMapped:false}));
   fan.frustumCulled=false;stripe.frustumCulled=false;scan.add(fan,stripe);
-  const rig={root,arms,scan,fan,stripe,depth,top,work:new THREE.Vector3(),ray:new THREE.Raycaster(),origin:new THREE.Vector3(),point:new THREE.Vector3(),source:new THREE.Vector3(),points:Array.from({length:samples},()=>new THREE.Vector3()),targets:[],patient:null};
+  const rig={root,arms,scan,fan,stripe,depth,top,work:new THREE.Vector3(),ray:new THREE.Raycaster(),origin:new THREE.Vector3(),point:new THREE.Vector3(),source:new THREE.Vector3(),points:Array.from({length:samples},()=>new THREE.Vector3()),targets:[],rayTargets:[],surfaces:new WeakMap(),surfaceTransform:new THREE.Matrix4(),bounds:new THREE.Box3(),patient:null};
   animateMedicalRig(rig,{extension:0,elevation:0},0);return rig;
 }
 
@@ -73,19 +117,25 @@ export function animateMedicalRig(rig,pose,age,{patient=null,scanning=false}={})
   for(const arm of rig.arms)arm.glow.color.setHex(scanning?0x65ff87:0x315244);
   rig.scan.visible=scanning&&Boolean(patient)&&pose.extension===1;
   if(!rig.scan.visible)return;
-  if(rig.patient!==patient){
-    rig.patient=patient;rig.targets=[];
-    const parts=patient.userData;
-    for(const part of [parts.hips,parts.chest,parts.head,...parts.legs.map(l=>l.leg),...parts.arms.map(a=>a.arm)])part.traverse(o=>{if(o.isMesh)rig.targets.push(o);});
-  }
-  patient.updateWorldMatrix(true,true);rig.root.updateWorldMatrix(true,true);
+  patient.updateWorldMatrix(true,false);patient.updateMatrixWorld(true);rig.root.updateWorldMatrix(true,true);
+  // The connected skin is a sibling of the old body parts, not their child.
+  // Refresh visible targets also after asynchronous model attachment/replacement.
+  rig.patient=patient;rig.targets.length=0;rig.rayTargets.length=0;
+  patient.traverseVisible(mesh=>{
+    if(!mesh.isMesh)return;
+    rig.targets.push(mesh);
+    const target=scanTarget(mesh,rig,sweep);
+    if(!target.geometry.boundingBox)target.geometry.computeBoundingBox();
+    rig.surfaceTransform.copy(rig.root.matrixWorld).invert().multiply(target.matrixWorld);
+    rig.bounds.copy(target.geometry.boundingBox).applyMatrix4(rig.surfaceTransform);
+    if(sweep>=rig.bounds.min.x&&sweep<=rig.bounds.max.x)rig.rayTargets.push(target);
+  });
   rig.source.set(0,-.14,0);rig.arms[0].tip.localToWorld(rig.source);rig.root.worldToLocal(rig.source);
   // Project onto the visible character surface, falling back to the pad at the sides.
   for(let i=0;i<samples;i++){
     const zz=rig.depth-.40+i*.80/(samples-1);
     rig.origin.set(sweep,rig.source.y,zz);rig.root.localToWorld(rig.origin);rig.ray.set(rig.origin,down);
-    const hits=rig.ray.intersectObjects(rig.targets,false);
-    const hit=hits.find(hit=>{let node=hit.object;while(node&&node!==patient){if(!node.visible)return false;node=node.parent;}return true;});
+    const hit=rig.ray.intersectObjects(rig.rayTargets,false)[0];
     if(hit){rig.point.copy(hit.point);rig.root.worldToLocal(rig.point);}
     else rig.point.set(sweep,rig.top+.014,zz);
     rig.point.y=Math.max(rig.top+.014,rig.point.y)+.009;rig.points[i].copy(rig.point);

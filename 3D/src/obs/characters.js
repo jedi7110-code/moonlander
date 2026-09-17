@@ -5,7 +5,7 @@ import {createCatSkull,createCatEyes,createCatMuzzle,updateCatEyes,catFaceSurfac
 import {applyCyclingPose,applyGymVisitPose} from './gym.js';
 import {applyMedicalPose,medicalExitTime} from './medical.js';
 import {BUNK_BED,reclineProgress,applyReclinedPose,reclineExitProgress} from './recline.js';
-import {applyBunkVisitPose} from './bunk-pose.js';
+import {applyBunkVisitPose,applySleepingHands} from './bunk-pose.js';
 import {applyCatGrooming} from './cat-groom.js';
 import {applyCatHop} from './cat-hop.js';
 import {restWeight,applyCatSitting} from './cat-rest.js';
@@ -16,8 +16,10 @@ import {relaxMiloHand} from './milo-hands.js';
 export {relaxMiloHand} from './milo-hands.js';
 import {applyCallingPose} from './calling.js';
 import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
-import {createLeisureProps,applyLeisurePose} from './leisure.js';
-import {applyLoungeExit,applyLoungeEntry} from './lounge-exit.js';
+import {createLeisureProps,applyLeisurePose,applyDeskHands} from './leisure.js';
+import {setTabletHandFit} from './tablet-pose.js';
+import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeEntryAge} from './lounge-exit.js';
+import {applySeatedLegSpread} from './seated-pose.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
 import {attachMiloBody} from './milo-body.js';
 import {attachMiloWatch,updateMiloWatch} from './milo-watch.js';
@@ -199,6 +201,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
 
 export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
+  setTabletHandFit(root,action==='lounge'&&!moving&&leisure==='tablet');
   if(action==='medical'&&!moving)root.userData.medicalStartYaw??=root.rotation.y;
   else delete root.userData.medicalStartYaw;
   resetDiningPose(root);
@@ -215,7 +218,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
   for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,root.userData.bodySkin?side*Math.PI/2:0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
     elbow.rotation.set(climbing?-.70:-.08,0,0);
-    fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.rotation.set(0,0,0);thumb.userData.ip.rotation.set(0,0,0);
+    fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.position.set(-side*.029,-.051,.025);thumb.rotation.set(0,0,0);thumb.userData.ip.rotation.set(0,0,0);
     if(!climbing&&(moving||!action))relaxMiloHand({fingers,thumb,side});
     if(seated){arm.rotation.x=-.65;elbow.rotation.x=-.8;}
   }
@@ -235,16 +238,22 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     if(walkStyle==='legacy')applyWalkingPose(root,walkDistance);
     else applyMocapWalk(root,miloWalkData,walkDistance/miloWalkData.cycleDistance*miloWalkData.duration);
   }
+  if(seated&&action==='lounge'&&!leisure)applyDeskHands(root);
   applyCallingPose(root,calling?callingTime:null,dt);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
   if(loungeExit)applyLoungeExit(root,loungeExit);
   if(loungeEntry)applyLoungeEntry(root,loungeEntry);
+  if(seated){
+    const rise=loungeExit?loungeExitPose(loungeExit.age).rise:loungeEntry?loungeExitPose(loungeEntryAge(loungeEntry.age)).rise:0;
+    applySeatedLegSpread(root,1-rise);
+  }
   if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top);
   if(action==='gym'&&!moving){if(gymVisit)applyGymVisitPose(root,gymVisit);else applyCyclingPose(root,actionTime);}
   if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration,root.userData.medicalStartYaw);
   if(reclineExit?.id==='medical')applyMedicalPose(root,medicalExitTime(reclineExit),reclineExit.actionDuration,root.userData.medicalStartYaw);
   else if(reclineExit)applyReclinedPose(root,reclineExitProgress(reclineExit),BUNK_BED.top);
   if(bunkVisit)applyBunkVisitPose(root,bunkVisit);
+  else if(action==='bunk'&&!moving)applySleepingHands(root,reclineExit?reclineExitProgress(reclineExit):reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition));
   if(action==='plant'&&!moving){
     const weight=THREE.MathUtils.smoothstep(Math.min(actionTime,(actionDuration??9)-actionTime),0,1.2);
     for(const {arm,elbow,side,hand}of arms){

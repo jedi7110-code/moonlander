@@ -29,6 +29,14 @@ export function applyMedicalPose(root,time,duration,startYaw=0){
   const pose=medicalTransferPose(time,duration);
   applyBedTransferPose(root,pose,{...MED_TRANSFER,top:MED_BED.top},startYaw);
   root.userData.body.position.y+=pose.elevation;
+  const rest=THREE.MathUtils.smoothstep(pose.recline,.25,1);
+  for(const {arm,elbow,hand,side}of root.userData.arms){
+    // Examination is palms-down beside the hips, unlike sleeping on the abdomen.
+    arm.rotation.x=THREE.MathUtils.lerp(arm.rotation.x,.07,rest);
+    arm.rotation.z=THREE.MathUtils.lerp(arm.rotation.z,side*.12,rest);
+    elbow.rotation.x=THREE.MathUtils.lerp(elbow.rotation.x,-.04,rest);
+    hand.rotation.x=THREE.MathUtils.lerp(hand.rotation.x,-.03,rest);
+  }
   if(pose.phase==='departing')root.rotation.y=startYaw+Math.atan2(Math.sin(-startYaw),Math.cos(-startYaw))*pose.approach;
 }
 

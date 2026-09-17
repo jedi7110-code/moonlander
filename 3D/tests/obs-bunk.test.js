@@ -5,6 +5,8 @@ import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {BUNK_BED,reclineProgress} from '../src/obs/recline.js';
 import {MED_BED,medicalDuration} from '../src/obs/medical.js';
 import {BunkVisit} from '../src/obs/bunk-visit.js';
+import {CabinBrain,OPENING_SLEEP_SECONDS} from '../src/obs/brain.js';
+import {CrewMotion,Supplies,CatRoutine,getStation} from '../src/obs/state.js';
 
 const character=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 const pose=(root,action,time,duration=9)=>{
@@ -12,16 +14,26 @@ const pose=(root,action,time,duration=9)=>{
   root.updateMatrixWorld(true);
 };
 
-test('sleep and examination retain the same supine pose on their different supports',()=>{
+test('sleep and examination retain the same supported torso and legs while sleep rests the hands on the abdomen',()=>{
   const sleeper=character(),patient=character(),visit=new BunkVisit();visit.update(30);
   animateMilo(sleeper,{action:'bunk',moving:false,time:0,bunkVisit:visit});pose(patient,'medical',17,medicalDuration());
   const a=sleeper.userData,b=patient.userData;
   assert.deepEqual(a.body.rotation.toArray(),b.body.rotation.toArray());
   assert.deepEqual(sleeper.rotation.toArray(),patient.rotation.toArray());
   assert.ok(Math.abs(b.body.position.y-a.body.position.y-(MED_BED.examTop-BUNK_BED.top))<1e-10);
-  for(const key of ['arms','legs'])for(let i=0;i<2;i++)for(const joint of key==='arms'?['arm','elbow']:['leg','knee','boot']){
-    const aa=a[key][i][joint].rotation,bb=b[key][i][joint].rotation;
+  for(let i=0;i<2;i++)for(const joint of ['leg','knee','boot']){
+    const aa=a.legs[i][joint].rotation,bb=b.legs[i][joint].rotation;
     for(const axis of ['x','y','z'])assert.ok(Math.abs(aa[axis]-bb[axis])<1e-9);
+  }
+  sleeper.updateMatrixWorld(true);
+  for(const {hand,elbow,side}of a.arms){
+    const palm=a.body.worldToLocal(hand.localToWorld(new Vector3(0,-.05,0)));
+    assert.ok(Math.abs(palm.x)<.13&&palm.y>1.10&&palm.y<1.27,'both palms rest over the abdomen');
+    assert.ok(palm.z>.12&&palm.z<.16,'hands sit close to the shirt, without hanging beside the body');
+    const fingers=new Vector3(0,-1,0).transformDirection(hand.matrixWorld);
+    const inward=new Vector3(-side,0,0).transformDirection(a.body.matrixWorld);
+    assert.ok(fingers.dot(inward)>.9,'fingers point inward across the abdomen');
+    assert.ok(Math.abs(elbow.rotation.x)>.8,'the elbows bend comfortably');
   }
 });
 
@@ -52,4 +64,15 @@ test('sleep lowers and rises continuously, then walking resets every pose transf
   assert.deepEqual(milo.userData.body.quaternion.toArray(),fresh.userData.body.quaternion.toArray());
   assert.deepEqual(milo.userData.body.position.toArray(),fresh.userData.body.position.toArray());
   assert.equal(milo.visible,true);assert.equal(milo.userData.mug.visible,false);
+});
+
+test('the cabin opens with Milo and Lucy asleep together, then wakes and releases both',()=>{
+  const actor=new CrewMotion(),care=new Supplies(),cat=new CatRoutine(care,{random:()=>.5,turns:true});
+  const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.5});brain.catRoutine=cat;
+  assert.equal(brain.beginWakeUp(),true);assert.equal(brain.bunkVisit.phase,'sleeping');assert.equal(cat.mode,'sleep');
+  assert.equal(actor.floor,getStation('bunk').floor);assert.equal(actor.x,getStation('bunk').x);assert.ok(cat.bunkWake);
+  brain.update(OPENING_SLEEP_SECONDS-.1);assert.equal(brain.bunkVisit.phase,'sleeping');
+  brain.update(.2);assert.equal(brain.bunkVisit.phase,'waking');
+  for(let i=0;i<1800&&brain.bunkVisit;i++){cat.update(1/60,actor);brain.update(1/60);}
+  assert.equal(brain.bunkVisit,null);assert.equal(brain.openingWake,null);assert.equal(cat.bunkWake,null);assert.equal(brain.state,'idle');assert.equal(cat.mode,'look');
 });

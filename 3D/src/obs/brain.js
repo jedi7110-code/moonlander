@@ -1,5 +1,5 @@
 import {Brain} from '../../../js/obs/brain.js?v=15';
-import {getStation} from './state.js';
+import {getStation,FLOORS} from './state.js';
 import {getLang} from '../../../js/obs/i18n.js?v=15';
 import {medicalReadings,medicalEntryTime,medicalDuration,MED_BED} from './medical.js';
 import {CrewHealth} from './health.js';
@@ -12,6 +12,7 @@ import {GymVisit} from './gym-visit.js';
 import {BunkVisit,BUNK_TRANSITION_DECAY} from './bunk-visit.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
+export const OPENING_SLEEP_SECONDS=3;
 export const isChessRequest=text=>/チェス|chess|ゲーム|\bgame\b|\bplay\b|遊ぼ|遊び|遊んで/i.test(text);
 export const isGameAcceptance=text=>/^(?:yes|yeah|sure|ok|okay|はい|うん|いいよ|いいね|やろう|やる|お願い|それで|了解|付き合う)[!！。\s]*$/i.test(text.trim());
 
@@ -28,6 +29,24 @@ export class CabinBrain extends Brain {
     this.bathroom=null;this.afterActivity=null;
     this.plants=new PlantBed();
     this.dayMs=CABIN_PACE.dayMs;this.clock=8*this.dayMs/24;
+    this.openingWake=null;
+  }
+  beginWakeUp(){
+    if(this.bunkVisit)return false;
+    const station=getStation('bunk');
+    this.actor.floor=station.floor;this.actor.x=station.x;this.actor.y=FLOORS[station.floor].y;
+    this.actor.queue=[];this.actor.onArrive=null;this.actor.facing=1;this.actor.setSymbol('');
+    this.cur=station;this.state='wakingBunk';this.actKey='perform';this.actStation='bunk';this.recoverNeed=null;
+    this.openingWake={age:0};
+    this.bunkVisit=new BunkVisit({startAsleep:true,
+      exited:()=>{
+        this.catRoutine?.finishBunkWake();this.openingWake=null;this.bunkVisit=null;
+        super._endPerform();this.finishDeparture();
+      }
+    });
+    this.bunkVisit.startYaw=0;
+    this.catRoutine?.beginBunkWake(this.bunkVisit);
+    return true;
   }
   get statusNeeds(){return{...this.needs,exercise:this.exercise,health:this.health.value};}
   _decayMul(need){
@@ -41,6 +60,12 @@ export class CabinBrain extends Brain {
     const exit=this.loungeExit;
     const gym=this.gymVisit;
     const bunk=this.bunkVisit;
+    let bunkDt=dt;
+    if(this.openingWake&&!bunk?.exitRequested){
+      const sleeping=Math.max(0,OPENING_SLEEP_SECONDS-this.openingWake.age),step=Math.min(dt,sleeping);
+      this.openingWake.age+=step;bunkDt-=step;
+      if(this.openingWake.age>=OPENING_SLEEP_SECONDS)bunk.requestExit();
+    }
     const entry=this.loungeEntry,recline=this.reclineExit;
     this.plants.update(dt);
     this.bathroom?.update(dt);
@@ -55,9 +80,9 @@ export class CabinBrain extends Brain {
       for(const [need,rate]of [['energy',.6],['thirst',.35],['hygiene',.55]])this.needs[need]=Math.max(0,this.needs[need]-dt*rate);
     }
     super.update(dt);
-    if(this.bunkVisit?.phase==='sleeping'&&this.needs.energy>=100)this._endPerform();
+    if(!this.openingWake&&this.bunkVisit?.phase==='sleeping'&&this.needs.energy>=100)this._endPerform();
     if(gym&&this.gymVisit===gym)gym.update(dt);
-    if(bunk&&this.bunkVisit===bunk)bunk.update(dt);
+    if(bunk&&this.bunkVisit===bunk)bunk.update(bunkDt);
     if(entry&&entry===this.loungeEntry){
       entry.age=Math.min(LOUNGE_ENTRY_SECONDS,entry.age+dt);
       if(entry.age===LOUNGE_ENTRY_SECONDS){

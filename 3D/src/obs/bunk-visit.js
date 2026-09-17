@@ -6,8 +6,8 @@ export const BUNK_TRANSITION_DECAY=2.76/Object.values(BUNK_PHASE_SECONDS).reduce
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
 
 export class BunkVisit {
-  constructor({entered=()=>{},exited=()=>{}}={}){
-    this.phase='approaching';this.age=0;this.entered=entered;this.exited=exited;this.exitRequested=false;
+  constructor({entered=()=>{},exited=()=>{},startAsleep=false}={}){
+    this.phase=startAsleep?'sleeping':'approaching';this.age=0;this.entered=entered;this.exited=exited;this.exitRequested=false;
   }
   requestExit(){
     this.exitRequested=true;

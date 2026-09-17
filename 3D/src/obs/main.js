@@ -85,6 +85,7 @@ function updateHUD(){
   const minutes=Math.floor(brain.hour*60);$('ship-clock').textContent=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
   $('milo-mood').textContent=t('mood_'+brain.mood);
   $('milo-activity').textContent=chess.open?words('チェスで対局中','Playing chess'):paused?words('一時停止','Paused'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('チェスをしにラウンジへ','Going to the lounge for chess'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
+  if(brain.openingWake)$('milo-activity').textContent=brain.bunkVisit?.phase==='sleeping'?words('ルーシーと眠っている','Sleeping with Lucy'):words('ルーシーと目を覚ます','Waking up with Lucy');
   for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
   if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);
   if(!paused&&brain.loungeExit)$('milo-activity').textContent=words('ラウンジから立ち上がる','Getting up from the lounge');
@@ -92,6 +93,7 @@ function updateHUD(){
   const catStates={play:['マイロと遊んでいる','Playing with Milo'],joinPlay:['マイロのそばへ','Joining Milo'],sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],look:['周りを見ている','Looking around'],stretch:['伸びをしている','Stretching'],prone:['伏せて休んでいる','Resting on belly'],follow:['マイロについて歩く','Following Milo'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
   const passage=cat.motion.portal;
   $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...catStates[cat.mode]);
+  if(cat.bunkWake)$('cat-activity').textContent=cat.bunkWake.visit.phase==='sleeping'?words('マイロと眠っている','Sleeping with Milo'):words('マイロと目を覚ます','Waking up with Milo');
   for(const [key,stock]of Object.entries(care.supplies)){
     $('stock-'+key).textContent=`${stock}/${care.capacity[key]}`;
     const button=document.querySelector(`[data-use="${key}"]`),labels={food:['食事','Eat'],water:['水を飲む','Drink'],catfood:['ルーシーに餌を出す','Feed Lucy']};
@@ -235,6 +237,8 @@ async function start(){
       useStation(id);
     };
     brain.catRoutine=cat;
+    brain.beginWakeUp();
+    view.setMode('milo');
     $('loading').hidden=true;
     function tick(now){
       const dt=Math.min((now-previous)/1000,.05);previous=now;

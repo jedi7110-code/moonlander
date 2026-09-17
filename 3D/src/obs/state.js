@@ -3,6 +3,7 @@ import {CAT_RISE_TIME} from './cat-rest.js';
 import {CABIN_PACE} from './pace.js';
 import {createCatTurn,sampleCatTurn,angleDelta} from './cat-turn.js';
 import {APPROVED_RESTS,approvedRestRelease} from './cat-approved-rest.js';
+import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 
 export const CAT_WALK_SPEED=18;
 const CAT_FREE_REST_MODES=new Set(['look','groom','sleep','stretch','prone']);
@@ -226,6 +227,19 @@ export class CatRoutine {
     this.care=care;this.random=random;this.motion=new CatMotion({turns});
     this.hunger=this.between(48,90);this.energy=this.between(35,80);this.groomNeed=this.between(20,80);this.curiosity=this.between(30,90);
     this.rest('sleep',this.between(8,16));this.companion=null;this.followLeft=0;this.retargetIn=0;
+    this.bunkWake=null;
+  }
+  beginBunkWake(visit){
+    const bunk=getStation('bunk');
+    this.motion.floor=bunk.floor;this.motion.x=bunk.x+24;this.motion.y=FLOORS[bunk.floor].y;
+    this.motion.queue=[];this.motion.onArrive=null;this.motion.destination=null;this.motion.onDestination=null;
+    this.motion.portal=null;this.motion.hop=null;this.motion.onSofa=false;this.motion.elevation=0;this.motion.z=CAT_PORT.walkZ;
+    this.mode='sleep';this.modeTime=4;this.remaining=100;this.pendingMove=null;this.playHost=null;this.playRelease=null;
+    this.restYaw=-Math.PI/2;this.motion.heading=this.restYaw;this.bunkWake={visit};
+  }
+  finishBunkWake(){
+    if(!this.bunkWake)return;
+    this.bunkWake=null;this.motion.heading=Math.PI/2;this.motion.facing=1;this.rest('look',6);
   }
   between(min,max){return min+(max-min)*this.random();}
   get poseYaw(){return this.motion.turns?(this.motion.turnPose?.yaw??this.motion.heading):!this.motion.busy&&CAT_FREE_REST_MODES.has(this.mode)?this.restYaw:this.motion.laneYaw;}
@@ -287,6 +301,14 @@ export class CatRoutine {
   update(dt,actor=null){
     if(dt<=0)return;
     this.companion=actor;
+    if(this.bunkWake){
+      const {visit}=this.bunkWake;
+      if(visit.phase==='sleeping'){this.mode='sleep';this.modeTime+=dt;this.remaining=100;}
+      else if(visit.phase==='waking'){
+        this.mode='sleep';this.modeTime+=dt;this.remaining=Math.max(0,BUNK_PHASE_SECONDS.waking-visit.age);
+      }else{this.mode='look';this.modeTime+=dt;this.remaining=100;}
+      return;
+    }
     const bounded=value=>Math.max(0,Math.min(100,value)),resting=!this.motion.busy;
     if(!this.motion.turnPose)this.modeTime+=dt;this.hunger=bounded(this.hunger-dt*.36*CABIN_PACE.catDecay);
     this.energy=bounded(this.energy+dt*(resting&&this.mode==='sleep'?3:-.25*CABIN_PACE.catDecay));

@@ -11,13 +11,14 @@ import {loadMiloHead} from './head.js';
 import {animateDelivery} from './delivery.js';
 import {animateVerticalShutter} from './shutter.js';
 import {animateGym,BIKE} from './gym.js';
-import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
+import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE,FLOORS,getStation} from './layout.js';
 import {animateAirlock} from './eva.js';
 import {loadEVAGarment} from './eva-garment.js';
 import {loadMiloBody} from './milo-body.js';
 import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
 import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
 import {animateBunk} from './bunk.js';
+import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {diningPhase,DINING_APPROACH} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 
@@ -143,7 +144,17 @@ export class ObservationView {
     const turn=catMotion.turnPose,passage=catMotion.passagePose,catMoving=!turn&&!catMotion.waitingForCrew&&(passage?['enter','exit'].includes(passage.phase):catMotion.busy);
     const hop=catMotion.hop&&!turn?{...catMotion.hop,yaw:Math.atan2((positionX(CAT_SOFA.seatX)-positionX(CAT_SOFA.floorX))*(catMotion.hop.up?1:-1),(LOUNGE_SEAT.centerDepth-CAT_SOFA.approachZ)*(catMotion.hop.up?1:-1))}:null;
     this.cat.position.set(positionX(catMotion.x),positionY(catMotion.y)+catMotion.elevation,catMotion.z);this.cat.visible=!catMotion.hidden;
-    animateLucy(this.cat,{time,dt:paused?0:dt,moving:catMoving,facing:catMotion.facing,yaw:catRoutine.poseYaw,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance+catMotion.depthWalkDistance,passage,hop,turn,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
+    let wakeHop=null;
+    const wake=catRoutine.bunkWake?.visit;
+    if(wake&&['sleeping','waking','leaving'].includes(wake.phase)){
+      const floorY=positionY(FLOORS[getStation('bunk').floor].y),bedX=positionX(getStation('bunk').x+24),bedZ=BUNK_BED.depth+.26;
+      if(wake.phase==='leaving'){
+        const u=THREE.MathUtils.clamp(wake.age/BUNK_PHASE_SECONDS.leaving,0,1),s=u*u*(3-2*u);
+        this.cat.position.set(bedX,floorY+THREE.MathUtils.lerp(BUNK_BED.top,0,s)+Math.sin(Math.PI*u)*.32,THREE.MathUtils.lerp(bedZ,CAT_PORT.walkZ,s));
+        wakeHop={up:false,phase:'flight',age:u*.56,duration:.56,yaw:0};
+      }else this.cat.position.set(bedX,floorY+BUNK_BED.top,bedZ);
+    }
+    animateLucy(this.cat,{time,dt:paused?0:dt,moving:catMoving,facing:catMotion.facing,yaw:catRoutine.poseYaw,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance+catMotion.depthWalkDistance,passage,hop:wakeHop??hop,turn,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
     if(action==='lounge'&&!actor.busy)this.milo.position.z=brain.loungeEntry?loungeExitPose(loungeEntryAge(brain.loungeEntry.age)).depth:brain.loungeExit?loungeExitPose(brain.loungeExit.age).depth:LOUNGE_SEAT.depth;
     if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
     if(action==='gym')this.milo.position.z=brain.gymVisit?.pose.depth??BIKE.depth;
@@ -162,5 +173,5 @@ export class ObservationView {
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
     this.renderer.render(this.scene,this.camera);
   }
-  dispose(){this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});const tabletFit=this.milo.userData.tabletHandFit;if(tabletFit){geometries.add(tabletFit.original);geometries.add(tabletFit.geometry);}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }
