@@ -18,6 +18,7 @@ import {applyCallingPose} from './calling.js';
 import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose,applyDeskHands} from './leisure.js';
 import {setTabletHandFit} from './tablet-pose.js';
+import {setLadderHandFit} from './ladder-hand-fit.js';
 import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 import {applySeatedLegSpread} from './seated-pose.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
@@ -201,6 +202,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
 
 export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
+  setLadderHandFit(root,false);
   setTabletHandFit(root,action==='lounge'&&!moving&&leisure==='tablet');
   if(action==='medical'&&!moving)root.userData.medicalStartYaw??=root.rotation.y;
   else delete root.userData.medicalStartYaw;

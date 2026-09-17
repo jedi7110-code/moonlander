@@ -21,6 +21,7 @@ import {animateBunk} from './bunk.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {diningPhase,DINING_APPROACH} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
+import {applyCabinLadder} from './cabin-ladder.js';
 
 export class ObservationView {
   static async create(canvas){const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment(),loadMiloBody()]);return new ObservationView(canvas,m,head,lucy);}
@@ -122,13 +123,19 @@ export class ObservationView {
     animateGym(this.ship.gym,brain.gymVisit?.pedalTime??brain.gymPedalTime??0);
     animateBunk(this.ship.bunk,brain.bunkVisit?.pose);
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
-    this.milo.position.set(positionX(actor.x),positionY(actor.y),actor.climbing?.48:CABIN_AISLE.crewZ);
+    this.milo.position.set(positionX(actor.x),positionY(actor.y),CABIN_AISLE.crewZ);
+    if(actor.climbing)this.cabinClimb??={startHeight:positionY(FLOORS[actor.floor].y),startYaw:this.milo.rotation.y};
+    else this.cabinClimb=null;
     const bathroom=brain.bathroom?.pose;
     if(action==='plant')this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
     if(['galley','hydro'].includes(action))this.milo.position.z=.78-DINING_APPROACH*diningPhase(actionTime,brain.curDurSec).approach;
     if(brain.gymVisit)brain.gymVisit.startYaw??=this.milo.rotation.y;
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
-    animateMilo(this.milo,{moving:actor.busy,waiting:actor.waitingForHatch||actor.waitingForCat,climbing:actor.climbing,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
+    animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForHatch||actor.waitingForCat,climbing:false,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
+    if(actor.climbing){
+      const nextX=actor.queue[1]?.x??actor.x,endYaw=(Math.sign(nextX-actor.x)||actor.facing)*Math.PI/2;
+      applyCabinLadder(this.milo,{...this.cabinClimb,height:positionY(actor.y),endHeight:positionY(actor.queue[0].y),endYaw});
+    }
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
       animateVerticalShutter(fixture.door,brain.bathroom?.id===id?(bathroom?.opening??0):0);
     }
@@ -173,5 +180,5 @@ export class ObservationView {
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
     this.renderer.render(this.scene,this.camera);
   }
-  dispose(){this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});const tabletFit=this.milo.userData.tabletHandFit;if(tabletFit){geometries.add(tabletFit.original);geometries.add(tabletFit.geometry);}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

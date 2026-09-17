@@ -16,7 +16,7 @@ const POSES=[
   {id:'idle',label:'静止'},
   {id:'mocap',label:'歩行・実測'},
   {id:'walk',label:'歩行・従来'},
-  {id:'ladder',label:'梯子・試作'},
+  {id:'ladder',label:'梯子・本編'},
   {id:'climb',label:'梯子・従来'},
   {id:'seat',label:'着席'},
   {id:'tablet',label:'端末を持つ'},
@@ -62,7 +62,7 @@ async function start(){
     updateMiloWatch(milo,watchTime);
     if(current.id!=='medical')milo.rotation.y=0;
     $('time').value=time;$('clock').value=`${time.toFixed(2)}秒`;$('status').textContent=current.id==='mocap'?'歩行・実測 / OBSと共通':`${current.label} / 本編と同じマイロを表示中`;
-    if(ladderSample){const moving=ladderSample.contacts.find(c=>c.moving);$('status').textContent=`梯子・試作 / ${moving?moving.label+'を掛け替え':'四点で支持'} / 段間隔28cm`;$('support').textContent=ladderSample.contacts.map(c=>`${c.label} ${c.moving?'移動':'支持'}`).join('　');}
+    if(ladderSample){const moving=ladderSample.contacts.find(c=>c.moving);$('status').textContent=`梯子・本編 / ${moving?moving.label+'を掛け替え':'四点で支持'} / 段間隔28cm`;$('support').textContent=ladderSample.contacts.map(c=>`${c.label} ${c.moving?'移動':'支持'}`).join('　');}
   }
   function setView(){
     const view=$('view').value,target=new THREE.Vector3(view==='arms'?.22:0,view==='arms'?1.02:view==='face'?1.68:view==='boots'?.13:view==='trousers'?.64:.87,view==='arms'?-.03:0);let az=.65,el=.12;camera.zoom=view==='arms'?2.4:view==='face'?4.4:view==='boots'?3.8:view==='trousers'?2.1:1;
