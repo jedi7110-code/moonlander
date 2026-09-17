@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,pipe,rod} from './materials.js';
-import {CABIN_AISLE} from './layout.js';
+import {CABIN_AISLE,DECK} from './layout.js';
 import {CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR} from './lighting.js';
 
 const WORK_LIGHTS=[[-10.3,29],[-7.35,18],[-4.4,25],[-1.65,16],[1.75,16],[4.3,32],[7.6,18],[10.9,27]];
@@ -116,7 +116,7 @@ function hoist(root,m,x,y){
 
 export function addIndustrialDeck(root,m,y,level){
   const front=CABIN_AISLE.deckFront+.19;
-  if(level===0)for(const x of LOUNGE_LIGHTS){
+  if(level===DECK.HABITATION)for(const x of LOUNGE_LIGHTS){
     for(const dx of [-.47,.47])rod(root,m.dark,[x+dx,y+2.98,-.08],[x+dx,y+2.69,-.08],.022);
     box(root,m.dark,x,y+2.68,-.08,1.26,.13,.43,.025).name='Lounge overhead light housing';
     box(root,m.metal,x,y+2.603,-.08,1.15,.026,.38);
@@ -125,7 +125,7 @@ export function addIndustrialDeck(root,m,y,level){
   for(const [x] of WORK_LIGHTS){
     box(root,m.dark,x,y+2.78,.37,.89,.14,.49,.03).name='Ceiling work light housing';
     box(root,m.metal,x,y+2.70,.37,.80,.055,.41,.015);
-    box(root,level===1?m.coolLamp:m.lamp,x,y+2.66,.37,.71,.024,.32,.008).name='Ceiling work light diffuser';
+    box(root,level===DECK.OPERATIONS?m.coolLamp:m.lamp,x,y+2.66,.37,.71,.024,.32,.008).name='Ceiling work light diffuser';
     for(const dx of [-.27,0,.27])rod(root,m.dark,[x+dx,y+2.64,.16],[x+dx,y+2.64,.58],.012);
   }
   // Deep front fascia and overhead trunking flank the open ladder shaft.
@@ -177,7 +177,7 @@ export function addIndustrialDeck(root,m,y,level){
     cableRun(root,m,x-.60,x+.62,y+2.52,-1.19,2,.12);
   }
   // Exposed services in the formerly bare wall bays; never in the ladder well.
-  for(const [x,width] of (level===0?[[-4.2,1.5],[3.0,.7],[10.55,.8]]:level===1?[[-2.65,.5]]:[[1.65,1.2]])){
+  for(const [x,width] of (level===DECK.HABITATION?[[-4.2,1.5],[3.0,.7],[10.55,.8]]:level===DECK.OPERATIONS?[]:[[1.65,1.2]])){
     box(root,m.dark,x,y+1.95,-1.40,width,.64,.18,.035);
     for(let i=0;i<3;i++){
       const yy=y+1.72+i*.21;
@@ -209,23 +209,23 @@ export function addIndustrialDeck(root,m,y,level){
       }
       for(let i=0;i<12;i++)ball(root,m.wetSteel,x+.04*Math.sin(i*4),y+.35+i*.17,-.425,.013,.024,.009);
     }
-  }else if(level===1){
+  }else if(level===DECK.OPERATIONS){
     chain(root,m,-12.68,y+3.12,y+1.66,front+.14);
   }
 }
 
 export function addWorkLights(root,y,level){
   // Preserve the pre-redesign deck lighting beneath the new fixture geometry.
-  const deckLight=new THREE.PointLight(level===1?0xb4dcdb:0xffebc7,level===0?12:45,20,2);
+  const deckLight=new THREE.PointLight(level===DECK.OPERATIONS?0xb4dcdb:0xffebc7,level===DECK.HABITATION?12:45,20,2);
   deckLight.name='Legacy deck light';deckLight.position.set(-5,y+2.3,.6);root.add(deckLight);
   const secondLight=new THREE.PointLight(0xe6ebe4,32,17,2);
   secondLight.name='Legacy deck fill';secondLight.position.set(6,y+2.3,.6);root.add(secondLight);
-  if(level===0)for(const x of LOUNGE_LIGHTS){
+  if(level===DECK.HABITATION)for(const x of LOUNGE_LIGHTS){
     const light=new THREE.SpotLight(CABIN_WARM_LIGHT_COLOR,20,4.9,.91,.6,2);light.name='Lounge seat light';
     light.position.set(x,y+2.54,-.08);light.target.position.set(x,y+.48,-.10);root.add(light,light.target);
   }
   for(const [x,power] of WORK_LIGHTS){
-    const light=new THREE.SpotLight(CABIN_LIGHT_COLOR,level===1?power*.9:power,6.3,1.03,.65,2);
+    const light=new THREE.SpotLight(CABIN_LIGHT_COLOR,level===DECK.OPERATIONS?power*.9:power,6.3,1.03,.65,2);
     light.name='Ceiling work light';
     light.position.set(x,y+2.50,.37);root.add(light);
     light.target.position.set(x,y+.7,-.70);root.add(light.target);

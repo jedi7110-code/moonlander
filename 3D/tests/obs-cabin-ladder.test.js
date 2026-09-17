@@ -8,8 +8,21 @@ import {applyCabinLadder,CABIN_LADDER} from '../src/obs/cabin-ladder.js';
 import {LADDER,LADDER_WRIST_OFFSET} from '../src/obs/ladder-pose.js';
 import {createAccessLadder} from '../src/obs/ship.js';
 import {CrewMotion} from '../src/obs/state.js';
+import {LADDER_PACE} from '../src/obs/pace.js';
+import {FLOORS,LADDER_X} from '../src/obs/layout.js';
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
 const create=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
+test('ascent and descent run twenty percent faster without speeding up walking',()=>{
+  assert.equal(LADDER_PACE,1.2);
+  for(const [from,to]of [[2,0],[0,2]]){
+    const actor=new CrewMotion({floor:from,x:LADDER_X}),start=actor.y;
+    actor.goTo({floor:to,x:LADDER_X});actor.update(1);
+    assert.ok(Math.abs(Math.abs(actor.y-start)-38*1.2)<1e-8);
+    assert.equal(Math.sign(actor.y-start),Math.sign(FLOORS[to].y-start));
+    assert.equal(actor.walkSpeed,54);
+  }
+  assert.equal(new CrewMotion({climbSpeed:10}).climbSpeed,10);
+});
 function pose(root,height,startHeight=0,endHeight=6.784){
   root.position.set(0,height,.78);animateMilo(root,{time:0,moving:false});
   const sample=applyCabinLadder(root,{height,startHeight,endHeight,startYaw:Math.PI/2,endYaw:-Math.PI/2});

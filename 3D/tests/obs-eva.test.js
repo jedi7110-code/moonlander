@@ -10,7 +10,7 @@ import {AirlockPassage} from '../src/obs/airlock.js';
 
 test('the EVA rack replaces audio in 3D without changing the original 2D station',()=>{
   assert.equal(getStation('stereo'),undefined);assert.ok(sharedStation('stereo'));
-  assert.equal(getStation('eva').floor,1);assert.equal(getStation('airlock').floor,1);assert.equal(getStation('hatch').floor,2);
+  assert.equal(getStation('eva').floor,0);assert.equal(getStation('airlock').floor,0);assert.equal(getStation('hatch').floor,2);
   assert.equal(STATIONS.filter(station=>station.id==='eva').length,1);
 });
 test('music requests and old station references cannot send Milo to removed equipment',()=>{
@@ -23,7 +23,7 @@ test('music requests and old station references cannot send Milo to removed equi
 });
 test('inspection requests arrive, report their own fixture, and end without changing reserves',()=>{
   for(const [text,id]of [['宇宙服を点検','eva'],['船外ハッチを確認','airlock'],['船内ハッチを確認','innerHatch']]){
-    const actor=new CrewMotion({floor:1,x:1100}),care=new Supplies(),reports=[];
+    const actor=new CrewMotion({floor:EVA_PASSAGE.floor,x:1100}),care=new Supplies(),reports=[];
     const brain=new CabinBrain({obsUI:{hideWant(){},inspectEVA(id){reports.push(id);}}},actor,{care});
     brain.handleChat(text);assert.equal(brain.actStation,id);
     for(let i=0;i<12*60;i++){actor.update(1/60);brain.update(1/60);}
@@ -85,9 +85,9 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
 
 test('the inner hatch opens before traffic in either direction, then seals behind it',()=>{
   for(const direction of [-1,1]){
-    const actor=new CrewMotion({floor:1,x:EVA_PASSAGE.x-direction*80}),gate=new AirlockPassage();
+    const actor=new CrewMotion({floor:EVA_PASSAGE.floor,x:EVA_PASSAGE.x-direction*80}),gate=new AirlockPassage();
     const target=EVA_PASSAGE.x+direction*80;let waited=false,arrivals=0;
-    actor.goTo({floor:1,x:target},()=>arrivals++);
+    actor.goTo({floor:EVA_PASSAGE.floor,x:target},()=>arrivals++);
     for(let i=0;i<6*60;i++){
       gate.update(1/60,actor);
       if(actor.waitingForHatch)waited=true;else actor.update(1/60);
@@ -98,14 +98,14 @@ test('the inner hatch opens before traffic in either direction, then seals behin
   }
 });
 test('unrelated traffic, cancelling an approach, and paused time do not leave the hatch open',()=>{
-  const gate=new AirlockPassage(),actor=new CrewMotion({floor:0,x:EVA_PASSAGE.x-20});
-  actor.goTo({floor:0,x:EVA_PASSAGE.x+80});gate.update(.7,actor);
+  const gate=new AirlockPassage(),actor=new CrewMotion({floor:getStation('lounge').floor,x:EVA_PASSAGE.x-20});
+  actor.goTo({floor:getStation('lounge').floor,x:EVA_PASSAGE.x+80});gate.update(.7,actor);
   assert.equal(gate.opening,0);assert.equal(actor.waitingForHatch,false);
-  const crew=new CrewMotion({floor:1,x:EVA_PASSAGE.x-25});
-  crew.goTo({floor:1,x:EVA_PASSAGE.x+80});gate.update(.25,crew);
+  const crew=new CrewMotion({floor:EVA_PASSAGE.floor,x:EVA_PASSAGE.x-25});
+  crew.goTo({floor:EVA_PASSAGE.floor,x:EVA_PASSAGE.x+80});gate.update(.25,crew);
   assert.equal(crew.waitingForHatch,true);
   const opening=gate.opening;gate.update(0,crew);assert.equal(gate.opening,opening);
-  crew.goTo({floor:1,x:EVA_PASSAGE.x-100});gate.update(1/60,crew);assert.equal(crew.waitingForHatch,false);
+  crew.goTo({floor:EVA_PASSAGE.floor,x:EVA_PASSAGE.x-100});gate.update(1/60,crew);assert.equal(crew.waitingForHatch,false);
   for(let i=0;i<180;i++){gate.update(1/60,crew);crew.update(1/60);}
   assert.equal(gate.opening,0);assert.equal(crew.x,EVA_PASSAGE.x-100);
 });

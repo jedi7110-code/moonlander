@@ -7,7 +7,7 @@ import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {LOUNGE_EXIT_SECONDS,loungeExitPose} from '../src/obs/lounge-exit.js';
 
 function setup(){
-  const actor=new CrewMotion({floor:0,x:1080}),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care:new Supplies(),random:()=>.8});
+  const actor=new CrewMotion({floor:getStation('lounge').floor,x:1080}),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care:new Supplies(),random:()=>.8});
   brain.health.nextIncident=Infinity;brain._startPerform(getStation('lounge'));brain.update(2.4);return{actor,brain};
 }
 test('a lounge departure waits for standing, keeps the latest destination, and freezes on pause',()=>{

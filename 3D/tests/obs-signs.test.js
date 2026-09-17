@@ -5,8 +5,8 @@ import {label,batchStatic} from '../src/obs/materials.js';
 import {buildShip} from '../src/obs/ship.js';
 
 test('sign textures preserve plate proportions and fit text without stretching or clipping',()=>{
-  const cases=[['01 / HABITATION',4.8,.30],['02 / OPERATIONS',4.8,.30],['03 / LIFE SUPPORT',4.8,.30],['MEDICAL',2.6,.26],['GALLEY',2.8,.26],['DRINKING WATER',1.8,.26],['SHIP SYSTEMS',3.2,.26],['LOUNGE',2.8,.30],['COOLANT SYSTEM',2.8,.26],['HYDROPONICS',2.6,.19],['SUPPLY HATCH',1.74,.26],['BUNK / M. JARVIS',2.2,.28],['TARAIRON\nCREW 01',1.13,.37],['COOLANT\nLOOP 02',.60,.38],['EVA / SUIT SERVICE',3.31,.26],['WC',.94,.26]];
-  cases.push(...['01 / HABITATION','02 / OPERATIONS','03 / LIFE SUPPORT'].map(text=>[text,1.30,.16]));
+  const cases=[['01 / OPERATIONS',4.8,.30],['02 / HABITATION',4.8,.30],['03 / LIFE SUPPORT',4.8,.30],['MEDICAL',2.6,.26],['GALLEY',2.8,.26],['DRINKING WATER',1.8,.26],['SHIP SYSTEMS',3.2,.26],['LOUNGE',2.8,.30],['COOLANT SYSTEM',2.8,.26],['HYDROPONICS',2.6,.19],['SUPPLY HATCH',1.74,.26],['BUNK / M. JARVIS',2.2,.28],['TARAIRON\nCREW 01',1.13,.37],['COOLANT\nLOOP 02',.60,.38],['EVA / SUIT SERVICE',3.31,.26],['WC',.94,.26]];
+  cases.push(...['01 / OPERATIONS','02 / HABITATION','03 / LIFE SUPPORT'].map(text=>[text,1.30,.16]));
   for(const [text,w,h]of cases){
     const draws=[],ctx={fillRect(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};},fillText(...args){draws.push({args,size:parseFloat(this.font.slice(4))});}};
     const canvas={getContext:()=>ctx},parent=new Group();let sign;
@@ -43,7 +43,7 @@ test('front-facing signs stay clear of fixtures, ceiling beams and one another',
   }
   const signs=objects.filter(mesh=>mesh.material.name.startsWith('Sign:')),ray=new Raycaster();let checked=0;
   const names=signs.map(sign=>sign.name);
-  for(const text of ['01 / HABITATION','02 / OPERATIONS','03 / LIFE SUPPORT','HYDROPONICS','SUPPLY HATCH'])assert.ok(names.includes('Sign: '+text),text);
+  for(const text of ['01 / OPERATIONS','02 / HABITATION','03 / LIFE SUPPORT','HYDROPONICS','SUPPLY HATCH'])assert.ok(names.includes('Sign: '+text),text);
   for(const text of ['GALLEY','DRINKING WATER','SHIP SYSTEMS','LOUNGE','COOLANT SYSTEM','MEDICAL','EVA / SUIT SERVICE','GYM / ERGOMETER','BUNK / M. JARVIS'])assert.ok(!names.includes('Sign: '+text),text);
   assert.ok(names.every(name=>!name.includes('ENGINEERING')));
   for(const sign of signs){

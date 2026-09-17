@@ -9,12 +9,12 @@ import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {createMedicalBay,animateMedical,medicalReadings,medicalRecline,medicalTransferPose,medicalDuration,MED_BED,MED_TRANSFER} from '../src/obs/medical.js';
 
 function setup(){
-  const actor=new CrewMotion({floor:1,x:MEDICAL.x}),care=new Supplies(),results=[];
+  const actor=new CrewMotion({floor:MEDICAL.floor,x:MEDICAL.x}),care=new Supplies(),results=[];
   const brain=new CabinBrain({obsUI:{hideWant(){},medicalResult(report){results.push(report);}}},actor,{care});
   return{actor,care,brain,results};
 }
 test('medical is confined to the 3D cabin and occupies the area left of the inner hatch',()=>{
-  assert.equal(originalStation('medical'),undefined);assert.equal(getStation('medical').floor,1);
+  assert.equal(originalStation('medical'),undefined);assert.equal(getStation('medical').floor,0);
   assert.ok(MEDICAL.x<getStation('innerHatch').x);assert.equal(MEDICAL.need,null);
 });
 test('a completed check produces one report, without curing needs or consuming food',()=>{

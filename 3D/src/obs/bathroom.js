@@ -1,5 +1,6 @@
 const smooth=t=>t*t*(3-2*t);
-const phases=[['reach',1.4],['open',.7],['enter',1.1],['close',.7],['use',Infinity],['reopen',1.8],['leave',1.1],['shut',.7]];
+const phases=[['reach',1.4],['open',.7],['enter',2.8],['close',.7],['use',Infinity],['reopen',1.8],['leave',2.8],['shut',.7]];
+export const BATHROOM_OUTSIDE_DEPTH=.78,BATHROOM_INSIDE_DEPTH=-2.8;
 // A longer visual turn must not charge extra hunger/thirst to the visit.
 export const BATHROOM_TURN_DECAY={reach:.4/1.4,reopen:.7/1.8};
 
@@ -21,7 +22,9 @@ export class BathroomVisit {
     if(this.done)return{opening:0,depth:.78,moving:false,inside:false,reach:0};
     const phase=this.phase,t=this.age/phases[this.index][1],s=smooth(t);
     const opening=phase==='open'||phase==='reopen'?s:phase==='close'||phase==='shut'?1-s:['enter','leave'].includes(phase)?1:0;
-    const depth=phase==='enter'?.78-1.08*s:phase==='leave'?-.30+1.08*s:['close','use','reopen'].includes(phase)?-.30:.78;
-    return{opening,depth,moving:['enter','leave'].includes(phase),inside:depth<.4,reach:phase==='reach'?Math.sin(Math.PI*t):0,turn:phase==='reach'?s:1,yaw:phase==='reopen'?Math.PI*(1-s):['leave','shut'].includes(phase)?0:Math.PI,phase};
+    const outside=BATHROOM_OUTSIDE_DEPTH,inside=BATHROOM_INSIDE_DEPTH;
+    const depth=phase==='enter'?outside+(inside-outside)*s:phase==='leave'?inside+(outside-inside)*s:['close','use','reopen'].includes(phase)?inside:outside;
+    // Automatic doors: turn toward the opening, then walk through the cleared frame.
+    return{opening,depth,walkDistance:Math.abs(depth-(phase==='enter'?outside:inside)),moving:['enter','leave'].includes(phase),inside:depth<-1.72,reach:0,turn:phase==='reach'?s:1,yaw:phase==='reopen'?Math.PI*(1-s):['leave','shut'].includes(phase)?0:Math.PI,phase};
   }
 }

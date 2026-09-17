@@ -6,7 +6,7 @@ import {CrewMotion,Supplies,CatRoutine,getStation} from '../src/obs/state.js';
 import {createMilo,animateMilo,createCat,animateCat} from '../src/obs/characters.js';
 
 function setup(random=()=>0){
-  const care=new Supplies(),actor=new CrewMotion({floor:0,x:1060});let opened=0;
+  const care=new Supplies(),actor=new CrewMotion({floor:getStation('lounge').floor,x:1060});let opened=0;
   const brain=new CabinBrain({obsUI:{hideWant(){},openGame(){opened++;}}},actor,{care,random});
   brain.health.nextIncident=Infinity;
   return{care,actor,brain,opened:()=>opened};
@@ -34,7 +34,7 @@ test('cat joins using the existing sofa hop and stops playing when chess starts'
   cat.hunger=80;cat.energy=80;brain.actor.x=getStation('lounge').x;
   brain._startPerform(getStation('lounge'));brain.update(2.4);assert.equal(brain.leisure,'cat');
   for(let i=0;i<1200&&cat.mode!=='play';i++)cat.update(1/60,actor);
-  assert.equal(cat.mode,'play');assert.ok(cat.motion.onSofa);assert.equal(cat.motion.floor,0);
+  assert.equal(cat.mode,'play');assert.ok(cat.motion.onSofa);assert.equal(cat.motion.floor,getStation('lounge').floor);
   brain.requestGame();cat.update(1/60,actor);assert.equal(cat.mode,'play');assert.ok(cat.playRelease);assert.equal(cat.playHost,null);
   cat.update(1.2,actor);assert.equal(cat.mode,'look');
 });

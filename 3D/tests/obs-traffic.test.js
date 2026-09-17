@@ -70,9 +70,9 @@ test('a changed destination cancels a waiting dock, and pause preserves both act
 });
 
 test('sofa boarding and leaving keep the original jump depths and return to the front aisle',()=>{
-  const {actor,cat,step}=setup(0,CAT_SOFA.floorX);actor.x=CAT_SOFA.floorX-100;
+  const {actor,cat,step}=setup(CAT_SOFA.floor,CAT_SOFA.floorX);actor.x=CAT_SOFA.floorX-100;
   for(const up of [true,false]){
-    cat.mode='fetch';cat.motion.goTo({floor:0,x:up?CAT_SOFA.seatX:CAT_SOFA.floorX},()=>cat.rest('look',100));
+    cat.mode='fetch';cat.motion.goTo({floor:CAT_SOFA.floor,x:up?CAT_SOFA.seatX:CAT_SOFA.floorX},()=>cat.rest('look',100));
     let flight=false,last=[cat.motion.x,cat.motion.z,cat.motion.elevation];
     for(let i=0;i<8*60;i++){
       step();const motion=cat.motion,point=[motion.x,motion.z,motion.elevation];

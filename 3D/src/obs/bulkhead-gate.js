@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import {box,cylinder,pipe,rod,screen} from './materials.js';
 import {CABIN_LIGHT_COLOR} from './lighting.js';
+import {createRearRoomFurnishings} from './rear-room-furnishings.js';
 
 export const BULKHEAD_GATE={x:-1.88,floor:6.784,width:1.82,height:2.42,bottom:.10,front:-1.36,back:-5.65};
 
-function outline(width,height,bottom){
-  const {x,floor}=BULKHEAD_GATE,cut=Math.min(width*.19,height*.18),lo=floor+bottom,hi=lo+height;
+function gateOutline(width,height,bottom,g){
+  const {x,floor}=g,cut=Math.min(width*.19,height*.18),lo=floor+bottom,hi=lo+height;
   return [[x-width/2+cut,lo],[x+width/2-cut,lo],
     [x+width/2,lo+cut],[x+width/2,hi-cut],[x+width/2-cut,hi],
     [x-width/2+cut,hi],[x-width/2,hi-cut],[x-width/2,lo+cut]];
@@ -20,18 +21,19 @@ function slab(root,m,shape,z,depth,name){
 }
 
 // Every wall layer has a real aperture. No black decal covers an intact bulkhead.
-export function gateWall(root,material,{left,right,bottom,top,z,depth,openingClearance=0}){
+export function gateWall(root,material,{left,right,bottom,top,z,depth,openingClearance=0,gates=[BULKHEAD_GATE],rectangles=[]}){
   const shape=path([[left,bottom],[right,bottom],[right,top],[left,top]]);
-  const g=BULKHEAD_GATE;
   // The trim hides this clearance; only the frame supplies the visible reveal.
-  shape.holes.push(path(outline(g.width+2*openingClearance,g.height+2*openingClearance,g.bottom-openingClearance).reverse(),THREE.Path));
+  for(const g of gates)shape.holes.push(path(gateOutline(g.width+2*openingClearance,g.height+2*openingClearance,g.bottom-openingClearance,g).reverse(),THREE.Path));
+  for(const r of rectangles)shape.holes.push(path([[r.left,r.bottom],[r.left,r.top],[r.right,r.top],[r.right,r.bottom]],THREE.Path));
   return slab(root,material,shape,z,depth,'Bulkhead with octagonal opening');
 }
 
-export function createBulkheadGate(m){
+export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
   const root=new THREE.Group(),lights=new THREE.Group();root.name='Octagonal gate and rear room';
   lights.name='Bulkhead gate lights';
-  const g=BULKHEAD_GATE,y=g.floor;
+  const y=g.floor;
+  const outline=(width,height,bottom)=>gateOutline(width,height,bottom,g);
   const opening=outline(g.width,g.height,g.bottom);
   const frame=path(outline(g.width+.30,g.height+.24,g.bottom-.12));
   frame.holes.push(path([...opening].reverse(),THREE.Path));
@@ -69,6 +71,8 @@ export function createBulkheadGate(m){
     rod(root,m.pipeSteel,[g.x-.91,y+2.16,z],[g.x+.91,y+2.16,z],.055);
     pipe(root,m.cable,[[g.x-.82,y+2.31,z],[g.x-.3,y+2.20,z+.1],[g.x+.70,y+2.3,z]],.027);
   }
+  if(g.room==='laundry'||g.room==='stores')root.add(createRearRoomFurnishings(m,g,wearMaterials));
+  else {
   for(let i=0;i<4;i++){
     const yy=y+.55+i*.34;
     box(root,m.metal,g.x-.92,yy,-3.79,.38,.035,1.24);
@@ -83,6 +87,7 @@ export function createBulkheadGate(m){
   box(root,m.enamel,g.x+.74,y+.87,-4.06,.48,.06,1.77,.018);
   for(const z of [-3.48,-4.30])box(root,m.olive,g.x+.74,y+1.06,z,.34,.31,.47,.035);
   pipe(root,m.pipeSteel,[[g.x+.66,y+.24,-5.40],[g.x+.66,y+1.9,-5.40],[g.x+.34,y+2.22,-5.40],[g.x-.65,y+2.22,-5.40]],.055);
+  }
   for(const z of [-2.85,-4.7]){
     box(root,m.dark,g.x,y+2.43,z,.83,.09,.33,.02);
     box(root,m.coolLamp,g.x,y+2.375,z,.71,.022,.25);

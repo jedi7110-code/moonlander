@@ -11,6 +11,8 @@ import {setLadderHandFit} from './ladder-hand-fit.js';
 import {createMedicalBay,animateMedical,medicalDuration,MED_BED} from '../../src/obs/medical.js';
 import {createLounge} from '../../src/obs/ship.js';
 import {LOUNGE_SEAT} from '../../src/obs/layout.js';
+import {LADDER_PACE} from '../../src/obs/pace.js';
+import {createDiningStudy,applyDiningStudy,DINING_ACTIONS,diningStudyDuration} from './dining-study.js';
 
 const POSES=[
   {id:'idle',label:'静止'},
@@ -21,6 +23,8 @@ const POSES=[
   {id:'seat',label:'着席'},
   {id:'tablet',label:'端末を持つ'},
   {id:'medical',label:'診察台'},
+  {id:'hydro',label:'水飲み'},
+  {id:'galley',label:'キッチン'},
 ];
 
 async function start(){
@@ -33,13 +37,18 @@ async function start(){
   const ladder=createStudyLadder();scene.add(ladder.root);
   const medical=createMedicalBay(m,0);medical.root.position.x=-MED_BED.x;scene.add(medical.root);
   const lounge=createLounge(m);lounge.position.x=-8.36;scene.add(lounge);
+  const dining=createDiningStudy(m);scene.add(dining.root);
   const key=new THREE.DirectionalLight(0xfffaf0,2.7);key.position.set(-3,5,4);key.castShadow=true;key.shadow.mapSize.set(2048,2048);scene.add(key);
   const fill=new THREE.DirectionalLight(0xbad1d5,1.2);fill.position.set(3,2,-4);scene.add(fill);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(20,20),new THREE.MeshStandardMaterial({color:0x656a69,roughness:1}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
   const camera=new THREE.OrthographicCamera(-1,1,1,-1,.01,30),controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minZoom=.45;controls.maxZoom=6;controls.maxPolarAngle=Math.PI/2-.015;
   const entryPose=new URLSearchParams(location.search).get('pose'),ladderEntry=entryPose==='ladder';
+  const easingLabel=document.createElement('label');easingLabel.textContent='イージング';
+  const easingSelect=document.createElement('select');easingSelect.id='ladder-easing';
+  easingSelect.add(new Option('あり（滑らか）','on'));easingSelect.add(new Option('なし（変更前）','off'));
+  easingLabel.append(easingSelect);$('ladder-options').insertBefore(easingLabel,$('support'));
   let current=POSES.find(p=>p.id===entryPose)??POSES[1],time=entryPose==='medical'?12:entryPose==='tablet'?3:0,watchTime=0,paused=['medical','tablet','seat'].includes(entryPose),last=performance.now();
-  const duration=()=>current.id==='tablet'?36:current.id==='medical'?medicalDuration():current.id==='mocap'?walkData.duration:current.id==='ladder'?LADDER.duration:8;
+  const duration=()=>DINING_ACTIONS.includes(current.id)?diningStudyDuration(current.id):current.id==='tablet'?36:current.id==='medical'?medicalDuration():current.id==='mocap'?walkData.duration:current.id==='ladder'?LADDER.duration:8;
   const originalArms=milo.userData.arms.map(({arm})=>arm.position.clone());
   function pose(){
     // Restore the source before animateMilo selects the tablet fit. The ladder
@@ -48,7 +57,11 @@ async function start(){
     $('time').max=duration();
     milo.userData.arms.forEach(({arm},i)=>arm.position.copy(originalArms[i]));
     milo.position.z=0;
-    animateMilo(milo,{moving:current.id==='walk'||current.id==='mocap',walkStyle:current.id==='walk'?'legacy':'measured',climbing:current.id==='climb',waiting:false,facing:1,action:current.id==='medical'?'medical':['seat','tablet'].includes(current.id)?'lounge':null,leisure:current.id==='tablet'?'tablet':null,time,walkDistance:time*walkData.cycleDistance/walkData.duration,actionTime:time,actionDuration:duration()});
+    milo.rotation.y=0;
+    dining.root.visible=DINING_ACTIONS.includes(current.id);
+    let diningStage;
+    if(dining.root.visible)diningStage=applyDiningStudy(dining,milo,current.id,time);
+    else animateMilo(milo,{moving:current.id==='walk'||current.id==='mocap',walkStyle:current.id==='walk'?'legacy':'measured',climbing:current.id==='climb',waiting:false,facing:1,action:current.id==='medical'?'medical':['seat','tablet'].includes(current.id)?'lounge':null,leisure:current.id==='tablet'?'tablet':null,time,walkDistance:time*walkData.cycleDistance/walkData.duration,actionTime:time,actionDuration:duration()});
     lounge.visible=['seat','tablet'].includes(current.id);
     if(lounge.visible)milo.position.z=LOUNGE_SEAT.depth;
     medical.root.visible=current.id==='medical';
@@ -56,13 +69,14 @@ async function start(){
     ladder.root.visible=current.id==='ladder';floor.visible=current.id!=='ladder';$('ladder-options').hidden=current.id!=='ladder';
     let ladderSample;
     if(current.id==='ladder'){
-      ladderSample=applyLadderStudy(milo,$('direction').value==='down'?LADDER.duration-time:time);
+      ladderSample=applyLadderStudy(milo,$('direction').value==='down'?LADDER.duration-time:time,{easing:easingSelect.value==='on'});
       ladder.update(ladderSample,$('contacts').checked);
     }
     updateMiloWatch(milo,watchTime);
-    if(current.id!=='medical')milo.rotation.y=0;
+    if(current.id!=='medical'&&!dining.root.visible)milo.rotation.y=0;
     $('time').value=time;$('clock').value=`${time.toFixed(2)}秒`;$('status').textContent=current.id==='mocap'?'歩行・実測 / OBSと共通':`${current.label} / 本編と同じマイロを表示中`;
     if(ladderSample){const moving=ladderSample.contacts.find(c=>c.moving);$('status').textContent=`梯子・本編 / ${moving?moving.label+'を掛け替え':'四点で支持'} / 段間隔28cm`;$('support').textContent=ladderSample.contacts.map(c=>`${c.label} ${c.moving?'移動':'支持'}`).join('　');}
+    if(diningStage)$('status').textContent=`${current.label} / ${diningStage} / 本編と共通の設備・手元・動作`;
   }
   function setView(){
     const view=$('view').value,target=new THREE.Vector3(view==='arms'?.22:0,view==='arms'?1.02:view==='face'?1.68:view==='boots'?.13:view==='trousers'?.64:.87,view==='arms'?-.03:0);let az=.65,el=.12;camera.zoom=view==='arms'?2.4:view==='face'?4.4:view==='boots'?3.8:view==='trousers'?2.1:1;
@@ -89,6 +103,11 @@ async function start(){
     if(view==='front')az=0;if(view==='back')az=Math.PI;if(view==='left')az=-Math.PI/2;if(view==='right')az=Math.PI/2;
     if(current.id==='medical'&&['oblique','front','back'].includes(view)){target.set(0,1.3,-.22);az=view==='back'?Math.PI:0;el=view==='oblique'?.30:.03;camera.zoom=.85;}
     if(['seat','tablet'].includes(current.id)&&view==='arms'){target.set(0,.99,.38);az=0;el=.28;camera.zoom=2.7;}
+    if(DINING_ACTIONS.includes(current.id)){
+      if(view==='oblique'){target.set(current.id==='galley'?-.55:0,1.20,-.25);az=1.04;el=.22;camera.zoom=.78;}
+      if(view==='arms'){target.set(0,1.36,.24);az=1.18;el=.18;camera.zoom=2.5;}
+      if(view==='face'){target.set(0,1.56,.12);az=1.30;el=.05;camera.zoom=3.5;}
+    }
     if(current.id==='tablet'&&['tablet-side','tablet-screen'].includes(view)){
       milo.updateMatrixWorld(true);milo.userData.leisure.tablet.getWorldPosition(target);camera.zoom=2.5;
       controls.target.copy(target);camera.position.copy(target).add(view==='tablet-side'?new THREE.Vector3(3,.4,1):new THREE.Vector3(1.2,1.8,-2));
@@ -107,11 +126,13 @@ async function start(){
   $('view').add(new Option('時計拡大','watch'));
   $('view').add(new Option('梯子・斜め横','ladder-side'));
   for(const entry of POSES){
-    const button=document.createElement('button');button.textContent=entry.label;button.setAttribute('aria-pressed',entry===current);button.onclick=()=>{current=entry;time=entry.id==='medical'?12:entry.id==='tablet'?3:0;for(const child of $('poses').children)child.setAttribute('aria-pressed',child===button);pose();setView();};$('poses').append(button);
+    const button=document.createElement('button');button.textContent=entry.label;button.setAttribute('aria-pressed',entry===current);button.onclick=()=>{current=entry;time=entry.id==='medical'?12:entry.id==='tablet'?3:0;history.replaceState(null,'',`?pose=${entry.id}`);for(const child of $('poses').children)child.setAttribute('aria-pressed',child===button);pose();setView();};$('poses').append(button);
   }
   $('direction').onchange=pose;$('contacts').onchange=pose;
+  easingSelect.onchange=pose;
   $('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'再生':'一時停止';};
   $('restart').onclick=()=>{time=0;pose();};
+  const step=document.createElement('button');step.textContent='1コマ進む';step.onclick=()=>{paused=true;$('pause').textContent='再生';time=Math.min(duration(),time+1/60);pose();};$('restart').after(step);
   $('time').oninput=()=>{time=Number($('time').value);paused=true;$('pause').textContent='再生';pose();};
   $('view').onchange=setView;$('reset').onclick=()=>{$('view').value='oblique';setView();};
   function resize(){
@@ -120,11 +141,11 @@ async function start(){
     renderer.setSize(w,h,false);camera.top=half+offset;camera.bottom=-half+offset;camera.left=-half*w/h;camera.right=half*w/h;camera.updateProjectionMatrix();
   }
   const layoutObserver=new ResizeObserver(resize);layoutObserver.observe(document.querySelector('header'));layoutObserver.observe(document.querySelector('footer'));
-  if(ladderEntry){$('view').value='ladder-side';$('speed').value='.5';}
+  if(ladderEntry){$('view').value='ladder-side';$('speed').value='1';}
   if(entryPose==='tablet')$('view').value='arms';
   if(paused)$('pause').textContent='再生';
   addEventListener('resize',resize);resize();pose();setView();
-  function frame(now){const dt=Math.max(0,Math.min(.1,(now-last)/1000));last=now;if(!paused){const step=dt*Number($('speed').value);watchTime+=step;time=(time+step)%duration();pose();}controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);}
+  function frame(now){const dt=Math.max(0,Math.min(.1,(now-last)/1000));last=now;if(!paused){const step=dt*Number($('speed').value);watchTime+=step;time=(time+step*(current.id==='ladder'?LADDER_PACE:1))%duration();pose();}controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);}
   requestAnimationFrame(frame);
 }
 start().catch(error=>{console.error(error);document.getElementById('status').textContent='読み込みに失敗しました';document.getElementById('error').textContent=error.message;});

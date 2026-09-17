@@ -7,7 +7,7 @@ export const CABIN_SHADOW_SIZE=1024;
 // Forward rendering evaluates every visible light on every lit surface.
 // Keep new fixture lenses while restoring the original pair of lights per deck.
 export function limitCabinLights(root){
-  let gateLight=false;
+  const litGates=new Set();
   root.traverse(light=>{
     if(!light.isLight)return;
     light.visible=false;light.castShadow=false;
@@ -17,8 +17,8 @@ export function limitCabinLights(root){
       light.visible=true;
     }else if(light.isPointLight&&light.name==='Ladder shaft fill'){
       light.visible=true;
-    }else if(light.isPointLight&&light.parent.name==='Bulkhead gate lights'&&!gateLight){
-      light.visible=true;gateLight=true;
+    }else if(light.isPointLight&&light.parent.name==='Bulkhead gate lights'&&!litGates.has(light.parent)){
+      light.visible=true;litGates.add(light.parent);
     }
   });
 }

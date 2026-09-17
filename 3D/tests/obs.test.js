@@ -138,7 +138,7 @@ test('mid-ladder destination changes preserve position',()=>{
   assert.equal(actor.y,FLOORS[2].y);assert.equal(actor.x,1100);
 });
 test('retargeting discards callbacks from the old destination',()=>{
-  const actor=new CrewMotion();let old=0,newArrival=0;actor.goTo({floor:2,x:300},()=>old++);advance(actor,1);actor.goTo({floor:1,x:600},()=>newArrival++);advance(actor,10);assert.equal(old,0);assert.equal(newArrival,1);
+  const actor=new CrewMotion({floor:1});let old=0,newArrival=0;actor.goTo({floor:2,x:300},()=>old++);advance(actor,1);actor.goTo({floor:1,x:600},()=>newArrival++);advance(actor,10);assert.equal(old,0);assert.equal(newArrival,1);
 });
 test('supplies are finite and never regenerate without an order',()=>{
   const care=new Supplies(),deliveries=[];care.onDeliver=type=>deliveries.push(type);

@@ -4,7 +4,7 @@ import {MeshStandardMaterial} from 'three';
 import {buildShip} from '../src/obs/ship.js';
 import {limitCabinLights,CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR} from '../src/obs/lighting.js';
 
-test('the dressed cabin retains fixtures with fourteen local lights and no extra shadow passes',()=>{
+test('the dressed cabin lights all three rear rooms with sixteen local lights and no extra shadow passes',()=>{
   const ctx=new Proxy({measureText:t=>({width:t.length*8}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:()=>{}});
   const material=new MeshStandardMaterial();let ship;
   globalThis.document={createElement:()=>({getContext:()=>ctx})};
@@ -16,10 +16,11 @@ test('the dressed cabin retains fixtures with fourteen local lights and no extra
   for(let repeat=0;repeat<2;repeat++){
     limitCabinLights(ship.animated);
     const active=lights.filter(l=>l.visible);
-    assert.equal(active.length,14);
+    assert.equal(active.length,16);
     assert.equal(active.filter(l=>l.isSpotLight).length,0);
     assert.equal(active.filter(l=>l.isRectAreaLight).length,3);
-    assert.equal(active.filter(l=>l.isPointLight).length,11);
+    assert.equal(active.filter(l=>l.isPointLight).length,13);
+    assert.equal(active.filter(l=>l.parent.name==='Bulkhead gate lights').length,3);
     const ladder=active.filter(l=>l.name==='Ladder shaft fill');
     assert.equal(ladder.length,4);
     const heights=ladder.map(l=>l.position.y).sort((a,b)=>a-b);
@@ -36,8 +37,8 @@ test('the dressed cabin retains fixtures with fourteen local lights and no extra
         assert.equal(light.distance,17);assert.equal(light.color.getHex(),0xe6ebe4);
       }else{
         const top=light.position.y>8,mid=light.position.y>5&&!top;
-        assert.equal(light.position.x,-5);assert.equal(light.intensity,top?12:45);
-        assert.equal(light.distance,20);assert.equal(light.color.getHex(),mid?0xb4dcdb:0xffebc7);
+        assert.equal(light.position.x,-5);assert.equal(light.intensity,mid?12:45);
+        assert.equal(light.distance,20);assert.equal(light.color.getHex(),top?0xb4dcdb:0xffebc7);
       }
     }
     assert.equal(decks.size,3);assert.ok([...decks.values()].every(n=>n===2));

@@ -82,7 +82,7 @@ function bootLeather(){
   }
   return new THREE.MeshStandardMaterial({color:0x554735,roughness:.73,metalness:0,bumpMap:bootGrain,bumpScale:.00035});
 }
-function combatBoot(parent,m,side){
+export function createMiloBoot(parent,m,side){
   const boot=joint(parent,0,-.425,.013);boot.name='Laced combat boot';
   const leather=bootLeather(),welt=leather.clone(),laces=m.cloth.clone();
   welt.color.setHex(0x736249);laces.color.setHex(0xc4b995);laces.roughness=.88;
@@ -186,7 +186,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
     ball(knee,pants,0,0,0,.064,.065,.064);
     limb(knee,pants,.425,[[0,.064],[.15,.072],[.36,.071],[.64,.060],[.90,.054],[1,.061]],.98);
     for(let i=0;i<2;i++)ball(knee,pants,0,-.359-i*.019,0,.062,.010,.063);
-    const boot=combatBoot(knee,m,side);
+    const boot=createMiloBoot(knee,m,side);
     arms.push({arm,elbow,hand,fingers,thumb,side});legs.push({leg,knee,boot,side});
   }
   const headParts=new Set();head.traverse(o=>headParts.add(o));
@@ -279,7 +279,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   root.visible=true;
   if(bathroom){
     root.position.z=bathroom.depth;root.rotation.y=desired;
-    if(bathroom.moving)applyWalkingPose(root,Math.abs(bathroom.depth-(bathroom.phase==='enter'?.78:-.30)));
+    if(bathroom.moving)applyWalkingPose(root,bathroom.walkDistance);
     if(bathroom.reach>0){
       root.updateWorldMatrix(true,true);
       const target=body.worldToLocal(new THREE.Vector3(root.position.x+.56,root.position.y+1.17,.58));

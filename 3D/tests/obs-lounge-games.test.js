@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {ReversiMatch,chooseReversiMove,flips} from '../src/obs/reversi-match.js';
 import {PokerMatch,evaluateHand} from '../src/obs/poker-match.js';
 import {CabinBrain,requestedGame} from '../src/obs/brain.js';
-import {CrewMotion,Supplies} from '../src/obs/state.js';
+import {CrewMotion,Supplies,getStation} from '../src/obs/state.js';
 
 test('reversi starts with four legal moves and flips only bracketed discs',()=>{
   const m=new ReversiMatch();assert.deepEqual(m.legal(),[19,26,37,44]);
@@ -61,7 +61,7 @@ test('poker saves resume a pending bet or draw, rejects corruption, and folds pa
 test('named games reach the lounge before opening and freeze the shared cabin state',()=>{
   for(const [text,kind]of [['チェスしよう','chess'],['ポーカーで遊ぼう','poker'],['リバーシしよう','reversi'],['オセロ','reversi'],['ゲームしよう',null]]){
     assert.equal(requestedGame(text),kind);let opened=false,selected;
-    const actor=new CrewMotion({floor:0,x:1030}),brain=new CabinBrain({obsUI:{hideWant(){},openGame(game){opened=true;selected=game;}}},actor,{care:new Supplies(),random:()=>.9});
+    const actor=new CrewMotion({floor:getStation('lounge').floor,x:1030}),brain=new CabinBrain({obsUI:{hideWant(){},openGame(game){opened=true;selected=game;}}},actor,{care:new Supplies(),random:()=>.9});
     brain.health.nextIncident=Infinity;brain.handleChat(text);assert(!opened);
     for(let i=0;i<600&&!opened;i++){actor.update(1/60);brain.update(1/60);}
     assert(opened,text);assert.equal(selected,kind);assert.equal(brain.state,'playingGame');

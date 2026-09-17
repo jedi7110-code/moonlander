@@ -49,11 +49,13 @@ function placeLadderHand(rig,target,inverseBody){
   hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(palm);
 }
 
-export function sampleLadder(time){
+export function sampleLadder(time,{easing=true}={}){
   const cycle=time/LADDER.duration,travel=cycle*2*LADDER.spacing;
   const contacts=limbs.map(limb=>{
     const shifted=cycle-limb.offset,lap=Math.floor(shifted),phase=shifted-lap;
-    const moving=phase<.23,u=Math.min(1,phase/.23),lift=Math.sin(Math.PI*u)**2;
+    const moving=phase<.23,u=Math.min(1,phase/.23);
+    // Zero velocity AND acceleration when releasing/settling onto the rung.
+    const lift=easing?64*u**3*(1-u)**3:Math.sin(Math.PI*u)**2;
     const rungY=limb.base+(lap+smooth(u))*2*LADDER.spacing;
     return {...limb,moving,u,grip:limb.hand?1-.85*lift:1,
       point:new THREE.Vector3(limb.side*(limb.hand?.235:.10),rungY-travel,LADDER.depth-(limb.hand?.035:.12)*lift)};
@@ -61,28 +63,34 @@ export function sampleLadder(time){
   return {travel,contacts};
 }
 
-export function applyLadderPose(root,time){
-  setLadderHandFit(root,true);
-  const sample=sampleLadder(time),{body,head,arms,legs}=root.userData;
-  // Follow the climber vertically: fixed grips descend with the ladder in this view.
-  const lean=.18;
-  body.rotation.set(lean,0,0);
+const BODY_LEAN=.18;
+export function ladderBodyPosition(sample,{easing=true}={}){
+  if(easing){
+    // All four reach spheres share this corridor throughout the cycle. Do not
+    // chase their changing interval midpoint: that repeatedly lifts/drops the
+    // pelvis when a different hand or foot becomes the limiting support.
+    // A 28 mm, two-second weight shift keeps world-space ascent monotonic.
+    const phase=sample.travel/(2*LADDER.spacing)*Math.PI*4;
+    return new THREE.Vector3(0,-.14-.014*Math.cos(phase),-.43);
+  }
+  const rotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),BODY_LEAN);
   // Find the farthest hip setback that all four limbs can reach, with a small
   // extension reserve. Height follows the intersection of their reach spheres.
   // This is evaluated from time, not previous frames, so scrubbing/reverse agree.
   const reaches=sample.contacts.map(c=>({
-    joint:new THREE.Vector3(c.side*(c.hand?.207:.1),c.hand?1.488:.970,0).applyQuaternion(body.quaternion),
+    joint:new THREE.Vector3(c.side*(c.hand?.207:.1),c.hand?1.488:.970,0).applyQuaternion(rotation),
     target:c.point.clone().add(c.hand?LADDER_WRIST_OFFSET:new THREE.Vector3(0,LADDER.radius+.107,-.12)),
     length:c.hand?.545:.845,
   }));
   const heightRange=back=>{
     let min=-Infinity,max=Infinity;
-    const z=-.988*Math.sin(lean)-back;
+    const z=-.988*Math.sin(BODY_LEAN)-back;
     for(const {joint,target,length} of reaches){
       const remaining=length*length-(target.x-joint.x)**2-(target.z-joint.z-z)**2;
       if(remaining<0)return {min:Infinity,max:-Infinity};
       const height=Math.sqrt(remaining);
-      min=Math.max(min,target.y-joint.y-height);max=Math.min(max,target.y-joint.y+height);
+      const low=target.y-joint.y-height,high=target.y-joint.y+height;
+      min=Math.max(min,low);max=Math.min(max,high);
     }
     return {min,max};
   };
@@ -93,7 +101,15 @@ export function applyLadderPose(root,time){
   }
   const range=heightRange(near);
   // Stand up on the supporting foot instead of hanging in a deep squat.
-  body.position.set(0,THREE.MathUtils.lerp(range.min,range.max,.55),-.988*Math.sin(lean)-near);
+  return new THREE.Vector3(0,THREE.MathUtils.lerp(range.min,range.max,.55),-.988*Math.sin(BODY_LEAN)-near);
+}
+
+export function applyLadderPose(root,time,options={}){
+  setLadderHandFit(root,true);
+  const sample=sampleLadder(time,options),{body,head,arms,legs}=root.userData;
+  // Time-based rather than frame-based easing also works in reverse and scrubbing.
+  body.rotation.set(BODY_LEAN,0,0);
+  body.position.copy(ladderBodyPosition(sample,options));
   const inverse=body.quaternion.clone().invert();
   head.rotation.set(-.12,0,0);
   for(const contact of sample.contacts){

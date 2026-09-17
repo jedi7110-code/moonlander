@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {DECK} from './layout.js';
 import {box,cylinder,rod,pipe} from './materials.js';
 
 function tin(root,m,x,y,z,h=.22,r=.09,paint=m.enamel){
@@ -100,19 +101,19 @@ function underdeck(root,m){
 
 export function addCabinDressing(parent,m,floors){
   const root=new THREE.Group();root.name='Cabin dressing';parent.add(root);
-  const [top,mid,bottom]=floors;
+  const [habitation,operations,bottom]=[floors[DECK.HABITATION],floors[DECK.OPERATIONS],floors[DECK.LIFE_SUPPORT]];
   floors.forEach(y=>heavyServices(root,m,y));underdeck(root,m);
 
   // Keep the wall above the lounge clear of shelves and stored objects.
-  wallCards(root,m,6.96,top+2.34);
-  softBag(root,m,10.14,top+.04,-.18,.83,.43);
-  cloth(root,m,10.20,top+1.63,-1.02,.47,.81);
-  box(root,m.dark,10.19,top+1.69,-1.10,.68,.08,.10);
-  for(const [x,y,w]of [[-11.94,top+1.73,.62],[-8.57,top+1.64,.70],[-12.02,mid+1.7,.67],[-5.74,mid+1.42,.48],[-2.55,mid+.74,.61]])serviceBoard(root,m,x,y,w);
-  wallCards(root,m,-5.64,top+2.20);
-  softBag(root,m,-8.56,top+.12,-.85,.66,.46);
-  box(root,m.dark,-11.89,top+.80,-.99,.63,.065,.53);
-  tin(root,m,-11.89,top+.84,-.99,.29,.115,m.red);
+  wallCards(root,m,6.96,habitation+2.34);
+  softBag(root,m,10.14,habitation+.04,-.18,.83,.43);
+  cloth(root,m,10.20,habitation+1.63,-1.02,.47,.81);
+  box(root,m.dark,10.19,habitation+1.69,-1.10,.68,.08,.10);
+  for(const [x,y,w]of [[-11.94,habitation+1.73,.62],[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]])serviceBoard(root,m,x,y,w);
+  wallCards(root,m,-5.64,habitation+2.20);
+  softBag(root,m,-8.56,habitation+.12,-.85,.66,.46);
+  box(root,m.dark,-11.89,habitation+.80,-.99,.63,.065,.53);
+  tin(root,m,-11.89,habitation+.84,-.99,.29,.115,m.red);
 
   // Keep the kitchen worktop props, without an overhead provision shelf.
   mug(root,m,-10.42,bottom+1.085,-.05);
@@ -131,7 +132,7 @@ export function addCabinDressing(parent,m,floors){
   for(let i=0;i<6;i++)rod(root,m.rope,[10.99+i*.26,bottom+.12,.04],[11.13+i*.26,bottom+1.40,.04],.011);
   for(let i=0;i<5;i++)rod(root,m.rope,[11.01,bottom+.18+i*.26,.05],[12.45,bottom+.18+i*.26,.05],.011);
   softBag(root,m,12.00,bottom+1.47,-.53,.60,.30);
-  for(const [x,y]of [[1.8,bottom+.45],[10.02,mid+.38]]){
+  for(const [x,y]of [[1.8,bottom+.45],[10.02,operations+.38]]){
     box(root,m.olive,x,y,-.89,.94,.58,.55);
     for(const dx of [-.29,.29])box(root,m.rubber,x+dx,y,-.602,.047,.58,.026);
     box(root,m.metal,x,y+.30,-.89,.23,.04,.10);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Group,MeshStandardMaterial,Raycaster,Vector3,Box3} from 'three';
 import {BULKHEAD_GATE,gateWall,createBulkheadGate} from '../src/obs/bulkhead-gate.js';
-import {buildShip} from '../src/obs/ship.js';
+import {buildShip,REAR_ROOM_GATES,RECESSED_OPENINGS,FLOOR_Y} from '../src/obs/ship.js';
 
 test('the eight-sided opening cuts through the hull and exposes a separate rear room',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),walls=new Group();
@@ -36,6 +36,21 @@ test('the assembled gate reveal has one surface per wall layer, without coplanar
   globalThis.document={createElement:()=>({getContext:()=>ctx})};
   try{ship=buildShip(new Proxy({},{get:()=>material}));}finally{delete globalThis.document;}
   ship.staticMesh.updateMatrixWorld(true);
+  for(const opening of RECESSED_OPENINGS){
+    const x=(opening.left+opening.right)/2,y=FLOOR_Y[opening.floor];
+    for(const offset of [-.3,0,.3]){
+      const ray=new Raycaster(new Vector3(x+offset,y+1.5,0),new Vector3(0,0,-1));
+      const hit=ray.intersectObject(ship.staticMesh,true)[0];
+      assert.ok(hit&&hit.point.z<-3,`${opening.id} exposes its recessed interior, not a solid wall`);
+    }
+  }
+  // Check the assembled scene, including dressing, not just the isolated frame.
+  // The old tool board and service pipes occupied the left side of this opening.
+  for(const door of REAR_ROOM_GATES)for(const u of [-.38,0,.38])for(const height of [.70,1.3,1.9]){
+    const ray=new Raycaster(new Vector3(door.x+u*door.width,door.floor+height,0),new Vector3(0,0,-1));
+    const hit=ray.intersectObject(ship.staticMesh,true)[0];
+    assert.ok(hit&&hit.point.z< -2.4,`deck at ${door.floor}, doorway ${u}/${height} must expose the rear room without equipment in front`);
+  }
   const g=BULKHEAD_GATE;
   for(const side of [-1,1])for(const z of [-2.23,-2.04,-1.62,-1.57,-1.35]){
     const ray=new Raycaster(new Vector3(g.x,g.floor+1.78,z),new Vector3(side,0,0));

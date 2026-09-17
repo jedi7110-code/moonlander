@@ -74,5 +74,28 @@ test('the cabin opens with Milo and Lucy asleep together, then wakes and release
   brain.update(OPENING_SLEEP_SECONDS-.1);assert.equal(brain.bunkVisit.phase,'sleeping');
   brain.update(.2);assert.equal(brain.bunkVisit.phase,'waking');
   for(let i=0;i<1800&&brain.bunkVisit;i++){cat.update(1/60,actor);brain.update(1/60);}
-  assert.equal(brain.bunkVisit,null);assert.equal(brain.openingWake,null);assert.equal(cat.bunkWake,null);assert.equal(brain.state,'idle');assert.equal(cat.mode,'look');
+  assert.equal(brain.bunkVisit,null);assert.equal(brain.openingWake,null);assert.equal(cat.bunkWake,null);assert.equal(brain.state,'idle');assert.equal(cat.mode,'walk');
+});
+
+test('Lucy leaves after landing, before Milo finishes rising, without a heading snap or a second release',()=>{
+  const actor=new CrewMotion(),care=new Supplies(),cat=new CatRoutine(care,{random:()=>.5,turns:true});
+  const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.5});brain.catRoutine=cat;brain.beginWakeUp();
+  const startX=cat.motion.x;let released=false,walkedAhead=false,lastYaw=cat.poseYaw;
+  for(let i=0;i<1800&&brain.bunkVisit;i++){
+    const visit=brain.bunkVisit;
+    if(cat.bunkWake&&['sleeping','waking','leaving'].includes(visit.phase))assert.equal(cat.motion.x,startX,'no horizontal departure before landing');
+    const held=cat.bunkWake;cat.update(0,actor);assert.equal(cat.bunkWake,held,'pause must not release the cat');
+    cat.update(1/60,actor);
+    if(held&&!cat.bunkWake){
+      released=true;assert.equal(visit.phase,'rising');assert(visit.age>=.45&&visit.age<.48);
+      assert.equal(cat.mode,'walk');assert(cat.motion.busy);assert.equal(cat.bunkHop,null);
+    }
+    if(visit.phase==='rising'&&cat.motion.x>startX+1)walkedAhead=true;
+    const yaw=cat.poseYaw;assert(Math.abs(Math.atan2(Math.sin(yaw-lastYaw),Math.cos(yaw-lastYaw)))<.08,'turn continuously from the landing direction');lastYaw=yaw;
+    brain.update(1/60);
+  }
+  assert(released&&walkedAhead,'Lucy must already be walking while Milo is rising');
+  const destination=cat.motion.destination,version=cat.motion.commandVersion;
+  cat.finishBunkWake();assert.equal(cat.motion.destination,destination);assert.equal(cat.motion.commandVersion,version);
+  assert(cat.motion.x>startX+100);
 });

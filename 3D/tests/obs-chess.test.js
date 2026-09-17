@@ -62,7 +62,7 @@ test('the packaged opponent chooses moves accepted by the independent rule engin
 
 function cabin(){
   let opened=0;
-  const actor=new CrewMotion({floor:0,x:1030}),care=new Supplies(),scene={obsUI:{hideWant(){},showWant(){},openGame(){opened++;}}};
+  const actor=new CrewMotion({floor:getStation('lounge').floor,x:1030}),care=new Supplies(),scene={obsUI:{hideWant(){},showWant(){},openGame(){opened++;}}};
   const brain=new CabinBrain(scene,actor,{care});return{actor,care,brain,get opened(){return opened;}};
 }
 test('accepting Milo’s invitation opens a real match only after arriving at the lounge',()=>{

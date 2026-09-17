@@ -10,7 +10,7 @@ import {createMilo,animateMilo} from '../src/obs/characters.js';
 
 const needs={energy:80,thirst:80,hunger:80,hygiene:80};
 function setup(){
-  const events=[],reports=[],actor=new CrewMotion({floor:1,x:MEDICAL.x}),care=new Supplies();
+  const events=[],reports=[],actor=new CrewMotion({floor:MEDICAL.floor,x:MEDICAL.x}),care=new Supplies();
   const brain=new CabinBrain({time:{delayedCall(){}},obsUI:{hideWant(){},healthEvent(e){events.push(e);},medicalResult(r){reports.push(r);}}},actor,{care});
   brain.wantCoolT=10000;
   return{brain,actor,care,events,reports};
@@ -100,7 +100,7 @@ test('autonomous care reaches the bay from another deck and slowed movement retu
   const {brain,actor}=setup();brain.health.startCondition('fever');brain.health.value=29;
   actor.floor=2;actor.y=FLOORS[2].y;actor.x=300;brain.update(1/60);
   assert.equal(brain.actStation,'medical');assert.ok(actor.walkSpeed<brain.baseWalkSpeed);
-  advance(brain,100,actor);assert.equal(brain.health.needsCare,false);assert.equal(actor.walkSpeed,brain.baseWalkSpeed);
+  advance(brain,140,actor);assert.equal(brain.health.needsCare,false);assert.equal(actor.walkSpeed,brain.baseWalkSpeed);
 });
 test('chess freezes symptoms and condition age',()=>{
   const {brain}=setup();brain.health.startCondition('injury');brain.state='playingGame';

@@ -9,7 +9,7 @@ import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
 import {loadMiloHead} from './head.js';
 import {animateDelivery} from './delivery.js';
-import {animateVerticalShutter} from './shutter.js';
+import {animatePocketShutter} from './shutter.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE,FLOORS,getStation} from './layout.js';
 import {animateAirlock} from './eva.js';
@@ -137,7 +137,7 @@ export class ObservationView {
       applyCabinLadder(this.milo,{...this.cabinClimb,height:positionY(actor.y),endHeight:positionY(actor.queue[0].y),endYaw});
     }
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
-      animateVerticalShutter(fixture.door,brain.bathroom?.id===id?(bathroom?.opening??0):0);
+      animatePocketShutter(fixture.door,brain.bathroom?.id===id?(bathroom?.opening??0):0);
     }
     for(const [id,docks]of Object.entries(this.ship.diningDocks)){
       docks.mug.visible=id==='hydro'&&action!==id;
