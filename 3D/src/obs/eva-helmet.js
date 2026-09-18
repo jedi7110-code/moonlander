@@ -56,14 +56,14 @@ export function helmetHoseSocket(side){
   return{position,axis,outlet:position.clone().addScaledVector(axis,.055)};
 }
 
-export function createEVAHelmet(m){
+export function createEVAHelmet(m,{red=false}={}){
   const root=new THREE.Group();root.name='Full-face EVA helmet';root.position.set(0,EVA_HELMET.base,EVA_HELMET.depthOffset);root.scale.setScalar(EVA_HELMET.scale);
-  const shellPaint=m.evaHelmet.clone();shellPaint.color.setHex(0xd4d7d2);shellPaint.roughness=.52;shellPaint.metalness=.19;
+  const shellPaint=m.evaHelmet.clone();shellPaint.color.setHex(red?0x962229:0xd4d7d2);shellPaint.roughness=.52;shellPaint.metalness=.19;
   shellPaint.roughnessMap=m.enamel.map;shellPaint.bumpMap=m.enamel.bumpMap;shellPaint.bumpScale=.0004;
   const hardware=new THREE.MeshStandardMaterial({color:0x62655d,roughness:.32,metalness:.78});
   const edge=new THREE.MeshStandardMaterial({color:0xa2a69b,roughness:.28,metalness:.8});
   const black=new THREE.MeshStandardMaterial({color:0x141914,roughness:.57,metalness:.26});
-  const panel=shellPaint.clone();panel.color.setHex(0xc3c6bb);
+  const panel=shellPaint.clone();panel.color.setHex(red?0x7e2025:0xc3c6bb);
   const seam=m.evaSeam.clone();seam.color.setHex(0x687064);
   const padding=m.evaCloth.clone();padding.color.setHex(0x182119);padding.roughness=.99;padding.metalness=0;
   const detail={paint:shellPaint,panel,metal:hardware,edge,black,seam,padding,rubber:m.rubber};

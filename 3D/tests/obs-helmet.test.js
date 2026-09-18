@@ -139,10 +139,14 @@ test('the fitted shell reduces horizontal bulge without raising or sharpening th
   dispose(root);
 });
 
-test('both white and red suits use the detailed white helmet with two physically connected rear hoses',()=>{
-  for(const index of [0,1]){
+test('helmet paint matches each suit while hardware, glazing and connected rear hoses stay unchanged',()=>{
+  for(const index of [0,1,2]){
     const root=suit(index),ports=[],hoses=[];
-    assert.equal(root.getObjectByName('Metal helmet shell').material.color.getHex(),0xd4d7d2);
+    const paint=index===1?0x962229:0xd4d7d2;
+    for(const name of ['Metal helmet shell','Continuous white visor surround','Bolted chin guard'])assert.equal(root.getObjectByName(name).material.color.getHex(),paint);
+    assert.equal(root.getObjectByName('Rear rectangular access cover').material.color.getHex(),index===1?0x7e2025:0xc3c6bb);
+    assert.equal(root.getObjectByName('Continuous face visor').material.color.getHex(),0x101a13);
+    assert.equal(root.getObjectByName('Brushed metal brow shield').material.color.getHex(),0x62655d);
     root.traverse(object=>{if(object.name==='Rear helmet hose port')ports.push(object);if(object.name==='Rear helmet breathing hose')hoses.push(object);});
     assert.equal(ports.length,2);assert.equal(hoses.length,2);
     for(const port of ports){

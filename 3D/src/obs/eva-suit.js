@@ -125,7 +125,7 @@ export function hangingSuit(materials,index){
   cylinder(collarRoot,m.dark,0,0,0,.140,.064,.133,48).name='Wide helmet locking collar';
   for(const y of [-.020,.014])ring(collarRoot,m.rubber,[0,y,0],.139,.0045,[0,1,0]);
   for(const side of [-1,1])box(collarRoot,m.metal,side*.039,-.004,.136,.018,.025,.009,.002);
-  const helmet=createEVAHelmet(m);suit.add(helmet);chestPlate(suit,m,index);finishEVAGarment(suit,m.evaCloth);
+  const helmet=createEVAHelmet(m,{red});suit.add(helmet);chestPlate(suit,m,index);finishEVAGarment(suit,m.evaCloth);
   pipe(suit,m.metal,[[.145,1.60,-.26],[.145,2.075,-.30],[0,2.115,-.31],[0,2.15,-.31]],.014).name='Suspension support';
   pipe(suit,m.metal,[[0,2.15,-.31],[0,2.24,-.31],[0,2.265,-.39],[0,2.18,-.43]],.014).name='Suspension hook';return suit;
 }

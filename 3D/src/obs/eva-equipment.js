@@ -11,8 +11,8 @@ function plate(parent,material,points,z,depth){
 
 export function createEVARifle(m){
   const root=new THREE.Group();root.name='EVA pulse rifle';
-  const shell=m.metal.clone();shell.color.setHex(0xb4b9b1);shell.roughness=.5; shell.metalness=.52;
-  const trim=m.metal.clone();trim.color.setHex(0xcbd0c6);
+  const shell=m.metal.clone();shell.name='Silver rifle body';shell.map=null;shell.color.setHex(0xd7dcdb);shell.roughness=.36;shell.metalness=.56;
+  const trim=m.metal.clone();trim.name='Bright silver rifle trim';trim.map=null;trim.color.setHex(0xf0f2f1);trim.roughness=.30;trim.metalness=.62;
   const light=m.coolLamp.clone();light.color.setHex(0x90dde0);light.emissive.setHex(0x48cbd8);light.emissiveIntensity=.65;
   // Display-only prop: broad shroud, inset panels and restrained cyan charge windows.
   plate(root,shell,[[-.43,-.11],[-.30,-.11],[-.22,-.06],[.51,-.06],[.58,.00],[.58,.13],[.51,.19],[-.26,.19],[-.43,.13]],-.072,.144).name='Armored receiver';
@@ -20,7 +20,7 @@ export function createEVARifle(m){
   plate(root,m.rubber,[[-.24,-.07],[-.29,-.26],[-.18,-.28],[-.12,-.07]],-.04,.08).name='Grip';
   box(root,m.dark,.12,-.112,0,.32,.07,.14,.015);
   box(root,trim,.15,.193,0,.74,.035,.17,.008);
-  box(root,m.rubber,.17,.107,.083,.63,.109,.016,.010);
+  const receiverFace=box(root,shell,.17,.107,.083,.63,.109,.016,.010);receiverFace.name='Silver receiver face';
   for(let i=0;i<7;i++)box(root,light,-.063+i*.076,.12,.096,.05,.042,.009,.006);
   for(let i=0;i<9;i++)box(root,m.rubber,-.18+i*.078,.219,0,.030,.013,.14,.003);
   for(const z of [-.085,.085]){

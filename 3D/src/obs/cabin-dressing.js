@@ -25,6 +25,14 @@ function softBag(root,m,x,y,z,w=.66,h=.48){
   pipe(root,m.rubber,[[x-.13,y+h,z],[x-.1,y+h+.11,z],[x+.1,y+h+.11,z],[x+.13,y+h,z]],.021);
 }
 
+function cargoCase(root,m,x,y,z=-.89){
+  const cargo=new THREE.Group();cargo.name='Life support cargo case';cargo.position.set(x,y,z);root.add(cargo);
+  box(cargo,m.olive,0,0,0,.94,.58,.55);
+  for(const dx of [-.29,.29])box(cargo,m.rubber,dx,0,.288,.047,.58,.026);
+  box(cargo,m.metal,0,.30,0,.23,.04,.10);
+  return cargo;
+}
+
 function cloth(root,m,x,y,z,w=.36,h=.55){
   const geo=new THREE.PlaneGeometry(w,h,8,8),p=geo.attributes.position;
   for(let i=0;i<p.count;i++){
@@ -132,9 +140,8 @@ export function addCabinDressing(parent,m,floors){
   for(let i=0;i<6;i++)rod(root,m.rope,[10.99+i*.26,bottom+.12,.04],[11.13+i*.26,bottom+1.40,.04],.011);
   for(let i=0;i<5;i++)rod(root,m.rope,[11.01,bottom+.18+i*.26,.05],[12.45,bottom+.18+i*.26,.05],.011);
   softBag(root,m,12.00,bottom+1.47,-.53,.60,.30);
-  for(const [x,y]of [[1.8,bottom+.45],[10.02,operations+.38]]){
-    box(root,m.olive,x,y,-.89,.94,.58,.55);
-    for(const dx of [-.29,.29])box(root,m.rubber,x+dx,y,-.602,.047,.58,.026);
-    box(root,m.metal,x,y+.30,-.89,.23,.04,.10);
-  }
+  cargoCase(root,m,1.8,bottom+.45);
+  // Keep the EVA preparation aisle clear; the former case at x=10.02 sat
+  // directly in front of the third hanging suit.
+  return root;
 }

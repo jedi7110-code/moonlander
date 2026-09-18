@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Box3,Group,MeshStandardMaterial,Vector3} from 'three';
-import {EVA,EVA_PASSAGE,STATIONS,getStation} from '../src/obs/layout.js';
+import {DECK,EVA,EVA_PASSAGE,STATIONS,getStation} from '../src/obs/layout.js';
 import {getStation as sharedStation} from '../../js/obs/layout.js?v=15';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies} from '../src/obs/state.js';
 import {createEVABay,EVA_BAY,animateAirlock} from '../src/obs/eva.js';
 import {AirlockPassage} from '../src/obs/airlock.js';
+import {addCabinDressing} from '../src/obs/cabin-dressing.js';
+import {FLOOR_Y} from '../src/obs/ship.js';
 
 test('the EVA rack replaces audio in 3D without changing the original 2D station',()=>{
   assert.equal(getStation('stereo'),undefined);assert.ok(sharedStation('stereo'));
@@ -61,6 +63,13 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
     const box=new Box3().setFromObject(weapon);assert.equal(weapon.userData.rackSlot,index+1);
     assert.ok(box.max.y-box.min.y>1.2);assert.ok(box.max.x-box.min.x<.5);
     if(previous)assert.ok(box.min.x>previous.max.x,'three stored weapons have separate silhouettes');previous=box;
+    const receiver=weapon.getObjectByName('Armored receiver');
+    assert.equal(receiver.material.name,'Silver rifle body');
+    assert.equal(receiver.material.color.getHex(),0xd7dcdb);
+    assert.equal(receiver.material.map,null,'silver stays legible in the dim rack instead of inheriting the dark steel texture');
+    assert.ok(receiver.material.metalness>=.5,'rifle body retains a metallic finish');
+    const face=weapon.getObjectByName('Silver receiver face');
+    assert.equal(face.material,receiver.material,'the large visible receiver face uses the silver body finish');
     weapon.traverse(mesh=>{
       if(!mesh.geometry)return;
       for(const key of ['position','normal','uv'])for(const value of mesh.geometry.attributes[key].array)assert.ok(Number.isFinite(value));
@@ -81,6 +90,17 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
   animateAirlock(door,signal,0);assert.equal(door.visible,true);assert.ok(door.position.distanceTo(original)<1e-10);
   assert.deepEqual(bay.hatch.userData.door.position,outer);
   assert.ok(EVA.x<getStation('airlock').x);
+});
+
+test('cabin dressing leaves the floor in front of the hanging suits clear',()=>{
+  const root=new Group(),material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});
+  const dressing=addCabinDressing(root,m,FLOOR_Y),cases=[];dressing.updateMatrixWorld(true);
+  dressing.traverse(object=>{if(object.name==='Life support cargo case')cases.push(object);});
+  assert.equal(cases.length,1,'only the cargo-room case remains');
+  const bounds=new Box3().setFromObject(cases[0]);
+  assert.ok(bounds.max.y<FLOOR_Y[DECK.LIFE_SUPPORT]+.8);
+  assert.ok(bounds.max.x<3,'no case remains in the EVA suit row around x=10');
+  root.traverse(object=>object.geometry?.dispose());material.dispose();
 });
 
 test('the inner hatch opens before traffic in either direction, then seals behind it',()=>{
