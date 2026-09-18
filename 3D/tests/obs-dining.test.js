@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MeshStandardMaterial,Vector3} from 'three';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
-import {mouthPosition,diningPhase,createDiningProps,DINING_APPROACH} from '../src/obs/dining.js';
+import {mouthPosition,diningPhase,cupGripPose,createDiningProps,DINING_APPROACH} from '../src/obs/dining.js';
+import {MEAL_CONTACTS,MEAL_HAND_CONTACTS} from '../src/obs/meal-pose.js';
 import {Group} from 'three';
 
 const character=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
@@ -10,9 +11,14 @@ const pose=(root,action,time,duration=action==='galley'?6:5,extra={})=>{
   animateMilo(root,{action,moving:false,climbing:false,facing:1,time:19,actionTime:time,actionDuration:duration,...extra});root.updateMatrixWorld(true);
 };
 const point=(prop,xyz)=>prop.localToWorld(new Vector3(...xyz));
+const cupGrip=(time,duration)=>cupGripPose(diningPhase(time,duration).progress).position.toArray();
 const handAt=(root,index,prop,grip)=>{
   const wrist=root.userData.arms[index].hand.getWorldPosition(new Vector3());
   assert.ok(wrist.distanceTo(point(prop,grip))<1e-8,`wrist misses the ${prop.name} grip by ${wrist.distanceTo(point(prop,grip))} at ${root.userData.auditTime}`);
+};
+const mealHandAt=(root,index,prop)=>{
+  const hand=root.userData.arms[index].hand;
+  assert.ok(hand.localToWorld(MEAL_HAND_CONTACTS[index].clone()).distanceTo(prop.localToWorld(MEAL_CONTACTS[index].clone()))<1e-7,`hand misses the ${prop.name} contact`);
 };
 
 test('dishes stay on the worktop until grasped, return to the same spot, and remain reachable',()=>{
@@ -30,8 +36,8 @@ test('dishes stay on the worktop until grasped, return to the same spot, and rem
         if(phase.hold===0)assert.ok(prop.getWorldPosition(new Vector3()).distanceTo(docks[name].getWorldPosition(new Vector3()))<1e-8);
       }
       if(phase.reach===1){
-        if(action==='galley'){handAt(root,0,root.userData.dining.bowl,[-.134,-.058,.015]);handAt(root,1,root.userData.dining.spoon,[.027,.018,.164]);}
-        else handAt(root,1,root.userData.dining.mug,[.097,.067,.019]);
+        if(action==='galley'){mealHandAt(root,0,root.userData.dining.bowl);mealHandAt(root,1,root.userData.dining.spoon);}
+        else handAt(root,1,root.userData.dining.mug,cupGrip(time,10));
       }
     }
   }
@@ -50,8 +56,8 @@ test('hands remain on the props between grasp and release',()=>{
     pose(root,action,frame/60,6);
     if(diningPhase(frame/60,6).reach<1)continue;
     if(action==='galley'){
-      handAt(root,0,dining.bowl,[-.134,-.058,.015]);handAt(root,1,dining.spoon,[.027,.018,.164]);
-    }else handAt(root,1,dining.mug,[.097,.067,.019]);
+      mealHandAt(root,0,dining.bowl);mealHandAt(root,1,dining.spoon);
+    }else handAt(root,1,dining.mug,cupGrip(frame/60,6));
     for(const {arm,elbow,hand} of root.userData.arms)for(const q of [arm.quaternion,elbow.quaternion,hand.quaternion])assert.ok(q.toArray().every(Number.isFinite));
   }
 });
@@ -111,7 +117,7 @@ test('prop paths are continuous, pause with action time, and reset after interru
     pose(root,action,2);const position=prop.position.toArray(),rotation=prop.quaternion.toArray();
     pose(root,action,2);assert.deepEqual(prop.position.toArray(),position);assert.deepEqual(prop.quaternion.toArray(),rotation);
     pose(root,action,2,6,{health:{needsCare:true,condition:{kind:'injury'}}});
-    handAt(root,1,prop,action==='galley'?[.027,.018,.164]:[.097,.067,.019]);
+    if(action==='galley')mealHandAt(root,1,prop);else handAt(root,1,prop,cupGrip(2,6));
     pose(root,null,0,6,{moving:true});
     const fresh=character();pose(fresh,null,0,6,{moving:true});
     for(const prop of [dining.mug,dining.spoon,dining.bowl])assert.equal(prop.visible,false);

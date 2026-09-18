@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MeshStandardMaterial} from 'three';
 import {buildShip} from '../src/obs/ship.js';
-import {limitCabinLights,CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR} from '../src/obs/lighting.js';
+import {limitCabinLights,CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR,CABIN_DECK_LIGHT,CABIN_AMBIENCE} from '../src/obs/lighting.js';
 
 test('the dressed cabin lights all three rear rooms with sixteen local lights and no extra shadow passes',()=>{
   const ctx=new Proxy({measureText:t=>({width:t.length*8}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:()=>{}});
@@ -33,12 +33,12 @@ test('the dressed cabin lights all three rear rooms with sixteen local lights an
       assert.equal(light.position.z,.6);
       assert.equal(light.decay,2);
       if(light.name==='Legacy deck fill'){
-        assert.equal(light.position.x,6);assert.equal(light.intensity,32);
-        assert.equal(light.distance,17);assert.equal(light.color.getHex(),0xe6ebe4);
+        assert.equal(light.position.x,6);assert.equal(light.intensity,CABIN_DECK_LIGHT.fillPower);
+        assert.equal(light.distance,17);assert.equal(light.color.getHex(),CABIN_DECK_LIGHT.fillColor);
       }else{
         const top=light.position.y>8,mid=light.position.y>5&&!top;
-        assert.equal(light.position.x,-5);assert.equal(light.intensity,mid?12:45);
-        assert.equal(light.distance,20);assert.equal(light.color.getHex(),top?0xb4dcdb:0xffebc7);
+        assert.equal(light.position.x,-5);assert.equal(light.intensity,mid?CABIN_DECK_LIGHT.livingPower:CABIN_DECK_LIGHT.power);
+        assert.equal(light.distance,20);assert.equal(light.color.getHex(),CABIN_DECK_LIGHT.color);
       }
     }
     assert.equal(decks.size,3);assert.ok([...decks.values()].every(n=>n===2));
@@ -54,4 +54,11 @@ test('the dressed cabin lights all three rear rooms with sixteen local lights an
   const geometry=new Set(meshes.map(m=>m.geometry)),materials=new Set(meshes.flatMap(m=>Array.isArray(m.material)?m.material:[m.material]));
   for(const g of geometry)g.dispose();
   for(const m of materials){m.map?.dispose();m.bumpMap?.dispose();m.roughnessMap?.dispose();m.dispose();}
+});
+
+test('the cabin is gently dimmer with warm rather than blue fill light',()=>{
+  assert.ok(CABIN_AMBIENCE.exposure>=1.1&&CABIN_AMBIENCE.exposure<1.28);
+  assert.ok(CABIN_AMBIENCE.ambient<1.05&&CABIN_AMBIENCE.keyPower<2.5&&CABIN_AMBIENCE.fillPower<.8);
+  assert.ok(CABIN_DECK_LIGHT.power<45&&CABIN_DECK_LIGHT.fillPower<32&&CABIN_DECK_LIGHT.livingPower<12);
+  for(const color of [CABIN_AMBIENCE.sky,CABIN_AMBIENCE.fill,CABIN_DECK_LIGHT.color,CABIN_DECK_LIGHT.fillColor])assert.ok((color>>16)>(color&255));
 });

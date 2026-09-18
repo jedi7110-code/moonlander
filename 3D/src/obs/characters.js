@@ -10,7 +10,7 @@ import {applyBunkVisitPose,applySleepingHands} from './bunk-pose.js';
 import {applyCatGrooming} from './cat-groom.js';
 import {applyCatHop} from './cat-hop.js';
 import {restWeight,applyCatSitting} from './cat-rest.js';
-import {createDiningProps,applyDiningPose,resetDiningPose,diningPhase,placeHand,DINING_APPROACH} from './dining.js';
+import {createDiningProps,applyDiningPose,resetDiningPose,diningPhase,placeHand,diningApproach} from './dining.js';
 import {applyWalkingPose} from './walking.js';
 import {applyMocapWalk,miloWalkData} from './mocap-walk.js';
 import {relaxMiloHand} from './milo-hands.js';
@@ -20,6 +20,8 @@ import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose,applyDeskHands} from './leisure.js';
 import {setTabletHandFit} from './tablet-pose.js';
 import {setLadderHandFit} from './ladder-hand-fit.js';
+import {setCupHandFit} from './cup-hand-fit.js';
+import {updateInjuryAppearance} from './injury-appearance.js';
 import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 import {applySeatedLegSpread} from './seated-pose.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
@@ -203,6 +205,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
 
 export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
+  setCupHandFit(root,0);
   setLadderHandFit(root,false);
   setTabletHandFit(root,action==='lounge'&&!moving&&leisure==='tablet');
   if(action==='medical'&&!moving)root.userData.medicalStartYaw??=root.rotation.y;
@@ -272,6 +275,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     head.rotation.x=.20*weight;
   }
   bandage.visible=Boolean(health?.bandageTime>0||(health?.treatment?.kind==='injury'&&health.treatment.elapsed>health.treatment.duration*.5));
+  updateInjuryAppearance(root,health);
   if(health?.needsCare&&!climbing&&!['medical','gym','bunk','lounge','console'].includes(action)){
     if(health.condition.kind==='injury'){arms[0].arm.rotation.x=-.70;arms[0].elbow.rotation.x=-1.3;}
     else{head.rotation.x=.12+Math.sin(time*9)*.012;if(!walking)body.position.y-=.008;}
@@ -290,7 +294,12 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   if(dining&&!climbing){
     const phase=diningPhase(actionTime,actionDuration??(action==='galley'?6:5));
     if(phase.approach>0&&phase.approach<1){
-      applyWalkingPose(root,DINING_APPROACH*phase.approach);
+      const armJoints=arms.flatMap(({arm,elbow,hand})=>[arm,elbow,hand]);
+      const restingArms=armJoints.map(joint=>joint.quaternion.clone());
+      applyWalkingPose(root,diningApproach(action)*phase.approach);
+      // The short step drives the legs only. A full-strength walk arm swing
+      // otherwise snaps on at the first frame before the reaching blend.
+      armJoints.forEach((joint,i)=>joint.quaternion.copy(restingArms[i]));
       const weight=Math.sin(Math.PI*phase.approach);
       for(const {leg,knee,boot}of legs){leg.rotation.x*=weight;knee.rotation.x*=weight;boot.rotation.x*=weight;}
     }

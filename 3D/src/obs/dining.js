@@ -1,14 +1,32 @@
 import * as THREE from 'three';
 import {ball,rod} from './materials.js';
 import {armHingeAngles} from './gym.js';
+import {relaxMiloHand} from './milo-hands.js';
+import {setCupHandFit,setMealHandFit} from './cup-hand-fit.js';
+import {reachMeal} from './meal-pose.js';
+import {CABIN_AISLE,HYDRO_TRAY} from './layout.js';
 
 const clamp=THREE.MathUtils.clamp,lerp=THREE.MathUtils.lerp;
 const smooth=value=>{const t=clamp(value,0,1);return t*t*(3-2*t);};
 const v=(x,y,z)=>new THREE.Vector3(x,y,z);
-const bowlHand=new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,Math.PI/2)),spoonHand=new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI/2,0,-.12));
-const cupHand=new THREE.Quaternion().setFromAxisAngle(v(0,1,0),Math.PI);
-const cupRim=v(0,.067,-.043),cupGrip=v(.097,.067,.019),spoonGrip=v(.027,.018,.164),bowlGrip=v(-.134,-.058,.015);
-export const DINING_APPROACH=.40;
+// Thumb up, palm toward the handle, fingers continuing along the forearm.
+// The old downward palm required a near right-angle bend at the wrist.
+const cupHand=new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,Math.PI/2,0));
+export const CUP_GRIP=Object.freeze([.118,.003,-.070]);
+const cupRim=v(0,.067,-.043),cupGrip=v(...CUP_GRIP);
+export const DINING_APPROACH=.32;
+// Leave room for the torso and the lifted cup in front of the dispenser taps.
+// Reach to the tray with the arm instead of bringing the body against the cabinet.
+export const diningApproach=action=>action==='hydro'?CABIN_AISLE.crewZ-HYDRO_TRAY.standZ:DINING_APPROACH;
+
+export function cupGripPose(progress){
+  const lift=smooth((progress-.14)/.18)*(1-smooth((progress-.73)/.17));
+  const tilt=.94*smooth((progress-.33)/.13)*(1-smooth((progress-.62)/.11));
+  // As the cup rises, move the wrist below the handle instead of folding the
+  // hand backwards against the forearm. Keep the grip centred on the handle.
+  const roll=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),-lift*(1.7-tilt));
+  return{lift,tilt,position:cupGrip.clone().sub(v(.098,.003,0)).applyQuaternion(roll).add(v(.098,.003,0)),rotation:roll.multiply(cupHand)};
+}
 
 export function mouthPosition(head){
   // Lip landmark on the head scan, in metres relative to the neck joint.
@@ -80,12 +98,43 @@ function dockProp(root,prop,dock,hold,defaultPosition){
   prop.quaternion.slerpQuaternions(rotation,prop.quaternion.clone(),hold);
 }
 
-function reachHand(root,index,prop,grip,rotation,reach,hold){
-  const rig=root.userData.arms[index];
+function reachCup(root,mug,reach,grasp){
+  const rig=root.userData.arms[1],{arm,elbow,hand,fingers,thumb}=rig;
+  setCupHandFit(root,reach);
+  relaxMiloHand(rig);
+  if(reach===0)return;
   root.updateWorldMatrix(true,true);
-  const rest=root.userData.body.worldToLocal(rig.hand.getWorldPosition(new THREE.Vector3()));
-  const target=rest.lerp(pointOn(prop,grip),reach);
-  placeHand(rig,target,rotation,reach*(hold>0?1.1:.8));
+  const rest=root.userData.body.worldToLocal(hand.getWorldPosition(new THREE.Vector3()));
+  const upper=arm.quaternion.clone(),lower=elbow.quaternion.clone();
+  const neutral=hand.quaternion.clone(),shoulder=arm.position.clone(),target=pointOn(mug,grasp.position);
+  const contactAngles=armHingeAngles(rig,target);
+  const contactArm=new THREE.Quaternion().setFromEuler(new THREE.Euler(contactAngles.upper,contactAngles.yaw,0,'YXZ'));
+  const contactElbow=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),contactAngles.lower);
+  const wrist=contactArm.multiply(contactElbow).invert().multiply(mug.quaternion).multiply(grasp.rotation);
+  arm.position.copy(shoulder);
+  // Lift the hand over the tray lip before reaching inward. Reversing this
+  // same arc also keeps the fingers above the tray when releasing the cup.
+  const reachTarget=rest.lerp(target,reach);
+  reachTarget.y+=.24*Math.sin(Math.PI*reach);
+  reachTarget.z-=.18*Math.sin(Math.PI*reach);
+  const angles=armHingeAngles(rig,reachTarget);
+  arm.rotation.set(angles.upper,angles.yaw,0,'YXZ');elbow.rotation.set(angles.lower,0,0);
+  // Blend the arm's orientation too: solving the resting wrist position alone
+  // can rotate the elbow plane abruptly on the very first reaching frame.
+  arm.quaternion.copy(upper.slerp(arm.quaternion,reach));
+  elbow.quaternion.copy(lower.slerp(elbow.quaternion,reach));
+  // Carry the open hand with the forearm first, then orient it to the handle.
+  // Interpolating an absolute palm angle made the wrist lead the arm and kink.
+  hand.quaternion.copy(neutral).slerp(wrist,smooth((reach-.45)/.55));
+  // Close only as the fingers arrive, without a jump when the cup is lifted.
+  const grip=smooth((reach-.72)/.28);
+  for(const [i,finger]of fingers.entries()){
+    finger.rotation.x=lerp(finger.rotation.x,.62+i*.035,grip);
+    finger.userData.links[0].rotation.x=lerp(finger.userData.links[0].rotation.x,1.10,grip);
+    finger.userData.links[1].rotation.x=lerp(finger.userData.links[1].rotation.x,.65,grip);
+  }
+  thumb.rotation.set(lerp(.16,.42,grip),0,rig.side*lerp(.10,.24,grip));
+  thumb.userData.ip.rotation.x=lerp(.28,.60,grip);
 }
 
 export function applyDiningPose(root,action,time,duration=action==='galley'?6:5,docks=null){
@@ -95,15 +144,14 @@ export function applyDiningPose(root,action,time,duration=action==='galley'?6:5,
   const mouth=mouthPosition(head);
   if(action==='hydro'){
     mug.visible=true;
-    const lift=smooth((progress-.14)/.18)*(1-smooth((progress-.73)/.17));
-    const tilt=.94*smooth((progress-.33)/.13)*(1-smooth((progress-.62)/.11));
+    const grasp=cupGripPose(progress),{lift,tilt}=grasp;
     head.rotation.x=-.045*(tilt/.94);
     const lip=mouthPosition(head),rest=v(.17,lerp(.96,1.26,ready),lerp(.10,.35,ready));
     mug.rotation.set(-tilt,0,0);
     const contact=lip.clone().add(v(0,-.002,.006)).sub(cupRim.clone().applyQuaternion(mug.quaternion));
     mug.position.copy(rest).lerp(contact,lift);
     dockProp(root,mug,docks?.mug,hold,v(.17,1.134,.40));
-    reachHand(root,1,mug,cupGrip,mug.quaternion.clone().multiply(cupHand),reach,hold);
+    reachCup(root,mug,reach,grasp);
     water.visible=tilt<.35;water.position.y=-.026-.015*smooth((progress-.42)/.2);
     if(head.userData.setMouthMotion)head.userData.setMouthMotion(0,tilt>.6?.22:0);
     return;
@@ -119,8 +167,9 @@ export function applyDiningPose(root,action,time,duration=action==='galley'?6:5,
   dockProp(root,spoon,docks?.spoon,hold,v(.17,1.039,.18));
   // Lift the handle through a reachable arc while rotating it away from the worktop.
   spoon.position.y+=Math.sin(Math.PI*hold)*.08;
-  reachHand(root,0,bowl,bowlGrip,bowl.quaternion.clone().multiply(bowlHand),reach,hold);
-  reachHand(root,1,spoon,spoonGrip,spoon.quaternion.clone().multiply(spoonHand),reach,hold);
+  setMealHandFit(root,reach);
+  reachMeal(root,0,bowl,reach);
+  reachMeal(root,1,spoon,reach);
   bite.visible=hold===1&&progress>.13&&progress<.87&&phase>.10&&phase<.50;
   meal.position.y=.017-.006*Math.min(2,Math.floor(cycle+.5));
   const eating=ready*smooth((phase-.30)/.1)*(1-smooth((phase-.54)/.06));

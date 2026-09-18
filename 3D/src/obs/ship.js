@@ -3,7 +3,7 @@ import {CABIN_LIGHT_COLOR} from './lighting.js';
 import {createDiningProps} from './dining.js';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
-import {DECK,FLOORS,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
+import {DECK,FLOORS,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,CABIN_AISLE,HYDRO_TRAY} from './layout.js';
 import {createPlantRack} from './plants.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
@@ -227,8 +227,8 @@ export function createDiningStation(m,action){
     cupboard(root,m,stationX,0,-1.03,1.25,2.35);
     box(root,m.dark,stationX,1.42,-.64,.66,.61,.13,.025);label(root,'H2O / 21°C',stationX,1.62,-.56,.54,.13,{fg:'#a2d9c7',size:50});
     for(const x of [stationX-.15,stationX+.15]){cylinder(root,m.metal,x,1.26,-.47,.034,.10);ball(root,x<stationX?m.teal:m.red,x,1.26,-.40,.025,.025,.025);}
-    box(root,m.metal,stationX,1.05,-.12,.74,.04,.76);
-    docks.mug.position.set(stationX-.17,1.134,.16);docks.mug.rotation.y=Math.PI;docks.mug.visible=true;
+    box(root,m.metal,stationX,1.05,HYDRO_TRAY.z,.74,.04,HYDRO_TRAY.depth).name='Shallow cup tray';
+    docks.mug.position.set(stationX-.17,1.134,HYDRO_TRAY.cupZ);docks.mug.rotation.y=Math.PI;docks.mug.visible=true;
   }else{
     for(let i=0;i<2;i++){
       const x=-10.8+i*1.50;box(root,m.dark,x,.49,-.48,1.47,.95,1.13,.03);panel(root,m,x,.47,.13,1.39,.83,m.white);box(root,m.black,x,.76,.215,.49,.035,.044,.01);box(root,m.metal,x,1.0,-.42,1.51,.07,1.25,.018);

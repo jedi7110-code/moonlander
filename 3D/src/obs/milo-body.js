@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {armBruiseMask,handBruiseMask,armBruiseShader} from './injury-appearance.js';
 
 // Share tapered garment folds between surface shading and displacement.
 const kneeFoldShader=`
@@ -253,13 +254,29 @@ export function attachMiloBody(root,m,pants,legacy){
   }
   geometry.setAttribute('tattooUv',new THREE.BufferAttribute(tattooUv,2));geometry.setAttribute('tattooMask',new THREE.BufferAttribute(tattooMask,1));
   geometry.setAttribute('armRegion',new THREE.Float32BufferAttribute(data.armRegions,1));
+  const bruiseMask=new Float32Array(surface.count),bruiseUv=new Float32Array(surface.count*2);
+  for(let i=0;i<surface.count;i++){
+    const x=surface.getX(i),y=surface.getY(i),z=surface.getZ(i),region=data.armRegions[i];
+    bruiseMask[i]=Math.max(armBruiseMask(x,y,z,region),handBruiseMask(x,y,z,region));
+    // Store pigment coordinates independently of position: grip fitting can
+    // reshape the palm but must not slide the bruise over its surface.
+    // Offset the smaller hand patch so its pale area breaks one edge instead
+    // of repeating the forearm's pattern as a conspicuous circular ring.
+    bruiseUv[i*2]=y<1?(y-.892)/.025+.75:(y-1.13)/.055;
+    bruiseUv[i*2+1]=y<1?(x+.212)/.023+.65:(z+.003)/.045;
+  }
+  geometry.setAttribute('bruiseMask',new THREE.BufferAttribute(bruiseMask,1));
+  geometry.setAttribute('bruiseUv',new THREE.BufferAttribute(bruiseUv,2));
   const material=m.skin.clone(),fabricMap=pants.userData.fabricMap??pants.bumpMap;material.roughness=.84;
+  material.userData.bruiseStrength={value:0};
   material.side=THREE.DoubleSide;material.shadowSide=THREE.BackSide;
   if(fabricMap){material.bumpMap=fabricMap.clone();material.bumpMap.repeat.set(18,24);material.bumpMap.needsUpdate=true;material.bumpScale=.006;}
   material.onBeforeCompile=shader=>{
+    shader.uniforms.bruiseStrength=material.userData.bruiseStrength;
     shader.uniforms.tattooAtom={value:tattooMaps?.[0]??null};shader.uniforms.tattooCat={value:tattooMaps?.[1]??null};shader.uniforms.tattooStrength={value:tattooMaps ? .88 : 0};
     shader.uniforms.shirtColor={value:m.cloth.color};shader.uniforms.trouserColor={value:pants.color};shader.uniforms.trouserMap={value:fabricMap};
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float armRegion; attribute vec2 tattooUv; attribute float tattooMask; varying vec2 vTattooUv; varying float vTattooMask; varying float vArmRegion; varying vec3 vBodyPosition; varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <begin_vertex>',`#include <begin_vertex>
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float bruiseMask; varying float vBruiseMask; attribute vec2 bruiseUv; varying vec2 vBruiseUv; attribute float armRegion; attribute vec2 tattooUv; attribute float tattooMask; varying vec2 vTattooUv; varying float vTattooMask; varying float vArmRegion; varying vec3 vBodyPosition; varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <begin_vertex>',`#include <begin_vertex>
+      vBruiseMask=bruiseMask;vBruiseUv=bruiseUv;
       vBodyPosition=position;vArmRegion=armRegion;vMiloUv=uv;vTattooUv=tattooUv;vTattooMask=tattooMask;
       float trouserVertex=(1.0-smoothstep(1.065,1.085,position.y))*(1.0-smoothstep(.2,.5,armRegion));
       float frontMask=smoothstep(.015,.095,position.z),backMask=smoothstep(.015,.095,-position.z);
@@ -277,7 +294,7 @@ export function attachMiloBody(root,m,pants,legacy){
       float crotchFold=-frontFolds.x+.30*frontFolds.y;
       transformed+=normal*trouserVertex*(.0009*clothFold+(.0015*kneeShape+.0007*calfShape)*crossFold+.0028*backKneeShape*backKneeFold+.0017*waistShape*waistFold+.0022*crotchShape*crotchFold);
     `);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform vec3 shirtColor;uniform vec3 trouserColor;uniform sampler2D trouserMap;uniform sampler2D tattooAtom;uniform sampler2D tattooCat;uniform float tattooStrength;varying vec2 vTattooUv;varying float vTattooMask;varying float vArmRegion;varying vec3 vBodyPosition;varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <color_fragment>',`#include <color_fragment>
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform float bruiseStrength;varying float vBruiseMask;varying vec2 vBruiseUv;uniform vec3 shirtColor;uniform vec3 trouserColor;uniform sampler2D trouserMap;uniform sampler2D tattooAtom;uniform sampler2D tattooCat;uniform float tattooStrength;varying vec2 vTattooUv;varying float vTattooMask;varying float vArmRegion;varying vec3 vBodyPosition;varying vec2 vMiloUv;'+kneeFoldShader+armBruiseShader).replace('#include <color_fragment>',`#include <color_fragment>
       float side=abs(vBodyPosition.x);
       float neckline=1.563-.020*(vBodyPosition.z+.009)/max(length(vec2(vBodyPosition.x,vBodyPosition.z+.009)),.001);
       if(vBodyPosition.y>neckline)discard;
@@ -359,13 +376,16 @@ export function attachMiloBody(root,m,pants,legacy){
         float ink=artwork.a*(1.0-smoothstep(.40,.96,pigment))*tattooFrame*vTattooMask*tattooStrength*(1.0-shirt)*(1.0-trousers);
         diffuseColor.rgb=mix(diffuseColor.rgb,inkColor,ink);
       }
+      // Pigment below intact skin: no blood, cuts, displacement or wet gloss.
+      diffuseColor.rgb=miloBruisedSkin(diffuseColor.rgb,vBruiseUv,vBruiseMask,
+        bruiseStrength*(1.0-shirt)*(1.0-trousers));
     `).replace('#include <normal_fragment_maps>',`vec3 smoothBodyNormal=normal;
       #include <normal_fragment_maps>
       float trouserBumpMask=(1.0-smoothstep(1.065,1.085,vBodyPosition.y))*(1.0-smoothstep(.2,.5,vArmRegion));
       normal=normalize(mix(smoothBodyNormal,normal,trouserBumpMask));
     `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.96,trousers);');
   };
-  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-v20';
+  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-bruise-v23';
   const mesh=new THREE.SkinnedMesh(geometry,material);mesh.name='Continuous sample-based human body';
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;body.add(mesh);
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});

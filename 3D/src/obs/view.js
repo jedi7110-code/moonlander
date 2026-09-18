@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,limitCabinLights} from './lighting.js';
+import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_AMBIENCE,limitCabinLights} from './lighting.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials} from './materials.js';
 import {buildShip,positionX,positionY,HABITAT_VIEW} from './ship.js';
@@ -19,7 +19,7 @@ import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
 import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
 import {animateBunk} from './bunk.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
-import {diningPhase,DINING_APPROACH} from './dining.js';
+import {diningPhase,diningApproach} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 import {applyCabinLadder} from './cabin-ladder.js';
 
@@ -29,14 +29,14 @@ export class ObservationView {
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.localClippingEnabled=true;
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,CABIN_PIXEL_RATIO));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.28;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,CABIN_PIXEL_RATIO));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=CABIN_AMBIENCE.exposure;
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     const pmrem=new THREE.PMREMGenerator(this.renderer),environment=new RoomEnvironment();
     this.envTarget=pmrem.fromScene(environment,.04);this.scene.environment=this.envTarget.texture;environment.dispose();pmrem.dispose();
-    Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=.24;});
-    this.scene.add(new THREE.HemisphereLight(0xdce9ed,0x2e3432,1.05));
-    const key=new THREE.DirectionalLight(0xffefd5,2.5);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
-    const fill=new THREE.DirectionalLight(0xb9d0d8,.80);fill.position.set(12,7,9);this.scene.add(fill);
+    Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
+    this.scene.add(new THREE.HemisphereLight(CABIN_AMBIENCE.sky,CABIN_AMBIENCE.ground,CABIN_AMBIENCE.ambient));
+    const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
+    const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
     this.ship=buildShip(m);limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
     this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
     this.camera=new THREE.PerspectiveCamera(24,1,.1,150);
@@ -128,7 +128,7 @@ export class ObservationView {
     else this.cabinClimb=null;
     const bathroom=brain.bathroom?.pose;
     if(action==='plant')this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
-    if(['galley','hydro'].includes(action))this.milo.position.z=.78-DINING_APPROACH*diningPhase(actionTime,brain.curDurSec).approach;
+    if(['galley','hydro'].includes(action))this.milo.position.z=CABIN_AISLE.crewZ-diningApproach(action)*diningPhase(actionTime,brain.curDurSec).approach;
     if(action==='gym')this.milo.position.z=brain.gymVisit?.pose.depth??BIKE.depth;
     if(brain.gymVisit)brain.gymVisit.startYaw??=this.milo.rotation.y;
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,pipe,rod} from './materials.js';
 import {CABIN_AISLE,DECK} from './layout.js';
-import {CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR} from './lighting.js';
+import {CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR,CABIN_DECK_LIGHT} from './lighting.js';
 
 const WORK_LIGHTS=[[-10.3,29],[-7.35,18],[-4.4,25],[-1.65,16],[1.75,16],[4.3,32],[7.6,18],[10.9,27]];
 const LOUNGE_LIGHTS=[6.25,8.65];
@@ -215,10 +215,10 @@ export function addIndustrialDeck(root,m,y,level){
 }
 
 export function addWorkLights(root,y,level){
-  // Preserve the pre-redesign deck lighting beneath the new fixture geometry.
-  const deckLight=new THREE.PointLight(level===DECK.OPERATIONS?0xb4dcdb:0xffebc7,level===DECK.HABITATION?12:45,20,2);
+  // Keep the two-light budget while warming and gently dimming each deck.
+  const deckLight=new THREE.PointLight(CABIN_DECK_LIGHT.color,level===DECK.HABITATION?CABIN_DECK_LIGHT.livingPower:CABIN_DECK_LIGHT.power,20,2);
   deckLight.name='Legacy deck light';deckLight.position.set(-5,y+2.3,.6);root.add(deckLight);
-  const secondLight=new THREE.PointLight(0xe6ebe4,32,17,2);
+  const secondLight=new THREE.PointLight(CABIN_DECK_LIGHT.fillColor,CABIN_DECK_LIGHT.fillPower,17,2);
   secondLight.name='Legacy deck fill';secondLight.position.set(6,y+2.3,.6);root.add(secondLight);
   if(level===DECK.HABITATION)for(const x of LOUNGE_LIGHTS){
     const light=new THREE.SpotLight(CABIN_WARM_LIGHT_COLOR,20,4.9,.91,.6,2);light.name='Lounge seat light';
