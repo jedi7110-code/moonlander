@@ -30,7 +30,7 @@ export function cupGripPose(progress){
 
 export function mouthPosition(head){
   // Lip landmark on the head scan, in metres relative to the neck joint.
-  return v(-.006,.02475,.1254).applyQuaternion(head.quaternion).add(head.position);
+  return v(-.006,.02475,.1254+(head.userData.faceForward??0)).applyQuaternion(head.quaternion).add(head.position);
 }
 
 function lathe(parent,material,profile,name){

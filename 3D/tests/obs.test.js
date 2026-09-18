@@ -9,7 +9,24 @@ import {positionX,createAccessLadder,createLoungeTable,HABITAT_VIEW} from '../sr
 import {createMilo,createCat,animateMilo,animateCat} from '../src/obs/characters.js';
 import {StationFeedback,SIGNAL_COLORS} from '../src/obs/feedback.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {headGeometry,createMiloEye,MILO_EYE_OPENINGS} from '../src/obs/head.js';
+import {headGeometry,createMiloEye,MILO_EYE_OPENINGS,MILO_HEAD_FORWARD} from '../src/obs/head.js';
+
+test('Milo head advances without moving the collar or changing facial proportions',async()=>{
+  const bytes=await readFile(new URL('../public/assets/obs/head/LeePerrySmith.glb',import.meta.url));
+  const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  const source=gltf.scene.getObjectByName('LeePerrySmith').geometry;
+  const before=headGeometry(source),after=headGeometry(source,MILO_HEAD_FORWARD/.055);
+  const a=before.attributes.position,b=after.attributes.position;
+  for(let i=0;i<a.count;i++){
+    assert.equal(b.getX(i),a.getX(i));assert.equal(b.getY(i),a.getY(i));
+    const dz=b.getZ(i)-a.getZ(i);
+    if(a.getY(i)<=-1.25)assert.equal(dz,0,'collar remains anchored');
+    if(a.getY(i)>=.55||(a.getY(i)>=-.55&&a.getZ(i)>=1.6))assert.ok(Math.abs(dz*.055-.025)<1e-7,'skull and face move forward 2.5 cm');
+    assert.ok(dz>=-1e-7&&dz<=MILO_HEAD_FORWARD/.055+1e-6,'neck transitions without overshoot');
+  }
+  assert.ok(after.attributes.normal.array.every(Number.isFinite));
+  before.dispose();after.dispose();
+});
 
 test('Milo eye openings follow the marked inner corners and relaxed lids',()=>{
   const [left,right]=MILO_EYE_OPENINGS;
@@ -27,6 +44,11 @@ test('Milo eye surfaces meet the scanned eyelids without holes from oblique view
   const openings=MILO_EYE_OPENINGS,eyes=openings.map(opening=>createMiloEye(source,opening));
   for(const [index,eye]of eyes.entries()){
     const {x,y}=openings[index],p=eye.geometry.attributes.position;
+    assert.ok(eye.material.isMeshPhysicalMaterial&&eye.material.clearcoat===1,'eyes retain a wet corneal layer');
+    assert.equal(eye.material.envMap,eyes[0].material.envMap,'both eyes share the same studio reflection');
+    const reflection=eye.material.envMap.image.data;
+    assert.ok(reflection.every(Number.isFinite),'HDR corneal reflection is finite');
+    assert.ok(reflection.some(value=>value>1),'studio reflection retains bright HDR light sources');
     for(let i=1+15*128;i<1+16*128;i++){
       point.fromBufferAttribute(p,i);ray.set(new Vector3(point.x,point.y,4),new Vector3(0,0,-1));
       assert.ok(Math.abs(ray.intersectObject(scan)[0].point.z-point.z)<1e-5,'eye border meets the actual lid depth');

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
+import {createGroom} from './hair-groom.js';
 
 export function hairline(x,z){
   const edge=1.20+THREE.MathUtils.smoothstep(z,-1.1,1.65)*1.54+THREE.MathUtils.smoothstep(Math.abs(x),.95,1.65)*.18
@@ -13,7 +14,33 @@ float hairline = 1.20 + smoothstep(-1.1, 1.65, vHeadPosition.z) * 1.54
   + 0.018 * sin(vHeadPosition.x * 19.0 + vHeadPosition.z * 7.0);
 hairline = max(hairline, 2.22 * smoothstep(1.2, 1.6, abs(vHeadPosition.x)));`;
 
-export function createHair(scalp){
+export const MILO_HAIR_STYLES={
+  reference:{label:'提供モデル',description:'提供OBJの毛束・頭皮・テクスチャを使用'},
+  crop:{label:'A 現行・短髪',description:'今の短いクルーカット'},
+  rough:{label:'B ラフクロップ',description:'不均一な束と立ち上がり。参照に最も近い'},
+  fringe:{label:'C 乱れた前髪',description:'前方へ落ちる短い束を残す'},
+  swept:{label:'D 流し気味',description:'片側へ流した少し整ったラフショート'},
+};
+
+function styleDisplacement(style,p,{top,edge,clump,front}){
+  const crown=THREE.MathUtils.smoothstep(p.y,2.78,3.48),rim=1-edge;
+  if(style==='rough'){
+    const broken=.5+.5*Math.sin(p.x*17-p.z*11+Math.sin(p.y*9)*2.2);
+    const spike=Math.max(0,Math.sin(p.x*11+p.z*7-p.y*3))**3;
+    return{volume:.006+edge*(.012+top*(.16+.11*clump)),x:crown*edge*(clump-.5)*.18,y:crown*edge*(.06+.22*spike+.08*broken),z:crown*edge*(front*.12-.045)};
+  }
+  if(style==='fringe'){
+    const fringe=front*(1-THREE.MathUtils.smoothstep(p.y,2.90,3.55));
+    const split=.55+.45*Math.sin(p.x*8.5+1.2);
+    return{volume:.005+edge*(.011+top*(.13+.09*clump)+fringe*.10),x:-top*edge*.03+p.x*fringe*rim*.10,y:-fringe*(.15+.42*rim)*split,z:fringe*(.34+.34*rim)-top*edge*.02};
+  }
+  if(style==='swept')return{volume:.005+edge*(.012+top*(.16+.07*clump)),x:-crown*edge*(.40+.10*clump),y:crown*edge*.07,z:crown*edge*.07};
+  return{volume:.003+edge*(.008+top*(.12+.09*clump)),x:-top*edge*.17,y:0,z:-top*edge*.06};
+}
+
+export function createHair(scalp,style='crop'){
+  if(!MILO_HAIR_STYLES[style])style='crop';
+  if(style!=='crop')return createGroom(scalp,style,hairline);
   const source=scalp.index?scalp.toNonIndexed():scalp,position=source.attributes.position,normal=source.attributes.normal,vertices=[],coverage=[];
   const signed=p=>p.y-Math.max(hairline(p.x,p.z)+.04,2.22+.08*Math.sin(p.x*4+p.z*3));
   // Clip the cap to an irregular hairline rather than leaving entire scan triangles at its edge.
@@ -28,8 +55,8 @@ export function createHair(scalp){
     for(let j=1;j<polygon.length-1;j++)for(const {p,n}of [polygon[0],polygon[j],polygon[j+1]]){
       const top=THREE.MathUtils.smoothstep(p.y,2.25,3.5),edge=THREE.MathUtils.smoothstep(signed(p),0,.32);
       const sweep=p.x*10+p.z*4+Math.sin(p.z*6)*.45,clump=.5+.5*Math.sin(sweep);
-      const volume=.003+edge*(.008+top*(.12+.09*clump));
-      const v=p.clone().addScaledVector(n,volume);v.x-=top*edge*.17;v.z-=top*edge*.06;
+      const front=THREE.MathUtils.smoothstep(p.z,.55,1.75),d=styleDisplacement(style,p,{top,edge,clump,front});
+      const v=p.clone().addScaledVector(n,d.volume);v.x+=d.x;v.y+=d.y;v.z+=d.z;
       vertices.push(v.x,v.y,v.z);
       coverage.push(THREE.MathUtils.smoothstep(signed(p),0,.32));
     }
@@ -49,6 +76,6 @@ export function createHair(scalp){
       diffuseColor.a *= vHairCoverage;
     `);
   };
-  material.customProgramCacheKey=()=> 'milo-textured-crop-v1';
-  const mesh=new THREE.Mesh(geometry,material);mesh.name='Milo textured short crop';mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
+  material.customProgramCacheKey=()=> `milo-textured-hair-${style}-v2`;
+  const mesh=new THREE.Mesh(geometry,material);mesh.name=`Milo hair ${style}`;mesh.userData.style=style;mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
 }

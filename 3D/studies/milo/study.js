@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {materials} from '../../src/obs/materials.js';
-import {loadMiloHead} from '../../src/obs/head.js';
+import {loadMiloHead,MILO_BEARD_STYLES} from '../../src/obs/head.js';
+import {MILO_HAIR_STYLES} from '../../src/obs/hair.js';
 import {loadMiloBody} from '../../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../../src/obs/characters.js';
 import {miloWalkData as walkData} from '../../src/obs/mocap-walk.js';
@@ -34,6 +35,19 @@ const POSES=[
 async function start(){
   const $=id=>document.getElementById(id);
   const [m,head]=await Promise.all([materials(),loadMiloHead(),loadMiloBody()]);
+  const params=new URLSearchParams(location.search),appearanceMode=params.get('mode')==='appearance';
+  $('appearance-note').textContent='提供モデル：OBJの毛束とテクスチャを頭の形に合わせて組み込み。A〜Dは従来の比較案です。';
+  let hair=MILO_HAIR_STYLES[params.get('hair')]?params.get('hair'):(appearanceMode?'reference':'crop'),beard=MILO_BEARD_STYLES[params.get('beard')]?params.get('beard'):(appearanceMode?'light':'rough');
+  const updateUrl=extra=>{const url=new URL(location.href);url.searchParams.set('hair',hair);url.searchParams.set('beard',beard);if(appearanceMode)url.searchParams.set('mode','appearance');for(const [key,value]of Object.entries(extra))url.searchParams.set(key,value);history.replaceState(null,'',url);};
+  const appearanceButtons=(target,entries,selected,onSelect)=>{
+    for(const [id,entry]of Object.entries(entries)){
+      const button=document.createElement('button');button.textContent=entry.label;button.title=entry.description??entry.label;button.setAttribute('aria-pressed',id===selected());
+      button.onclick=()=>{onSelect(id);for(const child of target.children)child.setAttribute('aria-pressed',child===button);head.userData.setAppearance({hair,beard});updateUrl({});pose();};target.append(button);
+    }
+  };
+  appearanceButtons($('hair-options'),MILO_HAIR_STYLES,()=>hair,id=>hair=id);
+  appearanceButtons($('beard-options'),MILO_BEARD_STYLES,()=>beard,id=>beard=id);
+  head.userData.setAppearance({hair,beard});
   const milo=createMilo(m,head);
   const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas'),antialias:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -47,12 +61,12 @@ async function start(){
   const fill=new THREE.DirectionalLight(0xbad1d5,1.2);fill.position.set(3,2,-4);scene.add(fill);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(20,20),new THREE.MeshStandardMaterial({color:0x656a69,roughness:1}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
   const camera=new THREE.OrthographicCamera(-1,1,1,-1,.01,30),controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minZoom=.45;controls.maxZoom=6;controls.maxPolarAngle=Math.PI/2-.015;
-  const entryPose=new URLSearchParams(location.search).get('pose'),ladderEntry=entryPose==='ladder';
+  const entryPose=params.get('pose')??(appearanceMode?'idle':null),ladderEntry=entryPose==='ladder';
   const easingLabel=document.createElement('label');easingLabel.textContent='イージング';
   const easingSelect=document.createElement('select');easingSelect.id='ladder-easing';
   easingSelect.add(new Option('あり（滑らか）','on'));easingSelect.add(new Option('なし（変更前）','off'));
   easingLabel.append(easingSelect);$('ladder-options').insertBefore(easingLabel,$('support'));
-  let current=POSES.find(p=>p.id===entryPose)??POSES[1],time=entryPose==='medical'?12:entryPose==='tablet'?3:0,watchTime=0,paused=['medical','tablet','seat','injury'].includes(entryPose),last=performance.now();
+  let current=POSES.find(p=>p.id===entryPose)??POSES[1],time=entryPose==='medical'?12:entryPose==='tablet'?3:0,watchTime=0,paused=appearanceMode||['medical','tablet','seat','injury'].includes(entryPose),last=performance.now();
   const duration=()=>current.id==='gym'?GYM_STUDY_DURATION:DINING_ACTIONS.includes(current.id)?diningStudyDuration(current.id):current.id==='tablet'?36:current.id==='medical'?medicalDuration():current.id==='mocap'?walkData.duration:current.id==='ladder'?LADDER.duration:8;
   const originalArms=milo.userData.arms.map(({arm})=>arm.position.clone());
   function pose(){
@@ -81,7 +95,7 @@ async function start(){
     }
     updateMiloWatch(milo,8+watchTime*1000/CABIN_PACE.dayMs*24);
     if(current.id!=='medical'&&!dining.root.visible&&!gym.root.visible)milo.rotation.y=0;
-    $('time').value=time;$('clock').value=`${time.toFixed(2)}秒`;$('status').textContent=current.id==='mocap'?'歩行・実測 / OBSと共通':`${current.label} / 本編と同じマイロを表示中`;
+    $('time').value=time;$('clock').value=`${time.toFixed(2)}秒`;$('status').textContent=`${MILO_HAIR_STYLES[hair].label} / ${MILO_BEARD_STYLES[beard].label} / ${current.id==='mocap'?'歩行・実測・OBSと共通':current.label}`;
     if(ladderSample){const moving=ladderSample.contacts.find(c=>c.moving);$('status').textContent=`梯子・本編 / ${moving?moving.label+'を掛け替え':'四点で支持'} / 段間隔28cm`;$('support').textContent=ladderSample.contacts.map(c=>`${c.label} ${c.moving?'移動':'支持'}`).join('　');}
     if(diningStage)$('status').textContent=`${current.label} / ${diningStage} / ${gym.root.visible?'本編と共通：乗る5秒・降りる5秒':'本編と共通の設備・手元・動作'}`;
   }
@@ -108,10 +122,14 @@ async function start(){
       controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(0,.1,-3).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion())));
       camera.lookAt(target);camera.updateProjectionMatrix();controls.update();return;
     }
-    if(view==='face')el=.04;
+    if(view==='face'){
+      el=.04;
+      if(appearanceMode){target.y=1.54;camera.zoom=3.55;}
+    }
     if(view==='ladder-side'){az=1.22;el=.05;}
     if(view==='boots'){az=Math.PI/2;el=.04;}
     if(view==='front')az=0;if(view==='back')az=Math.PI;if(view==='left')az=-Math.PI/2;if(view==='right')az=Math.PI/2;
+    if(appearanceMode&&['face','oblique','front','back','left','right'].includes(view)){target.set(0,1.725,.015);camera.zoom=1.1;el=.04;}
     if(current.id==='medical'&&['oblique','front','back'].includes(view)){target.set(0,1.3,-.22);az=view==='back'?Math.PI:0;el=view==='oblique'?.30:.03;camera.zoom=.85;}
     if(['seat','tablet'].includes(current.id)&&view==='arms'){target.set(0,.99,.38);az=0;el=.28;camera.zoom=2.7;}
     if(DINING_ACTIONS.includes(current.id)){
@@ -137,7 +155,7 @@ async function start(){
   $('view').add(new Option('時計拡大','watch'));
   $('view').add(new Option('梯子・斜め横','ladder-side'));
   for(const entry of POSES){
-    const button=document.createElement('button');button.textContent=entry.label;button.setAttribute('aria-pressed',entry===current);button.onclick=()=>{current=entry;time=entry.id==='medical'?12:entry.id==='tablet'?3:0;history.replaceState(null,'',`?pose=${entry.id}`);for(const child of $('poses').children)child.setAttribute('aria-pressed',child===button);pose();setView();};$('poses').append(button);
+    const button=document.createElement('button');button.textContent=entry.label;button.setAttribute('aria-pressed',entry===current);button.onclick=()=>{current=entry;time=entry.id==='medical'?12:entry.id==='tablet'?3:0;updateUrl({pose:entry.id});for(const child of $('poses').children)child.setAttribute('aria-pressed',child===button);pose();setView();};$('poses').append(button);
   }
   $('direction').onchange=pose;$('contacts').onchange=pose;
   easingSelect.onchange=pose;
@@ -150,10 +168,12 @@ async function start(){
     const w=innerWidth,h=innerHeight,top=document.querySelector('header').getBoundingClientRect().bottom+12,bottom=document.querySelector('footer').getBoundingClientRect().top-12;
     const usable=Math.max(100,bottom-top),half=Math.max(.92,1.08*h/w,1.03*h/usable),offset=((top+bottom)/2-h/2)*2*half/h;
     renderer.setSize(w,h,false);camera.top=half+offset;camera.bottom=-half+offset;camera.left=-half*w/h;camera.right=half*w/h;camera.updateProjectionMatrix();
+    if(appearanceMode){renderer.setViewport(0,h-bottom,w,usable);camera.top=.235;camera.bottom=-.235;camera.left=-.235*w/usable;camera.right=.235*w/usable;camera.updateProjectionMatrix();}
   }
   const layoutObserver=new ResizeObserver(resize);layoutObserver.observe(document.querySelector('header'));layoutObserver.observe(document.querySelector('footer'));
   if(ladderEntry){$('view').value='ladder-side';$('speed').value='1';}
   if(['tablet','injury'].includes(entryPose))$('view').value='arms';
+  if(appearanceMode)$('view').value='face';
   if(paused)$('pause').textContent='再生';
   addEventListener('resize',resize);resize();pose();setView();
   function frame(now){const dt=Math.max(0,Math.min(.1,(now-last)/1000));last=now;if(!paused){const step=dt*Number($('speed').value);watchTime+=step;const next=time+step*(current.id==='ladder'?LADDER_PACE:1);time=current.id==='gym'?Math.min(next,duration()):next%duration();if(current.id==='gym'&&time===duration()){paused=true;$('pause').textContent='再生';}pose();}controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);}

@@ -24,7 +24,11 @@ import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 import {applyCabinLadder} from './cabin-ladder.js';
 
 export class ObservationView {
-  static async create(canvas){const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment(),loadMiloBody()]);return new ObservationView(canvas,m,head,lucy);}
+  static async create(canvas){
+    const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment(),loadMiloBody()]);
+    head.userData.setAppearance({hair:'reference',beard:'rough'});
+    return new ObservationView(canvas,m,head,lucy);
+  }
   constructor(canvas,m,head,lucy){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});

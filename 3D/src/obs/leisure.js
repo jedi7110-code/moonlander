@@ -52,7 +52,7 @@ export function applyLeisurePose(root,mode,time,duration=36,catReady=false){
     applyTabletHands(root);
   }else if(mode==='music'){
     head.rotation.set(.035*Math.sin(time*2.4),.03*Math.sin(time*.6),.025*Math.sin(time*1.2));
-    phones.visible=true;phones.position.copy(head.position).add(new THREE.Vector3(0,.094,-.008).applyQuaternion(head.quaternion));phones.quaternion.copy(head.quaternion);
+    phones.visible=true;phones.position.copy(head.position).add(new THREE.Vector3(0,.094,-.008+(head.userData.faceForward??0)).applyQuaternion(head.quaternion));phones.quaternion.copy(head.quaternion);
     for(const rig of arms){rig.arm.rotation.x=-.24;rig.elbow.rotation.x=-.64;rig.hand.rotation.y=rig.side*Math.PI/2;}
   }else if(mode==='cat'){
     const swing=Math.sin(time*2.1)*(catReady?.07:.025)*ease;
