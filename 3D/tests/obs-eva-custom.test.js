@@ -30,7 +30,10 @@ test('the custom garment loads with separately authored helmets and cabin-safe g
   assert.equal(colors[0],colors[2]);assert.notEqual(colors[0],colors[1]);
   assert.equal(shared.color.getHex(),0xffffff);
   assert.ok(new Box3().setFromObject(bay.equipmentRack).min.x>bounds[2].max.x);
-  assert.ok(batchStatic(bay.root).children.length>0,'custom geometry must participate in cabin batching');
+  const batched=batchStatic(bay.root);assert.ok(batched.children.length>0,'custom geometry must participate in cabin batching');
+  const glass=batched.children.filter(mesh=>mesh.material.userData.castShadow===false);
+  assert.equal(glass.length,3,'retain each helmet glass in the cabin batch');
+  for(const mesh of glass){assert.equal(mesh.castShadow,false,'transparent visor must not cast an opaque shadow over the interior');assert.equal(mesh.material.transparent,true);}
 });
 
 test('reconstructed joints and opposed hands retain an anatomical resting pose',()=>{

@@ -144,5 +144,5 @@ export function batchStatic(root) {
   root.traverse(mesh=>{if(!mesh.isMesh || Array.isArray(mesh.material))return;const geometry=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
     if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[]});grouped.get(key).geometries.push(geometry);
   });
-  const merged=new THREE.Group();for(const {mat,geometries} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:');mesh.receiveShadow=mesh.castShadow;merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
+  const merged=new THREE.Group();for(const {mat,geometries} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
 }

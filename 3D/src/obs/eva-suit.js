@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,pipe,label} from './materials.js';
-import {createEVAHelmet} from './eva-helmet.js';
+import {createEVAHelmet,EVA_HELMET,helmetHoseSocket} from './eva-helmet.js';
 import {finishEVAGarment} from './eva-garment.js';
 import {EVA_BODY,mirrored,armFrame,buildTailoredBody,tailoredTube} from './eva-anatomy.js';
 
@@ -94,7 +94,11 @@ function lifeSupport(parent,m){
   for(const [x,y,r]of [[-.092,1.259,.026],[.092,1.259,.026],[0,1.192,.036]]){
     const port=new THREE.Group();port.position.set(x,y,-.279);port.rotation.y=Math.PI;pack.add(port);socket(port,m,0,0,0,r);
   }
-  for(const x of [-.054,.054])hose(pack,m,[[x,1.578,-.264],[x,1.703,-.220],[x,1.820,-.146]],.008);
+  for(const side of [-1,1]){
+    const socket=helmetHoseSocket(side).outlet.multiplyScalar(EVA_HELMET.scale).add(new THREE.Vector3(0,EVA_HELMET.base,EVA_HELMET.depthOffset)).sub(pack.position);
+    const link=new THREE.Group();link.name='Rear helmet breathing hose';link.userData.side=side;pack.add(link);
+    hose(link,m,[[side*.071,1.608,-.270],[side*.070,1.669,-.231],socket.toArray()],.0105);
+  }
 }
 function chestPlate(parent,m,index){
   const shape=new THREE.Shape();shape.moveTo(-.105,.144);shape.lineTo(.105,.144);shape.lineTo(.130,.074);shape.lineTo(.105,-.105);shape.lineTo(.082,-.143);shape.lineTo(-.082,-.143);shape.lineTo(-.105,-.105);shape.lineTo(-.130,.074);shape.closePath();
@@ -118,10 +122,10 @@ export function hangingSuit(materials,index){
   }
   pipe(suit,m.evaSeam,[[0,1.137,.080],[0,1.083,.072],[0,1.010,.039],[0,.948,-.005]],.0013);
   const collarRoot=new THREE.Group();collarRoot.position.set(0,1.629,-.044);collarRoot.rotation.x=Math.atan(.30);suit.add(collarRoot);
-  cylinder(collarRoot,m.evaPaint,0,0,0,.140,.064,.133,48).name='Wide helmet locking collar';
+  cylinder(collarRoot,m.dark,0,0,0,.140,.064,.133,48).name='Wide helmet locking collar';
   for(const y of [-.020,.014])ring(collarRoot,m.rubber,[0,y,0],.139,.0045,[0,1,0]);
   for(const side of [-1,1])box(collarRoot,m.metal,side*.039,-.004,.136,.018,.025,.009,.002);
-  const helmet=createEVAHelmet(m);helmet.position.z-=.040;suit.add(helmet);chestPlate(suit,m,index);finishEVAGarment(suit,m.evaCloth);
+  const helmet=createEVAHelmet(m);suit.add(helmet);chestPlate(suit,m,index);finishEVAGarment(suit,m.evaCloth);
   pipe(suit,m.metal,[[.145,1.60,-.26],[.145,2.075,-.30],[0,2.115,-.31],[0,2.15,-.31]],.014).name='Suspension support';
   pipe(suit,m.metal,[[0,2.15,-.31],[0,2.24,-.31],[0,2.265,-.39],[0,2.18,-.43]],.014).name='Suspension hook';return suit;
 }
