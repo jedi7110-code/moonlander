@@ -83,7 +83,7 @@ export function createMedicalBay(m,y){
   for(const xx of [-.82,.82]){
     box(bed,m.dark,xx,.09,0,.49,.13,.87,.025);
     pistons.push(cylinder(bed,m.metal,xx,.13+(top-.34)/2,0,.09,top-.34,.09,24));
-    cylinder(bed,m.enamel,xx,.22,0,.14,.18,.14,24);
+    cylinder(bed,m.enamel,xx,.225,0,.14,.17,.14,24);
   }
   const platform=new THREE.Group();platform.name='Elevating patient platform';bed.add(platform);
   box(platform,m.dark,0,top-.22,0,length+.10,.15,width+.07,.045);

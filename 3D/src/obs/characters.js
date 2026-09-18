@@ -94,6 +94,7 @@ export function createMiloBoot(parent,m,side){
   const lugRows=[[-.073,.021],[-.045,.032],[.046,.047],[.077,.044],[.109,.036],[.137,.026],[.162,.012]];
   for(const [z,width]of lugRows)for(const x of [-width,0,width]){
     if(x===0&&Math.abs(z)<.03)continue;
+    if(width<.02&&x!==0)continue; // The narrow toe fits one lug, not three intersecting lugs.
     const lug=box(boot,m.rubber,x,-.102,z,x===0?.024:.020,.010,.024,.002);lug.name='Combat boot sole lug';
     lug.rotation.y=x===0?0:-Math.sign(x)*THREE.MathUtils.lerp(.08,.34,THREE.MathUtils.clamp((z+.09)/.23,0,1));
   }
@@ -203,7 +204,7 @@ export function createMilo(m,headModel=new THREE.Group()) {
   root.userData.updateWristTwists?.();attachMiloWatch(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   setCupHandFit(root,0);
   setLadderHandFit(root,false);
@@ -216,7 +217,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   else delete root.userData.bunkStartYaw;
   resetDiningPose(root);
   for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
-  const stride=time*(climbing?5.4:6.5),walking=moving&&!climbing&&!waiting;
+  const stride=time*(climbing?5.4:6.5),walking=(moving||Boolean(bathroom?.moving))&&!climbing&&!waiting;
   const seated=['lounge','console'].includes(action)&&!moving;
   body.position.y=walking?0:Math.sin(time*1.5)*.003;
   body.position.x=0;body.position.z=0;body.rotation.set(0,0,0);chest.scale.x=1+Math.sin(time*1.6)*.006;
@@ -247,8 +248,11 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     boot.rotation.set(seated?-(leg.rotation.x+knee.rotation.x):0,0,0);
   }
   if(walking){
-    if(walkStyle==='legacy')applyWalkingPose(root,walkDistance);
-    else applyMocapWalk(root,miloWalkData,walkDistance/miloWalkData.cycleDistance*miloWalkData.duration);
+    // Bathroom passages move in depth without setting CrewMotion.busy. They
+    // still use Milo's selected walk, driven by actual passage distance.
+    const distance=bathroom?.moving?bathroom.walkDistance:walkDistance;
+    if(walkStyle==='legacy')applyWalkingPose(root,distance);
+    else applyMocapWalk(root,miloWalkData,distance/miloWalkData.cycleDistance*miloWalkData.duration);
   }
   if(seated&&action==='lounge'&&!leisure)applyDeskHands(root);
   applyCallingPose(root,calling?callingTime:null,dt);
@@ -283,7 +287,6 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   root.visible=true;
   if(bathroom){
     root.position.z=bathroom.depth;root.rotation.y=desired;
-    if(bathroom.moving)applyWalkingPose(root,bathroom.walkDistance);
     if(bathroom.reach>0){
       root.updateWorldMatrix(true,true);
       const target=body.worldToLocal(new THREE.Vector3(root.position.x+.56,root.position.y+1.17,.58));
@@ -306,7 +309,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     body.position.y=0;applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
   root.userData.updateWristTwists?.();
-  updateMiloWatch(root,time);
+  updateMiloWatch(root,shipHour);
   // Raycast bounds must follow the current pose, not the first observed pose.
   if(root.userData.bodySkin){root.userData.bodySkin.boundingBox=null;root.userData.bodySkin.boundingSphere=null;}
 }

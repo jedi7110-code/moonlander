@@ -37,7 +37,7 @@ export function createEVARifle(m){
   cylinder(muzzle,trim,0,.055,0,.070,.014,.070,8);
   cylinder(muzzle,m.black,0,.064,0,.052,.008,.052,24);
   rod(root,m.dark,[-.38,.279,0],[-.02,.279,0],.031).name='Optic';
-  for(const x of [-.28,-.12])box(root,trim,x,.238,0,.036,.051,.058,.006);
+  for(const x of [-.28,-.12])box(root,trim,x,.242,0,.036,.051,.058,.006);
   return root;
 }
 

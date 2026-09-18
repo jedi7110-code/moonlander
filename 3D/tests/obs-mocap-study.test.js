@@ -5,6 +5,7 @@ import {Box3,MeshStandardMaterial,Vector3} from 'three';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {applyMocapWalk,sampleWalk} from '../src/obs/mocap-walk.js';
+import {BathroomVisit} from '../src/obs/bathroom.js';
 
 const data=JSON.parse(await readFile(new URL('../src/obs/milo-walk-cycle.json',import.meta.url)));
 const body=await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url));
@@ -42,6 +43,34 @@ test('OBS defaults to the approved measured walk and advances by distance, not e
     animateMilo(reference,{...idle,moving:true,walkDistance:.31,walkStyle:'legacy',...extra});
     assert.deepEqual(capture(root),capture(reference));
   }
+});
+
+for(const id of ['shower','toilet'])test(`${id}: entry and exit use the same distance-driven measured walk as the aisle`,()=>{
+  const root=character(),reference=character(),visit=new BathroomVisit(id);
+  const capture=r=>{const {body,chest,head,arms,legs}=r.userData;return [body,chest,head,...arms.flatMap(a=>[a.arm,a.elbow,a.hand]),...legs.flatMap(l=>[l.leg,l.knee,l.boot])].flatMap(o=>[...o.position.toArray(),...o.quaternion.toArray()]);};
+  const phases=new Set();
+  for(let frame=0;!visit.done&&frame<120*12;frame++){
+    const bathroom=visit.pose;
+    if(bathroom.moving&&frame%7===0){
+      phases.add(bathroom.phase);
+      for(const clock of [0,127]){
+        animateMilo(root,{...idle,time:clock,action:id,bathroom,walkDistance:999,dt:0});
+        animateMilo(reference,{...idle,moving:true,walkDistance:bathroom.walkDistance});
+        const expected=capture(reference);
+        capture(root).forEach((v,j)=>assert.ok(Math.abs(v-expected[j])<1e-9,`${bathroom.phase}: old gait or incorrect distance at ${j}`));
+        assert.equal(root.position.z,bathroom.depth);
+        root.updateMatrixWorld(true);
+        const heights=root.userData.legs.map(({boot})=>new Box3().setFromObject(boot).min.y);
+        assert.ok(heights.every(h=>h>=-.002)&&Math.min(...heights)<.012,'boots keep the measured ground contact');
+      }
+    }
+    if(visit.phase==='use')visit.requestExit();
+    visit.update(1/120);
+  }
+  assert.ok(visit.done);assert.deepEqual([...phases],['enter','leave']);
+  animateMilo(root,{...idle,action:id,bathroom:visit.pose});
+  animateMilo(reference,{...idle,action:id});
+  assert.deepEqual(capture(root),capture(reference),'exit removes the measured walk pose');
 });
 
 test('both boots clear the floor while one foot remains in support',()=>{

@@ -11,7 +11,7 @@ import {setLadderHandFit} from './ladder-hand-fit.js';
 import {createMedicalBay,animateMedical,medicalDuration,MED_BED} from '../../src/obs/medical.js';
 import {createLounge} from '../../src/obs/ship.js';
 import {LOUNGE_SEAT} from '../../src/obs/layout.js';
-import {LADDER_PACE} from '../../src/obs/pace.js';
+import {LADDER_PACE,CABIN_PACE} from '../../src/obs/pace.js';
 import {createDiningStudy,applyDiningStudy,DINING_ACTIONS,diningStudyDuration} from './dining-study.js';
 import {createGym} from '../../src/obs/gym.js';
 import {applyGymStudy,GYM_STUDY_DURATION} from './gym-study.js';
@@ -79,7 +79,7 @@ async function start(){
       ladderSample=applyLadderStudy(milo,$('direction').value==='down'?LADDER.duration-time:time,{easing:easingSelect.value==='on'});
       ladder.update(ladderSample,$('contacts').checked);
     }
-    updateMiloWatch(milo,watchTime);
+    updateMiloWatch(milo,8+watchTime*1000/CABIN_PACE.dayMs*24);
     if(current.id!=='medical'&&!dining.root.visible&&!gym.root.visible)milo.rotation.y=0;
     $('time').value=time;$('clock').value=`${time.toFixed(2)}秒`;$('status').textContent=current.id==='mocap'?'歩行・実測 / OBSと共通':`${current.label} / 本編と同じマイロを表示中`;
     if(ladderSample){const moving=ladderSample.contacts.find(c=>c.moving);$('status').textContent=`梯子・本編 / ${moving?moving.label+'を掛け替え':'四点で支持'} / 段間隔28cm`;$('support').textContent=ladderSample.contacts.map(c=>`${c.label} ${c.moving?'移動':'支持'}`).join('　');}

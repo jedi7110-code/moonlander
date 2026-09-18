@@ -21,7 +21,8 @@ export function createGym(m,x){
     const disc=cylinder(root,m.black,side*.115,.38,.66,.24,.012,.24,40);disc.rotation.z=Math.PI/2;
   }
   const flywheel=new THREE.Group();flywheel.position.set(-.128,.38,.66);root.add(flywheel);
-  for(let i=0;i<8;i++){const a=i*Math.PI/4;rod(flywheel,m.metal,[0,0,0],[0,Math.cos(a)*.23,Math.sin(a)*.23],.013);}
+  for(let i=0;i<8;i++){const a=i*Math.PI/4;rod(flywheel,m.metal,[0,Math.cos(a)*.035,Math.sin(a)*.035],[0,Math.cos(a)*.23,Math.sin(a)*.23],.013);}
+  const hub=cylinder(flywheel,m.metal,0,0,0,.042,.034,.042,24);hub.rotation.z=Math.PI/2;
   for(const side of [-1,1]){
     rod(root,m.enamel,[side*.22,.18,.76],[side*.22,1.19,.71],.031);
     rod(root,m.metal,[side*.22,1.19,.71],[side*.22,BIKE.gripY,BIKE.gripZ],.028);

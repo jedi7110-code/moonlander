@@ -62,7 +62,7 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
     for(const z of [-2.8,-4.1,-5.3])box(root,m.enamel,g.x+side*1.10,y+1.43,z,.06,2.44,.09);
   }
   box(root,m.dark,g.x,y+2.76,-3.75,2.4,.16,4.1);
-  box(root,m.enamel,g.x,y+1.35,g.back,2.3,2.66,.16);
+  box(root,m.enamel,g.x,y+1.35,g.back,2.23,2.66,.16);
   for(const side of [-1,1]){
     box(root,m.dark,g.x+side*.93,y+1.26,g.front+.045,.075,.67,.045);
     box(root,m.metal,g.x+side*.93,y+1.26,g.front+.08,.036,.43,.06);

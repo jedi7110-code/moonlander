@@ -9,7 +9,7 @@ import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
 import {loadMiloHead} from './head.js';
 import {animateDelivery} from './delivery.js';
-import {animatePocketShutter} from './shutter.js';
+import {animateBathroom} from './bathroom.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE,FLOORS,getStation} from './layout.js';
 import {animateAirlock} from './eva.js';
@@ -74,6 +74,14 @@ export class ObservationView {
     this.bind('wheel',e=>{if(e.deltaY===0)return;e.preventDefault();this.changeZoom(e.deltaY<0?1.15:1/1.15,e);},{passive:false});
   }
   setMode(mode){this.hover(null);this.zoomAnchor=null;this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
+  miloHeadScreenPosition(){
+    if(!this.milo.visible)return null;
+    // The head origin is at the neck; add the crown height in world units so
+    // the scanned head's own import scale does not shrink the popup offset.
+    const point=this.milo.userData.head.getWorldPosition(new THREE.Vector3());
+    point.y+=.26;point.project(this.camera);
+    return{x:(point.x+1)*this.width/2,y:(1-point.y)*this.height/2,z:point.z};
+  }
   changeZoom(ratio,pointer=null){
     if(!Number.isFinite(ratio)||ratio<=0||ratio===1)return;
     const height=THREE.MathUtils.clamp((this.targetHeight??this.viewHeight)/ratio,1.9,this.fitHeight*1.25);
@@ -132,13 +140,13 @@ export class ObservationView {
     if(action==='gym')this.milo.position.z=brain.gymVisit?.pose.depth??BIKE.depth;
     if(brain.gymVisit)brain.gymVisit.startYaw??=this.milo.rotation.y;
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
-    animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForHatch||actor.waitingForCat,climbing:false,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
+    animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForHatch||actor.waitingForCat,climbing:false,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
     if(actor.climbing){
       const nextX=actor.queue[1]?.x??actor.x,endYaw=(Math.sign(nextX-actor.x)||actor.facing)*Math.PI/2;
       applyCabinLadder(this.milo,{...this.cabinClimb,height:positionY(actor.y),endHeight:positionY(actor.queue[0].y),endYaw});
     }
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
-      animatePocketShutter(fixture.door,brain.bathroom?.id===id?(bathroom?.opening??0):0);
+      animateBathroom(fixture,brain.bathroom?.id===id?bathroom:null);
     }
     for(const [id,docks]of Object.entries(this.ship.diningDocks)){
       docks.mug.visible=id==='hydro'&&action!==id;
@@ -166,7 +174,7 @@ export class ObservationView {
     if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
     if(brain.reclineExit?.id==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineExitProgress(brain.reclineExit));
     if(brain.bunkVisit)this.milo.position.z=brain.bunkVisit.pose.depth;
-    if(!paused)this.ship.fan.children.slice(1).forEach(blade=>blade.rotation.z+=dt*3.0);
+    if(!paused)this.ship.fan.rotation.z+=dt*3.0;
     animateDelivery(this.ship,care,this.reducedMotion);
     this.ship.foodGroup.visible=care.has('catfood')||catRoutine.mode==='eat';
     for(const [id,{group,material}]of Object.entries(this.ship.indicators)){

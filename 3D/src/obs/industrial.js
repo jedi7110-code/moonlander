@@ -89,8 +89,10 @@ function cableRun(root,m,left,right,y,z,count=4,sag=.42){
   for(let i=0;i<count;i++){
     const offset=i*.061,mid=(left+right)/2,drop=sag+(i%3)*.033;
     pipe(root,m.cable,[[left,y-offset,z],[left+.30,y-.11-offset,z+.07],[mid-.40+(i%2)*.23,y-drop-offset,z+.14+i*.028],[right-.25,y-.12-offset,z+.06],[right,y-offset,z]],.029+i*.009);
-    for(const x of [left+.06,right-.06])box(root,m.metal,x,y-.08-offset,z+.035,.10,.16,.12,.012);
   }
+  // A single clamp spans the bundle instead of overlapping one per cable.
+  const span=(count-1)*.061;
+  for(const x of [left+.06,right-.06])box(root,m.metal,x,y-.08-span/2,z+.035,.10,.16+span,.12,.012);
 }
 
 function chain(root,m,x,top,bottom,z){
@@ -123,7 +125,7 @@ export function addIndustrialDeck(root,m,y,level){
     box(root,m.warmLamp,x,y+2.58,-.08,1.06,.025,.30).name='Lounge overhead diffuser';
   }
   for(const [x] of WORK_LIGHTS){
-    box(root,m.dark,x,y+2.78,.37,.89,.14,.49,.03).name='Ceiling work light housing';
+    box(root,m.dark,x,y+2.775,.37,.89,.13,.49,.03).name='Ceiling work light housing';
     box(root,m.metal,x,y+2.70,.37,.80,.055,.41,.015);
     box(root,level===DECK.OPERATIONS?m.coolLamp:m.lamp,x,y+2.66,.37,.71,.024,.32,.008).name='Ceiling work light diffuser';
     for(const dx of [-.27,0,.27])rod(root,m.dark,[x+dx,y+2.64,.16],[x+dx,y+2.64,.58],.012);
@@ -132,7 +134,7 @@ export function addIndustrialDeck(root,m,y,level){
   for(const side of [-1,1]){
     const center=side*6.88;
     box(root,m.dark,center,y-.23,front,12.56,.31,.22,.02);
-    box(root,m.pipeSteel,center,y-.10,front+.025,12.56,.055,.27);
+    box(root,m.pipeSteel,center,y-.10,front+.03,12.58,.055,.27);
     rod(root,m.pipeSteel,[side*.74,y+3.08,1.85],[side*12.9,y+3.08,1.85],.102);
     for(let x=1.1;x<12.8;x+=1.43){
       flange(root,m,side*x,y+3.08,1.85,.102);
@@ -165,10 +167,13 @@ export function addIndustrialDeck(root,m,y,level){
       for(const dx of [-.075,.075]){const fastener=cylinder(root,m.metal,x+dx,y+h,front+.21,.021,.025,.021,6);fastener.rotation.x=Math.PI/2;}
     }
   }
-  for(const x of [-12.8,12.82])for(let i=0;i<4;i++){
-    const xx=x+(x<0?1:-1)*i*.062;
-    pipe(root,m.cable,[[xx,y+.18,.78],[xx,y+1.2,.78],[xx,y+2.66,.78],[xx+(x<0?.34:-.34),y+2.97,.86]],.022);
-    for(const h of [.49,1.69,2.47])box(root,m.metal,xx,y+h,.8,.09,.08,.12);
+  for(const x of [-12.8,12.82]){
+    const direction=x<0?1:-1;
+    for(let i=0;i<4;i++){
+      const xx=x+direction*i*.062;
+      pipe(root,m.cable,[[xx,y+.18,.78],[xx,y+1.2,.78],[xx,y+2.66,.78],[xx+direction*.34,y+2.97,.86]],.022);
+    }
+    for(const h of [.49,1.69,2.47])box(root,m.metal,x+direction*.093,y+h,.8,.276,.08,.12);
   }
   // Recessed cable trays and service panels between the ceiling ribs.
   for(const x of [-10.4,-7.25,-3.35,2.13,5.24,8.37,11.47]){
@@ -199,7 +204,7 @@ export function addIndustrialDeck(root,m,y,level){
     // Condensation sheen belongs beside coolant equipment, not the galley.
     for(const [x,width] of [[5.69,1.76],[11.43,1.32]]){
       box(root,m.wetFloor,x,y+.024,1.49,width,.009,1.87,.003);
-      for(let i=0;i<19;i++)box(root,m.dark,x-width/2+i*width/19,y+.032,1.49,.021,.014,1.87);
+      for(let i=0;i<19;i++)box(root,m.dark,x-width/2+i*width/19,y+.032,1.49,.021,.014,1.85);
     }
     for(const x of [4.66,6.58]){
       pipe(root,m.pipeSteel,[[x,y+.18,-.79],[x,y+.25,-.52],[x,y+2.55,-.52],[x-.32,y+2.70,-.65]],.088);

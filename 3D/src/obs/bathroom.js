@@ -1,8 +1,23 @@
+import {animatePocketShutter} from './shutter.js';
+
 const smooth=t=>t*t*(3-2*t);
 const phases=[['reach',1.4],['open',.7],['enter',2.8],['close',.7],['use',Infinity],['reopen',1.8],['leave',2.8],['shut',.7]];
 export const BATHROOM_OUTSIDE_DEPTH=.78,BATHROOM_INSIDE_DEPTH=-2.8;
 // A longer visual turn must not charge extra hunger/thirst to the visit.
 export const BATHROOM_TURN_DECAY={reach:.4/1.4,reopen:.7/1.8};
+
+export function animateBathroom(fixture,pose=null){
+  animatePocketShutter(fixture.door,pose?.opening??0);
+  const {lamp}=fixture,material=lamp.material;
+  // Pocket-door materials are cloned per fixture, so the other room and all
+  // shared cyan indicators stay unchanged. Preserve the original idle glow.
+  const available=lamp.userData.available??={color:material.color.clone(),emissive:material.emissive.clone()};
+  if(pose?.inside){
+    material.color.setHex(0xe23832);material.emissive.setHex(0xff1e14);
+  }else{
+    material.color.copy(available.color);material.emissive.copy(available.emissive);
+  }
+}
 
 export class BathroomVisit {
   constructor(id,{entered,exited}={}){this.id=id;this.index=0;this.age=0;this.entered=entered;this.exited=exited;this.exitRequested=false;this.done=false;}

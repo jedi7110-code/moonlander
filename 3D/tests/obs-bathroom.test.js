@@ -1,11 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BathroomVisit} from '../src/obs/bathroom.js';
+import {BathroomVisit,animateBathroom} from '../src/obs/bathroom.js';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,getStation} from '../src/obs/state.js';
 import {Box3,Group,MeshStandardMaterial} from 'three';
 import {createBathroom,FLOOR_Y} from '../src/obs/ship.js';
-import {animatePocketShutter} from '../src/obs/shutter.js';
 
 const scene={time:{delayedCall(){}},obsUI:{hideWant(){}}};
 const setup=id=>{
@@ -18,9 +17,22 @@ for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clea
  const ctx={fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
  globalThis.document={createElement:()=>({getContext:()=>ctx})};
  let fixture;try{fixture=createBathroom(fixed,animated,m,-7,floor,id);}finally{delete globalThis.document;}
- const {door}=fixture,initial=door.position.clone(),visit=new BathroomVisit(id),bounds=new Box3();let exited=false;
+ const {door,lamp}=fixture,initial=door.position.clone(),visit=new BathroomVisit(id),bounds=new Box3();let exited=false;
+ const available={color:lamp.material.color.clone(),emissive:lamp.material.emissive.clone()};
+ let occupiedFrames=0,emptyFrames=0;
  for(let frame=0;!visit.done&&frame<1440;frame++){
-  const pose=visit.pose;animatePocketShutter(door,pose.opening);animated.updateMatrixWorld(true);
+  const pose=visit.pose;animateBathroom(fixture,pose);animated.updateMatrixWorld(true);
+  if(pose.inside){
+    occupiedFrames++;
+    assert.equal(lamp.material.color.getHex(),0xe23832);
+    assert.equal(lamp.material.emissive.getHex(),0xff1e14);
+  }else{
+    emptyFrames++;
+    assert.ok(lamp.material.color.equals(available.color));
+    assert.ok(lamp.material.emissive.equals(available.emissive));
+  }
+  assert.notEqual(lamp.material,material);
+  assert.ok(material.color.equals(available.color)&&material.emissive.equals(available.emissive),'other room/shared indicators do not change color');
   assert.equal(door.position.y,initial.y);assert.ok(door.position.z<=initial.z);
   if(pose.opening<=.32)assert.equal(door.position.x,initial.x,'unplug before sliding');
   if(door.position.x<initial.x)assert.equal(door.position.z,initial.z-.24);
@@ -31,9 +43,34 @@ for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clea
   if(visit.phase==='use'&&!exited){visit.requestExit();exited=true;}
   visit.update(1/120);
  }
- assert.ok(visit.done&&exited);animatePocketShutter(door,visit.pose.opening);assert.deepEqual(door.position.toArray(),initial.toArray());
+ assert.ok(visit.done&&exited&&occupiedFrames>0&&emptyFrames>0);
+ animateBathroom(fixture,null);assert.deepEqual(door.position.toArray(),initial.toArray());
+ assert.ok(lamp.material.color.equals(available.color)&&lamp.material.emissive.equals(available.emissive),'inactive room returns to cyan');
  assert.ok(initial.z< -1.6,'door is flush with the cabin wall, not a projecting booth');
  assert.equal(material.clippingPlanes,null,'fixed walls keep their unclipped materials');
+ for(const root of [fixed,animated])root.traverse(part=>part.geometry?.dispose());material.dispose();
+});
+test('only the occupied room turns red, including pause and switching to the other room',()=>{
+ const material=new MeshStandardMaterial({color:0x4b9982,emissive:0x6fddaa,emissiveIntensity:.6}),m=new Proxy({},{get:()=>material});
+ const fixed=new Group(),animated=new Group();
+ const ctx={fillRect(){},fillText(){},measureText(){return{width:100};}};
+ globalThis.document={createElement:()=>({getContext:()=>ctx})};
+ let rooms;
+ try{rooms={shower:createBathroom(fixed,animated,m,-7,0,'shower'),toilet:createBathroom(fixed,animated,m,-4,0,'toilet')};}finally{delete globalThis.document;}
+ assert.notEqual(rooms.shower.lamp.material,rooms.toilet.lamp.material);
+ for(const active of ['shower','toilet']){
+   const visit=new BathroomVisit(active);visit.update(6);
+   assert.equal(visit.phase,'use');
+   for(let frame=0;frame<3;frame++){
+     visit.update(0);
+     for(const [id,fixture]of Object.entries(rooms)){
+       animateBathroom(fixture,id===active?visit.pose:null);
+       assert.equal(fixture.lamp.material.color.getHex(),id===active?0xe23832:0x4b9982);
+       assert.equal(fixture.lamp.material.emissive.getHex(),id===active?0xff1e14:0x6fddaa);
+       assert.equal(fixture.lamp.material.emissiveIntensity,.6);
+     }
+   }
+ }
  for(const root of [fixed,animated])root.traverse(part=>part.geometry?.dispose());material.dispose();
 });
 for(const id of ['shower','toilet'])test(`${id}: opens, enters, shuts, uses, exits and shuts without teleporting`,()=>{

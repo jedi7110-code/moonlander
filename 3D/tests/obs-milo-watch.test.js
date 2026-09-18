@@ -6,6 +6,8 @@ import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {updateMiloWatch} from '../src/obs/milo-watch.js';
 import {applyMocapWalk} from '../src/obs/mocap-walk.js';
+import {CabinBrain} from '../src/obs/brain.js';
+import {CrewMotion,Supplies} from '../src/obs/state.js';
 const bytes=await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url));
 await loadMiloBody(`data:application/json;base64,${bytes.toString('base64')}`);
 const clip=JSON.parse(await readFile(new URL('../src/obs/milo-walk-cycle.json',import.meta.url)));
@@ -27,15 +29,42 @@ test('Milo wears one fitted GMT watch on the left wrist, with four independent h
   assert.equal(face.parent,caseGroup);assert.equal(face.geometry.parameters.radius,.0217);
   assert.equal(w.group.getObjectByName('24-hour bezel'),undefined,'no separate bezel draw remains');
   const meshes=[];w.group.traverse(part=>{if(part.isMesh)meshes.push(part);});
-  assert.equal(meshes.length,7,'one strap, one housing, one face, and four moving hands');
+  assert.equal(meshes.length,7,'one strap, one housing, one face, and four hands');
   for(const part of meshes)assert.ok([...part.geometry.attributes.position.array].every(Number.isFinite));
   assert.equal(w.group.getObjectByName('Fitted graphite watch strap').parent,w.group);
   for(const ring of w.radii){assert.equal(ring.length,64);assert.ok(ring.every(r=>r>.014&&r<.065));assert.ok(Math.max(...ring)-Math.min(...ring)>.008,'strap must follow the wrist, not a cylinder');}
   assert.equal(new Set([w.hour,w.minute,w.second,w.gmt]).size,4);
-  const second=w.second.rotation.z,hour=w.hour.rotation.z,gmt=w.gmt.rotation.z;
-  updateMiloWatch(root,.125);
-  assert.ok(Math.abs(w.second.rotation.z-second+Math.PI*2*.125/60)<1e-9,'seconds hand sweeps continuously');
-  assert.ok(Math.abs((w.hour.rotation.z-hour)/(w.gmt.rotation.z-gmt)-2)<1e-6,'GMT hand rotates once per 24 hours');
+  assert.equal(w.second.rotation.z,0,'seconds hand is fixed at twelve');
+});
+
+test('watch hands match the ship HUD minute, including noon and midnight, without moving seconds',()=>{
+  const root=character(),w=root.userData.watch;
+  const brain=new CabinBrain({time:{delayedCall(){}},obsUI:{hideWant(){}}},new CrewMotion(),{care:new Supplies(),random:()=>.8});
+  for(const hour of [0,8,8+17/60,10.5,11.99999,12,15.25,23.99999,24,24.5]){
+    brain.clock=hour/24*brain.dayMs;
+    const minutes=Math.floor(brain.hour*60),tau=Math.PI*2;
+    animateMilo(root,{moving:false,time:987,actionTime:2,shipHour:brain.hour});
+    assert.ok(Math.abs(w.hour.rotation.z+(minutes%720)/720*tau)<1e-10);
+    assert.ok(Math.abs(w.minute.rotation.z+(minutes%60)/60*tau)<1e-10);
+    assert.ok(Math.abs(w.gmt.rotation.z+minutes/1440*tau)<1e-10,'24-hour hand also reads ship time, with no timezone offset');
+    assert.equal(w.second.rotation.z,0);
+  }
+});
+
+test('animation resets, sub-minute ticks and pause leave the displayed watch time unchanged',async()=>{
+  const root=character(),w=root.userData.watch;
+  const angles=()=>[w.hour,w.minute,w.second,w.gmt].map(hand=>hand.rotation.z);
+  updateMiloWatch(root,8.5);const expected=angles();
+  for(const action of [null,'hydro','galley','medical','gym'])for(const time of [0,3,123]){
+    animateMilo(root,{moving:false,action,time,actionTime:time,shipHour:8.5001,dt:0});
+    assert.deepEqual(angles(),expected);
+  }
+  updateMiloWatch(root,8+31/60+.0001);
+  assert.ok(Math.abs(w.minute.rotation.z-expected[1]+Math.PI*2/60)<1e-10);
+  assert.ok(Math.abs((w.hour.rotation.z-expected[0])/(w.gmt.rotation.z-expected[3])-2)<1e-9);
+  assert.equal(w.second.rotation.z,0);
+  const source=await readFile(new URL('../src/obs/view.js',import.meta.url),'utf8');
+  assert.match(source,/shipHour:brain.hour/,'the production view forwards the same clock as the HUD');
 });
 test('the watch follows the enlarged left wrist throughout measured walking and other poses',()=>{
   const root=character(),w=root.userData.watch,local=w.group.position.clone();let first,last;

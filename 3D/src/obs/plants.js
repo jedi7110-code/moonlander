@@ -14,8 +14,8 @@ function waterRecovery(root,m){
   cylinder(fan,m.black,0,0,0,.23,.03).rotation.x=Math.PI/2;
   const rotor=new THREE.Group();rotor.position.z=.025;fan.add(rotor);
   for(let i=0;i<5;i++){
-    const blade=box(rotor,m.metal,0,.11,0,.10,.19,.025,.025);
-    blade.rotation.z=i*Math.PI*2/5;blade.position.set(Math.sin(-blade.rotation.z)*.11,Math.cos(blade.rotation.z)*.11,0);
+    const blade=box(rotor,m.metal,0,.15,0,.08,.13,.025,.012);
+    blade.rotation.z=i*Math.PI*2/5;blade.position.set(Math.sin(-blade.rotation.z)*.15,Math.cos(blade.rotation.z)*.15,0);
   }
   for(let i=-2;i<=2;i++)rod(fan,m.dark,[-.22,i*.075,.065],[.22,i*.075,.065],.012);
   box(root,m.metal,2.03,1.86,-.60,.65,.055,.37,.015).name='Condensate tray';
@@ -78,7 +78,7 @@ export function createPlantRack(m,x){
     box(root,growDiffuser,-.16,y+.426,-.393,2.16,.026,.018).name=`Grow light front lens ${i+1}`;
     const growLight=new THREE.RectAreaLight(CABIN_LIGHT_COLOR,5.5,2.20,.30);
     growLight.name=`Plant grow light ${i+1}`;growLight.position.set(-.16,y+.431,-.60);growLight.rotation.x=-Math.PI/2;root.add(growLight);
-    for(const z of [-.83,-.39])box(root,m.metal,-.16,y+.452,z,2.32,.06,.025);
+    for(const z of [-.83,-.39])box(root,m.metal,-.16,y+.452,z,2.30,.06,.025);
     for(const side of [-1,1])rod(root,m.black,[side*1.35,y,-.83],[side*1.18,y,-.70],.020);
     for(let p=0;p<6;p++){
       const plant=new THREE.Group();plant.position.set(-1.08+p*.37,y+.09,-.58);root.add(plant);plants.push(plant);

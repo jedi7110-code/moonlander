@@ -84,7 +84,7 @@ function underdeck(root,m){
     const tank=cylinder(tanks,m.pipeSteel,x,-.91,.74,.28,length,.28,16);tank.rotation.z=Math.PI/2;
     for(const dx of [-length*.34,length*.34]){
       const strap=cylinder(tanks,m.dark,x+dx,-.91,.74,.296,.10,.296,16);strap.rotation.z=Math.PI/2;
-      box(tanks,m.dark,x+dx,-.53,.74,.10,.25,.67);
+      box(tanks,m.dark,x+dx,-.53,.74,.09,.25,.67);
     }
     for(const side of [-1,1]){
       const cap=cylinder(tanks,m.enamel,x+side*length/2,-.91,.74,.24,.09,.24,16);cap.rotation.z=Math.PI/2;

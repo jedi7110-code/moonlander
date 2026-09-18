@@ -31,7 +31,7 @@ function frame(parent,material,width,height,z,depth){
 export function createEVAHatch(m,y,inner=false){
   const root=new THREE.Group();root.name=inner?'Inner airlock / sealed':'EVA airlock / sealed';
   root.position.set(inner?EVA_BAY.innerX:EVA_BAY.hatchX,y+1.38,EVA_BAY.depth);root.rotation.y=EVA_BAY.hatchYaw;
-  frame(root,m.dark,3.22,2.94,-.15,.22);frame(root,m.metal,3.10,2.79,.07,.10);frame(root,m.rubber,2.88,2.53,.18,.035);
+  frame(root,m.dark,3.22,2.94,-.15,.22);frame(root,m.metal,3.10,2.79,.07,.10);frame(root,m.rubber,2.86,2.53,.18,.035);
   const door=new THREE.Group();door.name='Pressure door assembly';root.add(door);
   plate(door,m.enamel,2.78,2.42,.17,.22,.085).name='Sealed pressure door';
   plate(door,m.dark,.84,1.30,.15,.308,.025).position.y=-.18;
@@ -68,7 +68,7 @@ export function createEVABay(m,y){
   const root=new THREE.Group();root.name='EVA preparation bay';const suits=[];
   for(const x of [7.25,10.88]){
     box(root,m.dark,x,y+1.36,-1.25,.085,2.66,.19,.015);
-    box(root,m.metal,x,y+.19,-.70,.11,.16,1.14,.014);
+    box(root,m.metal,x,y+.19,-.70,.10,.16,1.14,.014);
   }
   rod(root,m.metal,[7.25,y+EVA_BAY.railY,-1.04],[10.88,y+EVA_BAY.railY,-1.04],.046);
   box(root,m.dark,9.05,y+.12,-.69,3.71,.12,1.25,.025);

@@ -22,9 +22,9 @@ function laundry(root,m,wearMaterials){
     box(unit,m.metal,.23,.36,.46,.05,.12,.055,.01);
   }
   const closet=new THREE.Group();closet.name='Open clothes closet';closet.position.set(.51,.14,-4.77);root.add(closet);
-  box(closet,m.dark,0,1.02,-.27,.92,2.04,.12);
+  box(closet,m.dark,0,1.02,-.39,.845,2.00,.06);
   for(const side of [-1,1])box(closet,m.enamel,side*.45,1.02,0,.055,2.04,.72);
-  for(const h of [.03,.37,2.01])box(closet,m.enamel,0,h,0,.92,.055,.72);
+  for(const h of [.03,.37,2.01])box(closet,m.enamel,0,h,0,.845,.055,.72);
   rod(closet,m.metal,[-.38,1.76,.12],[.38,1.76,.12],.018);
   for(const [i,paint]of [m.olive,m.cloth,m.teal].entries()){
     const garment=new THREE.Group();garment.name='Hanging garment';garment.position.x=-.27+i*.27;closet.add(garment);

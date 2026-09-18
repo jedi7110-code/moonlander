@@ -1,6 +1,7 @@
 import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinLoungeGames} from './lounge-games.js';
+import {loungeGamePromptAvailable,updateLoungeGamePrompt} from './lounge-prompt.js';
 import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
@@ -40,7 +41,7 @@ const scene={
     flashMonitor(){$('call-alert').animate([{opacity:.6},{opacity:1}],{duration:350});},
     showWant(text){$('call-text').textContent=text.replace(t('want_hint'),'');$('call-alert').hidden=false;},
     hideWant(){$('call-alert').hidden=true;},
-    openGame(kind){pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');games.show(kind);audio.pause(true);},
+    openGame(kind){pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');games.show(kind);$('lounge-game-prompt').hidden=true;audio.pause(true);},
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     healthEvent(event){
       if(event.type==='onset'){
@@ -60,7 +61,7 @@ const scene={
 };
 const brain=new CabinBrain(scene,actor,{care,name:'MILO'});
 const games=new CabinLoungeGames({parent:$('observation'),refreshIcons,
-  onClose(){brain.finishGame();previous=performance.now();accumulator=0;audio.pause(paused||document.hidden);updateHUD();},
+  onClose(){brain.finishGame();previous=performance.now();accumulator=0;audio.pause(paused||document.hidden);updateHUD();if(games.returnFocus===$('open-lounge-games'))$('ship-view').focus({preventScroll:true});},
   onMove(){audio.tone(340,.07,.02);},
   onResult(){brain.needs.fun=Math.min(100,brain.needs.fun+25);brain.rapport=Math.min(100,brain.rapport+5);}
 });
@@ -201,6 +202,11 @@ $('obs-chat').addEventListener('submit',event=>{
   if(actor.commandVersion!==version)confirmOrder(brain.actStation);$('obs-input').value='';audio.tone(330,.08,.02);updateHUD();
 });
 $('play-chess').addEventListener('click',requestGame);
+$('open-lounge-games').addEventListener('click',()=>{
+  if(!loungeGamePromptAvailable(brain,games.open))return;
+  pendingHQ=false;if(paused)setPause(false);
+  brain.requestGame();updateHUD();
+});
 $('health-toggle').addEventListener('click',()=>setHealthDetails($('health-alert').hidden));
 $('dismiss-health').addEventListener('click',()=>setHealthDetails(false,true));
 $('seek-treatment').addEventListener('click',()=>{useStation('medical');setHealthDetails(false,true);});
@@ -249,7 +255,7 @@ async function start(){
         while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);advanceCabinTraffic(actor,cat,step);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
-      if(!document.hidden){feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock);}
+      if(!document.hidden){feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock);updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
       hudTime+=dt;if(hudTime>.15){updateHUD();hudTime=0;}
       frame=requestAnimationFrame(tick);
     }

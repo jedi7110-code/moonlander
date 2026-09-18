@@ -102,7 +102,7 @@ export function attachMiloWatch(root){
   const crown=mesh(caseGroup,new THREE.CylinderGeometry(.003,.003,.004,16),steel,'Screw-down crown');crown.rotation.z=Math.PI/2;crown.position.set(.022,0,.0025);
   const gmt=hand(caseGroup,'GMT hand',.0148,.00065,.0087,red,true);
   const hour=hand(caseGroup,'Hour hand',.010,.0019,.0090,lume),minute=hand(caseGroup,'Minute hand',.015,.0011,.0093,lume);
-  const second=hand(caseGroup,'Sweeping seconds',.0158,.00035,.0096,red);
+  const second=hand(caseGroup,'Fixed seconds',.0158,.00035,.0096,red);
   disc(caseGroup,.0012,.0007,.010,steel,'Hand pinion');
   // Only the hands move relative to the case. Batch all rigid steel in case space.
   const parts=caseGroup.children.filter(part=>part.isMesh&&part.material===steel);
@@ -111,13 +111,17 @@ export function attachMiloWatch(root){
   for(const part of parts){caseGroup.remove(part);part.geometry.dispose();}
   for(const geometry of geometries)geometry.dispose();
   mesh(caseGroup,housing,steel,'Unified steel watch housing');
-  root.userData.watch={group:watch,parent,hour,minute,second,gmt,radii,side:-1};updateMiloWatch(root,0);
+  root.userData.watch={group:watch,parent,hour,minute,second,gmt,radii,side:-1};updateMiloWatch(root);
   left.hand.quaternion.copy(previous);root.userData.updateWristTwists?.();root.updateMatrixWorld(true);
   return watch;
 }
-export function updateMiloWatch(root,time=0){
+export function updateMiloWatch(root,shipHour=8){
   const watch=root.userData.watch;if(!watch)return;
-  const seconds=10*3600+8*60+37+time;
-  watch.hour.rotation.z=-seconds/43200*Math.PI*2;watch.minute.rotation.z=-seconds/3600*Math.PI*2;
-  watch.second.rotation.z=-seconds/60*Math.PI*2;watch.gmt.rotation.z=-(seconds+8*3600)/86400*Math.PI*2;
+  // Match the HUD's minute precision, using the simulation clock rather than
+  // animation/action time. Pausing or changing activities cannot desync it.
+  const minutes=THREE.MathUtils.euclideanModulo(Math.floor(shipHour*60),1440);
+  watch.hour.rotation.z=-(minutes%720)/720*Math.PI*2;
+  watch.minute.rotation.z=-(minutes%60)/60*Math.PI*2;
+  watch.second.rotation.z=0;
+  watch.gmt.rotation.z=-minutes/1440*Math.PI*2;
 }

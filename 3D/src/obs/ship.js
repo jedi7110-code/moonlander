@@ -104,7 +104,7 @@ function consoleUnit(parent,m,x,y,w=1.7,seed=0) {
   box(parent,m.dark,x,y+.58,-.30,w,1.15,1.15,.08);
   box(parent,m.enamel,x,y+.54,.3,w-.10,.90,.09,.03);
   grille(parent,m,x,y+.46,.36,w*.66,.3);
-  box(parent,m.dark,x,y+1.14,-.5,w+.06,.14,1.47,.045);
+  box(parent,m.dark,x,y+1.14,-.5,w+.04,.14,1.47,.045);
   box(parent,m.rubber,x,y+1.7,-.80,w-.02,1.07,.37,.05);
   box(parent,m.enamel,x,y+1.7,-.58,w-.1,.98,.09,.035);
   box(parent,m.black,x-.1,y+1.73,-.51,w*.70,.73,.09,.04);
@@ -160,12 +160,14 @@ export function createStationInteraction(id,bounds,pickMaterial){
   return{mesh,group,material};
 }
 export function createBathroom(parent,animated,m,x,y,type) {
-  box(parent,m.dark,x,y+1.29,-3.75,1.66,2.59,.12,.04);
-  for(const side of [-1,1])box(parent,m.white,x+side*.83,y+1.29,-2.66,.10,2.59,2.18,.025);
-  box(parent,m.white,x,y+2.54,-2.66,1.76,.10,2.18,.025);
-  box(parent,m.dark,x,y+.025,-2.66,1.66,.05,2.18,.01);
+  // Fit the sill and ceiling BETWEEN the jambs. Their old full-width front
+  // faces intersected the jamb faces, producing black flicker at all corners.
+  box(parent,m.dark,x,y+1.29,-3.80,1.56,2.48,.12,.04).name=`${type} rear wall`;
+  for(const side of [-1,1])box(parent,m.white,x+side*.83,y+1.29,-2.66,.10,2.59,2.18,.025).name=`${type} side wall`;
+  box(parent,m.white,x,y+2.54,-2.66,1.56,.10,2.18,.025).name=`${type} ceiling`;
+  box(parent,m.dark,x,y+.025,-2.66,1.56,.05,2.18,.01).name=`${type} sill`;
   if(type==='toilet'){
-    cylinder(parent,m.white,x,y+.24,-3.37,.24,.48,.29);
+    cylinder(parent,m.white,x,y+.265,-3.37,.24,.43,.29);
     const seat=new THREE.Mesh(new THREE.TorusGeometry(.22,.045,12,36),m.dark);seat.rotation.x=Math.PI/2;seat.position.set(x,y+.49,-3.37);parent.add(seat);
   }else pipe(parent,m.metal,[[x+.5,y+.4,-3.62],[x+.5,y+2.15,-3.62],[x,y+2.15,-3.38]],.025);
   const door=new THREE.Group();door.position.set(x-.735,y,-1.72);animated.add(door);
@@ -185,9 +187,9 @@ export function createBathroom(parent,animated,m,x,y,type) {
   return{door,lamp};
 }
 function hatch(parent,animated,m,x,y) {
-  box(parent,m.black,x,y+1.15,-3.3,1.95,2.30,.12);
+  box(parent,m.black,x,y+1.15,-3.42,1.80,2.30,.12);
   for(const side of [-1,1])box(parent,m.dark,x+side*.97,y+1.15,-2.45,.14,2.30,1.8);
-  for(const h of [.15,2.17])box(parent,m.metal,x,y+h,-2.45,1.94,.10,1.8);
+  for(const h of [.15,2.17])box(parent,m.metal,x,y+h,-2.51,1.80,.10,1.68);
   const door=new THREE.Group();door.position.set(x-.85,y,-1.67);animated.add(door);
   door.name='Pocket supply shutter';
   box(door,m.enamel,.85,1.15,0,1.7,1.92,.10,.10);
@@ -197,7 +199,7 @@ function hatch(parent,animated,m,x,y) {
   configurePocketShutter(door,{left:x-.89,right:x+.89,travel:HATCH_TRAVEL});
   for(const side of [-1,1])box(parent,m.metal,x+side*.91,y+1.17,-1.53,.065,2.02,.15,.012);
   box(parent,m.dark,x,y+2.17,-1.56,1.96,.10,.17,.025);
-  for(const side of [-1,1]){box(parent,m.dark,x+side*.91,y+.52,-1.52,.12,.15,.13);box(parent,m.dark,x+side*.91,y+1.84,-1.52,.12,.15,.13);}
+  for(const side of [-1,1]){box(parent,m.dark,x+side*.91,y+.52,-1.50,.12,.15,.13);box(parent,m.dark,x+side*.91,y+1.84,-1.50,.12,.15,.13);}
   // Keep the fixed header ahead of the service cables; only the leaf is recessed.
   label(parent,'SUPPLY HATCH',x,y+2.47,-.32,1.74,.26,{fg:'#e2c174',size:52});
   box(parent,m.dark,x,y+.32,.32,2.15,.55,.73,.04);
@@ -247,13 +249,16 @@ export function createDiningStation(m,action){
   return{root,propsRoot,docks,stationX};
 }
 
-export function buildShip(sourceMaterials) {
+export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
   const m=industrialMaterials(sourceMaterials);
   const staticRoot=new THREE.Group(),animated=new THREE.Group(),targets=[];
+  // Leave clearance behind the fitted jambs: aperture reveal faces must not
+  // double up with the room walls, even when the pocket doors are open.
+  const wallOpenings=RECESSED_OPENINGS.map(r=>({...r,left:r.left-.015,right:r.right+.015,bottom:r.bottom-.015,top:r.top+.015}));
   // Recess the dark hull behind the lining so their aperture walls cannot coincide.
-  gateWall(staticRoot,m.dark,{left:-13.4,right:13.4,bottom:-.405,top:10.285,z:-2.30,depth:.19,gates:REAR_ROOM_GATES,rectangles:RECESSED_OPENINGS});
+  gateWall(staticRoot,m.dark,{left:-13.4,right:13.4,bottom:-.405,top:10.285,z:-2.30,depth:.19,gates:REAR_ROOM_GATES,rectangles:wallOpenings});
   // Interior faces sit in front of the hull's back surface; the viewing wall is removed.
-  gateWall(staticRoot,m.enamel,{left:-13.15,right:13.15,bottom:-.10,top:10.10,z:-2.09,depth:.22,gates:REAR_ROOM_GATES,rectangles:RECESSED_OPENINGS});
+  gateWall(staticRoot,m.enamel,{left:-13.15,right:13.15,bottom:-.10,top:10.10,z:-2.09,depth:.22,gates:REAR_ROOM_GATES,rectangles:wallOpenings});
   for(const side of [-1,1]){
     box(staticRoot,m.dark,side*7,10.31,-.12,12.9,.26,3.6,.05);
     box(staticRoot,m.enamel,side*6.925,10.48,-.14,12.75,.19,3.46,.035);
@@ -343,7 +348,11 @@ export function buildShip(sourceMaterials) {
   for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,m.olive,Math.cos(a)*r,CAT_BOWL.foodHeight,Math.sin(a)*r,.025,.018,.022);}
   const fan=new THREE.Group();fan.position.set(12.08,2.14,-1.32);animated.add(fan);
   const fanRim=new THREE.Mesh(new THREE.TorusGeometry(.34,.039,12,36),m.metal);fan.add(fanRim);
-  for(let i=0;i<4;i++){const blade=box(fan,m.dark,0,0,0,.18,.61,.035,.03);blade.rotation.z=i*Math.PI/2;}
+  // Four radial blades, not four full diameters superimposed at the hub.
+  for(let i=0;i<4;i++){
+    const angle=i*Math.PI/2,blade=box(fan,m.dark,-Math.sin(angle)*.19,Math.cos(angle)*.19,0,.14,.25,.035,.017);
+    blade.rotation.z=angle;
+  }
   const cargo=[];
   ['food','water','catfood'].forEach((key,i)=>{
     const group=new THREE.Group();group.name='Delivery '+key;group.position.set(positionX(1110)+(i-1)*.70,.675,.32);group.visible=false;animated.add(group);
@@ -369,5 +378,5 @@ export function buildShip(sourceMaterials) {
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
   addCabinDressing(staticRoot,m,FLOOR_Y);
-  return {staticMesh:batchStatic(staticRoot),animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk};
+  return {staticMesh:mergeStatic?batchStatic(staticRoot):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk};
 }
