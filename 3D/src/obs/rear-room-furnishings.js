@@ -26,7 +26,9 @@ function laundry(root,m,wearMaterials){
   for(const side of [-1,1])box(closet,m.enamel,side*.45,1.02,0,.055,2.04,.72);
   for(const h of [.03,.37,2.01])box(closet,m.enamel,0,h,0,.845,.055,.72);
   rod(closet,m.metal,[-.38,1.76,.12],[.38,1.76,.12],.018);
-  for(const [i,paint]of [m.olive,m.cloth,m.teal].entries()){
+  const whiteCloth=m.cloth.clone();whiteCloth.name='Laundry / white cotton';
+  whiteCloth.color.setHex(0xffffff);whiteCloth.map=null;
+  for(let i=0;i<3;i++){
     const garment=new THREE.Group();garment.name='Hanging garment';garment.position.x=-.27+i*.27;closet.add(garment);
     const hanger=new THREE.Group();hanger.name='Shirt hanger';garment.add(hanger);
     // The hook wraps over the rail; its stem passes through the neck opening.
@@ -38,10 +40,10 @@ function laundry(root,m,wearMaterials){
     const points=[[-.035,1.51],[-.075,1.49],[-.12,1.38],[-.085,1.32],[-.07,1.37],[-.07,.74],
       [.07,.74],[.07,1.37],[.085,1.32],[.12,1.38],[.075,1.49],[.035,1.51],[.026,1.46],[-.026,1.46]];
     const shape=new THREE.Shape();shape.moveTo(...points[0]);for(const p of points.slice(1))shape.lineTo(...p);shape.closePath();
-    const shirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.08,bevelEnabled:false,steps:1,curveSegments:1}),paint);
+    const shirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.08,bevelEnabled:false,steps:1,curveSegments:1}),whiteCloth);
     shirt.name='Seamless T-shirt';shirt.position.set(0,.10,.12);shirt.castShadow=shirt.receiveShadow=true;garment.add(shirt);
   }
-  for(let i=0;i<3;i++)box(closet,i%2?m.cloth:m.olive,0,.45+i*.08,.12,.59,.075,.39,.018).name='Folded clothing';
+  for(let i=0;i<3;i++)box(closet,whiteCloth,0,.45+i*.08,.12,.59,.075,.39,.018).name='Folded clothing';
   // Use Milo's actual left/right boots, at their worn size, without a separate prop model.
   for(const side of [-1,1]){
     const pair=new THREE.Group();pair.name='Wardrobe boot';pair.userData.side=side;

@@ -50,19 +50,19 @@ function glove(parent,m,side){
   // palm. Keep this one continuous surface, not a separate floating hand.
   const handScale=1.12,hand=new THREE.Group();hand.name='Pressure glove hand';
   hand.scale.setScalar(handScale);hand.position.y=.018*(handScale-1);root.add(hand);
-  tailoredTube(root,m.rubber,[[0,.020,0],[0,-.018,0],[0,-.0628,0],[0,-.1132,-.00336]],
+  tailoredTube(root,m.evaCloth,[[0,.020,0],[0,-.018,0],[0,-.0628,0],[0,-.1132,-.00336]],
     [[0,.057,.057],[.34,.057,.057],[.50,.054,.047],[.75,.0504,.0336],[1,.04592,.02464]],
     {rows:48,columns:32,name:'Shaped glove palm'});
-  ball(hand,m.rubber,0,-.095,-.004,.043,.026,.024);ball(hand,m.dark,0,-.064,.024,.034,.036,.005);
+  ball(hand,m.evaCloth,0,-.095,-.004,.043,.026,.024);ball(hand,m.evaCloth,0,-.064,.024,.034,.036,.005);
   const lengths=[.077,.088,.082,.064];
   for(let i=0;i<4;i++){
     const x=side*(i-1.5)*.021,base=-.101+Math.abs(i-1.3)*.002,len=lengths[i],tip=[x+side*(i-1.5)*.001,base-len*.88,-.031];
-    const finger=tailoredTube(hand,m.rubber,[[x,base,0],[x,base-len*.46,-.005],tip],[[0,.0105,.012],[.42,.010,.011],[.78,.009,.009],[1,.0075,.008]],{rows:20,columns:16,name:'Curved glove finger'});
-    finger.userData.finger=i;ball(hand,m.rubber,...tip,.0075,.009,.008);ring(hand,m.dark,[x,base-len*.35,-.003],.010,.0013,[0,1,.15]);
+    const finger=tailoredTube(hand,m.evaCloth,[[x,base,0],[x,base-len*.46,-.005],tip],[[0,.0105,.012],[.42,.010,.011],[.78,.009,.009],[1,.0075,.008]],{rows:20,columns:16,name:'Curved glove finger'});
+    finger.userData.finger=i;ball(hand,m.evaCloth,...tip,.0075,.009,.008);ring(hand,m.evaSeam,[x,base-len*.35,-.003],.010,.0013,[0,1,.15]);
   }
   const thumbPoints=[[-side*.032,-.049,-.004],[-side*.060,-.078,-.014],[-side*.061,-.111,-.035]];
-  tailoredTube(hand,m.rubber,thumbPoints,[[0,.019,.020],[.42,.016,.016],[1,.010,.011]],{rows:24,columns:20,name:'Opposed glove thumb'});
-  ball(hand,m.rubber,...thumbPoints[2],.010,.012,.011);
+  tailoredTube(hand,m.evaCloth,thumbPoints,[[0,.019,.020],[.42,.016,.016],[1,.010,.011]],{rows:24,columns:20,name:'Opposed glove thumb'});
+  ball(hand,m.evaCloth,...thumbPoints[2],.010,.012,.011);
   const instrument=new THREE.Group();instrument.name='Dorsal wrist instrument';instrument.position.set(0,.066,.064);root.add(instrument);
   box(instrument,m.evaPaint,0,0,0,.074,.094,.025,.010);box(instrument,m.dark,0,.004,.016,.052,.061,.009,.005);
   for(const x of [-.025,.025])box(instrument,m.metal,x,-.035,.015,.010,.008,.006,.002);
