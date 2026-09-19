@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import {DECK} from './layout.js';
 import {box,cylinder,rod,pipe} from './materials.js';
+import {whiteCeramic,finishStaticCups} from './cabin-fixtures.js';
+import {addFireExtinguishers} from './fire-extinguishers.js';
+import {createPilotSeat} from './pilot-seats.js';
+import {createMachinedMetals,finishMachinedFixtures} from './machined-metals.js';
+import {finishServicePanels} from './service-panel.js';
 
 function tin(root,m,x,y,z,h=.22,r=.09,paint=m.enamel){
   cylinder(root,paint,x,y+h/2,z,r,h,r,12);
@@ -9,9 +14,9 @@ function tin(root,m,x,y,z,h=.22,r=.09,paint=m.enamel){
 }
 
 function mug(root,m,x,y,z){
-  cylinder(root,m.enamel,x,y+.09,z,.078,.18,.088,12);
+  cylinder(root,whiteCeramic,x,y+.09,z,.078,.18,.088,12);
   cylinder(root,m.dark,x,y+.184,z,.067,.007,.067,12);
-  const handle=new THREE.Mesh(new THREE.TorusGeometry(.060,.016,6,12),m.enamel);
+  const handle=new THREE.Mesh(new THREE.TorusGeometry(.060,.016,6,12),whiteCeramic);
   handle.position.set(x+.098,y+.10,z);root.add(handle);
 }
 
@@ -107,10 +112,30 @@ function underdeck(root,m){
   }
 }
 
+function arrangeConsoleChairs(parent,floor,metals){
+  // The source ship's single console chair is an unnamed, unbatched group.
+  const chair=parent.children.find(object=>object.isGroup&&object.position.x===-8.8&&
+    object.position.y===floor&&object.position.z===.82&&object.rotation.y===Math.PI);
+  chair?.removeFromParent();
+  const pilot=createPilotSeat(metals);
+  const chairs=[pilot,pilot.clone(),pilot.clone()];
+  chairs.forEach((seat,index)=>{
+    seat.name=`Console chair ${index+1}`;
+    seat.position.set(-10.2+index*1.63,floor,.82);
+    seat.rotation.y=Math.PI;
+    parent.add(seat);
+  });
+}
+
 export function addCabinDressing(parent,m,floors){
   const root=new THREE.Group();root.name='Cabin dressing';parent.add(root);
   const [habitation,operations,bottom]=[floors[DECK.HABITATION],floors[DECK.OPERATIONS],floors[DECK.LIFE_SUPPORT]];
+  const metals=createMachinedMetals();
+  arrangeConsoleChairs(parent,operations,metals);
+  finishMachinedFixtures(parent,m,metals);
+  finishServicePanels(parent,m,habitation,bottom);
   floors.forEach(y=>heavyServices(root,m,y));underdeck(root,m);
+  addFireExtinguishers(root,m,floors);
 
   // Keep the wall above the lounge clear of shelves and stored objects.
   wallCards(root,m,6.96,habitation+2.34);
@@ -124,11 +149,11 @@ export function addCabinDressing(parent,m,floors){
   tin(root,m,-11.89,habitation+.84,-.99,.29,.115,m.red);
 
   // Keep the kitchen worktop props, without an overhead provision shelf.
-  mug(root,m,-10.42,bottom+1.085,-.05);
-  tin(root,m,-10.03,bottom+1.085,-.26,.33,.13,m.metal);
-  const handle=new THREE.Mesh(new THREE.TorusGeometry(.15,.024,6,16,Math.PI),m.dark);handle.position.set(-10.03,bottom+1.43,-.26);root.add(handle);
-  rod(root,m.metal,[-9.94,bottom+1.29,-.26],[-9.81,bottom+1.37,-.26],.034);
-  cloth(root,m,-9.52,bottom+.99,.23,.37,.57);
+  const worktop=bottom+1.0+.07/2; // Counter centre and half its thickness.
+  mug(root,m,-10.42,worktop,-.05);
+  tin(root,m,-10.03,worktop,-.26,.33,.13,m.metal);
+  const handle=new THREE.Mesh(new THREE.TorusGeometry(.15,.024,6,16,Math.PI),m.dark);handle.position.set(-10.03,worktop+.345,-.26);root.add(handle);
+  rod(root,m.metal,[-9.94,worktop+.205,-.26],[-9.81,worktop+.285,-.26],.034);
   softBag(root,m,-12.07,bottom+.08,-.79,.71,.43);
   for(let i=0;i<3;i++)box(root,m.enamel,-12.06,bottom+.58+i*.13,-.84,.66,.10,.42);
 
@@ -143,5 +168,6 @@ export function addCabinDressing(parent,m,floors){
   cargoCase(root,m,1.8,bottom+.45);
   // Keep the EVA preparation aisle clear; the former case at x=10.02 sat
   // directly in front of the third hanging suit.
+  finishStaticCups(parent);
   return root;
 }

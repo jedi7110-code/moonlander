@@ -16,6 +16,7 @@ import {LADDER_PACE,CABIN_PACE} from '../../src/obs/pace.js';
 import {createDiningStudy,applyDiningStudy,DINING_ACTIONS,diningStudyDuration} from './dining-study.js';
 import {createGym} from '../../src/obs/gym.js';
 import {applyGymStudy,GYM_STUDY_DURATION} from './gym-study.js';
+import {createMiloToon} from './toon-style.js';
 
 const POSES=[
   {id:'idle',label:'静止'},
@@ -36,20 +37,31 @@ async function start(){
   const $=id=>document.getElementById(id);
   const [m,head]=await Promise.all([materials(),loadMiloHead(),loadMiloBody()]);
   const params=new URLSearchParams(location.search),appearanceMode=params.get('mode')==='appearance';
-  $('appearance-note').textContent='提供モデル：OBJの毛束とテクスチャを頭の形に合わせて組み込み。A〜Dは従来の比較案です。';
+  let style=params.get('style')==='toon'?'toon':'original',toon=null;
+  $('appearance-note').textContent='OBS採用：髪型A・髭なし・トゥーン。髪型と髭は個別に比較できます。';
   let hair=MILO_HAIR_STYLES[params.get('hair')]?params.get('hair'):(appearanceMode?'reference':'crop'),beard=MILO_BEARD_STYLES[params.get('beard')]?params.get('beard'):(appearanceMode?'light':'rough');
   const updateUrl=extra=>{const url=new URL(location.href);url.searchParams.set('hair',hair);url.searchParams.set('beard',beard);if(appearanceMode)url.searchParams.set('mode','appearance');for(const [key,value]of Object.entries(extra))url.searchParams.set(key,value);history.replaceState(null,'',url);};
   const appearanceButtons=(target,entries,selected,onSelect)=>{
     for(const [id,entry]of Object.entries(entries)){
       const button=document.createElement('button');button.textContent=entry.label;button.title=entry.description??entry.label;button.setAttribute('aria-pressed',id===selected());
-      button.onclick=()=>{onSelect(id);for(const child of target.children)child.setAttribute('aria-pressed',child===button);head.userData.setAppearance({hair,beard});updateUrl({});pose();};target.append(button);
+      button.onclick=()=>{toon?.dispose();toon=null;onSelect(id);for(const child of target.children)child.setAttribute('aria-pressed',child===button);head.userData.setAppearance({hair,beard});if(style==='toon')toon=createMiloToon(milo);updateUrl({});pose();};target.append(button);
     }
   };
   appearanceButtons($('hair-options'),MILO_HAIR_STYLES,()=>hair,id=>hair=id);
   appearanceButtons($('beard-options'),MILO_BEARD_STYLES,()=>beard,id=>beard=id);
   head.userData.setAppearance({hair,beard});
   const milo=createMilo(m,head);
-  const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas'),antialias:true});
+  function setStyle(next){
+    toon?.dispose();style=next;toon=style==='toon'?createMiloToon(milo):null;
+    for(const value of ['original','toon'])$('style-'+value).setAttribute('aria-pressed',style===value);
+    updateUrl({style});
+  }
+  for(const value of ['original','toon']){
+    const button=$('style-'+value);button.disabled=false;button.onclick=()=>setStyle(value);
+  }
+  setStyle(style);
+  const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas'),antialias:true,stencil:true});
+  const inkViewport=new THREE.Vector4();
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x5d6263);scene.add(milo,new THREE.HemisphereLight(0xffffff,0x343a3c,2.2));
   const ladder=createStudyLadder();scene.add(ladder.root);
@@ -115,12 +127,12 @@ async function start(){
     if(view==='watch'){
       const watch=milo.userData.watch.group;watch.getWorldPosition(target);camera.zoom=6;
       controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(0,.5,3).applyQuaternion(watch.getWorldQuaternion(new THREE.Quaternion())));
-      camera.lookAt(target);camera.updateProjectionMatrix();controls.update();return;
+      camera.lookAt(target);resize();controls.update();return;
     }
     if(view==='nape'){
       milo.updateMatrixWorld(true);target.copy(head.localToWorld(new THREE.Vector3(0,-.35,-1.1)));camera.zoom=6;
       controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(0,.1,-3).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion())));
-      camera.lookAt(target);camera.updateProjectionMatrix();controls.update();return;
+      camera.lookAt(target);resize();controls.update();return;
     }
     if(view==='face'){
       el=.04;
@@ -140,9 +152,9 @@ async function start(){
     if(current.id==='tablet'&&['tablet-side','tablet-screen'].includes(view)){
       milo.updateMatrixWorld(true);milo.userData.leisure.tablet.getWorldPosition(target);camera.zoom=2.5;
       controls.target.copy(target);camera.position.copy(target).add(view==='tablet-side'?new THREE.Vector3(3,.4,1):new THREE.Vector3(1.2,1.8,-2));
-      camera.lookAt(target);camera.updateProjectionMatrix();controls.update();return;
+      camera.lookAt(target);resize();controls.update();return;
     }
-    controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(Math.sin(az)*3,Math.sin(el)*3,Math.cos(az)*3));camera.lookAt(target);camera.updateProjectionMatrix();controls.update();
+    controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(Math.sin(az)*3,Math.sin(el)*3,Math.cos(az)*3));camera.lookAt(target);resize();controls.update();
   }
   $('view').add(new Option('ブーツ拡大','boots'));
   $('view').add(new Option('顔拡大','face'));
@@ -166,7 +178,7 @@ async function start(){
   $('view').onchange=setView;$('reset').onclick=()=>{$('view').value='oblique';setView();};
   function resize(){
     const w=innerWidth,h=innerHeight,top=document.querySelector('header').getBoundingClientRect().bottom+12,bottom=document.querySelector('footer').getBoundingClientRect().top-12;
-    const usable=Math.max(100,bottom-top),half=Math.max(.92,1.08*h/w,1.03*h/usable),offset=((top+bottom)/2-h/2)*2*half/h;
+    const usable=Math.max(100,bottom-top),half=Math.max(.92,1.08*h/w,1.03*h/usable),offset=((top+bottom)/2-h/2)*2*half/h/camera.zoom;
     renderer.setSize(w,h,false);camera.top=half+offset;camera.bottom=-half+offset;camera.left=-half*w/h;camera.right=half*w/h;camera.updateProjectionMatrix();
     if(appearanceMode){renderer.setViewport(0,h-bottom,w,usable);camera.top=.235;camera.bottom=-.235;camera.left=-.235*w/usable;camera.right=.235*w/usable;camera.updateProjectionMatrix();}
   }
@@ -176,7 +188,7 @@ async function start(){
   if(appearanceMode)$('view').value='face';
   if(paused)$('pause').textContent='再生';
   addEventListener('resize',resize);resize();pose();setView();
-  function frame(now){const dt=Math.max(0,Math.min(.1,(now-last)/1000));last=now;if(!paused){const step=dt*Number($('speed').value);watchTime+=step;const next=time+step*(current.id==='ladder'?LADDER_PACE:1);time=current.id==='gym'?Math.min(next,duration()):next%duration();if(current.id==='gym'&&time===duration()){paused=true;$('pause').textContent='再生';}pose();}controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);}
+  function frame(now){const dt=Math.max(0,Math.min(.1,(now-last)/1000));last=now;if(!paused){const step=dt*Number($('speed').value);watchTime+=step;const next=time+step*(current.id==='ladder'?LADDER_PACE:1);time=current.id==='gym'?Math.min(next,duration()):next%duration();if(current.id==='gym'&&time===duration()){paused=true;$('pause').textContent='再生';}pose();}controls.update();renderer.getViewport(inkViewport);toon?.update(inkViewport.z,inkViewport.w);renderer.render(scene,camera);requestAnimationFrame(frame);}
   requestAnimationFrame(frame);
 }
 start().catch(error=>{console.error(error);document.getElementById('status').textContent='読み込みに失敗しました';document.getElementById('error').textContent=error.message;});

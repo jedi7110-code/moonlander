@@ -14,6 +14,7 @@ import {createStretchStudy,STRETCH_DURATION} from './stretch-study.js';
 import {createLucyTurnRig} from '../../src/obs/lucy-turn.js';
 import {createCatTurn,sampleCatTurn} from '../../src/obs/cat-turn.js';
 import {createProneStudy,PRONE_DURATION} from './prone-study.js';
+import {createLucyToon} from './toon-style.js';
 
 export const STUDY_ACTIONS=[
   {id:'idle',label:'待機',clip:'Idle'},
@@ -66,7 +67,19 @@ async function start(){
   addLucyWhiskerPads(lying);addLucyPawPads(lying);addLucyPupilShape(lying);
   animateLucy(lying,{dt:.1,time:0,mode:'idle',yaw:0});
   const prone=createProneStudy(lying);
-  const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas'),antialias:true});
+  const cats=[cat,sleep,jumping,stretching,turning,lying];
+  let toon=[];
+  function setStyle(style){
+    toon.forEach(effect=>effect.dispose());
+    toon=style==='toon'?cats.map(root=>createLucyToon(root,{thresholds:[.8,1.3]})):[];
+    $('style-original').setAttribute('aria-pressed',style!=='toon');
+    $('style-toon').setAttribute('aria-pressed',style==='toon');
+  }
+  for(const style of ['original','toon']){
+    const button=$('style-'+style);button.disabled=false;button.onclick=()=>setStyle(style);
+  }
+  setStyle(new URLSearchParams(location.search).get('style')==='toon'?'toon':'original');
+  const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas'),antialias:true,stencil:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x62676b);scene.add(cat,sleep,jumping,stretching,turning,lying,new THREE.HemisphereLight(0xffffff,0x414749,2));
   const key=new THREE.DirectionalLight(0xffffff,2.5);key.position.set(-3,5,4);key.castShadow=true;key.shadow.mapSize.set(2048,2048);
@@ -151,7 +164,7 @@ async function start(){
       renderer.domElement.dataset.poseMs=(poseCost/Math.max(1,poseCount)).toFixed(2);
       reportStart=now;poseCount=0;poseCost=0;
     }
-    controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);
+    controls.update();toon.forEach(effect=>effect.update(innerWidth,innerHeight));renderer.render(scene,camera);requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }

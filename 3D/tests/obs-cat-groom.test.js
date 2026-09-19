@@ -50,11 +50,14 @@ test('entering a cat passage overrides grooming and preserves its low-clearance 
   assert.equal(root.userData.groom.weight,0);assert.equal(root.userData.body.scale.y,.86);assert.equal(root.userData.tongue.visible,false);
 });
 test('every rest starts its own animation clock; feeding and pause keep the routine coherent',()=>{
-  const cat=new CatRoutine(new Supplies());cat.rest('groom',16);cat.update(2);assert.equal(cat.modeTime,2);
-  cat.update(0);assert.equal(cat.modeTime,2);cat.fetch();assert.equal(cat.pendingMove.kind,'fetch');assert.equal(cat.modeTime,2);
-  const laneDetour=2*(CAT_PORT.walkZ-CAT_BOWL.depth)/(cat.motion.walkSpeed*.022);
-  for(let i=0;i<(45+laneDetour)*60&&cat.mode!=='eat';i++)cat.update(1/60);
-  assert.equal(cat.mode,'eat');assert.equal(cat.modeTime,0);assert.equal(cat.motion.x,CAT_BOWL.approachX);
-  for(let i=0;i<9*60&&cat.mode==='eat';i++)cat.update(1/60);
-  assert.ok(['groom','sleep','look','walk'].includes(cat.mode));assert.equal(cat.modeTime,0);
+  // Include the approved stretch/prone choices without a random pass/fail result.
+  for(const random of [0,.25,.5,.75,.9,.99]){
+    const cat=new CatRoutine(new Supplies(),{random:()=>random});cat.rest('groom',16);cat.update(2);assert.equal(cat.modeTime,2);
+    cat.update(0);assert.equal(cat.modeTime,2);cat.fetch();assert.equal(cat.pendingMove.kind,'fetch');assert.equal(cat.modeTime,2);
+    const laneDetour=2*(CAT_PORT.walkZ-CAT_BOWL.depth)/(cat.motion.walkSpeed*.022);
+    for(let i=0;i<(45+laneDetour)*60&&cat.mode!=='eat';i++)cat.update(1/60);
+    assert.equal(cat.mode,'eat');assert.equal(cat.modeTime,0);assert.equal(cat.motion.x,CAT_BOWL.approachX);
+    for(let i=0;i<9*60&&cat.mode==='eat';i++)cat.update(1/60);
+    assert.ok(['groom','sleep','look','walk','stretch','prone'].includes(cat.mode));assert.equal(cat.modeTime,0);
+  }
 });

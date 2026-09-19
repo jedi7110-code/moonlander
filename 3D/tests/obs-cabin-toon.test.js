@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {Group,Mesh,BoxGeometry,MeshStandardMaterial,MeshBasicMaterial,MeshPhysicalMaterial} from 'three';
+import {createCabinToon} from '../src/obs/cabin-toon.js';
+
+test('three cabin variants retain original materials, shared geometry and unaffected objects',()=>{
+  const root=new Group(),geometry=new BoxGeometry(2,2,1),paint=new MeshStandardMaterial({color:0xbbaabb});
+  const wall=new Mesh(geometry,paint),door=new Mesh(geometry,paint);root.add(wall,door);
+  const screen=new Mesh(geometry,new MeshBasicMaterial()),glass=new Mesh(geometry,new MeshPhysicalMaterial({transparent:true}));
+  const wet=new Mesh(geometry,new MeshStandardMaterial({name:'Industrial / wet chain'}));root.add(screen,glass,wet);
+  const untouched=[screen.material,glass.material,wet.material],character=new Mesh(geometry,paint);
+  const effect=createCabinToon([root]);effect.update(900,500);
+  assert.equal(wall.material,paint);
+  effect.setStyle('cartoon');assert(wall.material.isMeshToonMaterial);assert.equal(door.material,wall.material);
+  assert.equal(character.material,paint,'a shared source outside the ship is untouched');
+  const shells=root.children.filter(m=>m.name==='Cabin toon outline');assert.equal(shells.length,2);
+  assert(shells.every(m=>m.visible&&m.geometry===geometry&&m.material.uniforms.width.value===1));
+  effect.update(900,500,15,15);assert.equal(effect.width,0);assert(shells.every(m=>!m.visible),'no outline passes at full view');
+  effect.update(900,500,15/1.75,15);assert(Math.abs(effect.width-.5)<1e-12);assert(shells.every(m=>m.visible));
+  effect.update(900,500,6,15);assert.equal(effect.width,1);
+  effect.update(900,500,2,15);assert.equal(effect.width,1,'close zoom stays capped');
+  effect.update(900,500,18,15);assert.equal(effect.width,0);assert(shells.every(m=>!m.visible),'zooming back out removes outlines');
+  effect.update(900,500,6,15);
+  door.position.x=3;door.visible=false;effect.update(900,500);root.updateMatrixWorld(true);
+  assert.equal(shells[1].matrix,door.matrix);assert.equal(shells[1].visible,false);
+  const toon=wall.material;effect.setStyle('flat');assert.equal(wall.material,toon);assert(shells.every(m=>!m.visible));
+  effect.update(900,500,2,15);assert.equal(effect.width,0);assert(shells.every(m=>!m.visible),'the no-outline variant stays unlined at close zoom');
+  assert.deepEqual([screen.material,glass.material,wet.material],untouched);
+  effect.setStyle('current');assert.equal(wall.material,paint);assert.equal(door.material,paint);
+  let disposed=false;geometry.addEventListener('dispose',()=>disposed=true);effect.dispose();
+  assert(!disposed);assert.equal(root.children.filter(m=>m.name==='Cabin toon outline').length,0);
+  geometry.dispose();paint.dispose();untouched.forEach(m=>m.dispose());
+});
+
+test('machined metal keeps reflections while outlines follow the selected style and zoom',()=>{
+  const root=new Group(),geometry=new BoxGeometry(1,1,1);
+  const material=new MeshPhysicalMaterial({metalness:.94,roughness:.4});
+  material.userData.cabinKeepSurface=true;
+  const seat=new Mesh(geometry,material);root.add(seat);
+  const effect=createCabinToon([root]);
+  effect.setStyle('cartoon');effect.update(900,500,6,15);
+  const outline=root.children.find(mesh=>mesh.name==='Cabin toon outline');
+  assert.equal(seat.material,material);assert(outline?.visible);
+  effect.update(900,500,15,15);assert(!outline.visible);
+  effect.setStyle('flat');effect.update(900,500,6,15);
+  assert.equal(seat.material,material);assert(!outline.visible);
+  effect.setStyle('current');assert.equal(seat.material,material);assert(!outline.visible);
+  effect.dispose();assert.equal(root.children.length,1);
+  geometry.dispose();material.dispose();
+});

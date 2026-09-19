@@ -22,16 +22,29 @@ import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {diningPhase,diningApproach} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 import {applyCabinLadder} from './cabin-ladder.js';
+import {createLucyToon} from './lucy-toon.js';
+import {createMiloToon} from './milo-toon.js';
+import {createCabinToon} from './cabin-toon.js';
+import {createCabinSignage} from './cabin-signage.js';
+import {finishCabinFixtures} from './cabin-fixtures.js';
 
 export class ObservationView {
-  static async create(canvas){
+  static async create(canvas,{cabinStyle='cartoon'}={}){
     const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment(),loadMiloBody()]);
-    head.userData.setAppearance({hair:'reference',beard:'rough'});
-    return new ObservationView(canvas,m,head,lucy);
+    head.userData.setAppearance({hair:'crop',beard:'none'});
+    const view=new ObservationView(canvas,m,head,lucy);
+    try{
+      finishCabinFixtures(view);
+      const roots=[view.ship.staticMesh,view.ship.animated];
+      view.cabinSignage=await createCabinSignage(roots);
+      view.cabinToon=createCabinToon(roots);
+      view.cabinToon.setStyle(cabinStyle);
+      return view;
+    }catch(error){view.dispose();throw error;}
   }
   constructor(canvas,m,head,lucy){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
-    this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+    this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,stencil:true,powerPreference:'high-performance'});
     this.renderer.localClippingEnabled=true;
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,CABIN_PIXEL_RATIO));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=CABIN_AMBIENCE.exposure;
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -43,6 +56,7 @@ export class ObservationView {
     const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
     this.ship=buildShip(m);limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
     this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
+    this.characterToon=[createMiloToon(this.milo),createLucyToon(this.cat)];
     this.camera=new THREE.PerspectiveCamera(24,1,.1,150);
     this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -189,7 +203,9 @@ export class ObservationView {
     if(this.mode==='milo')this.targetCenter.copy(this.milo.position).add(new THREE.Vector3(0,.9,0));
     if(this.mode==='cat')this.targetCenter.copy(this.cat.position).add(new THREE.Vector3(0,.37*this.cat.scale.y,0));
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
+    this.characterToon.forEach(toon=>toon.update(this.width,this.height));
+    this.cabinToon?.update(this.width,this.height,this.viewHeight,this.fitHeight);
     this.renderer.render(this.scene,this.camera);
   }
-  dispose(){this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

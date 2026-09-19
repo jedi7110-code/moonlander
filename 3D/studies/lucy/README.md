@@ -1,5 +1,12 @@
 # Lucy: Biological Study
 
+## トゥーン表示（2026-09-19・OBS本編採用）
+
+`node studies/lucy/study-server.mjs` で起動し、<http://127.0.0.1:8767/review/all-actions.html?style=toon> を開きます。
+「通常 / トゥーン」で同じ姿勢・時刻・視点のまま比較できます。三毛の頂点色と承認済みの造形・動作を維持し、三段階の陰影と細い濃紺の輪郭線を猫だけに追加しています。瞳の艶とひげは維持します。
+毛繕いの変形面、横寝、伸び、伏せにも対応。輪郭線1.2 CSS pxでOBS本編にも反映しています。
+実装は `src/obs/lucy-toon.js` と共通（`toon-style.js` は再エクスポート）。検証は `node --test studies/lucy/toon-style.test.js`。
+
 ## 現在の採用版（2026-09-15）
 
 ユーザーの「全部OK、OBS反映」により、**伸び・伏せを含む全行動が採用済み・OBS本編反映済み**です。以下の「確認中」「本編未反映」は制作時の履歴で、現在の状態ではありません。

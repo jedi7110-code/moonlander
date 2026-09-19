@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>船内スタディー | TARAIRON</title>
+<link rel="stylesheet" href="/studies/cabin/style.css"></head>
+<body>
+<header>
+  <div class="heading"><div><p class="eyebrow">TARAIRON / MATERIAL STUDY</p><h1>船内の描画比較</h1></div><span class="badge">STUDY</span></div>
+  <nav class="styles" aria-label="船内の表示表現">
+    <button data-style="current" aria-pressed="true" disabled><span>01</span>今のver<small>現在の材質</small></button>
+    <button data-style="cartoon" aria-pressed="false" disabled><span>02</span>cartoon ver<small>三段階の陰影 ＋ 輪郭線</small></button>
+    <button data-style="flat" aria-pressed="false" disabled><span>03</span>cartoon 線なしver<small>三段階の陰影</small></button>
+  </nav>
+  <p id="description">同じ船内・照明・視点で比較。猫とマイロは共通のトゥーン表示です。</p>
+</header>
+<main>
+  <canvas id="ship-view" aria-label="船内の材質を比較する3Dビュー"></canvas>
+  <div id="loading" role="status">船内を読み込み中…</div>
+  <div class="toolbar">
+    <label>視点 <select id="view" disabled>
+      <option value="all">全景</option><option value="habitation">居住区・ラウンジ</option>
+      <option value="galley">キッチン・給水</option><option value="operations">操縦区・医療</option>
+      <option value="machinery">機関・補給ハッチ</option><option value="manual" hidden>自由視点</option>
+    </select></label>
+    <button id="out" aria-label="縮小" disabled>−</button><button id="in" aria-label="拡大" disabled>＋</button>
+    <button id="reset" disabled>視点を戻す</button>
+  </div>
+  <span class="canvas-label" id="version">01 / CURRENT</span>
+  <span class="hint">ドラッグ：移動　スクロール：拡大縮小</span>
+</main>
+<footer>
+  <div class="footer-row"><p>船内スタディー。OBS本編反映済み。輪郭線 0→1px（現在 <span id="outline-width">0.00px</span>）。</p>
+    <div class="actions"><button id="signage" disabled>サイン見本</button><button id="animate" aria-pressed="false" disabled>動きを再生</button><button id="measure" disabled>この視点で負荷比較</button></div>
+  </div>
+  <p id="status" role="status">準備中</p>
+  <section id="comparison" hidden aria-label="同じ視点での負荷比較">
+    <div class="comparison-heading"><span id="measured-context"></span><button id="close-comparison">閉じる</button></div>
+    <div class="table-scroll"><table><thead><tr><th>表示</th><th>FPS</th><th>GPU時間</th><th>描画回数</th></tr></thead><tbody id="measurements"></tbody></table></div>
+    <p>各表示を同じ静止状態で2回測定した目安です。GPU時間は小さいほど軽く、FPSは画面の更新上限や他の処理にも左右されます。</p>
+  </section>
+  <p id="error" role="alert" hidden></p>
+</footer>
+<dialog id="sign-dialog" aria-labelledby="sign-title">
+  <div class="comparison-heading"><h2 id="sign-title">船内サイン</h2><button id="close-signs">閉じる</button></div>
+  <p id="sign-summary"></p>
+  <p>NASA Graphics Standards Manual §5.3・6.1・6.2を参考にした書体・字間・余白です。</p>
+  <div id="sign-samples"></div>
+</dialog>
+<style>
+#sign-dialog{width:min(840px,92vw);max-height:86vh;padding:22px;border:1px solid #6e776a;background:#151e1b;color:#eae9dd;border-radius:8px}#sign-dialog::backdrop{background:#0009}#sign-title{font-size:19px;margin:0}#sign-dialog p{font-size:12px;color:#b8c0b0}#sign-samples{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}#sign-samples figure{margin:0;min-width:0}#sign-samples figcaption{font-size:12px;margin:6px 0 12px}#sign-samples span{display:block;font-size:10px;color:#a5b09c;margin:8px 0 4px}#sign-samples canvas{position:static;width:100%;height:auto;max-height:130px;object-fit:contain;object-position:left}#sign-samples figure[data-fits=false]{outline:1px solid #eb7255}@media(max-width:520px){#sign-samples{grid-template-columns:1fr}}
+</style>
+<script type="module" src="/studies/cabin/study.js"></script>
+</body></html>
