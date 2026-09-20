@@ -6,6 +6,7 @@ import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
 import {ObservationView} from './view.js';
+import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
 import {AirlockPassage} from './airlock.js';
@@ -22,6 +23,7 @@ const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?wor
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
 let paused=false,elapsed=0,view=null,frame=0,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
+let idleCamera=null,unbindIdleCamera=null;
 const timers=[];
 let messageTimer=null;
 function dismissMessage(){
@@ -236,7 +238,8 @@ async function start(){
   try{
     view=await ObservationView.create($('ship-view'));
     view.feedback=feedback;
-    view.onModeChange=()=>updateHUD();
+    idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
+    view.onModeChange=()=>{idleCamera.modeChanged();updateHUD();};
     view.onStation=id=>{
       if(id==='lounge'){loungeClick();return;}
       if(id==='console'){requestSupply();return;}
@@ -249,6 +252,7 @@ async function start(){
     $('loading').hidden=true;
     function tick(now){
       const dt=Math.min((now-previous)/1000,.05);previous=now;
+      idleCamera.update(now,{blocked:paused||document.hidden||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
       if(!paused&&!document.hidden&&!games.open){
         accumulator+=dt;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
@@ -263,5 +267,5 @@ async function start(){
   }catch(error){console.error(error);$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
 }
 $('ship-view').addEventListener('webglcontextlost',event=>{event.preventDefault();setPause(true);$('obs-error').hidden=false;$('obs-error').textContent=words('映像接続が中断されました。ページを再読み込みしてください。','Graphics connection interrupted. Please reload the page.');});
-window.addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(frame);games.dispose();view?.dispose();audio.dispose();}});
+window.addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(frame);unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
 start();
