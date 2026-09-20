@@ -27,6 +27,7 @@ import {createMiloToon} from './milo-toon.js';
 import {createCabinToon} from './cabin-toon.js';
 import {createCabinSignage} from './cabin-signage.js';
 import {finishCabinFixtures} from './cabin-fixtures.js';
+import {updateMiloBandage} from './milo-bandage.js';
 
 export class ObservationView {
   static async create(canvas,{cabinStyle='cartoon'}={}){
@@ -203,6 +204,8 @@ export class ObservationView {
     if(this.mode==='milo')this.targetCenter.copy(this.milo.position).add(new THREE.Vector3(0,.9,0));
     if(this.mode==='cat')this.targetCenter.copy(this.cat.position).add(new THREE.Vector3(0,.37*this.cat.scale.y,0));
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
+    // Late ladder/medical fitting must reach the bandage before GPU upload.
+    updateMiloBandage(this.milo);
     this.characterToon.forEach(toon=>toon.update(this.width,this.height));
     this.cabinToon?.update(this.width,this.height,this.viewHeight,this.fitHeight);
     this.renderer.render(this.scene,this.camera);

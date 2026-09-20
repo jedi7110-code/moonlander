@@ -47,7 +47,7 @@ const scene={
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     healthEvent(event){
       if(event.type==='onset'){
-        showMessage(event.kind==='fever'?words('寒気がする。熱もあるようだ。','I have chills. I think I am running a fever.'):event.source==='fitting'?words('点検中、金具で左腕を切った。手当てが要りそうだ。','I cut my left arm on a fitting. It needs dressing.'):words('足元がふらついて、左腕を壁で擦った。','I lost my footing and scraped my left arm against the wall.'));
+        showMessage(event.kind==='fever'?words('寒気がする。熱もあるようだ。','I have chills. I think I am running a fever.'):event.source==='fitting'?words('点検中、金具で右腕を切った。手当てが要りそうだ。','I cut my right arm on a fitting. It needs dressing.'):words('足元がふらついて、右腕を壁で擦った。','I lost my footing and scraped my right arm against the wall.'));
         audio.tone(240,.25,.035);
       }else if(event.type==='worsened'){
         showMessage(event.stage==='critical'?words('もう作業を続けられない。医療区画へ向かう。','I cannot keep working. I am heading to the medical bay.'):words('具合が悪くなってきた。早く手当てを受けたい。','I am getting worse. I need treatment soon.'));

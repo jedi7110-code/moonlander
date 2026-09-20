@@ -7,6 +7,7 @@ import {loadMiloBody} from '../../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../../src/obs/characters.js';
 import {miloWalkData as walkData} from '../../src/obs/mocap-walk.js';
 import {updateMiloWatch} from '../../src/obs/milo-watch.js';
+import {updateMiloBandage} from '../../src/obs/milo-bandage.js';
 import {LADDER,applyLadderStudy,createStudyLadder} from './ladder-study.js';
 import {setLadderHandFit} from './ladder-hand-fit.js';
 import {createMedicalBay,animateMedical,medicalDuration,MED_BED} from '../../src/obs/medical.js';
@@ -81,6 +82,9 @@ async function start(){
   let current=POSES.find(p=>p.id===entryPose)??POSES[1],time=entryPose==='medical'?12:entryPose==='tablet'?3:0,watchTime=0,paused=appearanceMode||['medical','tablet','seat','injury'].includes(entryPose),last=performance.now();
   const duration=()=>current.id==='gym'?GYM_STUDY_DURATION:DINING_ACTIONS.includes(current.id)?diningStudyDuration(current.id):current.id==='tablet'?36:current.id==='medical'?medicalDuration():current.id==='mocap'?walkData.duration:current.id==='ladder'?LADDER.duration:8;
   const originalArms=milo.userData.arms.map(({arm})=>arm.position.clone());
+  const bandageLabel=document.createElement('label'),bandageToggle=document.createElement('input');
+  bandageToggle.type='checkbox';bandageToggle.checked=params.get('bandage')==='1';bandageLabel.append(bandageToggle,'包帯を表示');$('pause').before(bandageLabel);
+  bandageToggle.onchange=()=>{updateUrl({bandage:bandageToggle.checked?'1':'0'});pose();};
   function pose(){
     // Restore the source before animateMilo selects the tablet fit. The ladder
     // fit is applied below, so switching never clones another pose's mesh.
@@ -106,6 +110,8 @@ async function start(){
       ladder.update(ladderSample,$('contacts').checked);
     }
     updateMiloWatch(milo,8+watchTime*1000/CABIN_PACE.dayMs*24);
+    milo.userData.bandage.visible=bandageToggle.checked;
+    updateMiloBandage(milo);
     if(current.id!=='medical'&&!dining.root.visible&&!gym.root.visible)milo.rotation.y=0;
     $('time').value=time;$('clock').value=`${time.toFixed(2)}秒`;$('status').textContent=`${MILO_HAIR_STYLES[hair].label} / ${MILO_BEARD_STYLES[beard].label} / ${current.id==='mocap'?'歩行・実測・OBSと共通':current.label}`;
     if(ladderSample){const moving=ladderSample.contacts.find(c=>c.moving);$('status').textContent=`梯子・本編 / ${moving?moving.label+'を掛け替え':'四点で支持'} / 段間隔28cm`;$('support').textContent=ladderSample.contacts.map(c=>`${c.label} ${c.moving?'移動':'支持'}`).join('　');}

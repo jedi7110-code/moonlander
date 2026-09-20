@@ -27,6 +27,7 @@ import {applySeatedLegSpread} from './seated-pose.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
 import {attachMiloBody} from './milo-body.js';
 import {attachMiloWatch,updateMiloWatch} from './milo-watch.js';
+import {attachMiloBandage,updateMiloBandage} from './milo-bandage.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
 function limb(parent,mat,length,profile,depth=1) {
@@ -195,11 +196,8 @@ export function createMilo(m,headModel=new THREE.Group()) {
   const headParts=new Set();head.traverse(o=>headParts.add(o));
   const legacy=[];body.traverse(o=>{if(o.isMesh&&!headParts.has(o)&&[m.skin,m.cloth,pants].includes(o.material))legacy.push(o);});
   const dining=createDiningProps(body,m),{mug}=dining;
-  const bandage=new THREE.Group();bandage.position.y=-.13;arms[0].elbow.add(bandage);bandage.visible=false;
-  cylinder(bandage,m.cloth,0,0,0,.049,.105,.049,24);
-  for(const y of [-.037,-.013,.013,.037])cylinder(bandage,m.white,0,y,0,.050,.009,.050,24);
   const leisure=createLeisureProps(body,m);
-  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,bandage,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);
+  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);attachMiloBandage(root,m);
   for(const {hand} of arms)hand.scale.multiplyScalar(1.08);
   root.userData.updateWristTwists?.();attachMiloWatch(root);return root;
 }
@@ -309,6 +307,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     body.position.y=0;applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
   root.userData.updateWristTwists?.();
+  updateMiloBandage(root);
   updateMiloWatch(root,shipHour);
   // Raycast bounds must follow the current pose, not the first observed pose.
   if(root.userData.bodySkin){root.userData.bodySkin.boundingBox=null;root.userData.bodySkin.boundingSphere=null;}

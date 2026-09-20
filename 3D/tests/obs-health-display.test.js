@@ -16,7 +16,7 @@ test('the compact health label tracks symptoms and recovery in both languages',(
   health.treatment=null;health.condition=null;health.value=84;
   assert.equal(healthDisplay(health).label,'回復');assert.equal(healthDisplay(health,{lang:'en'}).label,'Recovery');
   health.value=100;assert.equal(healthDisplay(health).label,'健康');
-  health.startCondition('injury');assert.equal(healthDisplay(health).label,'怪我');assert.equal(healthDisplay(health,{lang:'en'}).title,'Left arm injury / Needs treatment');
+  health.startCondition('injury');assert.equal(healthDisplay(health).label,'怪我');assert.equal(healthDisplay(health).title,'右腕の怪我 / 要手当て');assert.equal(healthDisplay(health,{lang:'en'}).title,'Right arm injury / Needs treatment');
 });
 
 test('the detail action distinguishes travelling, examination and treatment',()=>{
