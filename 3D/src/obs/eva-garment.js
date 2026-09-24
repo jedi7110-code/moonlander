@@ -3,7 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
 let geometry=null;
 
-export async function loadEVAGarment(url=`${import.meta.env.BASE_URL}assets/obs/eva/pressure-garment.glb`){
+export async function loadEVAGarment(url=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/eva/pressure-garment.glb`){
   if(geometry)return geometry;
   const gltf=await new GLTFLoader().loadAsync(url);
   gltf.scene.updateMatrixWorld(true);

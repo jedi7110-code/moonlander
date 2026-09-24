@@ -38,11 +38,11 @@ function styleDisplacement(style,p,{top,edge,clump,front}){
   return{volume:.003+edge*(.008+top*(.12+.09*clump)),x:-top*edge*.17,y:0,z:-top*edge*.06};
 }
 
-export function createHair(scalp,style='crop'){
+export function createHair(scalp,style='crop',{hairline:edgeAt=hairline}={}){
   if(!MILO_HAIR_STYLES[style])style='crop';
   if(style!=='crop')return createGroom(scalp,style,hairline);
   const source=scalp.index?scalp.toNonIndexed():scalp,position=source.attributes.position,normal=source.attributes.normal,vertices=[],coverage=[];
-  const signed=p=>p.y-Math.max(hairline(p.x,p.z)+.04,2.22+.08*Math.sin(p.x*4+p.z*3));
+  const signed=p=>p.y-Math.max(edgeAt(p.x,p.z)+.04,2.22+.08*Math.sin(p.x*4+p.z*3));
   // Clip the cap to an irregular hairline rather than leaving entire scan triangles at its edge.
   for(let i=0;i<position.count;i+=3){
     const polygon=[];

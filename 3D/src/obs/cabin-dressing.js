@@ -154,8 +154,7 @@ export function addCabinDressing(parent,m,floors){
   tin(root,m,-10.03,worktop,-.26,.33,.13,m.metal);
   const handle=new THREE.Mesh(new THREE.TorusGeometry(.15,.024,6,16,Math.PI),m.dark);handle.position.set(-10.03,worktop+.345,-.26);root.add(handle);
   rod(root,m.metal,[-9.94,worktop+.205,-.26],[-9.81,worktop+.285,-.26],.034);
-  softBag(root,m,-12.07,bottom+.08,-.79,.71,.43);
-  for(let i=0;i<3;i++)box(root,m.enamel,-12.06,bottom+.58+i*.13,-.84,.66,.10,.42);
+  // The floor space left of the galley is reserved for the waste incinerator.
 
   // Strapped stores and a rope net give the cargo bay a worked-in foreground.
   for(const x of [11.30,12.20]){

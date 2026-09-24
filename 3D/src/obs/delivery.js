@@ -22,6 +22,7 @@ export function animateDelivery(ship,care,reducedMotion=false){
   ship.cargo.forEach((group,index)=>{
     const pose=unloading?cargoPose(reducedMotion?(age<2.1?0:2.5):age,index):{visible:care.lastDelivery!==null,y:0,z:0,tilt:0};
     group.userData.deliveryX??=group.position.x;
-    group.visible=pose.visible;group.position.x=group.userData.deliveryX+(pose.x??0);group.position.y=.675+pose.y;group.position.z=.32+pose.z;group.rotation.z=pose.tilt;
+    const handled=!unloading&&care.cargoHandling?.delivery===care.lastDelivery&&care.cargoHandling.picked.includes(index);
+    group.visible=pose.visible&&!handled;group.position.x=group.userData.deliveryX+(pose.x??0);group.position.y=.675+pose.y;group.position.z=.32+pose.z;group.rotation.z=pose.tilt;
   });
 }

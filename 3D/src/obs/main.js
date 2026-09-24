@@ -1,4 +1,4 @@
-import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
+import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinLoungeGames} from './lounge-games.js';
 import {loungeGamePromptAvailable,updateLoungeGamePrompt} from './lounge-prompt.js';
@@ -6,6 +6,7 @@ import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
 import {ObservationView} from './view.js';
+import {ObservationXR} from './xr.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
@@ -13,16 +14,17 @@ import {AirlockPassage} from './airlock.js';
 import {Sprout} from 'lucide';
 import {PLANT} from './layout.js';
 import {healthDisplay} from './health-display.js';
+import {DroidRoutine} from './droid-routine.js';
 
 const $=id=>document.getElementById(id);
-const icons={Sprout,Pause,Play,VolumeX,Volume2,Cat,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
+const icons={Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
 const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
-let paused=false,elapsed=0,view=null,frame=0,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
+let paused=false,elapsed=0,view=null,immersive=null,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
 let idleCamera=null,unbindIdleCamera=null;
 const timers=[];
 let messageTimer=null;
@@ -43,7 +45,7 @@ const scene={
     flashMonitor(){$('call-alert').animate([{opacity:.6},{opacity:1}],{duration:350});},
     showWant(text){$('call-text').textContent=text.replace(t('want_hint'),'');$('call-alert').hidden=false;},
     hideWant(){$('call-alert').hidden=true;},
-    openGame(kind){pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');games.show(kind);$('lounge-game-prompt').hidden=true;audio.pause(true);},
+    openGame(kind){void immersive?.exit();pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');games.show(kind);$('lounge-game-prompt').hidden=true;audio.pause(true);},
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     healthEvent(event){
       if(event.type==='onset'){
@@ -107,8 +109,8 @@ function updateHUD(){
   $('delivery-status').textContent=words(...deliveryLabels[care.phase]);$('delivery-status').dataset.phase=care.phase;
   $('request-supply').disabled=Boolean(care.delivery)||!care.needsDelivery;
   $('request-supply').setAttribute('aria-label',words('コンソールから物資配送を依頼','Order supplies at console'));
-  document.querySelectorAll('[id^="view-"]').forEach(button=>{if(!['view-all','view-milo','view-cat'].includes(button.id))return;const selected=button.id==='view-'+view?.mode;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
-  $('camera-label').textContent={all:'CAM 01 / WIDE',milo:'CAM 02 / MILO',cat:'CAM 03 / LUCY',manual:'CAM / MANUAL'}[view?.mode]||'CAM 01 / WIDE';
+  document.querySelectorAll('[id^="view-"]').forEach(button=>{if(!['view-all','view-milo','view-cat','view-droid'].includes(button.id))return;const selected=button.id==='view-'+view?.mode;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
+  $('camera-label').textContent=view?.mode==='droid'?`3817 / ${view.droidRoutine.label}`:{all:'CAM 01 / WIDE',milo:'CAM 02 / MILO',cat:'CAM 03 / LUCY',manual:'CAM / MANUAL'}[view?.mode]||'CAM 01 / WIDE';
   const signal=feedback.summary,status=$('station-status');status.hidden=!signal;
   if(signal){
     const phases={hover:['',''],inspect:['在庫確認','Inventory'],moving:['移動中','En route'],waiting:['指示待機','Queued'],active:['使用中','In use'],done:['完了','Completed'],blocked:['補給待ち','Supply required'],stocked:['在庫あり','Already stocked'],unloading:['荷受け中','Unloading'],delivered:['補給済み','Delivered'],acknowledged:['応答済み','Acknowledged']};
@@ -142,11 +144,12 @@ function localize(){
   document.documentElement.lang=getLang();document.querySelectorAll('[data-ja]').forEach(el=>el.textContent=el.dataset[getLang()]);
   $('obs-lang').textContent=words('EN','JA');$('obs-lang').setAttribute('aria-label',words('Switch to English','日本語に切り替え'));
   $('obs-input').placeholder=words('マイロに話しかける','Talk to Milo');$('obs-input').setAttribute('aria-label',$('obs-input').placeholder);
-  for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['obs-fullscreen','全画面','Fullscreen'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
+  for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['obs-fullscreen','全画面','Fullscreen'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   const pauseLabel=paused?words('再開','Resume'):words('一時停止','Pause');$('obs-pause').setAttribute('aria-label',pauseLabel);$('obs-pause').dataset.tip=pauseLabel;
   $('play-chess').setAttribute('aria-label',words('ラウンジゲーム','Lounge games'));$('play-chess').dataset.tip=words('チェス・ポーカー・リバーシ','Chess · Poker · Reversi');
   $('dismiss-health').setAttribute('aria-label',words('閉じる','Close'));
   if(games.open)games.render();
+  immersive?.localize();
   if(brain.isCalling())scene.obsUI.showWant(brain._wantText());updateHUD();
 }
 function setPause(next){paused=next;$('obs-pause').innerHTML=`<i data-lucide="${paused?'play':'pause'}"></i>`;$('obs-pause').setAttribute('aria-pressed',String(paused));audio.pause(paused);refreshIcons();localize();}
@@ -178,7 +181,7 @@ function useStation(id){
 }
 function useSupply(type){
   if(type==='catfood'){
-    if(care.has(type)){cat.fetch();showMessage(words('ルーシーの餌皿へ出しておいた。',"Food is ready in Lucy's bowl."));}
+    if(care.catBowl>0||care.has(type)){cat.fetch();showMessage(words('ルーシーの餌皿へ出しておいた。',"Food is ready in Lucy's bowl."));}
     else showMessage(words('猫餌が切れている。配送を頼もう。','We are out of cat food. Time to order supplies.'));
     updateHUD();return;
   }
@@ -220,7 +223,7 @@ $('acknowledge').addEventListener('click',acknowledge);
 $('hq-message').addEventListener('click',headquarters);
 document.querySelectorAll('[data-use]').forEach(button=>button.addEventListener('click',()=>useSupply(button.dataset.use)));
 $('request-supply').addEventListener('click',requestSupply);
-for(const mode of ['all','milo','cat'])$('view-'+mode).addEventListener('click',()=>view?.setMode(mode));
+for(const mode of ['all','milo','cat','droid'])$('view-'+mode).addEventListener('click',()=>view?.setMode(mode));
 $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').addEventListener('click',()=>view?.changeZoom(1/1.3));
 if(!document.fullscreenEnabled)$('obs-fullscreen').hidden=true;
 $('obs-fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('observation').requestFullscreen();}catch{showMessage(words('全画面に切り替えられませんでした。','Fullscreen is unavailable.'),'SYSTEM');}});
@@ -231,41 +234,52 @@ document.addEventListener('keydown',event=>{
   const supply={f:'food',w:'water',c:'catfood'}[event.key.toLowerCase()];
   if(supply){event.preventDefault();useSupply(supply);}else if(event.code==='Space'){event.preventDefault();setPause(!paused);}else if(event.key==='Escape'){dismissMessage();view?.setMode('all');}
 });
-document.addEventListener('visibilitychange',()=>{previous=performance.now();accumulator=0;audio.pause(document.hidden||paused||games.open);});
+function visibilityChanged(){previous=performance.now();accumulator=0;audio.pause((immersive?.active?!immersive.visible:document.hidden)||paused||games.open);}
+document.addEventListener('visibilitychange',visibilityChanged);
 refreshIcons();localize();
 
 async function start(){
   try{
     view=await ObservationView.create($('ship-view'));
+    const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
-    view.onModeChange=()=>{idleCamera.modeChanged();updateHUD();};
+    view.onModeChange=mode=>{idleCamera.modeChanged();immersive?.focus(mode);updateHUD();};
     view.onStation=id=>{
       if(id==='lounge'){loungeClick();return;}
       if(id==='console'){requestSupply();return;}
       if(id==='hatch'){feedback.notify(id,'inspect');showMessage(care.delivery?words('補給便の受け入れを準備中。','Preparing to receive the shipment.'):words('受け入れ待機中。配送の依頼はコンソールで。','Hatch on standby. Place supply orders at the console.'),'LOGISTICS');updateHUD();return;}
       useStation(id);
     };
+    immersive=new ObservationXR(view,{
+      button:$('obs-vr'),words,getLang,notify:text=>showMessage(text,'SYSTEM'),onChange:visibilityChanged,
+      status:()=>({
+        status:`${$('ship-clock').textContent} / ${$('milo-activity').textContent} / ${words('健康','Health')} ${Math.round(brain.health.value)}`,
+        message:!$('call-alert').hidden?$('call-text').textContent:!$('dialogue').hidden?$('dialogue-text').textContent:'',
+      }),
+      action:id=>{if(['food','water','catfood'].includes(id))useSupply(id);else if(id==='supply')requestSupply();else if(id==='pause')setPause(!paused);else if(id==='reply')headquarters();},
+    });
+    view.immersive=immersive;
     brain.catRoutine=cat;
     brain.beginWakeUp();
     view.setMode('all');
     $('loading').hidden=true;
-    function tick(now){
+    function tick(now,xrFrame){
       const dt=Math.min((now-previous)/1000,.05);previous=now;
-      idleCamera.update(now,{blocked:paused||document.hidden||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
-      if(!paused&&!document.hidden&&!games.open){
+      const visible=immersive.active?immersive.visible:!document.hidden;
+      idleCamera.update(now,{blocked:immersive.active||paused||!visible||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
+      if(!paused&&visible&&!games.open){
         accumulator+=dt;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);advanceCabinTraffic(actor,cat,step);brain.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor);advanceCabinTraffic(actor,cat,step);brain.update(step);droid.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
-      if(!document.hidden){feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock);updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
+      if(visible){feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
       hudTime+=dt;if(hudTime>.15){updateHUD();hudTime=0;}
-      frame=requestAnimationFrame(tick);
     }
-    frame=requestAnimationFrame(tick);
+    view.renderer.setAnimationLoop(tick);
   }catch(error){console.error(error);$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
 }
 $('ship-view').addEventListener('webglcontextlost',event=>{event.preventDefault();setPause(true);$('obs-error').hidden=false;$('obs-error').textContent=words('映像接続が中断されました。ページを再読み込みしてください。','Graphics connection interrupted. Please reload the page.');});
-window.addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(frame);unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
+window.addEventListener('pagehide',event=>{if(!event.persisted){unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
 start();

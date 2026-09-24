@@ -13,7 +13,7 @@ const CAT_WAKE_PREP_SECONDS=.3,CAT_WAKE_LAND_SECONDS=.45;
 export function advanceCabinTraffic(actor,cat,dt){
   if(dt<=0)return;
   actor.waitingForCat=cat.motion.blocksCrew(actor,dt);
-  if(!actor.waitingForHatch&&!actor.waitingForCat)actor.update(dt);
+  if(!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid)actor.update(dt);
   cat.update(dt,actor);
 }
 
@@ -204,9 +204,12 @@ export class Supplies {
   constructor(){
     this.capacity={food:3,water:4,catfood:3};this.supplies={...this.capacity};
     this.delivery=null;this.deliveryCount=0;this.lastDelivery=null;this.onPhase=null;this.onDeliver=null;
+    this.catBowl=0;
   }
   has(type){return type==='music'||this.supplies[type]>0;}
-  take(type){if(type==='music')return true;if(!this.has(type))return false;this.supplies[type]--;return true;}
+  take(type){if(type==='music')return true;if(!this.has(type))return false;this.supplies[type]--;if(type==='food')this.preparedMeals=0;return true;}
+  fillCatBowl(){if(this.catBowl>0||!this.take('catfood'))return false;this.catBowl=1;return true;}
+  eatCatFood(){if(this.catBowl>0){this.catBowl--;return true;}return this.take('catfood');}
   get depleted(){return Object.keys(this.capacity).some(type=>!this.has(type));}
   get needsDelivery(){return Object.keys(this.capacity).some(type=>this.supplies[type]<this.capacity[type]);}
   get phase(){return this.delivery?.phase||'idle';}
@@ -310,7 +313,7 @@ export class CatRoutine {
   endFollow(){this.motion.goTo({floor:this.motion.floor,x:this.motion.x});this.rest('look',this.between(5,9));}
   choose(){
     // Fulfil actual needs, but sample their weights instead of repeating a fixed tour.
-    const choices=[['fetch',this.care.has('catfood')&&this.hunger<70?(100-this.hunger)**2/100:0],['sleep',1+(100-this.energy)**2/100],['groom',1+this.groomNeed**2/100],['look',12+this.curiosity*.15],['stretch',8],['prone',10],['follow',this.canFollow()?18:0],['walk',5+this.curiosity**2/100]];
+    const choices=[['fetch',(this.care.catBowl>0||this.care.has('catfood'))&&this.hunger<70?(100-this.hunger)**2/100:0],['sleep',1+(100-this.energy)**2/100],['groom',1+this.groomNeed**2/100],['look',12+this.curiosity*.15],['stretch',8],['prone',10],['follow',this.canFollow()?18:0],['walk',5+this.curiosity**2/100]];
     let draw=this.random()*choices.reduce((sum,[,weight])=>sum+weight,0),mode='walk';
     for(const [candidate,weight]of choices){draw-=weight;if(draw<0){mode=candidate;break;}}
     if(mode==='fetch'){this.fetch();return;}
@@ -325,6 +328,7 @@ export class CatRoutine {
   update(dt,actor=null){
     if(dt<=0)return;
     this.companion=actor;
+    if(this.waitForDroidFood&&!this.care.catBowlFilling){this.waitForDroidFood=false;this.fetch();}
     const wake=this.bunkWake?.visit;
     if(wake&&((wake.phase==='rising'&&wake.age>=CAT_WAKE_LAND_SECONDS)||['seated','standing','retracting','sealing','departing','done'].includes(wake.phase)))this.finishBunkWake();
     if(this.bunkWake){
@@ -375,12 +379,12 @@ export class CatRoutine {
     }
     if(this.mode==='fetch'||this.motion.busy)return;
     if(this.pendingMove){this.remaining-=dt;if(this.remaining<=0){const {run}=this.pendingMove;this.pendingMove=null;run();}return;}
-    if(this.hunger<25&&this.care.has('catfood')){this.fetch();return;}
+    if(this.hunger<25&&(this.care.catBowl>0||this.care.has('catfood'))){this.fetch();return;}
     this.remaining-=dt;if(this.remaining>0)return;
     if(this.mode==='eat')this.groomNeed=Math.min(100,this.groomNeed+25);
     this.choose();
   }
-  fetch(){if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=CAT_WALK_SPEED;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX,z:CAT_BOWL.depth},()=>{if(this.care.take('catfood')){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
+  fetch(){if(this.care.catBowlFilling){this.waitForDroidFood=true;return;}if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=CAT_WALK_SPEED;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX,z:CAT_BOWL.depth},()=>{if(this.care.eatCatFood()){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
 }
 
 export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}

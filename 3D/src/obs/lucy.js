@@ -26,7 +26,7 @@ function transitionIK(model){
 }
 
 export async function loadLucy(version=''){
-  return new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}${LUCY.asset}${version?`?v=${encodeURIComponent(version)}`:''}`);
+  return new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL??'/3D/'}${LUCY.asset}${version?`?v=${encodeURIComponent(version)}`:''}`);
 }
 
 export function disposeLucy(root){

@@ -124,6 +124,7 @@ export class CabinBrain extends Brain {
   _usable(station){return station.id!=='stereo'&&!(station.id==='gym'&&this.health.needsCare)&&super._usable(station);}
   _go(station){
     station=getStation(station?.id);if(!station)return false;
+    if(this.droidRoutine?.reserveForCrew(station.id,()=>this._go(station)))return true;
     if(station.id==='medical'&&this.state==='performing'&&this.cur?.id==='medical')return true;
     if(this.deferDeparture(()=>this._go(station)))return true;
     if(station.id!=='lounge')this.nextLeisure=null;

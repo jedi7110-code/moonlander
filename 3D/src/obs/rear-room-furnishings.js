@@ -16,10 +16,12 @@ function laundry(root,m,wearMaterials){
     box(unit,m.teal,-.16,.75,.408,.24,.055,.012);
     const knob=cylinder(unit,m.metal,.25,.75,.416,.042,.025,.042,16);knob.rotation.x=Math.PI/2;
     const drum=cylinder(unit,m.dark,0,.36,.391,.265,.024,.265,32);drum.rotation.x=Math.PI/2;
-    ring(unit,m.metal,0,.36,.425,.258,.028);
-    ring(unit,m.rubber,0,.36,.432,.219,.016);
-    box(unit,m.cloth,-.035,.31,.415,.24,.13,.018,.03);
-    box(unit,m.metal,.23,.36,.46,.05,.12,.055,.01);
+    const door=new THREE.Group();door.name=i===0?'Washer service door':'Dryer door';door.position.set(-.28,.36,.425);unit.add(door);
+    ring(door,m.metal,.28,0,0,.258,.028);
+    ring(door,m.rubber,.28,0,.007,.219,.016);
+    box(door,m.metal,.51,0,.035,.05,.12,.055,.01);
+    const clothes=new THREE.Group();clothes.position.set(0,.36,.416);clothes.name=i===0?'Washer rotating clothes':'Dryer clothes';unit.add(clothes);
+    box(clothes,m.cloth,-.035,-.05,0,.24,.13,.018,.03);
   }
   const closet=new THREE.Group();closet.name='Open clothes closet';closet.position.set(.51,.14,-4.77);root.add(closet);
   box(closet,m.dark,0,1.02,-.39,.845,2.00,.06);

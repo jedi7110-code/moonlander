@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {box,ball,cylinder,pipe,rod} from './materials.js';
 
 const up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
-const samples=81,linkLength=.98;
+const samples=81,linkLength=.98,parkDrop=.46;
 
 function scanTarget(mesh,rig,sweep){
   if(!mesh.isSkinnedMesh)return mesh;
@@ -51,9 +51,10 @@ function scanTarget(mesh,rig,sweep){
 function boom(parent,m){
   const root=new THREE.Group();parent.add(root);
   cylinder(root,m.dark,0,.5,0,.047,1,.047,16);
-  box(root,m.enamel,0,.38,0,.125,.54,.13,.024);
+  box(root,m.enamel,0,.38,0,.125,.54,.13,.024).name='Diagnostic arm housing';
   box(root,m.teal,0,.40,.067,.07,.19,.009,.006);
-  for(const yy of [.15,.63])cylinder(root,m.metal,0,yy,0,.067,.055,.067,16);
+  // Seat collars beyond the cover ends instead of cutting through its faces.
+  for(const yy of [.075,.70])cylinder(root,m.metal,0,yy,0,.067,.055,.067,16).name='Diagnostic arm collar';
   rod(root,m.rubber,[.076,.09,0],[.076,.83,0],.016);
   return root;
 }
@@ -71,7 +72,9 @@ function arm(parent,m,index){
   const glow=new THREE.MeshBasicMaterial({color:0x65ff87,toneMapped:false});
   const lens=box(tip,glow,0,-.129,0,index?.055:.19,.013,index?.09:.027,.004);
   if(index)for(const xx of [-.06,.06])cylinder(tip,m.metal,xx,-.13,.065,.016,.037,.016,16);
-  return{root,base,side,shoulder,upper,lower,elbow,tip,lens,glow,park:base.clone().add(new THREE.Vector3(0,-.30,0)),target:new THREE.Vector3(),joint:new THREE.Vector3(),axis:new THREE.Vector3(),bend:new THREE.Vector3()};
+  // Leave room between the folded housings; closing to .30 makes their flat
+  // front faces overlap in the same plane and flicker as the camera moves.
+  return{root,base,side,shoulder,upper,lower,elbow,tip,lens,glow,park:base.clone().add(new THREE.Vector3(0,-parkDrop,0)),target:new THREE.Vector3(),joint:new THREE.Vector3(),axis:new THREE.Vector3(),bend:new THREE.Vector3()};
 }
 
 function placeArm(arm,work,extension){

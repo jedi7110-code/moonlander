@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Box3,MeshStandardMaterial,Vector3} from 'three';
+import {OBB} from 'three/addons/math/OBB.js';
+import {animateMedicalRig} from '../src/obs/medical-rig.js';
 import {createMedicalBay,animateMedical,medicalTransferPose,medicalDuration,medicalExitTime,MED_BED} from '../src/obs/medical.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {CabinBrain} from '../src/obs/brain.js';
@@ -14,6 +16,37 @@ function fixture(){
   const milo=createMilo(m);milo.position.x=MED_BED.x;
   return{bay,milo};
 }
+
+test('diagnostic arm housings stay separated while parked, deploying, scanning and stowing',()=>{
+  const {bay}=fixture(),rig=bay.rig;
+  const housingBounds=part=>{
+    const mesh=part.getObjectByName('Diagnostic arm housing');
+    mesh.geometry.computeBoundingBox();
+    return new OBB().fromBox3(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
+  };
+  // Include every scan target so interrupting and stowing mid-scan is covered.
+  for(let age=0;age<=16;age+=.5)for(let step=0;step<=40;step++){
+    const extension=step/40;
+    animateMedicalRig(rig,{extension},age);rig.root.updateMatrixWorld(true);
+    for(const arm of rig.arms)assert.equal(housingBounds(arm.upper).intersectsOBB(housingBounds(arm.lower)),false,
+      `${arm.root.name}: overlapping housings at extension ${extension}, scan ${age}`);
+  }
+});
+
+test('metal collars clear the cover ends instead of intersecting their visible faces',()=>{
+  const {bay}=fixture();
+  bay.rig.root.updateMatrixWorld(true);
+  for(const arm of bay.rig.arms)for(const part of [arm.upper,arm.lower]){
+    const housing=part.getObjectByName('Diagnostic arm housing');
+    housing.geometry.computeBoundingBox();
+    const cover=housing.geometry.boundingBox.clone().applyMatrix4(housing.matrix);
+    for(const collar of part.children.filter(mesh=>mesh.name==='Diagnostic arm collar')){
+      collar.geometry.computeBoundingBox();
+      const bounds=collar.geometry.boundingBox.clone().applyMatrix4(collar.matrix);
+      assert.ok(bounds.max.y<cover.min.y-.005||bounds.min.y>cover.max.y+.005,'collars leave at least 5mm at each end of the cover');
+    }
+  }
+});
 
 test('the seated patient and bedding rise together; arms deploy only after reclining and stow before sitting up',()=>{
   const {bay,milo}=fixture(),duration=medicalDuration();

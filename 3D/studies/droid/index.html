@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3817 — 生活支援ドロイド スタディ</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script>
+</head>
+<body>
+  <main>
+    <section class="viewport" aria-label="ドロイドの3Dプレビュー">
+      <canvas id="droid-canvas" aria-label="ドラッグでドロイドを回転、スクロールで拡大"></canvas>
+      <header><span class="eyebrow">MOONLANDER / FORM STUDY 01</span><h1>生活支援ドロイド</h1><p>露出した機構、使い込まれた金属。</p></header>
+      <div class="corner"><span class="live-dot"></span><span id="mode-label">待機 / 周囲を確認</span></div>
+      <div class="view-label"><span id="view-label">THREE-QUARTER</span><span>ドラッグで回転 · スクロールで拡大</span></div>
+      <div id="loading" role="status">ドロイドを組み立てています…</div>
+      <div id="error" role="alert" hidden></div>
+    </section>
+    <aside>
+      <div class="identity"><span class="eyebrow">DOMESTIC SUPPORT UNIT</span><div class="serial">3817<span>α</span></div><p>配膳、運搬、船内の軽作業を手伝う<br>生活支援ロボットの形状・動作スタディ。</p></div>
+      <section class="control-section"><h2><span>01</span> 動作</h2><div class="actions">
+        <button data-mode="idle" aria-pressed="true"><span>待機</span><small>周囲の確認</small></button>
+        <button data-mode="walk" aria-pressed="false"><span>歩行</span><small>ゆっくり巡回</small></button>
+        <button data-mode="carry" aria-pressed="false"><span>配膳</span><small>両手でトレーを保持</small></button>
+        <button data-mode="charging" aria-pressed="false"><span>充電休止</span><small>うなだれて脱力</small></button>
+      </div></section>
+      <section class="control-section"><h2><span>02</span> 表情</h2><div class="segmented views">
+        <button data-expression="neutral" aria-pressed="true">通常</button><button data-expression="happy" aria-pressed="false">喜び</button><button data-expression="sad" aria-pressed="false">悲しみ</button><button data-expression="surprised" aria-pressed="false">驚き</button><button data-expression="angry" aria-pressed="false">怒り</button><button data-expression="sleepy" aria-pressed="false">眠い</button>
+      </div></section>
+      <section class="control-section"><h2><span>03</span> 視点</h2><div class="segmented views">
+        <button data-view="three" aria-pressed="true">斜め</button><button data-view="front" aria-pressed="false">正面</button><button data-view="side" aria-pressed="false">横</button><button data-view="back" aria-pressed="false">背面</button><button data-view="head" aria-pressed="false">顔</button><button data-view="hands" aria-pressed="false">手元</button>
+        <button data-view="head-side" aria-pressed="false">頭・側面</button><button data-view="head-back" aria-pressed="false">頭・背面</button><button data-view="head-under" aria-pressed="false">頭・底面</button>
+      </div></section>
+      <section class="control-section"><h2><span>04</span> 表面</h2><div class="segmented">
+        <button data-style="current" aria-pressed="true">金属</button><button data-style="cartoon" aria-pressed="false">トゥーン</button><button data-style="flat" aria-pressed="false">線なし</button>
+      </div></section>
+      <section class="playback"><div class="playback-heading"><button id="play" aria-pressed="true">一時停止</button><output id="time-output" for="time">0.0 s</output></div><input id="time" aria-label="動作の時間" type="range" min="0" max="20" value="0" step="0.01"><div class="playback-foot"><button id="reset">最初から</button><label>速度 <select id="speed"><option value=".5">0.5×</option><option value="1" selected>1×</option></select></label></div></section>
+      <dl><div><dt>FACE</dt><dd>発光管の目と口・6つの表情</dd></div><div><dt>FRAME</dt><dd>燻銀・塗装剥がれ・銅配線</dd></div><div><dt>HANDS</dt><dd>4本指＋対向する親指</dd></div><div><dt>HEIGHT</dt><dd>約 1.7 m</dd></div></dl>
+      <footer>FORM STUDY <span>船内と共通の形状・姿勢を確認</span></footer>
+    </aside>
+  </main>
+  <script type="module" src="./study.js"></script>
+</body>
+</html>

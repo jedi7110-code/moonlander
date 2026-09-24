@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>マイロ / 奥部屋の作業</title><link rel="stylesheet" href="./growth.css"><style>
+.room-view{height:clamp(440px,calc(100dvh - 335px),850px);position:relative;border:1px solid var(--line);overflow:hidden}.room-label{position:absolute;top:20px;left:24px;pointer-events:none}.room-label h2{font-size:25px;font-weight:500;margin:8px 0}.room-label p{font-size:12px;color:var(--muted);margin:0}#phase{position:absolute;bottom:20px;left:24px;padding:9px 12px;background:#111819dd;font-size:13px}.toolbar{gap:10px}.toolbar select{background:#1b2527;color:var(--ink);border:1px solid var(--line);padding:8px}header a,.settings a{color:var(--accent);font-size:12px}.settings{flex-wrap:wrap}#visit-status{font-variant-numeric:tabular-nums}
+</style></head><body><main>
+<header><div><p class="eyebrow">TARAIRON / REAR ROOM ROUTINE</p><h1>奥部屋の作業</h1><p class="intro">設備室で端末を点検。備蓄倉庫で品物を確認。作業を終えたら通路へ戻ります。</p></div><a href="./grooming.html">散髪・髭剃りへ</a></header>
+<section class="room-view" aria-label="マイロの奥部屋への入退室と作業">
+<canvas id="room-canvas" aria-label="設備室と備蓄倉庫の3Dスタディ"></canvas>
+<div class="room-label"><p id="deck">3F / OPERATIONS</p><h2 id="room-name">設備室</h2><p id="visit-status">自動巡回 · 作業後は2〜4分の間隔</p></div>
+<div id="phase" role="status">読み込み中…</div><div id="loading">奥部屋を読み込み中…</div><p id="error" role="alert" hidden></p></section>
+<section class="controls" aria-label="作業の再生操作"><div class="timeline-heading"><label for="visit-time">入室から退室まで</label><output id="time-output">0.0 / 52秒</output></div><input id="visit-time" type="range" min="0" max="52" step=".01" value="0" aria-label="作業の時刻" disabled>
+<div class="toolbar"><button id="play" class="play" disabled>一時停止</button><button id="automatic" aria-pressed="true" disabled>自動巡回</button><button data-room="operations" aria-pressed="true" disabled>3階・端末点検</button><button data-room="stores" aria-pressed="false" disabled>1階・備蓄確認</button><button data-time="18" disabled>作業を見る</button><button data-time="42" disabled>退室を見る</button><label>速度 <select id="speed" aria-label="再生速度" disabled><option value="1">1倍</option><option value="8">8倍</option></select></label><div class="views"><button data-view="room" aria-pressed="true" disabled>入口から</button><button data-view="work" aria-pressed="false" disabled>作業を近くで</button></div></div>
+<div class="settings"><p>自動巡回では2〜4分おきに部屋を交互に訪れます。スライダーで止めて、手と設備の位置を確認できます。</p><p>STUDY · ドラッグで回転／ホイールで拡大</p></div>
+</section></main><script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script><script type="module" src="./rear-rooms-study.js"></script></body></html>

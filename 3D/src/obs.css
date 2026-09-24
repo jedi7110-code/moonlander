@@ -52,3 +52,5 @@
 @media(max-width:760px){#observation{grid-template-rows:58px 122px minmax(0,1fr) 140px}.needs{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;width:100%;max-width:none}}
 @media(max-width:480px){html[lang=en] .need>div{font-size:9px;gap:2px}}
 @media(max-height:560px) and (min-width:600px) and (max-width:1200px){#observation{grid-template-rows:45px 112px minmax(0,1fr) 67px}}
+.vr-button{font:700 12px/1 Arial,sans-serif;letter-spacing:.02em}.vr-button:disabled{opacity:.4;cursor:wait}
+@media(max-width:400px){.view-top>span{display:none}}

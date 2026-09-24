@@ -28,6 +28,8 @@ import {createCabinToon} from './cabin-toon.js';
 import {createCabinSignage} from './cabin-signage.js';
 import {finishCabinFixtures} from './cabin-fixtures.js';
 import {updateMiloBandage} from './milo-bandage.js';
+import {createDroidChargingBay,DROID_DOCK} from './droid-charging.js';
+import {createDroidServiceRig} from './droid-service.js';
 
 export class ObservationView {
   static async create(canvas,{cabinStyle='cartoon'}={}){
@@ -36,7 +38,7 @@ export class ObservationView {
     const view=new ObservationView(canvas,m,head,lucy);
     try{
       finishCabinFixtures(view);
-      const roots=[view.ship.staticMesh,view.ship.animated];
+      const roots=[view.ship.staticMesh,view.ship.animated,view.droidBay.root,view.droidService.root];
       view.cabinSignage=await createCabinSignage(roots);
       view.cabinToon=createCabinToon(roots);
       view.cabinToon.setStyle(cabinStyle);
@@ -56,12 +58,16 @@ export class ObservationView {
     const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
     this.ship=buildShip(m);limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
+    this.droidBay=createDroidChargingBay(positionY(FLOORS[DROID_DOCK.floor].y));this.scene.add(this.droidBay.root);
+    this.droidService=createDroidServiceRig(this.droidBay,this.ship);this.scene.add(this.droidService.root);
+    // Preserve the powered-down pose until the live routine is attached.
+    this.droidService.actorRoot.position.copy(this.droidBay.root.position);
     this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
     this.characterToon=[createMiloToon(this.milo),createLucyToon(this.cat)];
     this.camera=new THREE.PerspectiveCamera(24,1,.1,150);
     this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.resize=()=>{const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;this.zoomAnchor=null;this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
+    this.resize=()=>{if(this.renderer.xr.isPresenting)return;const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;this.zoomAnchor=null;this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
     this.observer=new ResizeObserver(this.resize);this.observer.observe(canvas);this.resize();this.viewHeight=this.targetHeight;this.setFrustum();
     this.listeners=[];this.bindControls();
     const stars=new Float32Array(420*3);for(let i=0;i<420;i++){stars[i*3]=(Math.sin(i*162.2)*.5)*90;stars[i*3+1]=(Math.sin(i*714.1)*.5)*52+5;stars[i*3+2]=-9-Math.abs(Math.sin(i))*10;}
@@ -70,15 +76,20 @@ export class ObservationView {
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
   targetAt(event){
     const rect=this.canvas.getBoundingClientRect();this.pointer.set((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);this.raycaster.setFromCamera(this.pointer,this.camera);
+    const target=this.targetFromRay(this.raycaster);
+    return target?{type:target.type,id:target.id}:null;
+  }
+  targetFromRay(raycaster){
     // Station hit volumes extend in front of furniture, so visible characters win.
-    for(const hit of this.raycaster.intersectObjects([this.milo,this.cat],true)){
+    const droid=this.droidBay?.droid?.root,characters=[this.milo,this.cat];if(droid)characters.push(droid);
+    for(const hit of raycaster.intersectObjects(characters,true)){
       if(!hit.object.isMesh)continue;
       let node=hit.object,visible=true,id=null;
-      while(node){if(!node.visible){visible=false;break;}if(node===this.milo)id='milo';if(node===this.cat)id='cat';node=node.parent;}
-      if(visible&&id){if(id==='cat'&&hit.point.z<CAT_PORT.wallZ)continue;return{type:'character',id};}
+      while(node){if(!node.visible){visible=false;break;}if(node===this.milo)id='milo';if(node===this.cat)id='cat';if(node===droid)id='droid';node=node.parent;}
+      if(visible&&id){if(id==='cat'&&hit.point.z<CAT_PORT.wallZ)continue;return{type:'character',id,point:hit.point,distance:hit.distance};}
     }
-    const id=this.raycaster.intersectObjects(this.ship.targets)[0]?.object.userData.station;
-    return id?{type:'station',id}:null;
+    const hit=raycaster.intersectObjects(this.ship.targets)[0],id=hit?.object.userData.station;
+    return id?{type:'station',id,point:hit.point,distance:hit.distance}:null;
   }
   hover(id){if(this.feedback)this.feedback.hovered=id;this.canvas.style.cursor=id?'pointer':'grab';}
   hoverTarget(target){this.hover(target?.type==='station'?target.id:null);if(target?.type==='character')this.canvas.style.cursor='zoom-in';}
@@ -92,7 +103,7 @@ export class ObservationView {
     this.bind('pointerleave',()=>this.hover(null));
     this.bind('wheel',e=>{if(e.deltaY===0)return;e.preventDefault();this.changeZoom(e.deltaY<0?1.15:1/1.15,e);},{passive:false});
   }
-  setMode(mode){this.hover(null);this.zoomAnchor=null;this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
+  setMode(mode){this.hover(null);this.zoomAnchor=null;this.mode=mode;this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:mode==='droid'?3.5:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
   miloHeadScreenPosition(){
     if(!this.milo.visible)return null;
     // The head origin is at the neck; add the crown height in world units so
@@ -116,10 +127,13 @@ export class ObservationView {
       this.targetCenter.copy(this.center);
       if(this.mode!=='manual'){this.mode='manual';this.onModeChange?.(this.mode);}
     }else this.zoomAnchor=null;
-    const base=this.mode==='all'||this.mode==='manual'?this.fitHeight:this.mode==='cat'?3.3:5.3;
+    const base=this.mode==='all'||this.mode==='manual'?this.fitHeight:this.mode==='cat'?3.3:this.mode==='droid'?3.5:5.3;
     this.targetHeight=height;this.zoom=base/height;
   }
   setFrustum(){
+    // WebXR supplies a projection and pose for each eye; desktop following must
+    // never overwrite the headset pose or move the viewer without a selection.
+    if(this.immersive?.active)return;
     const distance=40;
     this.camera.aspect=this.width/this.height;
     this.camera.fov=THREE.MathUtils.radToDeg(2*Math.atan(this.viewHeight/(2*distance)));
@@ -144,7 +158,7 @@ export class ObservationView {
     }
     this.targetCenter.copy(this.center);
   }
-  render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null){
+  render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null,xrFrame=null){
     const action=currentAction(brain),catMotion=catRoutine.motion;
     const actionTime=brain.reclineExit?.actionTime??brain.loungeExit?.actionTime??(brain.loungeEntry?0:brain.state==='performing'?brain.curDurSec-brain.performT:time);
     animateGym(this.ship.gym,brain.gymVisit?.pedalTime??brain.gymPedalTime??0);
@@ -165,7 +179,8 @@ export class ObservationView {
       applyCabinLadder(this.milo,{...this.cabinClimb,height:positionY(actor.y),endHeight:positionY(actor.queue[0].y),endYaw});
     }
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
-      animateBathroom(fixture,brain.bathroom?.id===id?bathroom:null);
+      const cleaning=this.droidRoutine?.door===id?{opening:this.droidRoutine.opening,inside:false}:null;
+      animateBathroom(fixture,brain.bathroom?.id===id?bathroom:cleaning);
     }
     for(const [id,docks]of Object.entries(this.ship.diningDocks)){
       docks.mug.visible=id==='hydro'&&action!==id;
@@ -195,7 +210,8 @@ export class ObservationView {
     if(brain.bunkVisit)this.milo.position.z=brain.bunkVisit.pose.depth;
     if(!paused)this.ship.fan.rotation.z+=dt*3.0;
     animateDelivery(this.ship,care,this.reducedMotion);
-    this.ship.foodGroup.visible=care.has('catfood')||catRoutine.mode==='eat';
+    this.ship.foodGroup.visible=(this.droidRoutine?care.catBowl>0:care.has('catfood'))||catRoutine.mode==='eat';
+    if(this.droidRoutine)this.droidService.update(this.droidRoutine);
     for(const [id,{group,material}]of Object.entries(this.ship.indicators)){
       const shipment=id==='hatch'&&care.delivery&&!['queued','transmitting'].includes(care.phase);
       const signal=shipment?{color:care.phase==='unloading'?0x85e3af:0xf3bd62,intensity:this.reducedMotion?1:.75+.25*Math.sin(time*3)}:this.feedback?.signal(id,this.reducedMotion)||(id==='gym'&&action==='gym'?{color:0x85e3af,intensity:1}:null);group.visible=Boolean(signal);
@@ -203,12 +219,16 @@ export class ObservationView {
     }
     if(this.mode==='milo')this.targetCenter.copy(this.milo.position).add(new THREE.Vector3(0,.9,0));
     if(this.mode==='cat')this.targetCenter.copy(this.cat.position).add(new THREE.Vector3(0,.37*this.cat.scale.y,0));
+    if(this.mode==='droid')this.targetCenter.copy(this.droidService.actorRoot.position).add(new THREE.Vector3(0,.9,0));
     const lerp=1-Math.exp(-dt*5);this.center.lerp(this.targetCenter,lerp);this.viewHeight=THREE.MathUtils.lerp(this.viewHeight,this.targetHeight,lerp);this.setFrustum();
     // Late ladder/medical fitting must reach the bandage before GPU upload.
     updateMiloBandage(this.milo);
-    this.characterToon.forEach(toon=>toon.update(this.width,this.height));
-    this.cabinToon?.update(this.width,this.height,this.viewHeight,this.fitHeight);
+    this.immersive?.update(dt,xrFrame);
+    const eye=this.renderer.xr.isPresenting?this.renderer.xr.getCamera().cameras[0]?.viewport:null;
+    const width=eye?.z||this.width,height=eye?.w||this.height;
+    this.characterToon.forEach(toon=>toon.update(width,height));
+    this.cabinToon?.update(width,height,this.viewHeight,this.fitHeight);
     this.renderer.render(this.scene,this.camera);
   }
-  dispose(){this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.renderer.setAnimationLoop(null);this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

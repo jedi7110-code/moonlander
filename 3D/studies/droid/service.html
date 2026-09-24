@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3817 — 生活支援動作</title>
+<link rel="stylesheet" href="./style.css">
+<style>@media(min-width:761px){main{height:100dvh;overflow:hidden}.viewport{min-height:0}aside{height:100dvh;overflow:auto}}a{color:#c9d3b5}</style>
+<script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script>
+</head><body><main>
+<section class="viewport"><canvas id="ship-view" aria-label="船内の生活支援動作"></canvas><header><span class="eyebrow">3817 / SERVICE STUDY</span><h1>船内の生活支援</h1></header><div class="corner"><span id="status">読み込み中</span></div><div id="loading">船内を準備しています…</div></section>
+<aside><div class="identity"><span class="eyebrow">DOMESTIC SUPPORT</span><div class="serial">3817</div><p>OBSと共通の経路・作業動作。<br>作業を選び、移動から帰還まで確認できます。</p></div>
+<section class="control-section"><h2>作業</h2><div id="jobs" class="actions"></div></section>
+<section class="control-section"><h2>再生</h2><div class="actions"><button id="play">再生</button><button id="next">次の作業動作へ</button><button id="home">最初から</button><button id="wide">全景</button><button id="follow">ドロイドに寄る</button></div><label>速度 <select id="speed"><option value="1">1×</option><option value="4">4×</option><option value="12">12×</option></select></label></section>
+<section class="control-section"><h2>移動の確認</h2><div class="actions"><button data-motion="walk">歩行を見る</button><button data-motion="down">ハシゴを下る</button><button data-motion="up">ハシゴを上る</button><button id="step">0.2秒進める</button></div><label>時間 <input id="time" aria-label="作業の時間" type="range" min="0" max="500" step=".05" value="0"></label></section>
+<output id="detail"></output><p><a href="http://127.0.0.1:4173/3D/obs.html">OBSを開く</a></p></aside>
+</main><script type="module" src="./service-study.js"></script></body></html>

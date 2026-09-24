@@ -20,7 +20,7 @@ export function decodeGroomCache(buffer,metadata){
     frames:Array.from({length:steps+1},(_,i)=>new Float32Array(buffer,16+count*4+i*count*24,count*6))};
 }
 export async function loadCabinLucy(){
-  const base=`${import.meta.env.BASE_URL}assets/obs/lucy/`;
+  const base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/lucy/`;
   const version='20260915-approved-2';
   const read=async(name,method)=>{const response=await fetch(`${base}${name}?v=${version}`);if(!response.ok)throw new Error(`Lucy ${name}: ${response.status}`);return response[method]();};
   const [gltf,poses,binary]=await Promise.all([loadLucy(version),read('lucy-approved.json','json'),read('lucy-groom.bin','arrayBuffer')]);

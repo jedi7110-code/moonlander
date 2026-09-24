@@ -1,4 +1,4 @@
-import {BackSide,Color,DoubleSide,Mesh,MeshToonMaterial,ShaderMaterial,Vector2} from 'three';
+import {BackSide,Color,DoubleSide,Mesh,SkinnedMesh,MeshToonMaterial,ShaderMaterial,Vector2} from 'three';
 
 const KEEP_GLOSS=new Set(['Industrial / wet chain','Industrial / wet floor']);
 const keepSurface=material=>material.userData.cabinKeepSurface===true;
@@ -45,16 +45,20 @@ function toonMaterial(source){
   return material;
 }
 
-function inkMaterial(){
+function inkMaterial(width=1){
   return new ShaderMaterial({name:'Cabin study ink',side:BackSide,toneMapped:false,depthWrite:false,
-    clipping:true,uniforms:{viewport:{value:new Vector2(1,1)},ink:{value:new Color(0x18231f)},width:{value:1}},
+    clipping:true,uniforms:{viewport:{value:new Vector2(1,1)},ink:{value:new Color(0x18231f)},width:{value:width}},
     vertexShader:`
       #include <common>
       #include <clipping_planes_pars_vertex>
+      #include <skinning_pars_vertex>
       uniform vec2 viewport; uniform float width;
       void main(){
         #include <beginnormal_vertex>
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
         #include <begin_vertex>
+        #include <skinning_vertex>
         #include <project_vertex>
         #include <clipping_planes_vertex>
         vec4 n = projectionMatrix * vec4(normalize(normalMatrix * objectNormal), 0.0);
@@ -76,7 +80,17 @@ function inkMaterial(){
 }
 
 export function createCabinToon(roots){
-  const originals=[],materials=new Map(),outlines=[],ink=inkMaterial();
+  const originals=[],materials=new Map(),outlines=[],ink=inkMaterial(),fixedInks=new Map();
+  function meshInk(mesh){
+    // Character roots keep a fixed CSS-pixel width, independent of cabin zoom.
+    for(let node=mesh;node;node=node.parent){
+      const width=node.userData.toonOutlineWidth;
+      if(!Number.isFinite(width)||width<0)continue;
+      if(!fixedInks.has(width))fixedInks.set(width,inkMaterial(width));
+      return fixedInks.get(width);
+    }
+    return ink;
+  }
   for(const root of roots){root.updateMatrixWorld(true);root.traverse(mesh=>{if(mesh.isMesh)originals.push({mesh,source:mesh.material});});}
   for(const {mesh,source} of originals){
     if(Array.isArray(source))continue;
@@ -84,7 +98,7 @@ export function createCabinToon(roots){
     if(!eligible(source)&&!keep)continue;
     if(!keep&&!materials.has(source))materials.set(source,toonMaterial(source));
     // Do not ink transparent panes, luminous lenses, thin cables or leaf cards.
-    if(source.side===DoubleSide||source.emissiveIntensity>1||/cable|rubber|rope/i.test(source.name)||mesh.isSkinnedMesh||source.alphaTest>0)continue;
+    if(source.side===DoubleSide||source.emissiveIntensity>1||/cable|rubber|rope/i.test(source.name)||(mesh.isSkinnedMesh&&!mesh.userData.cabinRigidSkin)||source.alphaTest>0)continue;
     if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
     // The static cabin is already batched by material. Moving small details stay clean.
     const box=mesh.geometry.boundingBox,scale=mesh.matrixWorld.elements;
@@ -92,7 +106,9 @@ export function createCabinToon(roots){
       (box.max.y-box.min.y)*Math.hypot(scale[4],scale[5],scale[6]),
       (box.max.z-box.min.z)*Math.hypot(scale[8],scale[9],scale[10]));
     if(extent<.24)continue;
-    const shell=new Mesh(mesh.geometry,ink);shell.name='Cabin toon outline';shell.matrixAutoUpdate=false;
+    const material=meshInk(mesh);
+    const shell=mesh.isSkinnedMesh?new SkinnedMesh(mesh.geometry,material):new Mesh(mesh.geometry,material);shell.name='Cabin toon outline';shell.matrixAutoUpdate=false;
+    if(mesh.isSkinnedMesh){shell.skeleton=mesh.skeleton;shell.bindMode=mesh.bindMode;shell.bindMatrix.copy(mesh.bindMatrix);shell.bindMatrixInverse.copy(mesh.bindMatrixInverse);shell.frustumCulled=false;}
     shell.matrix=mesh.matrix;shell.renderOrder=mesh.renderOrder+1;shell.raycast=()=>{};
     mesh.parent.add(shell);outlines.push({mesh,shell});
   }
@@ -104,14 +120,17 @@ export function createCabinToon(roots){
     update();
   }
   function update(width,height,viewHeight,fullHeight){
-    if(width&&height)ink.uniforms.viewport.value.set(width,height);
+    if(width&&height){
+      ink.uniforms.viewport.value.set(width,height);
+      fixedInks.forEach(material=>material.uniforms.viewport.value.set(width,height));
+    }
     if(viewHeight>0&&fullHeight>0)ink.uniforms.width.value=outlineWidth(viewHeight,fullHeight);
     // A zero-width shell must not add draw calls or darken open geometry.
-    for(const {mesh,shell} of outlines){shell.visible=mode==='cartoon'&&ink.uniforms.width.value>1e-6&&mesh.visible;shell.geometry=mesh.geometry;}
+    for(const {mesh,shell} of outlines){shell.visible=mode==='cartoon'&&shell.material.uniforms.width.value>1e-6&&mesh.visible;shell.geometry=mesh.geometry;}
   }
   setStyle('current');
   return {setStyle,update,get width(){return mode==='cartoon'?ink.uniforms.width.value:0;},dispose(){
     for(const {mesh,source} of originals)mesh.material=source;
-    outlines.forEach(({shell})=>shell.removeFromParent());materials.forEach(material=>material.dispose());ink.dispose();
+    outlines.forEach(({shell})=>shell.removeFromParent());materials.forEach(material=>material.dispose());ink.dispose();fixedInks.forEach(material=>material.dispose());
   }};
 }

@@ -14,6 +14,7 @@ import {BULKHEAD_GATE,gateWall,createBulkheadGate} from './bulkhead-gate.js';
 import {addCabinDressing} from './cabin-dressing.js';
 import {configurePocketShutter} from './shutter.js';
 import {HATCH_TRAVEL} from './delivery.js';
+import {createWasteIncinerator} from './waste-incinerator.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -329,6 +330,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
   const diningStations=Object.fromEntries(['galley','hydro'].map(action=>[action,createDiningStation(m,action)]));
   for(const station of Object.values(diningStations)){staticRoot.add(station.root);animated.add(station.propsRoot);}
   const diningDocks=Object.fromEntries(Object.entries(diningStations).map(([action,station])=>[action,station.docks]));
+  const incinerator=createWasteIncinerator(m);animated.add(incinerator.root);
   const plants=createPlantRack(m,positionX(PLANT.x));animated.add(plants.root);
   const gym=createGym(m,positionX(GYM.x));animated.add(gym.root);
   panel(staticRoot,m,positionX(GYM.x)-.70,.97,-1.36,.57,.93,m.dark);
@@ -345,7 +347,8 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
   cylinder(staticRoot,m.metal,bowlX,bowlY+.07,bowlZ,.16,.10,.20,28);
   cylinder(staticRoot,m.dark,bowlX,bowlY+.121,bowlZ,.16,.012,.16,28);
   const foodGroup=new THREE.Group();foodGroup.position.set(bowlX,bowlY,bowlZ);animated.add(foodGroup);
-  for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,m.olive,Math.cos(a)*r,CAT_BOWL.foodHeight,Math.sin(a)*r,.025,.018,.022);}
+  const catFood=new THREE.MeshStandardMaterial({name:'Cat food / brown kibble',color:CAT_BOWL.foodColor,roughness:.9});
+  for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,catFood,Math.cos(a)*r,CAT_BOWL.foodHeight,Math.sin(a)*r,.025,.018,.022);}
   const fan=new THREE.Group();fan.position.set(12.08,2.14,-1.32);animated.add(fan);
   const fanRim=new THREE.Mesh(new THREE.TorusGeometry(.34,.039,12,36),m.metal);fan.add(fanRim);
   // Four radial blades, not four full diameters superimposed at the hub.
@@ -378,5 +381,8 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
   addCabinDressing(staticRoot,m,FLOOR_Y);
-  return {staticMesh:mergeStatic?batchStatic(staticRoot):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk};
+  staticRoot.updateMatrixWorld(true);
+  const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
+  for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
+  return {staticMesh:mergeStatic?batchStatic(staticRoot):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk,washerDoor,washerClothes,incinerator};
 }
