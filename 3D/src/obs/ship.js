@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {CABIN_LIGHT_COLOR} from './lighting.js';
+import {CABIN_LIGHT_COLOR,LADDER_LIGHT_LAYOUT} from './lighting.js';
 import {createDiningProps} from './dining.js';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
@@ -15,6 +15,8 @@ import {addCabinDressing} from './cabin-dressing.js';
 import {configurePocketShutter} from './shutter.js';
 import {HATCH_TRAVEL} from './delivery.js';
 import {createWasteIncinerator} from './waste-incinerator.js';
+import {createScreenGlow} from './screen-glow.js';
+import {displayFrame} from './display-frame.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -50,6 +52,7 @@ export function createAccessLadder(m){
   const root=new THREE.Group();root.name='Interdeck access shaft';
   const lights=new THREE.Group();lights.name='Ladder work lights';root.add(lights);
   const diffuser=new THREE.MeshBasicMaterial({name:'Ladder light diffuser',color:CABIN_LIGHT_COLOR,toneMapped:false});
+  diffuser.userData.cabinAlwaysPowered=true;
   const bottom=.08,top=13.14;
   panel(root,m,0,6.65,-1.46,1.12,13.3,m.dark);
   for(const side of [-1,1]){
@@ -57,8 +60,8 @@ export function createAccessLadder(m){
     box(root,m.dark,side*.56,6.7,-.5,.18,13.4,1.45,.02);
     box(root,m.metal,side*.64,11.93,-.32,.10,2.75,1.83,.016);
     // A matched pair every four rungs lights hands and feet along the entire shaft.
-    for(let i=0;i<12;i++){
-      const y=.54+i*1.12,sconce=new THREE.Group();sconce.name='Inward ladder light housing';
+    for(let i=0;i<LADDER_LIGHT_LAYOUT.count;i++){
+      const y=LADDER_LIGHT_LAYOUT.firstY+i*LADDER_LIGHT_LAYOUT.spacing,sconce=new THREE.Group();sconce.name='Inward ladder light housing';
       sconce.position.set(side*.53,y,.24);sconce.lookAt(0,y-.08,.03);root.add(sconce);
       box(sconce,m.dark,0,0,0,.14,.28,.10,.012);
       box(sconce,m.metal,0,0,.054,.10,.23,.015);
@@ -66,7 +69,7 @@ export function createAccessLadder(m){
       box(root,diffuser,side*.53,y,.33,.040,.16,.014).name='Ladder front light lens';
       for(const x of [-.063,.063])box(sconce,m.dark,x,0,.073,.018,.28,.065);
       const light=new THREE.SpotLight(CABIN_LIGHT_COLOR,2.4,1.8,1.06,.72,2);
-      light.name='Ladder hand and foot light';light.position.set(side*.46,y-.01,.21);
+      light.name='Ladder hand and foot light';light.position.set(side*LADDER_LIGHT_LAYOUT.sourceX,y+LADDER_LIGHT_LAYOUT.sourceYOffset,LADDER_LIGHT_LAYOUT.sourceZ);
       light.target.position.set(0,y-.08,.03);lights.add(light,light.target);
     }
   }
@@ -107,10 +110,11 @@ function consoleUnit(parent,m,x,y,w=1.7,seed=0) {
   grille(parent,m,x,y+.46,.36,w*.66,.3);
   box(parent,m.dark,x,y+1.14,-.5,w+.04,.14,1.47,.045);
   box(parent,m.rubber,x,y+1.7,-.80,w-.02,1.07,.37,.05);
-  box(parent,m.enamel,x,y+1.7,-.58,w-.1,.98,.09,.035);
+  displayFrame(parent,m.enamel,{x,y:y+1.7,z:-.49,width:w-.1,height:.98,depth:.20,holeWidth:w*.70+.012,holeHeight:.742,offsetX:-.1,offsetY:.03});
   box(parent,m.black,x-.1,y+1.73,-.51,w*.70,.73,.09,.04);
+  displayFrame(parent,m.black,{x:x-.1,y:y+1.73,z:-.44,width:w*.70,height:.73,depth:.07,holeWidth:w*.64+.012,holeHeight:.622});
   screen(parent,x-.1,y+1.73,-.45,w*.64,.61,seed);
-  for(let i=0;i<4;i++){const knob=cylinder(parent,m.black,x+w*.39,y+1.49+i*.14,-.48,.035,.06);knob.rotation.x=Math.PI/2;}
+  for(let i=0;i<4;i++){const knob=cylinder(parent,m.black,x+w*.39,y+1.49+i*.14,-.35,.035,.06);knob.rotation.x=Math.PI/2;}
   for(let row=0;row<3;row++)for(let col=0;col<10;col++)box(parent,(row+col)%11===0?m.red:m.rubber,x-w*.34+col*w*.073,y+1.234,.00+row*.10,.074,.028,.059,.006);
   for(let i=0;i<5;i++)ball(parent,i%3?m.green:m.amber,x-w*.34+i*.135,y+1.243,-.3,.017,.014,.017);
   pipe(parent,m.black,[[x+.5,y+.12,-.6],[x+.7,y+.15,-1],[x+.75,y+1.1,-1]],.035);
@@ -319,7 +323,12 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
   for(let i=0;i<3;i++)consoleUnit(staticRoot,m,-10.2+i*1.63,operations,1.56,i);
   chair(staticRoot,m,-8.8,operations,.82,Math.PI);
   panel(staticRoot,m,-4.57,operations+1.48,-1.41,1.52,2.43,m.dark);
-  for(let i=0;i<4;i++){screen(staticRoot,-4.57,operations+.79+i*.42,-1.30,1.16,.27,i+8);}
+  for(let i=0;i<4;i++){
+    const y=operations+.79+i*.42;
+    displayFrame(staticRoot,m.black,{x:-4.57,y,z:-1.275,width:1.32,height:.36,depth:.065,holeWidth:1.17,holeHeight:.282});
+    screen(staticRoot,-4.57,y,-1.30,1.16,.27,i+8);
+  }
+  animated.add(createScreenGlow());
   for(let i=0;i<4;i++)gauge(staticRoot,m,-4.99+i*.27,operations+2.39,-1.24,.084);
   const medical=createMedicalBay(m,operations);staticRoot.add(medical.root);
   animated.attach(medical.bed);animated.attach(medical.rig.root);

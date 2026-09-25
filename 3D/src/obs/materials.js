@@ -135,7 +135,9 @@ export function screen(parent,x,y,z,w=.85,h=.58,seed=0) {
   ctx.strokeRect(235,44,128,150);for(let row=0;row<5;row++){ctx.beginPath();for(let i=0;i<125;i++){const py=65+row*26+Math.sin(i*.14+row+seed)*9; i?ctx.lineTo(237+i,py):ctx.moveTo(237+i,py);}ctx.stroke();}
   ctx.fillStyle='#00000040';for(let y0=0;y0<256;y0+=3)ctx.fillRect(0,y0,384,1);
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture}));mesh.position.set(x,y,z);parent.add(mesh);return mesh;
+  const material=new THREE.MeshBasicMaterial({name:'Powered telemetry screen',map:texture});
+  material.userData.cabinAlwaysPowered=true;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),material);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
 }
 
 // Ship fixtures are static; merge by material so rivets and switches stay inexpensive.

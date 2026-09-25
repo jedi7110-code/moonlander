@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {HABITAT_VIEW} from './ship.js';
 import {ObservationXRQuality,XRCharacterPicker,XR_FRAMEBUFFER_SCALE} from './xr-quality.js';
+import {XRNavigation} from './xr-navigation.js';
 
 const Y=new THREE.Vector3(0,1,0);
 const BUTTONS=[
@@ -26,9 +27,9 @@ function createPanel(){
   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;
   const context=canvas.getContext('2d'),texture=new THREE.CanvasTexture(canvas);
   texture.colorSpace=THREE.SRGBColorSpace;
-  const material=new THREE.MeshBasicMaterial({map:texture,toneMapped:false});
+  const material=new THREE.MeshBasicMaterial({map:texture,toneMapped:false,depthTest:false,depthWrite:false});
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.44,.72),material);
-  mesh.name='VR controls';
+  mesh.name='VR controls';mesh.renderOrder=10000;
   let last='';
   return{
     mesh,
@@ -57,7 +58,7 @@ function createPanel(){
       }
       if(row<4)c.fillText(line,24,103+row*30);
       c.fillStyle='#99b8ad';c.font='18px sans-serif';
-      c.fillText(ja?'グリップボタンでも全景に戻れます':'Squeeze the grip to return to wide view',24,229);
+      c.fillText(ja?'左スティック：旋回 / 右：移動　A・X：メニュー　B・Y・グリップ：全景':'Left stick: turn / Right: move   A/X: menu   B/Y or grip: wide',24,229,976);
       BUTTONS.forEach(([id,japanese,english],i)=>{
         const x=20+(i%4)*248,y=258+Math.floor(i/4)*80;
         c.fillStyle=hover.has(id)?'#537968':mode===id?'#344e47':'#24363b';c.fillRect(x,y,240,72);
@@ -83,7 +84,7 @@ export class ObservationXR {
     this.ready=this.checkSupport();
   }
   get active(){return Boolean(this.session);}
-  get visible(){return this.active&&this.session.visibilityState!=='hidden';}
+  get visible(){return this.active&&this.session.visibilityState==='visible';}
   async checkSupport(){
     this.support='checking';this.localize();
     try{this.support=!this.secure?'insecure':!this.xr?'unsupported':await this.xr.isSessionSupported('immersive-vr')?'ready':'unsupported';}
@@ -116,7 +117,7 @@ export class ObservationXR {
       this.session=session;
       this.ended=()=>queueMicrotask(()=>this.finish(session));
       session.addEventListener('end',this.ended);
-      this.visibility=()=>this.onChange();session.addEventListener('visibilitychange',this.visibility);
+      this.visibility=()=>{this.navigation?.reset();this.onChange();};session.addEventListener('visibilitychange',this.visibility);
       this.prepare();
       await this.view.renderer.xr.setSession(session);
       if(this.session!==session)return;
@@ -134,6 +135,7 @@ export class ObservationXR {
     this.saved={parent:c.parent,position:c.position.clone(),quaternion:c.quaternion.clone(),scale:c.scale.clone(),fov:c.fov,aspect:c.aspect,near:c.near,far:c.far,
       mode:v.mode,zoom:v.zoom,center:v.center.clone(),targetCenter:v.targetCenter.clone(),viewHeight:v.viewHeight,targetHeight:v.targetHeight};
     this.rig=new THREE.Group();this.rig.name='XR viewer';v.scene.add(this.rig);this.rig.add(c);
+    this.navigation=new XRNavigation(this.rig);this.followPoint=new THREE.Vector3();this.followDelta=new THREE.Vector3();this.followRoot=null;this.menuOpen=false;
     c.position.set(0,0,0);c.quaternion.identity();c.scale.setScalar(1);
     this.panel=this.makePanel();this.rig.add(this.panel.mesh);this.rig.visible=false;
     this.controllers=[0,1].map(index=>{
@@ -156,18 +158,37 @@ export class ObservationXR {
     if(mode==='milo'){v.milo.getWorldPosition(target);target.y+=.95;scale=1.7;distance=1.9;}
     if(mode==='cat'){v.cat.getWorldPosition(target);target.y+=.37*v.cat.scale.y;scale=.9;distance=1.8;}
     if(mode==='droid'){v.droidService.actorRoot.getWorldPosition(target);target.y+=.9;scale=1.6;distance=1.9;}
+    this.followRoot=mode==='milo'?v.milo:mode==='cat'?v.cat:mode==='droid'?v.droidService.actorRoot:null;
+    this.followRoot?.getWorldPosition(this.followPoint);
     const yaw=frameXRViewer(this.rig,this.pose,target,scale,distance);
+    this.menuOpen=false;this.panel.mesh.visible=mode==='all';
     this.panel.mesh.quaternion.setFromAxisAngle(Y,yaw);
     // Keep the panel below the ship's lowest deck, rather than covering it.
     this.panel.mesh.position.set(0,-1,-1.6).applyQuaternion(this.panel.mesh.quaternion).add(this.pose.position);
     this.rig.visible=true;this.rig.updateMatrixWorld(true);
+  }
+  follow(dt){
+    if(!this.followRoot)return;
+    this.followRoot.getWorldPosition(this.followDelta).sub(this.followPoint).multiplyScalar(1-Math.exp(-dt*6));
+    this.followPoint.add(this.followDelta);this.rig.position.add(this.followDelta);
+    // Translate only: preserve head orientation, room-scale motion and any
+    // position/heading the user chose with the sticks while following.
+  }
+  toggleMenu(){
+    if(!this.pose)return;
+    this.menuOpen=!this.menuOpen;this.panel.mesh.visible=this.menuOpen;
+    if(this.menuOpen){
+      this.panel.mesh.quaternion.copy(this.pose.orientation);
+      this.panel.mesh.position.set(0,-.08,-1.6).applyQuaternion(this.pose.orientation).add(this.pose.position);
+    }
+    this.hoverAge=1;this.panelAge=1;
   }
   pick(controller){
     this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     this.rotation.extractRotation(controller.matrixWorld);
     this.raycaster.ray.direction.set(0,0,-1).applyMatrix4(this.rotation).normalize();
     this.raycaster.far=40*this.rig.scale.x;
-    const panelHit=this.raycaster.intersectObject(this.panel.mesh)[0];
+    const panelHit=this.panel.mesh.visible?this.raycaster.intersectObject(this.panel.mesh)[0]:null;
     if(panelHit)return{type:'control',id:this.panel.buttonAt(panelHit.uv),distance:panelHit.distance};
     return this.picker.pick(this.raycaster);
   }
@@ -181,10 +202,19 @@ export class ObservationXR {
   }
   update(dt,frame){
     if(!this.active||!frame||!this.rig)return;
+    if(!this.visible){this.navigation.reset();return;}
     const pose=frame.getViewerPose(this.view.renderer.xr.getReferenceSpace());
-    if(!pose)return;
+    if(!pose){this.navigation.reset();return;}
     this.pose=pose.transform;
-    if(this.pendingFocus){this.frame(this.pendingFocus);this.pendingFocus=null;}
+    dt=Number.isFinite(dt)?Math.max(0,Math.min(dt,.05)):0;
+    const input=this.navigation.read(this.session.inputSources);
+    if(input.wide)this.view.setMode('all');
+    const refocused=Boolean(this.pendingFocus);
+    if(refocused){this.frame(this.pendingFocus);this.pendingFocus=null;}
+    else this.follow(dt);
+    // A reset wins over a held stick in the same frame.
+    if(!refocused)this.navigation.move(this.pose,dt);
+    if(input.menu&&!input.wide)this.toggleMenu();
     this.hoverAge+=dt;this.panelAge+=dt;
     if(this.hoverAge>=.1){
       this.hoverAge=0;this.view.scene.updateMatrixWorld(true);this.picker.update();
@@ -211,6 +241,7 @@ export class ObservationXR {
     if(this.session!==session)return;
     session.removeEventListener('end',this.ended);session.removeEventListener('visibilitychange',this.visibility);
     this.session=null;
+    this.navigation?.reset();this.navigation=null;this.followRoot=null;this.menuOpen=false;this.pose=null;
     this.quality?.dispose();this.quality=null;this.picker=null;
     for(const item of this.controllers){
       item.controller.removeEventListener('select',item.select);item.controller.removeEventListener('squeeze',item.squeeze);

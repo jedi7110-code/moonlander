@@ -7,6 +7,7 @@ import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
 import {ObservationView} from './view.js';
 import {ObservationXR} from './xr.js';
+import {revealStartupScene} from './startup-lighting.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
@@ -263,9 +264,15 @@ async function start(){
     brain.catRoutine=cat;
     brain.beginWakeUp();
     view.setMode('all');
-    $('loading').hidden=true;
+    view.startLighting();
+    await revealStartupScene({
+      draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),
+      reveal:()=>{$('loading').hidden=true;},
+    });
+    previous=performance.now();
+    let firstVisibleFrame=true;
     function tick(now,xrFrame){
-      const dt=Math.min((now-previous)/1000,.05);previous=now;
+      const frameDt=Math.max(0,(now-previous)/1000),dt=Math.min(frameDt,.05);previous=now;
       const visible=immersive.active?immersive.visible:!document.hidden;
       idleCamera.update(now,{blocked:immersive.active||paused||!visible||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
       if(!paused&&visible&&!games.open){
@@ -274,7 +281,7 @@ async function start(){
         while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor);advanceCabinTraffic(actor,cat,step);brain.update(step);droid.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
-      if(visible){feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
+      if(visible){view.startupLighting?.update(paused||games.open||firstVisibleFrame?0:frameDt);feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);firstVisibleFrame=false;if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
       hudTime+=dt;if(hudTime>.15){updateHUD();hudTime=0;}
     }
     view.renderer.setAnimationLoop(tick);

@@ -41,6 +41,9 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
   for(let i=0;i<3;i++){
     assert.equal(bay.suits[i].userData.suitNumber,i+1);assert.ok(bounds[i].min.y>3.392+.20);assert.ok(bounds[i].max.y<3.392+2.8);
     if(i)assert.ok(bounds[i].min.x>bounds[i-1].max.x);
+    const spot=bay.root.getObjectByName(`EVA overhead spot ${i+1}`),spotBounds=new Box3().setFromObject(spot);
+    assert.ok(spotBounds.min.y>bounds[i].max.y+.1,'each spotlight clears its helmet and suspension hook');
+    assert.equal(spot.position.x,bay.suits[i].position.x,'one overhead fixture per suit');
   }
   assert.ok(new Box3().setFromObject(bay.hatch).min.x>bounds[2].max.x);
   assert.ok(new Box3().setFromObject(bay.innerHatch).max.x<bounds[0].min.x);

@@ -6,6 +6,9 @@ export const CABIN_DECK_LIGHT={color:0xffdfbb,fillColor:0xe9dfcf,power:40,living
 // Keep CSS-sized ink while reducing high-DPI fragment work in the cabin.
 export const CABIN_PIXEL_RATIO=1.1;
 export const CABIN_SHADOW_SIZE=1024;
+// Shared by the visible ladder fixtures and their low-cost local light spill.
+export const LADDER_LIGHT_LAYOUT=Object.freeze({firstY:.54,spacing:1.12,count:12,sourceX:.46,sourceYOffset:-.01,sourceZ:.21});
+export const EVA_SPOT_LAYOUT=Object.freeze({suitX:Object.freeze([7.85,9.05,10.25]),floorY:6.784,sourceY:2.91,sourceZ:-.05,targetY:1.95,targetZ:-.67,innerAngle:16,outerAngle:26,range:3.15});
 
 // Forward rendering evaluates every visible light on every lit surface.
 // Keep new fixture lenses while restoring the original pair of lights per deck.

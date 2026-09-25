@@ -69,6 +69,7 @@ export function createPlantRack(m,x){
   label(root,'HYDROPONICS',0,2.38,-.29,2.60,.19,{size:40});
   const recovery=waterRecovery(root,m),rows=[];
   const growDiffuser=new THREE.MeshBasicMaterial({name:'Full-spectrum grow diffuser',color:CABIN_LIGHT_COLOR,toneMapped:false});
+  growDiffuser.userData.cabinAlwaysPowered=true;
   for(let i=0;i<3;i++){
     const y=1.80-i*.62,plants=[];
     box(root,m.enamel,-.16,y,-.66,2.32,.14,.54,.025);

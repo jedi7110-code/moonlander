@@ -30,6 +30,7 @@ import {finishCabinFixtures} from './cabin-fixtures.js';
 import {updateMiloBandage} from './milo-bandage.js';
 import {createDroidChargingBay,DROID_DOCK} from './droid-charging.js';
 import {createDroidServiceRig} from './droid-service.js';
+import {CabinStartupLighting} from './startup-lighting.js';
 
 export class ObservationView {
   static async create(canvas,{cabinStyle='cartoon'}={}){
@@ -42,6 +43,8 @@ export class ObservationView {
       view.cabinSignage=await createCabinSignage(roots);
       view.cabinToon=createCabinToon(roots);
       view.cabinToon.setStyle(cabinStyle);
+      // Practical lighting also exists in studies that don't replay startup.
+      view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat],{reducedMotion:view.reducedMotion,start:false});
       return view;
     }catch(error){view.dispose();throw error;}
   }
@@ -74,6 +77,10 @@ export class ObservationView {
     const starGeo=new THREE.BufferGeometry();starGeo.setAttribute('position',new THREE.BufferAttribute(stars,3));this.scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0x9bafb5,size:.028,transparent:true,opacity:.36})));
   }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
+  startLighting(){
+    if(this.startupLighting){this.startupLighting.restart(this.reducedMotion);return;}
+    this.startupLighting=new CabinStartupLighting([this.ship.staticMesh,this.ship.animated,this.droidBay.root,this.droidService.root,this.milo,this.cat],{reducedMotion:this.reducedMotion});
+  }
   targetAt(event){
     const rect=this.canvas.getBoundingClientRect();this.pointer.set((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);this.raycaster.setFromCamera(this.pointer,this.camera);
     const target=this.targetFromRay(this.raycaster);
@@ -132,7 +139,7 @@ export class ObservationView {
   }
   setFrustum(){
     // WebXR supplies a projection and pose for each eye; desktop following must
-    // never overwrite the headset pose or move the viewer without a selection.
+    // never overwrite the headset pose or the XR rig's locomotion/following.
     if(this.immersive?.active)return;
     const distance=40;
     this.camera.aspect=this.width/this.height;
@@ -233,5 +240,5 @@ export class ObservationView {
     try{this.renderer.render(this.scene,this.camera);}
     finally{quality?.endFrame();}
   }
-  dispose(){this.renderer.setAnimationLoop(null);this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

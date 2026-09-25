@@ -3,9 +3,29 @@ import {box,ball,cylinder,rod,label} from './materials.js';
 import {EVA_PASSAGE} from './layout.js';
 import {hangingSuit} from './eva-suit.js';
 import {createEquipmentRack} from './eva-equipment.js';
+import {EVA_SPOT_LAYOUT} from './lighting.js';
 export {hangingSuit} from './eva-suit.js';
 
-export const EVA_BAY={suitX:[7.85,9.05,10.25],suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:-.12};
+export const EVA_BAY={suitX:EVA_SPOT_LAYOUT.suitX,suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:-.12};
+
+export function createEVASpotlights(m,y){
+  const root=new THREE.Group();root.name='EVA overhead spotlights';
+  const lens=new THREE.MeshBasicMaterial({name:'EVA spot light lens',color:0xffe5c6,toneMapped:false});
+  lens.userData.cabinAlwaysPowered=true;
+  const layout=EVA_SPOT_LAYOUT,direction=new THREE.Vector3(0,layout.targetY-layout.sourceY,layout.targetZ-layout.sourceZ).normalize();
+  for(const [index,x]of layout.suitX.entries()){
+    box(root,m.dark,x,y+3.18,layout.sourceZ,.27,.055,.24);
+    cylinder(root,m.metal,x,y+3.07,layout.sourceZ,.025,.20,.025,8);
+    const head=new THREE.Group();head.name=`EVA overhead spot ${index+1}`;
+    head.position.set(x,y+layout.sourceY,layout.sourceZ);
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),direction);root.add(head);
+    cylinder(head,m.dark,0,.025,0,.115,.20,.115,16).name='EVA spot housing';
+    cylinder(head,m.metal,0,-.078,0,.108,.024,.108,16);
+    const glass=cylinder(head,lens,0,-.092,0,.087,.009,.087,16);glass.name=`EVA spot lens ${index+1}`;
+    glass.castShadow=false;glass.receiveShadow=false;
+  }
+  return root;
+}
 
 function ring(parent,material,x,y,z,r,tube=.025){
   const mesh=new THREE.Mesh(new THREE.TorusGeometry(r,tube,8,32),material);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
@@ -76,6 +96,7 @@ export function createEVABay(m,y){
   EVA_BAY.suitX.forEach((x,index)=>{
     const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.rotation.y=(index-1)*.16;root.add(suit);suits.push(suit);
   });
+  root.add(createEVASpotlights(m,y));
   const hatch=createEVAHatch(m,y),innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
   const equipmentRack=createEquipmentRack(m,y);root.add(equipmentRack);
   return{root,suits,hatch,innerHatch,equipmentRack};
