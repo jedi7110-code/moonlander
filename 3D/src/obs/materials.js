@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {makeXRWideGeometry} from './xr-geometry.js';
 
 export async function materials() {
   const loader = new THREE.TextureLoader();
@@ -138,11 +139,30 @@ export function screen(parent,x,y,z,w=.85,h=.58,seed=0) {
 }
 
 // Ship fixtures are static; merge by material so rivets and switches stay inexpensive.
-export function batchStatic(root) {
+export function batchStatic(root,{xrLOD=false}={}) {
   root.updateMatrixWorld(true);
   const grouped=new Map();
   root.traverse(mesh=>{if(!mesh.isMesh || Array.isArray(mesh.material))return;const geometry=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
-    if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[]});grouped.get(key).geometries.push(geometry);
+    if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[],wide:[]});
+    const group=grouped.get(key);group.geometries.push(geometry);
+    if(xrLOD){
+      geometry.computeBoundingBox();
+      // At model-scale viewing, sub-16 cm bolts, beads and droplets add very
+      // little to the silhouette. Keep labels and thin but long structural parts.
+      if(geometry.boundingBox.getSize(new THREE.Vector3()).length()>=.16||mesh.material.name.startsWith('Sign:')){
+        const coarse=makeXRWideGeometry(mesh.geometry);
+        const wide=coarse.index?coarse.toNonIndexed():coarse;
+        if(wide!==coarse)coarse.dispose();
+        wide.applyMatrix4(mesh.matrixWorld);wide.deleteAttribute('uv2');group.wide.push(wide);
+      }
+    }
   });
-  const merged=new THREE.Group();for(const {mat,geometries} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
+  const merged=new THREE.Group();for(const {mat,geometries,wide} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;
+    if(xrLOD){
+      mesh.userData.xrWideGeometry=wide.length?mergeGeometries(wide,false):new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([],3));
+      if(!mesh.userData.xrWideGeometry)throw new Error('Invalid XR ship geometry');
+      geometry.addEventListener('dispose',()=>mesh.userData.xrWideGeometry.dispose());
+      wide.forEach(g=>g.dispose());
+    }
+    merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
 }

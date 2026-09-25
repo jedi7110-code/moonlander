@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {HABITAT_VIEW} from './ship.js';
+import {ObservationXRQuality,XRCharacterPicker,XR_FRAMEBUFFER_SCALE} from './xr-quality.js';
 
 const Y=new THREE.Vector3(0,1,0);
 const BUTTONS=[
@@ -75,7 +76,7 @@ export class ObservationXR {
     this.support='checking';this.pending=false;this.session=null;this.disposed=false;this.controllers=[];
     this.raycaster=new THREE.Raycaster();this.rotation=new THREE.Matrix4();
     const manager=view.renderer.xr;manager.enabled=true;manager.setReferenceSpaceType('local');
-    manager.setFramebufferScaleFactor(.8);manager.setFoveation(1);
+    manager.setFramebufferScaleFactor(XR_FRAMEBUFFER_SCALE);manager.setFoveation(1);
     this.click=()=>{void this.toggle();};button.addEventListener('click',this.click);
     this.deviceChange=()=>{if(!this.active&&!this.pending)void this.checkSupport();};
     xr?.addEventListener('devicechange',this.deviceChange);
@@ -129,6 +130,7 @@ export class ObservationXR {
   }
   prepare(){
     const v=this.view,c=v.camera;
+    this.quality=new ObservationXRQuality(v);this.picker=new XRCharacterPicker(v);
     this.saved={parent:c.parent,position:c.position.clone(),quaternion:c.quaternion.clone(),scale:c.scale.clone(),fov:c.fov,aspect:c.aspect,near:c.near,far:c.far,
       mode:v.mode,zoom:v.zoom,center:v.center.clone(),targetCenter:v.targetCenter.clone(),viewHeight:v.viewHeight,targetHeight:v.targetHeight};
     this.rig=new THREE.Group();this.rig.name='XR viewer';v.scene.add(this.rig);this.rig.add(c);
@@ -140,7 +142,7 @@ export class ObservationXR {
       line.scale.z=4;
       const cursor=new THREE.Mesh(new THREE.SphereGeometry(.006,6,4),new THREE.MeshBasicMaterial({color:0xe3f4c9,toneMapped:false}));
       cursor.position.z=-4;controller.add(line,cursor);this.rig.add(controller);
-      const select=()=>{if(this.visible){this.view.scene.updateMatrixWorld(true);this.activate(this.pick(controller));}};
+      const select=()=>{if(this.visible){this.view.scene.updateMatrixWorld(true);this.picker.update();this.activate(this.pick(controller));}};
       const squeeze=()=>{if(this.visible)this.view.setMode('all');};
       controller.addEventListener('select',select);controller.addEventListener('squeeze',squeeze);
       return{controller,line,cursor,select,squeeze,target:null};
@@ -167,7 +169,7 @@ export class ObservationXR {
     this.raycaster.far=40*this.rig.scale.x;
     const panelHit=this.raycaster.intersectObject(this.panel.mesh)[0];
     if(panelHit)return{type:'control',id:this.panel.buttonAt(panelHit.uv),distance:panelHit.distance};
-    return this.view.targetFromRay(this.raycaster);
+    return this.picker.pick(this.raycaster);
   }
   activate(target){
     if(!target?.id)return;
@@ -184,8 +186,8 @@ export class ObservationXR {
     this.pose=pose.transform;
     if(this.pendingFocus){this.frame(this.pendingFocus);this.pendingFocus=null;}
     this.hoverAge+=dt;this.panelAge+=dt;
-    if(this.hoverAge>=.05){
-      this.hoverAge=0;this.view.scene.updateMatrixWorld(true);
+    if(this.hoverAge>=.1){
+      this.hoverAge=0;this.view.scene.updateMatrixWorld(true);this.picker.update();
       for(const item of this.controllers){
         item.target=item.controller.visible?this.pick(item.controller):null;
         const length=item.target?item.target.distance/this.rig.scale.x:4;
@@ -209,6 +211,7 @@ export class ObservationXR {
     if(this.session!==session)return;
     session.removeEventListener('end',this.ended);session.removeEventListener('visibilitychange',this.visibility);
     this.session=null;
+    this.quality?.dispose();this.quality=null;this.picker=null;
     for(const item of this.controllers){
       item.controller.removeEventListener('select',item.select);item.controller.removeEventListener('squeeze',item.squeeze);
       for(const object of [item.line,item.cursor]){object.removeFromParent();object.geometry.dispose();object.material.dispose();}

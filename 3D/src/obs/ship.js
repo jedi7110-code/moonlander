@@ -384,5 +384,5 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
-  return {staticMesh:mergeStatic?batchStatic(staticRoot):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk,washerDoor,washerClothes,incinerator};
+  return {staticMesh:mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk,washerDoor,washerClothes,incinerator};
 }

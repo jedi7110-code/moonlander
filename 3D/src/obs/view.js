@@ -228,7 +228,10 @@ export class ObservationView {
     const width=eye?.z||this.width,height=eye?.w||this.height;
     this.characterToon.forEach(toon=>toon.update(width,height));
     this.cabinToon?.update(width,height,this.viewHeight,this.fitHeight);
-    this.renderer.render(this.scene,this.camera);
+    const quality=this.immersive?.active?this.immersive.quality:null;
+    quality?.beginFrame(this.mode);
+    try{this.renderer.render(this.scene,this.camera);}
+    finally{quality?.endFrame();}
   }
   dispose(){this.renderer.setAnimationLoop(null);this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

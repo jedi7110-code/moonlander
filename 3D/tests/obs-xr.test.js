@@ -97,9 +97,9 @@ test('controller rays select the VR panel or route characters and stations to ex
   s.immersive.update(.1,xrFrame(transform()));
   const controller=s.immersive.controllers[0].controller;controller.position.set(0,-1,0);s.view.scene.updateMatrixWorld(true);
   controller.dispatchEvent({type:'select'});assert.deepEqual(s.actions,['pause']);
-  controller.position.set(0,1,0);s.view.targetFromRay=()=>({type:'station',id:'medical',distance:10});
+  controller.position.set(0,1,0);s.immersive.picker.pick=()=>({type:'station',id:'medical',distance:10});
   controller.dispatchEvent({type:'select'});assert.deepEqual(s.stations,['medical']);
-  s.view.targetFromRay=()=>({type:'character',id:'droid',distance:10});controller.dispatchEvent({type:'select'});assert.equal(s.view.mode,'droid');
+  s.immersive.picker.pick=()=>({type:'character',id:'droid',distance:10});controller.dispatchEvent({type:'select'});assert.equal(s.view.mode,'droid');
   controller.dispatchEvent({type:'squeeze'});assert.equal(s.view.mode,'all');
   await s.immersive.exit();s.immersive.dispose();
 });
