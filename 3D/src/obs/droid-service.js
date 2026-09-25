@@ -18,16 +18,16 @@ const LOADS={
   cloth:{width:.32,front:.12,offsetY:-.045},
   greens:{width:.38,front:.14,offsetY:.03},
   food:{width:.23,front:.07,offsetY:.08},
-  waste:{carton:{width:.42,front:.13,offsetY:0},wrapper:{width:.23,front:.025,offsetY:.08},scraps:{width:.30,front:.09,offsetY:0}}
+  waste:{wrapper:{width:.23,front:.025,offsetY:.08},scraps:{width:.30,front:.09,offsetY:0}}
 };
 
 function fitCarriedObject(out,p,loads){
   const a=p.action;
-  const wastePickup=['cargo-unpack','cook-cleanup'].includes(a)&&p.age>p.duration*.5;
+  const wastePickup=a==='cook-cleanup'&&p.age>p.duration*.5;
   const kind=p.carrying??((a==='waste-insert'||wastePickup)&&p.wasteKind?'waste':a==='cargo-pick'&&p.age>p.duration*.5?'cargo':
     ['laundry-pick','laundry-load','laundry-unload','laundry-fold'].includes(a)?'cloth':a==='harvest'?'greens':null);
   if(!kind||!out.hands||p.climb)return;
-  const shape=kind==='cargo'?loads.cargo[p.cargoIndex??0]:kind==='waste'?loads.waste[p.wasteKind??'carton']:loads[kind];
+  const shape=kind==='cargo'?loads.cargo[p.cargoIndex??0]:kind==='waste'?loads.waste[p.wasteKind??'scraps']:loads[kind];
   const indices=['harvest','washer-open','washer-close'].includes(a)?[0]:[0,1];
   const q=new THREE.Quaternion().setFromAxisAngle(V(1,0,0),a==='food-pour'?-.9*smooth(p.age/1.4):0);
   const position=V(...out.hands[indices[0]]);
@@ -112,7 +112,6 @@ export function sampleDroidServicePose(p,loads=LOADS){
       hands=[-1,1].map(side=>[side*.30,mix(.945,1.04,lift),mix(.73,.40,lift)]);break;
     }
     case 'cargo-place':hip=[.34,.83,.955][p.cargoIndex];lean=[.50,.10,.05][p.cargoIndex];hands=[[-.30,.27+p.cargoIndex*.65,.55],[.30,.27+p.cargoIndex*.65,.55]];break;
-    case 'cargo-unpack':lean=.15;hands=[[-.22,1.04,.4],[.22,1.04+.025*wave,.4]];break;
     case 'harvest':{
       const height=1.89-p.harvestRow*.62;hip=p.harvestRow===0?.965:p.harvestRow===2?.62:.905;
       nod=p.harvestRow===0?-.20:.23;hands=[[-.21,.91,.22],[.13,height+.015*wave,.40+.025*Math.cos(t*2.8)]];break;
@@ -134,7 +133,7 @@ export function sampleDroidServicePose(p,loads=LOADS){
     case 'door-open':case 'door-close':hands=[[-.23,.8,.03],[.24,1.13,.30]];break;
   }
   if(hands){
-    const pickup=['cargo-pick','cargo-unpack','cook-cleanup','laundry-pick','laundry-unload','food-pick','harvest'].includes(p.action);
+    const pickup=['cargo-pick','cook-cleanup','laundry-pick','laundry-unload','food-pick','harvest'].includes(p.action);
     const weight=p.action==='cargo-pick'?smooth(t/.85):blend;
     out.hipHeight=mix(out.hipHeight,hip,weight);out.lean=mix(out.lean,lean,weight);out.nod=mix(out.nod,nod,weight);
     out.bodyZ=mix(out.bodyZ,p.action?.startsWith('cook-')||p.action==='greens-place'?.1:0,weight);
@@ -175,17 +174,9 @@ export function createDroidServiceRig(bay,ship){
   for(let i=0;i<7;i++)ball(greens,m.green,(i%3-1)*.09,.05,Math.floor(i/3)*.07-.08,.068,.12,.05);
   const food=prop('food');box(food,m.bag,0,0,0,.23,.25,.14,.018);box(food,m.dark,0,.04,.075,.13,.065,.007);
   const waste=prop('waste'),wasteVariants={};
-  for(const kind of ['carton','wrapper','scraps']){
+  for(const kind of ['wrapper','scraps']){
     const g=new THREE.Group();g.name='Discarded '+kind;
-    if(kind==='carton'){
-      box(g,m.bag,0,-.115,0,.42,.02,.26);
-      for(const side of [-1,1]){
-        box(g,m.bag,side*.204,0,0,.012,.25,.26);
-        box(g,m.bag,0,0,side*.124,.40,.25,.012);
-      }
-      const flap=box(g,m.bag,0,.145,-.142,.38,.07,.01);flap.rotation.x=-.55;
-      box(g,m.dark,0,.015,.133,.13,.065,.004);
-    }else if(kind==='wrapper'){
+    if(kind==='wrapper'){
       box(g,m.bag,0,0,0,.23,.25,.05,.01);
       box(g,m.dark,0,.035,.029,.13,.065,.006);
       const fold=box(g,m.bag,0,.132,-.008,.22,.025,.012);fold.rotation.x=.5;
@@ -202,7 +193,7 @@ export function createDroidServiceRig(bay,ship){
   const pot=prop('pot');cylinder(pot,m.metal,0,.115,0,.145,.22,.15,24);cylinder(pot,m.dark,0,.23,0,.14,.014,.14,24);
   for(const side of [-1,1])box(pot,m.dark,side*.20,.18,0,.11,.025,.04,.009);
   pot.position.set(-10.56,1.075,-.17);
-  const board=prop('board');box(board,m.bag,0,0,0,.40,.025,.22,.012);board.position.set(-10.50,1.065,-.015);
+  const board=prop('board');box(board,m.bag,0,0,0,.40,.025,.22,.012);board.position.set(-10.00,1.065,-.015);
   for(let i=0;i<7;i++)box(board,m.green,(i-3)*.04,.025,0,.025,.028,.095,.009);
   const stream=prop('kibble');for(let i=0;i<10;i++)ball(stream,m.food,(i%3-1)*.013,-i*.028,0,.012,.012,.012);
   const cargo=ship.cargo.map((source,i)=>{const g=source.clone(true);g.name='Handled supply '+i;root.add(g);return g;});
@@ -220,7 +211,7 @@ export function createDroidServiceRig(bay,ship){
   }));
   let lastStamp=null;
   function update(routine){
-    const p=routine.pose,stamp=p.mode==='charging'?`charging/${routine.care.preparedMeals??0}/${routine.stored.length}`:[p.time,p.mode,p.action].join('/');if(stamp===lastStamp)return;lastStamp=stamp;
+    const p=routine.pose,stamp=p.mode==='charging'?`charging/${routine.care.preparedMeals??0}/${routine.stored.length}/${routine.washerLoaded}`:[p.time,p.mode,p.action].join('/');if(stamp===lastStamp)return;lastStamp=stamp;
     ship.incinerator?.update(routine.incineratorOpen,routine.time<routine.incineratingUntil&&routine.incineratorOpen===0);
     const model=sampleDroidServicePose(p,loads),droid=bay.droid;
     actorRoot.position.set(p.x,p.y,p.z);actorRoot.rotation.y=p.yaw;
@@ -243,7 +234,7 @@ export function createDroidServiceRig(bay,ship){
     }
     const a=p.action,t=p.age;
     for(const [kind,g]of Object.entries(wasteVariants))g.visible=kind===(routine.binWaste??p.wasteKind);
-    if(p.carrying==='waste'||(['cargo-unpack','cook-cleanup'].includes(a)&&t>p.duration*.5))held(waste,[0,0,0],true);
+    if(p.carrying==='waste'||(a==='cook-cleanup'&&t>p.duration*.5))held(waste,[0,0,0],true);
     if(routine.binWaste){
       const elapsed=Math.max(0,routine.time-routine.wasteDroppedAt),f=smooth(elapsed/.42);
       const target=V(WASTE.x,.36,WASTE.z+.03);
@@ -252,9 +243,8 @@ export function createDroidServiceRig(bay,ship){
     if(p.carrying==='cargo'){held(cargo[routine.cargoIndex],[0,-.27,0],true);}
     if(a==='cargo-pick'&&t>p.duration*.5){held(cargo[routine.step.cargoIndex],[0,-.27,0],true);ship.cargo[routine.step.cargoIndex].visible=false;}
     if(a==='cargo-place'&&t>p.duration*.5){const i=routine.step.cargoIndex;cargo[i].position.copy(stored[i].position);}
-    if(p.carrying==='cloth'||['laundry-pick','laundry-load','laundry-unload','laundry-fold'].includes(a))held(cloth,[0,-.045,0],true);
+    if(p.carrying==='cloth'||['laundry-pick','laundry-fold'].includes(a)||(a==='laundry-load'&&!routine.washerLoaded))held(cloth,[0,-.045,0],true);
     if(p.carrying==='greens'||a==='harvest')held(greens,[0,-.10,0],a!=='harvest',0);
-    if(a==='laundry-load'&&t>p.duration*.65)cloth.visible=false;
     if(p.carrying==='food')held(food,[0,.08,0],true);
     if(a==='food-pour'&&routine.carriedFood){
       if(!model.load)food.rotation.x=-.9*smooth(t/1.4);
@@ -262,10 +252,14 @@ export function createDroidServiceRig(bay,ship){
     }
     if(a==='scrub-toilet')held(brush);
     if(a==='scrub-shower')held(sponge);
-    pot.visible=Boolean(routine.care.preparedMeals);
-    if(a?.startsWith('cook-')){pot.visible=a!=='cook-chop';board.visible=a==='cook-chop';if(a!=='cook-cleanup')held(a==='cook-chop'?knife:spoon);}
+    // The saucepan lives on the hob, including before cooking and after meals.
+    pot.visible=true;
+    if(a?.startsWith('cook-')){board.visible=a==='cook-chop';if(a!=='cook-cleanup')held(a==='cook-chop'?knife:spoon);}
     if(ship.washerDoor)ship.washerDoor.rotation.y=-routine.washerOpening*1.55;
-    if(ship.washerClothes)ship.washerClothes.rotation.z=routine.time<routine.washingUntil?routine.time*6:0;
+    if(ship.washerClothes){
+      ship.washerClothes.visible=Boolean(routine.washerLoaded);
+      ship.washerClothes.rotation.z=routine.washerLoaded&&routine.time<routine.washingUntil?routine.time*6:0;
+    }
   }
   return {root,actorRoot,update,props,cargo,stored,wasteVariants};
 }

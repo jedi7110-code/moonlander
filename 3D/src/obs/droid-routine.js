@@ -22,14 +22,14 @@ export class DroidRoutine {
     this.care=care;this.brain=brain;this.actor=actor;this.cat=cat;
     this.position={...DROID_HOME};this.time=0;this.steps=[];this.age=0;
     this.job=null;this.carrying=null;this.door=null;this.opening=0;
-    this.washerOpening=0;this.washingUntil=0;this.completed={};this.harvestRow=0;
+    this.washerOpening=0;this.washerLoaded=false;this.washingUntil=0;this.completed={};this.harvestRow=0;
     this.due={laundry:100,toilet:180,shower:270,cook:70};this.restUntil=12;
     this.stored=[];this.lastDelivery=null;this.walkDistance=0;this.returning=false;
     this.wasteKind=null;this.binWaste=null;this.disposedWaste=0;this.incineratorOpen=0;this.incineratingUntil=0;
   }
   get step(){return this.steps[0]??null;}
   get docked(){return !this.job&&!this.steps.length;}
-  get label(){return this.docked?'充電休止':this.returning?'充電台へ戻る':this.carrying==='waste'||this.step?.action?.startsWith('waste-')?'空き箱・ごみを焼却ボックスへ':DROID_JOBS[this.job];}
+  get label(){return this.docked?'充電休止':this.returning?'充電台へ戻る':this.carrying==='waste'||this.step?.action?.startsWith('waste-')?'ごみを焼却ボックスへ':DROID_JOBS[this.job];}
   get station(){return this.returning?null:STATIONS[this.job];}
   get pose(){
     const s=this.step,u=s?smooth(this.age/s.duration):0;
@@ -134,8 +134,8 @@ export class DroidRoutine {
       this.act('cargo-pick',2.6,()=>{this.carrying='cargo';this.cargoIndex=i;if(this.lastDelivery===delivery)this.care.cargoHandling.picked.push(i);},{cargoIndex:i});
       this.enterRear(2,-1.20,-3.15);
       this.act('cargo-place',2.8,()=>{this.carrying=null;if(this.lastDelivery===delivery){this.stored.push(i);this.care.cargoHandling.stored.push(i);}},{cargoIndex:i});
-      this.act('cargo-unpack',3,()=>{this.wasteKind='carton';this.carrying='waste';},{wasteKind:'carton'});
-      this.leaveRear();this.planDisposal();
+      // Store sealed supplies as delivered; there is no unpacking or refuse.
+      this.leaveRear();
     }
   }
   planHarvest(){
@@ -175,8 +175,10 @@ export class DroidRoutine {
     this.walk(x,LANE);
   }
   planCooking(){
-    this.travel(2,-10.25,.66);this.turn(Math.PI);this.guard();
-    this.act('cook-chop',9);this.act('cook-stir',16);
+    // Chop beside the permanently placed saucepan, then step over to the hob.
+    this.travel(2,-9.75,.66);this.turn(Math.PI);this.guard();
+    this.act('cook-chop',9);
+    this.walk(-10.25,.66);this.turn(Math.PI);this.act('cook-stir',16);
     this.act('cook-serve',3,()=>{this.preparedAt=this.time;if(this.care.has('food'))this.care.preparedMeals=1;});
     this.act('cook-cleanup',2.6,()=>{this.wasteKind='scraps';this.carrying='waste';},{wasteKind:'scraps'});
     this.planDisposal();
@@ -239,6 +241,11 @@ export class DroidRoutine {
     if(s.action==='door-close')this.opening=1-smooth(u);
     if(s.action==='washer-open')this.washerOpening=smooth(u);
     if(s.action==='washer-close')this.washerOpening=1-smooth(u);
+    if(!s.transferred&&((s.action==='laundry-load'&&u>=.65)||(s.action==='laundry-unload'&&u>=.35))){
+      s.transferred=true;
+      this.washerLoaded=s.action==='laundry-load';
+      this.carrying=this.washerLoaded?null:'cloth';
+    }
     if(this.age>=s.duration){
       // Carry the last walking footprints into the first pivot step.
       if(s.kind==='walk'&&this.steps[1]?.turn)this.steps[1].turn.entryWalk={distance:this.walkDistance,age:s.duration};

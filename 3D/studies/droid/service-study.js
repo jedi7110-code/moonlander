@@ -24,7 +24,7 @@ function draw(dt=.05){
   $('status').textContent=routine.label;
   const names={'food-pick':'猫餌を取り出す','food-pour':'皿に注ぐ','cargo-pick':'荷受け','cargo-place':'倉庫に置く','scrub-toilet':'便器をブラシで清掃','scrub-shower':'壁をスポンジで清掃',harvest:'葉を摘む','laundry-pick':'洗濯物を集める','washer-open':'洗濯機を開く','washer-close':'洗濯機を閉じる','laundry-load':'衣類を入れる','laundry-unload':'衣類を取り出す','laundry-fold':'たたんで棚へ','washer-start':'洗濯を開始',wash:'洗濯中','cook-chop':'野菜を切る','cook-stir':'鍋をかき混ぜる','cook-serve':'盛り付け','door-open':'扉を開く','door-close':'扉を閉じる'};
   $('detail').textContent=`${routine.time.toFixed(1)}秒 / ${names[routine.pose.action]??routine.pose.mode}　${routine.door?'ドア開放 '+Math.round(routine.opening*100)+'%':''}　餌皿 ${care.catBowl} / 1`;
-  const wasteNames={'cargo-unpack':'空き箱をまとめる','cook-cleanup':'調理ごみを集める','waste-open':'焼却ボックスを開く','waste-insert':'ごみを投入','waste-close':'扉を閉じる','waste-burn':'焼却中'};
+  const wasteNames={'cook-cleanup':'調理ごみを集める','waste-open':'焼却ボックスを開く','waste-insert':'ごみを投入','waste-close':'扉を閉じる','waste-burn':'焼却中'};
   if(wasteNames[routine.pose.action])$('detail').textContent=`${routine.time.toFixed(1)}秒 / ${wasteNames[routine.pose.action]}　処理 ${routine.disposedWaste} 件`;
   $('time').value=routine.time;
 }

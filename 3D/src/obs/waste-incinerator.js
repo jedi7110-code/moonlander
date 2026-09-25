@@ -3,7 +3,7 @@ import {box,cylinder,batchStatic} from './materials.js';
 import {WASTE_INCINERATOR as WASTE} from './layout.js';
 
 // Compact sealed unit under the existing galley wall equipment. The door
-// opens beside the load; no added light, smoke pass or particle simulation.
+// folds forward about its lower edge; no added light or particle simulation.
 export function createWasteIncinerator(m){
   const root=new THREE.Group();root.name='Galley waste incinerator';root.position.set(WASTE.x,0,WASTE.z);
   const body=new THREE.Group();root.add(body);
@@ -33,17 +33,27 @@ export function createWasteIncinerator(m){
     // Attached below to the moving door, so the open chamber stays clear.
     body.userData.sign=sign;
   }
-  const door=new THREE.Group();door.name='Waste loading door';door.position.set(.345,.56,d/2+.036);root.add(door);
-  box(door,alloy,-.345,0,0,.685,.63,.042,.018);
-  box(door,dark,-.545,-.005,.034,.045,.20,.032,.007);
-  for(const y of [-.205,.205])box(door,dark,.004,y,0,.054,.092,.071,.009);
+  const door=new THREE.Group();door.name='Waste loading door';door.position.set(0,.245,d/2+.036);root.add(door);
+  box(door,alloy,0,.315,0,.685,.63,.042,.018).name='Waste door leaf';
+  box(door,dark,0,.525,.034,.20,.045,.032,.007).name='Waste door upper handle';
+  // Fixed and moving knuckles share a horizontal axis at the lower seal.
+  for(const side of [-1,1]){
+    for(const x of [side*.19,side*.30]){
+      const fixed=cylinder(body,dark,x,door.position.y,door.position.z,.025,.05,.025,12);
+      fixed.rotation.z=Math.PI/2;fixed.name='Waste door fixed lower hinge';
+    }
+    const moving=cylinder(door,alloy,side*.245,0,0,.025,.052,.025,12);
+    moving.rotation.z=Math.PI/2;moving.name='Waste door lower hinge';
+  }
   const sign=body.userData.sign;
   if(sign){delete body.userData.sign;sign.position.sub(door.position);sign.position.z=.024;door.add(sign);}
   const indicator=new THREE.MeshBasicMaterial({color:0x6e8c65,toneMapped:false});
   box(body,indicator,.255,.115,d/2+.018,.055,.025,.012,.003);
   root.remove(body);root.add(batchStatic(body));
   function update(open=0,burning=false){
-    door.rotation.y=THREE.MathUtils.clamp(open,0,1)*1.63;
+    // Positive X rotation carries the top edge toward the aisle; the bottom
+    // stays anchored. Fully open the leaf is horizontal below the load path.
+    door.rotation.x=THREE.MathUtils.clamp(open,0,1)*Math.PI/2;
     indicator.color.setHex(burning?0xe18c37:open>0?0xb6aa73:0x6e8c65);
   }
   update();return {root,door,indicator,update};

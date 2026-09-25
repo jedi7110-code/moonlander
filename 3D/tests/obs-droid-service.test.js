@@ -67,6 +67,84 @@ test('harvesting, storage and feeding do not duplicate or overdraw inventory',()
   assert.equal(feed.care.fillCatBowl(),false);assert.equal(feed.care.eatCatFood(),true);
   assert.equal(feed.care.catBowl,0);assert.equal(feed.care.supplies.catfood,2);
 });
+test('laundry contents appear only after loading and leave the drum when picked up',()=>{
+  const droid=createDroid({detail:'obs'}),washerClothes=new Group();
+  const rig=createDroidServiceRig({droid,cable:new Group()},{cargo:[],washerClothes});
+  const {routine,care,brain,actor}=setup('laundry');
+  try{
+    rig.update(new DroidRoutine({care,brain,actor,cat:{mode:'sleep'}}));assert.equal(washerClothes.visible,false);
+    for(let cycle=0;cycle<2;cycle++){
+      if(cycle)assert.ok(routine.request('laundry'));
+      rig.update(routine);assert.equal(routine.washerLoaded,false);assert.equal(washerClothes.visible,false);
+      let loaded=0,unloaded=0,previous=false,washing=0,loading=0,unloading=0;
+      finish(routine,r=>{
+        rig.update(r);
+        assert.equal(washerClothes.visible,r.washerLoaded);
+        if(r.washerLoaded&&!previous)loaded++;
+        if(!r.washerLoaded&&previous)unloaded++;
+        previous=r.washerLoaded;
+        const p=r.pose;
+        if(p.action==='laundry-load'||p.action==='laundry-unload'){
+          const inside=p.action==='laundry-load'?p.age>=p.duration*.65:p.age<p.duration*.35;
+          assert.equal(r.washerLoaded,inside);
+          assert.equal(rig.props.cloth.visible,!inside,'one load transfers between the hands and the drum, without duplication');
+          if(p.action==='laundry-load')loading++;else unloading++;
+        }
+        if(p.action==='wash'){
+          washing++;assert.equal(washerClothes.visible,true);assert.equal(rig.props.cloth.visible,false);
+          const state=[r.washerLoaded,r.carrying,washerClothes.rotation.z];r.update(0);rig.update(r);
+          assert.deepEqual([r.washerLoaded,r.carrying,washerClothes.rotation.z],state,'pause preserves the load');
+        }
+        if(!r.washerLoaded)assert.equal(washerClothes.rotation.z,0);
+      });
+      assert.equal(loaded,1);assert.equal(unloaded,1);assert.ok(loading&&washing&&unloading);
+      assert.equal(washerClothes.visible,false);assert.equal(routine.washerLoaded,false);
+    }
+    // Seeking back to the start in the study must clear a previous load too.
+    const loadedRoutine=setup('laundry').routine;
+    for(let i=0;i<10000&&!loadedRoutine.washerLoaded;i++)loadedRoutine.update(.05);
+    rig.update(loadedRoutine);assert.equal(washerClothes.visible,true);
+    rig.update(setup('laundry').routine);assert.equal(washerClothes.visible,false);
+  }finally{
+    droid.dispose();const geometries=new Set(),materials=new Set();
+    rig.root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+  }
+});
+test('the saucepan stays on the hob before cooking, throughout the job and after the meal is eaten',()=>{
+  const droid=createDroid({detail:'obs'}),rig=createDroidServiceRig({droid,cable:new Group()},{cargo:[]});
+  const {routine,care,brain,actor}=setup('cook'),pot=rig.props.pot;
+  const position=pot.position.clone(),rotation=pot.quaternion.clone(),seen=new Set();
+  const check=()=>{
+    assert.equal(pot.visible,true,'the saucepan must never appear or disappear with the cooking phase');
+    assert.ok(pot.position.equals(position));assert.ok(pot.quaternion.equals(rotation));
+  };
+  try{
+    check();
+    rig.update(new DroidRoutine({care,brain,actor,cat:{mode:'sleep'}}));check();
+    rig.update(routine);check();
+    for(let i=0;i<5000&&!routine.docked;i++){
+      routine.update(.2);rig.update(routine);check();
+      const action=routine.pose.action;
+      if(action?.startsWith('cook-'))seen.add(action);
+      if(action==='cook-chop'){
+        assert.equal(rig.props.board.visible,true);
+        const boardBounds=new Box3().setFromObject(rig.props.board),potBounds=new Box3().setFromObject(pot);
+        assert.ok(boardBounds.min.x>potBounds.max.x+.05,'chopping board clears the saucepan and its handles');
+        const knifeBounds=new Box3().setFromObject(rig.props.knife),tip=knifeBounds.getCenter(new Vector3());
+        assert.ok(tip.x>boardBounds.min.x&&tip.x<boardBounds.max.x,'chopping hand follows the relocated board');
+      }
+    }
+    assert.ok(routine.docked);assert.deepEqual([...seen],['cook-chop','cook-stir','cook-serve','cook-cleanup']);
+    assert.equal(care.preparedMeals,1);assert.ok(care.take('food'));assert.equal(care.preparedMeals,0);
+    rig.update(routine);check();rig.update(routine);check();
+    assert.ok(routine.request('feed'));rig.update(routine);check();
+  }finally{
+    droid.dispose();const geometries=new Set(),materials=new Set();
+    rig.root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+  }
+});
 test('bathroom stays open throughout entry, cleaning and exit; Milo waits until it is free',()=>{
   for(const job of ['toilet','shower']){
     const {routine}=setup(job);let requested=false,resumed=false,scrubbed=false;

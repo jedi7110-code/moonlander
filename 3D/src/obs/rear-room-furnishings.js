@@ -7,6 +7,44 @@ function ring(root,material,x,y,z,r,tube){
   mesh.position.set(x,y,z);root.add(mesh);return mesh;
 }
 
+function crumpledLaundry(source){
+  // Three overlapping fabric folds, baked into one lightweight mesh. Wavy hems,
+  // drooping corners and shaded valleys read as cloth without a cloth simulation.
+  const positions=[],colors=[],uvs=[],indices=[],cols=10,rows=4;
+  const pieces=[
+    {x:-.015,y:-.105,w:.29,h:.085,angle:-.16,phase:.3},
+    {x:.025,y:-.065,w:.27,h:.09,angle:.31,phase:1.8},
+    {x:-.025,y:-.023,w:.25,h:.09,angle:-.25,phase:3.1},
+  ];
+  for(const [layer,piece]of pieces.entries()){
+    const start=positions.length/3,c=Math.cos(piece.angle),s=Math.sin(piece.angle);
+    for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++){
+      const u=col/cols,v=row/rows,edge=Math.abs(2*u-1);
+      const wave=Math.sin(u*Math.PI*3+v*.9+piece.phase);
+      const x=(u-.5)*piece.w+.008*Math.sin(v*Math.PI+piece.phase);
+      const y=(v-.5)*piece.h*(1-.28*edge)+.012*wave-.017*edge*edge;
+      const z=.003+layer*.008+.006*(1+wave)+.004*Math.sin(v*Math.PI);
+      const px=piece.x+c*x-s*y,py=piece.y+s*x+c*y;
+      const inset=Math.min(1,.198/Math.hypot(px,py));
+      positions.push(px*inset,py*inset,z);
+      // Subtle self-shadow in folded-under edges survives the cabin toon bands.
+      const shade=.69+.24*(wave+1)/2-.12*(1-v)**3;
+      colors.push(shade,shade,shade);uvs.push(u,v);
+      if(row<rows&&col<cols){const a=start+row*(cols+1)+col,b=a+cols+1;indices.push(a,a+1,b,a+1,b+1,b);}
+    }
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  geometry.setIndex(indices);geometry.computeVertexNormals();
+  const material=source.clone();material.name='Laundry / crumpled cotton';
+  material.color.setHex(0xf1f0e8);material.vertexColors=true;material.side=THREE.DoubleSide;
+  material.metalness=0;material.roughness=1;material.map=null;material.bumpScale=.0007;
+  const mesh=new THREE.Mesh(geometry,material);mesh.name='Crumpled laundry';mesh.castShadow=mesh.receiveShadow=true;
+  return mesh;
+}
+
 function laundry(root,m,wearMaterials){
   // Stacked front-loading washer/dryer: round doors face the cabin entrance.
   for(const [i,name]of ['Washing machine','Dryer'].entries()){
@@ -20,8 +58,12 @@ function laundry(root,m,wearMaterials){
     ring(door,m.metal,.28,0,0,.258,.028);
     ring(door,m.rubber,.28,0,.007,.219,.016);
     box(door,m.metal,.51,0,.035,.05,.12,.055,.01);
-    const clothes=new THREE.Group();clothes.position.set(0,.36,.416);clothes.name=i===0?'Washer rotating clothes':'Dryer clothes';unit.add(clothes);
-    box(clothes,m.cloth,-.035,-.05,0,.24,.13,.018,.03);
+    // Only the washer receives a load in the service routine. The unused dryer
+    // stays empty, and the washer contents are animated separately from the room.
+    if(i===0){
+      const clothes=new THREE.Group();clothes.position.set(0,.36,.416);clothes.name='Washer rotating clothes';clothes.visible=false;unit.add(clothes);
+      clothes.add(crumpledLaundry(m.cloth));
+    }
   }
   const closet=new THREE.Group();closet.name='Open clothes closet';closet.position.set(.51,.14,-4.77);root.add(closet);
   box(closet,m.dark,0,1.02,-.39,.845,2.00,.06);

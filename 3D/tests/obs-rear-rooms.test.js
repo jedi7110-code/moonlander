@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Box3,MeshStandardMaterial,Raycaster,Vector3} from 'three';
+import {Box3,DoubleSide,MeshStandardMaterial,Raycaster,Vector3} from 'three';
 import {REAR_ROOM_GATES,FLOOR_Y} from '../src/obs/ship.js';
 import {createRearRoomFurnishings} from '../src/obs/rear-room-furnishings.js';
 import {createMilo} from '../src/obs/characters.js';
@@ -20,6 +20,23 @@ test('02 has laundry and clothes; 03 has food and household supplies',()=>{
     assert(bounds.min.z>g.back,'equipment stays in front of the rear wall');
     if(level===1){
       assert(!room.getObjectByName('Food ration case'));
+      assert.equal(room.getObjectByName('Washer rotating clothes').visible,false,'washer starts empty');
+      assert.equal(room.getObjectByName('Dryer clothes'),undefined,'unused dryer has no clothes to merge into the static room');
+      const load=room.getObjectByName('Washer rotating clothes'),cloth=load.getObjectByName('Crumpled laundry');
+      assert.equal(load.children.length,1,'folds share one draw mesh');assert.ok(cloth);
+      assert.equal(cloth.geometry.index.count/3,240,'less geometry than the old 300-triangle rounded box');
+      assert.equal(cloth.material.side,DoubleSide);assert.equal(cloth.material.vertexColors,true);
+      assert.equal(cloth.material.metalness,0);assert.equal(cloth.material.roughness,1);
+      const points=cloth.geometry.attributes.position,normals=cloth.geometry.attributes.normal;
+      let minZ=Infinity,maxZ=-Infinity;
+      for(let i=0;i<points.count;i++){
+        const p=new Vector3().fromBufferAttribute(points,i),n=new Vector3().fromBufferAttribute(normals,i);
+        assert.ok(p.toArray().every(Number.isFinite));assert.ok(Math.abs(n.length()-1)<1e-5);
+        assert.ok(Math.hypot(p.x,p.y)<.205,'the load stays within the opening at every rotation');
+        assert.ok(p.z>-.012&&p.z<.04,'folds sit ahead of the dark drum and behind the door rim');
+        minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);
+      }
+      assert.ok(maxZ-minZ>.025,'folds have real depth instead of a flat white panel');
       const shirts=[];room.traverse(o=>{if(o.name==='Seamless T-shirt')shirts.push(new Box3().setFromObject(o));});
       assert.equal(shirts.length,3);
       shirts.sort((a,b)=>a.min.x-b.min.x);

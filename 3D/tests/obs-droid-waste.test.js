@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Box3,BoxGeometry,Group,Mesh,MeshStandardMaterial,Vector3} from 'three';
+import {Box3,BoxGeometry,Group,Mesh,MeshStandardMaterial,Vector3,Matrix4} from 'three';
 import {WASTE_INCINERATOR as WASTE,CABIN_AISLE} from '../src/obs/layout.js';
 import {createWasteIncinerator} from '../src/obs/waste-incinerator.js';
 import {DroidRoutine} from '../src/obs/droid-routine.js';
@@ -37,8 +37,46 @@ test('sealed waste unit fits left of the galley below its existing wall equipmen
   }finally{dispose(unit.root);metal.dispose();}
 });
 
-test('empty cartons, food wrappers and kitchen scraps are carried, deposited once and burned after closing',()=>{
-  for(const [job,expected,kind]of [['cargo',3,'carton'],['feed',1,'wrapper'],['cook',1,'scraps']]){
+test('waste door pivots on its fixed lower edge and folds outward to horizontal without sliding sideways',()=>{
+  const metal=new MeshStandardMaterial(),unit=createWasteIncinerator({metal,dark:metal});
+  try{
+    unit.root.updateMatrixWorld(true);
+    const hinge=unit.door.getWorldPosition(new Vector3()),closed=new Box3().setFromObject(unit.door);
+    assert.equal(unit.door.position.y,.245);
+    for(const opening of [0,.1,.25,.5,.75,1,.75,.5,.25,0]){
+      unit.update(opening);unit.root.updateMatrixWorld(true);
+      assert.ok(unit.door.getWorldPosition(new Vector3()).distanceTo(hinge)<1e-10,'bottom hinge stays anchored');
+      assert.equal(unit.door.rotation.y,0);assert.equal(unit.door.rotation.z,0);
+      const top=unit.door.localToWorld(new Vector3(0,.63,0)),angle=opening*Math.PI/2;
+      assert.ok(Math.abs(top.x-hinge.x)<1e-10);
+      assert.ok(Math.abs(top.y-hinge.y-.63*Math.cos(angle))<1e-10);
+      assert.ok(Math.abs(top.z-hinge.z-.63*Math.sin(angle))<1e-10,'top edge moves forward, not into the chamber');
+    }
+    assert.ok(new Box3().setFromObject(unit.door).equals(closed),'closing restores the original seal');
+    const handle=unit.root.getObjectByName('Waste door upper handle');assert.ok(handle.position.y>.5);
+    unit.update(2);assert.equal(unit.door.rotation.x,Math.PI/2);
+    unit.update(-1);assert.equal(unit.door.rotation.x,0);
+  }finally{dispose(unit.root);metal.dispose();}
+});
+
+test('cargo is stored sealed without unpacking, generating refuse or visiting the waste unit',()=>{
+  const {care,routine}=setup('cargo'),inventory={...care.supplies};
+  assert.deepEqual(routine.steps.filter(step=>step.kind==='work').map(step=>step.action),Array.from({length:3},()=>['cargo-pick','cargo-place']).flat());
+  assert.ok(!routine.steps.some(step=>step.to?.x===WASTE.x&&step.to?.z===WASTE.approachZ));
+  let placements=0;
+  for(let i=0;i<20000&&!routine.docked;i++){
+    routine.update(.05);
+    assert.notEqual(routine.carrying,'waste');assert.equal(routine.wasteKind,null);assert.equal(routine.binWaste,null);
+    assert.equal(routine.incineratorOpen,0);assert.equal(routine.disposedWaste,0);
+    placements=Math.max(placements,routine.stored.length);
+  }
+  assert.ok(routine.docked);assert.equal(placements,3);assert.equal(routine.completed.cargo,1);
+  assert.deepEqual(routine.stored,[0,1,2]);assert.deepEqual(care.cargoHandling.picked,[0,1,2]);assert.deepEqual(care.cargoHandling.stored,[0,1,2]);
+  assert.deepEqual(care.supplies,inventory,'moving sealed supplies never consumes or duplicates inventory');
+});
+
+test('food wrappers and kitchen scraps are carried, deposited once and burned after closing',()=>{
+  for(const [job,expected,kind]of [['feed',1,'wrapper'],['cook',1,'scraps']]){
     const {care,routine}=setup(job),inventory={...care.supplies};
     let seenCarry=0,seenDeposit=0,seenBurn=0,previousCount=0;
     for(let i=0;i<20000&&!routine.docked;i++){
@@ -66,7 +104,6 @@ test('empty cartons, food wrappers and kitchen scraps are carried, deposited onc
     assert.ok(routine.docked&&seenCarry>20&&seenBurn>20);assert.equal(seenDeposit,expected);
     assert.equal(routine.disposedWaste,expected);assert.equal(routine.binWaste,null);assert.equal(routine.incineratorOpen,0);
     assert.deepEqual(care.supplies,job==='feed'?{...inventory,catfood:inventory.catfood-1}:inventory,'discarding packaging never consumes the contents');
-    if(job==='cargo')assert.deepEqual(routine.stored,[0,1,2]);
     if(job==='cook')assert.equal(care.preparedMeals,1);
   }
 });
@@ -78,11 +115,32 @@ test('visible refuse follows both palms, enters the chamber before the door clos
   });
   const incinerator=createWasteIncinerator({metal,dark:metal}),rig=createDroidServiceRig({droid,cable:new Group()},{cargo,incinerator});
   try{
+    assert.deepEqual(Object.keys(rig.wasteVariants).sort(),['scraps','wrapper'],'unused empty cartons are not generated');
     for(const job of ['cargo','feed','cook']){
       const {routine}=setup(job);let checked=0;
       for(let i=0;i<12000&&!routine.docked;i++){
-        routine.update(.1);rig.update(routine);rig.root.updateMatrixWorld(true);
+        routine.update(.1);rig.update(routine);rig.root.updateMatrixWorld(true);incinerator.root.updateMatrixWorld(true);
         const p=routine.pose,waste=rig.props.waste;
+        if(job==='cargo'){
+          assert.equal(waste.visible,false,'cargo transport never shows a refuse prop');
+          assert.equal(incinerator.door.rotation.x,0,'cargo never opens the waste unit');
+          assert.equal(rig.stored.filter(o=>o.visible).length,routine.stored.length);
+          checked++;
+        }
+        if(['waste-open','waste-insert','waste-close'].includes(p.action)){
+          const leaf=incinerator.root.getObjectByName('Waste door leaf');leaf.geometry.computeBoundingBox();
+          const inverse=new Matrix4().copy(leaf.matrixWorld).invert(),point=new Vector3();
+          // Use posed skin vertices, not the droid's bind-space geometry.
+          for(const target of [droid.root,waste])target.traverse(mesh=>{
+            if(!mesh.isMesh||!mesh.geometry.attributes.position)return;
+            for(let node=mesh;node;node=node.parent)if(!node.visible)return;
+            const toDoor=new Matrix4().multiplyMatrices(inverse,mesh.matrixWorld);
+            for(let i=0;i<mesh.geometry.attributes.position.count;i++){
+              mesh.getVertexPosition(i,point).applyMatrix4(toDoor);
+              assert.ok(!leaf.geometry.boundingBox.containsPoint(point),`${job}: ${p.action} door must clear the posed droid and refuse`);
+            }
+          });
+        }
         if(p.carrying==='waste'){
           assert.equal(waste.visible,true);
           const variant=rig.wasteVariants[p.wasteKind],bounds=new Box3().setFromObject(variant);
