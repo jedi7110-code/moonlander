@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {createDroid} from './droid-model.js';
-import {box,cylinder,rod,pipe,batchStatic} from './materials.js';
+import {box,rod,pipe,batchStatic} from './materials.js';
 import {DECK} from './layout.js';
 
 export const DROID_DOCK=Object.freeze({x:-11.92,z:-.52,floor:DECK.OPERATIONS,baseHeight:.020});
@@ -26,17 +26,18 @@ export function createDroidChargingBay(floorY){
   }
   box(fixture,dark,0,1.105,-.253,.42,.17,.066,.012);
   box(fixture,rubber,0,1.105,-.2075,.27,.12,.025,.009);
+  // The droid rests against fixed charging contacts; no detachable body lead.
+  for(const x of [-.075,.075])box(fixture,metal,x,1.105,-.191,.026,.064,.009);
   box(fixture,dark,-.435,.88,-.65,.23,.36,.15,.015);
   box(fixture,metal,-.435,.88,-.564,.18,.30,.023,.006);
   for(let i=0;i<4;i++)box(fixture,rubber,-.435,.80+i*.025,-.545,.13,.008,.006);
   box(fixture,rubber,-.435,.973,-.541,.088,.031,.01,.004);
   box(fixture,lamp,-.435,.973,-.533,.031,.009,.005,.002);
   const droid=createDroid({detail:'obs'});root.add(droid.root);droid.update(0,'charging');
-  const port=cylinder(droid.chassis,dark,-.09,.285,-.218,.022,.028);port.name='Droid charging connector';port.rotation.x=Math.PI/2;
-  root.updateMatrixWorld(true);
-  const connector=port.getWorldPosition(new THREE.Vector3());
-  const cable=new THREE.Group();cable.name='Automatic docking lead';root.add(cable);
-  pipe(cable,rubber,[[-.435,.74,-.555],[-.43,.49,-.45],[-.31,.47,-.33],[-.23,.88,-.26],connector.toArray()],.011);
+  const cable=new THREE.Group();cable.name='Fixed charging stand cable';root.add(cable);
+  // Both ends are attached to the stand: power unit below, contact support above.
+  // It stays in place and visible through waking, departure and return.
+  pipe(cable,rubber,[[-.435,.74,-.555],[-.43,.49,-.45],[-.31,.47,-.33],[-.32,.86,-.27],[-.255,1.035,-.25]],.011);
   const dock=batchStatic(fixture);dock.name=fixture.name;root.remove(fixture);root.add(dock);
   root.position.set(DROID_DOCK.x,floorY+DROID_DOCK.baseHeight,DROID_DOCK.z);
   root.updateMatrixWorld(true);

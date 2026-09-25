@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Vector3,Box3,MeshStandardMaterial,Group,Mesh,BoxGeometry,Quaternion} from 'three';
-import {DroidRoutine,DROID_JOBS,DROID_HOME} from '../src/obs/droid-routine.js';
+import {DroidRoutine,DROID_JOBS,DROID_HOME,DROID_PACE} from '../src/obs/droid-routine.js';
 import {Supplies} from '../src/obs/state.js';
 import {PlantBed} from '../src/obs/plant-state.js';
 import {createDroid,DROID_SPEC} from '../src/obs/droid-model.js';
@@ -51,7 +51,7 @@ test('all household jobs travel continuously, finish once and return powered dow
   for(const job of Object.keys(DROID_JOBS)){
     const {routine}=setup(job);let before={...routine.position},climbed=false;
     finish(routine,r=>{
-      const p=r.position;assert.ok(Math.hypot(p.x-before.x,p.y-before.y,p.z-before.z)<.04,'no teleport');
+      const p=r.position;assert.ok(Math.hypot(p.x-before.x,p.y-before.y,p.z-before.z)<.58*DROID_PACE*.05+.001,'no teleport');
       climbed||=r.step?.kind==='climb';before={...p};
     });
     assert.ok(climbed);assert.equal(routine.completed[job],1);assert.equal(routine.pose.rest,1);
@@ -181,14 +181,19 @@ test('autonomy leaves the dock for an empty bowl, reserves its food, then rests 
 });
 test('the droid does not claim an occupied ladder or release it before stepping away',()=>{
   const {routine,actor}=setup('feed');
-  // Stop at the step boundary instead of already spending part of a tick climbing.
-  while(routine.step?.kind!=='climb')routine.advance(routine.step.duration);
+  // Stop beside the ladder, before reserving or entering its shared approach.
+  while(!routine.step?.ladderEntry)routine.advance(routine.step.duration);
   actor.climbing=true;assert.equal(routine.blocksCrew(actor),false);
   routine.update(2);assert.equal(routine.age,0);assert.equal(routine.blocksCrew(actor),false);
+  assert.ok(Math.abs(routine.position.x)>1,'wait beside the ladder, not directly in front of it');
   actor.climbing=false;routine.update(.05);actor.climbing=true;assert.equal(routine.blocksCrew(actor),true);
+  while(routine.step?.kind!=='climb')routine.update(.05);
   while(routine.step?.kind==='climb')routine.update(.05);
   assert.equal(routine.blocksCrew(actor),true);
   while(routine.position.z<=.92)routine.update(.05);
+  assert.equal(routine.blocksCrew(actor),true,'keep the reservation while leaving the centre of the landing');
+  while(routine.ladderClaim)routine.update(.05);
+  assert.ok(Math.abs(routine.position.x)>1);
   assert.equal(routine.blocksCrew(actor),false);
 });
 test('all working and climbing poses preserve rigid arm and leg lengths',()=>{
@@ -283,18 +288,18 @@ test('ascending and descending hands show their backs to the camera and grip the
   }
 });
 
-test('ladder travel covers one deck in about 8.5 seconds in both directions',()=>{
+test('ladder travel covers one deck in about 5.3 seconds in both directions',()=>{
   const {routine}=setup('feed');
   const climbs=routine.steps.filter(s=>s.kind==='climb');
   assert.ok(climbs.some(s=>s.to.y>s.from.y)&&climbs.some(s=>s.to.y<s.from.y));
   for(const climb of climbs){
     const perDeck=climb.duration/Math.abs(climb.to.floor-climb.from.floor);
-    assert.ok(perDeck>8&&perDeck<9,'a single deck should take roughly half the former 17 seconds');
+    assert.ok(perDeck>5&&perDeck<5.5,'a single deck is 1.6 times faster than the former 8.5 seconds');
   }
   while(routine.step.kind!=='climb')routine.update(.05);
   const from=routine.position.y,direction=Math.sign(routine.step.to.y-from);
   routine.update(1);
-  assert.ok(Math.abs((routine.position.y-from)*direction-.40)<1e-6,'live motion advances at the faster planned speed');
+  assert.ok(Math.abs((routine.position.y-from)*direction-.40*DROID_PACE)<1e-6,'live motion advances at the faster planned speed');
 });
 
 test('carrying palms meet each load surface through walking, turns and pouring, using the rendered width',()=>{

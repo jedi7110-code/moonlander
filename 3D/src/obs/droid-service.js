@@ -216,7 +216,7 @@ export function createDroidServiceRig(bay,ship){
     const model=sampleDroidServicePose(p,loads),droid=bay.droid;
     actorRoot.position.set(p.x,p.y,p.z);actorRoot.rotation.y=p.yaw;
     droid.face.setExpression(p.mode==='charging'?'sleepy':'neutral');droid.update(p.time,'service',model);
-    bay.cable.visible=p.rest>.9;bay.mode=p.mode;
+    bay.mode=p.mode;
     root.updateMatrixWorld(true);
     for(const g of Object.values(props))g.visible=false;
     for(const [i,g]of stored.entries())g.visible=routine.stored.includes(i);

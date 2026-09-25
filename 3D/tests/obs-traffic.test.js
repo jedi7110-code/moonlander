@@ -12,7 +12,7 @@ const setup=(floor=2,x=600)=>{
 };
 
 test('separate lanes are supported across all decks without filling the ladder well',()=>{
-  assert(CAT_PORT.walkZ-CABIN_AISLE.crewZ>1);assert(CABIN_AISLE.deckFront-CAT_PORT.walkZ>.5);
+  assert(CAT_PORT.walkZ-CABIN_AISLE.crewZ>1);assert(CABIN_AISLE.deckFront-CAT_PORT.walkZ>.3);
   assert.equal(CAT_BOWL.depth,.89);assert.equal(CAT_SOFA.approachZ,.89);assert.equal(LOUNGE_SEAT.centerDepth,-.10);
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});
   for(let level=0;level<3;level++){

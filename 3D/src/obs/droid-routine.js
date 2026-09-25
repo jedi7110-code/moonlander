@@ -1,6 +1,7 @@
-import {FLOORS,CAT_BOWL,WASTE_INCINERATOR as WASTE} from './layout.js';
+import {FLOORS,LADDER_X,CAT_BOWL,WASTE_INCINERATOR as WASTE} from './layout.js';
 import {planDroidTurn,sampleDroidTurn} from './droid-turn.js';
 import {DROID_STARTUP_SECONDS} from './droid-startup.js';
+import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
 
 export const DROID_JOBS=Object.freeze({
   cargo:'支援物資を倉庫へ運搬',harvest:'野菜を収穫',laundry:'衣類を洗濯',
@@ -8,8 +9,12 @@ export const DROID_JOBS=Object.freeze({
 });
 export const DROID_HOME={x:-11.92,y:6.804,z:-.52,floor:0,yaw:0};
 export const DROID_FLOORS=FLOORS.map(f=>(870-f.y)*.016);
+// Metres from the shaft centre, with separate side holds for the two aisle depths.
+export const DROID_LADDER_TRAFFIC=Object.freeze({droidWaitX:1.15,crewWaitX:1.35,crewClearX:1.5});
 const STATIONS={cargo:'hatch',harvest:'plant',toilet:'toilet',shower:'shower',cook:'galley'};
-const LANE=1.48,SPEED=.58,CLIMB_SPEED=.40;
+export const DROID_PACE=1.6;
+export const DROID_LANE=1.48;
+const LANE=DROID_LANE,SPEED=.58*DROID_PACE,CLIMB_SPEED=.40*DROID_PACE;
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
 const mix=(a,b,t)=>a+(b-a)*t;
 const angle=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
@@ -24,17 +29,19 @@ export class DroidRoutine {
     this.job=null;this.carrying=null;this.door=null;this.opening=0;
     this.washerOpening=0;this.washerLoaded=false;this.washingUntil=0;this.completed={};this.harvestRow=0;
     this.due={laundry:100,toilet:180,shower:270,cook:70};this.restUntil=12;
-    this.stored=[];this.lastDelivery=null;this.walkDistance=0;this.returning=false;
+    this.stored=[];this.lastDelivery=null;this.walkDistance=0;this.returning=false;this.ladderClaim=false;
     this.wasteKind=null;this.binWaste=null;this.disposedWaste=0;this.incineratorOpen=0;this.incineratingUntil=0;
   }
   get step(){return this.steps[0]??null;}
   get docked(){return !this.job&&!this.steps.length;}
-  get label(){return this.docked?'充電休止':this.returning?'充電台へ戻る':this.carrying==='waste'||this.step?.action?.startsWith('waste-')?'ごみを焼却ボックスへ':DROID_JOBS[this.job];}
+  get label(){return this.docked?'充電休止':this.waiting&&this.step?.ladderEntry?'ハシゴの空き待ち':this.returning?'充電台へ戻る':this.carrying==='waste'||this.step?.action?.startsWith('waste-')?'ごみを焼却ボックスへ':DROID_JOBS[this.job];}
   get station(){return this.returning?null:STATIONS[this.job];}
+  get ladderPath(){return this.ladderClaim&&this.ladderRoute?{from:this.position.y,to:this.ladderRoute.to}:null;}
   get pose(){
     const s=this.step,u=s?smooth(this.age/s.duration):0;
     return {...this.position,mode:this.docked?'charging':s?.kind??'idle',job:this.job,
-      action:s?.action??null,age:this.age,duration:s?.duration??1,time:this.time,
+      // Keep authored gesture/contact timings together while shortening real time.
+      action:s?.action??null,age:this.age*(s?.actionRate??1),duration:(s?.duration??1)*(s?.actionRate??1),time:this.time,
       carrying:this.carrying,walkDistance:this.walkDistance,harvestRow:s?.harvestRow??this.harvestRow,cargoIndex:s?.cargoIndex??this.cargoIndex??0,
       wasteKind:s?.wasteKind??this.wasteKind,
       walking:s?.kind==='walk'&&!this.waiting,
@@ -51,8 +58,18 @@ export class DroidRoutine {
     if(this.station!==station){this.crewRequest=null;return false;}
     this.crewRequest=callback;return true;
   }
-  blocksCrew(actor){
-    return Boolean(this.ladderClaim&&actor.climbing);
+  blocksCrew(actor,dt=1/60){
+    if(!this.ladderClaim)return false;
+    if(!ladderPathsConflict(this.ladderPath,crewLadderPath(actor)))return false;
+    if(actor.climbing)return true;
+    const walk=actor.queue?.[0];
+    if(walk?.type!=='walk')return false;
+    const from=actor.x-LADDER_X,to=walk.x-LADDER_X;
+    // Retargeting away from the shaft is always allowed, even from inside a hold.
+    if(from*to>0&&Math.abs(to)>=Math.abs(from))return false;
+    if(from*to>0&&Math.abs(to)*.022>DROID_LADDER_TRAFFIC.crewWaitX)return false;
+    const next=Math.max(0,Math.abs(from)-actor.walkSpeed*Math.max(0,dt));
+    return next*.022<=DROID_LADDER_TRAFFIC.crewWaitX;
   }
   available(job){
     if(this.occupied(job))return false;
@@ -98,10 +115,11 @@ export class DroidRoutine {
     return true;
   }
   add(kind,duration,finish=null,extra={}){this.steps.push({kind,duration,finish,...extra});}
-  act(action,duration,finish=null,extra={}){this.add('work',duration,finish,{action,...extra});}
+  act(action,duration,finish=null,extra={}){this.add('work',duration/DROID_PACE,finish,{action,actionRate:DROID_PACE,...extra});}
   turn(yaw){
     const d=angle(this.plan.yaw,yaw);if(Math.abs(d)<.01)return;
     const turn=planDroidTurn(this.plan.yaw,this.plan.yaw+d);
+    turn.duration/=DROID_PACE;
     this.add('turn',turn.duration,null,{from:{...this.plan},to:{...this.plan,yaw:this.plan.yaw+d},turn});
     this.plan.yaw+=d;
   }
@@ -113,10 +131,15 @@ export class DroidRoutine {
   travel(floor,x,z){
     this.walk(this.plan.x,LANE);
     if(floor!==this.plan.floor){
+      const side=Math.sign(this.plan.x)||Math.sign(x)||-1;
+      this.walk(side*DROID_LADDER_TRAFFIC.droidWaitX,LANE);
+      this.add('ladder-wait',.1,null,{ladderEntry:true,ladderPath:{from:this.plan.y,to:DROID_FLOORS[floor]}});
       this.walk(0,LANE);this.walk(0,.34);this.turn(Math.PI);
       const to={...this.plan,floor,y:DROID_FLOORS[floor]};
       this.add('climb',Math.abs(to.y-this.plan.y)/CLIMB_SPEED,null,{from:{...this.plan},to});this.plan={...to};
       this.walk(0,LANE);
+      this.walk((Math.sign(x)||side)*DROID_LADDER_TRAFFIC.droidWaitX,LANE);
+      this.add('ladder-release',.01,()=>{this.ladderClaim=false;this.ladderRoute=null;});
     }
     this.walk(x,LANE);this.walk(x,z,floor);
   }
@@ -156,7 +179,7 @@ export class DroidRoutine {
     this.act('washer-open',1.8,()=>{this.washerOpening=1;});
     this.act('laundry-load',4,()=>{this.carrying=null;});
     this.act('washer-close',1.8,()=>{this.washerOpening=0;});
-    this.act('washer-start',2,()=>{this.washingUntil=this.time+24;});
+    this.act('washer-start',2,()=>{this.washingUntil=this.time+24/DROID_PACE;});
     this.act('wash',24);
     this.act('washer-open',1.8,()=>{this.washerOpening=1;});
     this.act('laundry-unload',4,()=>{this.carrying='cloth';});
@@ -201,7 +224,7 @@ export class DroidRoutine {
     this.act('waste-open',.9,()=>{this.incineratorOpen=1;});
     this.act('waste-insert',WASTE.insertDuration);
     this.act('waste-close',.9,()=>{
-      this.incineratorOpen=0;if(this.binWaste)this.incineratingUntil=this.time+WASTE.burnDuration;
+      this.incineratorOpen=0;if(this.binWaste)this.incineratingUntil=this.time+WASTE.burnDuration/DROID_PACE;
     });
     this.act('waste-burn',WASTE.burnDuration,()=>{this.binWaste=null;this.wasteKind=null;});
   }
@@ -215,28 +238,32 @@ export class DroidRoutine {
     if(this.docked){if(this.time>=this.restUntil){const job=this.choose();if(job)this.request(job);}return;}
     const s=this.step;if(!s)return;
     this.waiting=false;
+    this.waitingForCat=Boolean(this.cat?.motion?.blocksDroid(this,dt));
+    if(this.waitingForCat){this.waiting=true;return;}
     if(s.guard&&this.occupied(this.job)){this.waiting=true;return;}
-    if((s.kind==='climb'&&this.age===0)||(s.kind==='walk'&&s.to.x===0&&s.to.z===.34)){
-      if(this.actor?.climbing||Math.abs((this.actor?.x??0)-700)<24){this.waiting=true;return;}
+    if(s.ladderEntry&&!this.ladderClaim){
+      const crewNear=this.actor?.climbing||Math.abs((this.actor?.x??0)-LADDER_X)*.022<DROID_LADDER_TRAFFIC.crewClearX;
+      if(crewNear&&ladderPathsConflict(s.ladderPath,crewLadderPath(this.actor))){this.waiting=true;return;}
+      // Reserve only this remaining route. Separate decks can be used together,
+      // and a vacated segment is reusable before the other climber has finished.
+      this.ladderClaim=true;this.ladderRoute=s.ladderPath;
     }
     if(s.action==='food-pour')this.care.catBowlFilling=Boolean(this.carriedFood);
     this.age=Math.min(s.duration,this.age+dt);const u=this.age/s.duration;
     if(s.action==='waste-open')this.incineratorOpen=smooth(u);
     if(s.action==='waste-close')this.incineratorOpen=1-smooth(u);
-    if(s.action==='waste-insert'&&!s.deposited&&this.age>=WASTE.depositAt){
+    if(s.action==='waste-insert'&&!s.deposited&&this.age*s.actionRate>=WASTE.depositAt){
       s.deposited=true;
       if(this.carrying==='waste'){
         this.binWaste=this.wasteKind;this.wasteDroppedAt=this.time;this.carrying=null;this.disposedWaste++;
       }
     }
-    if(s.kind==='climb')this.ladderClaim=true;
     if(s.from){
       for(const k of ['x','y','z','yaw'])this.position[k]=mix(s.from[k],s.to[k],u);
       if(s.turn)this.position.yaw=sampleDroidTurn(s.turn,this.age).yaw;
       if(s.kind==='walk')this.walkDistance+=SPEED*dt;
       if(u>=1)this.position.floor=s.to.floor;
     }
-    if(s.kind!=='climb'&&this.position.z>.92)this.ladderClaim=false;
     if(s.action==='door-open'){this.door=s.door;this.opening=smooth(u);}
     if(s.action==='door-close')this.opening=1-smooth(u);
     if(s.action==='washer-open')this.washerOpening=smooth(u);

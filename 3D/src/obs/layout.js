@@ -7,7 +7,7 @@ const cabinFloor=floor=>floor===0?DECK.HABITATION:floor===1?DECK.OPERATIONS:floo
 export const GYM={id:'gym',floor:2,x:840,need:'exercise',dur:16000};
 export const PLANT={id:'plant',floor:2,x:385,need:null,dur:9000};
 export const MEDICAL={id:'medical',floor:DECK.OPERATIONS,x:912,need:null,dur:14000};
-export const CABIN_AISLE={crewZ:.78,catZ:1.92,deckBack:-1.81,deckFront:2.55,crossingClearance:48};
+export const CABIN_AISLE={crewZ:.78,catZ:2.20,deckBack:-1.81,deckFront:2.55,crossingClearance:48};
 export const HYDRO_TRAY={depth:.40,z:-.40,cupZ:-.28,standZ:.10};
 export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66};
 export const CAT_SCALE=.8;

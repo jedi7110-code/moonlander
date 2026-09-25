@@ -10,11 +10,11 @@ const CAT_FREE_REST_MODES=new Set(['look','groom','sleep','stretch','prone']);
 const CAT_REST_YAWS=Array.from({length:8},(_,i)=>i*Math.PI/4);
 const CAT_WAKE_PREP_SECONDS=.3,CAT_WAKE_LAND_SECONDS=.45;
 
-export function advanceCabinTraffic(actor,cat,dt){
+export function advanceCabinTraffic(actor,cat,dt,droid=null){
   if(dt<=0)return;
   actor.waitingForCat=cat.motion.blocksCrew(actor,dt);
   if(!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid)actor.update(dt);
-  cat.update(dt,actor);
+  cat.update(dt,actor,droid);
 }
 
 export class CrewMotion {
@@ -108,10 +108,10 @@ export class CatMotion extends CrewMotion {
     if(this.hop){min=CAT_SOFA.floorX;max=CAT_SOFA.seatX;seconds=1;active=this.hop.up||this.hop.started||this.hop.phase!=='prepare';}
     else if(this.portal&&['enter','exit'].includes(this.portal.phase)){seconds=this.portal.duration-this.portal.age;active=this.portal.age>0;}
     else if(segment?.type==='depth'&&Math.abs(segment.z-this.z)>.001){
-      if(Math.min(this.z,segment.z)>CABIN_AISLE.crewZ+.65&&!segment.started)return null;
-      seconds=Math.abs(segment.z-this.z)/(this.walkSpeed*.022)+.4;active=Boolean(segment.started)||this.z<CABIN_AISLE.crewZ+.65;
+      if(Math.min(this.z,segment.z)>CABIN_AISLE.catZ-.08&&!segment.started)return null;
+      seconds=Math.abs(segment.z-this.z)/(this.walkSpeed*.022)+.4;active=Boolean(segment.started)||this.z<CABIN_AISLE.catZ-.08;
       if(this.floor===CAT_SOFA.floor&&this.destination?.x>=CAT_SOFA.seatX){max=CAT_SOFA.seatX;seconds+=1;}
-    }else if(!this.onSofa&&!this.portal&&this.z<CABIN_AISLE.crewZ+.65){active=true;}
+    }else if(!this.onSofa&&!this.portal&&this.z<CABIN_AISLE.catZ-.08){active=true;}
     else return null;
     const clearance=!this.busy?60:CABIN_AISLE.crossingClearance;
     return{min:min-clearance,max:max+clearance,seconds,active};
@@ -124,7 +124,26 @@ export class CatMotion extends CrewMotion {
     return Math.max(actor.x,end)>=crossing.min&&Math.min(actor.x,end)<=crossing.max;
   }
   blocksCrew(actor,dt){return Boolean(this.crossing?.active&&this.crewInCrossing(actor,dt));}
-  update(dt,actor=null){
+  droidInCrossing(droid,seconds){
+    const crossing=this.crossing;if(!crossing||!droid?.position)return false;
+    const floorY=(870-this.y)*.016,minX=(crossing.min-LADDER_X)*.022,maxX=(crossing.max-LADDER_X)*.022;
+    const intersects=(a,b)=>Math.max(a.x,b.x)>=minX&&Math.min(a.x,b.x)<=maxX&&
+      Math.max(a.y,b.y)>=floorY-.45&&Math.min(a.y,b.y)<=floorY+.55&&
+      Math.max(a.z,b.z)>=Math.min(this.z,CAT_PORT.insideZ)-.4&&Math.min(a.z,b.z)<=CAT_PORT.walkZ+.4;
+    let from=droid.position,remaining=Math.max(0,seconds);
+    if(intersects(from,from))return true;
+    // Reserve the entire crossing, including an approaching turn/next segment.
+    for(let i=0;i<droid.steps.length&&remaining>0;i++){
+      const step=droid.steps[i],age=i===0?droid.age:0,duration=step.duration-age;
+      const used=Math.min(remaining,duration),u=step.to?Math.min(1,(age+used)/step.duration):0;
+      const to=step.to?{x:step.from.x+(step.to.x-step.from.x)*u,y:step.from.y+(step.to.y-step.from.y)*u,z:step.from.z+(step.to.z-step.from.z)*u}:from;
+      if(intersects(from,to))return true;
+      remaining-=used;from=to;
+    }
+    return false;
+  }
+  blocksDroid(droid,dt){return Boolean(this.crossing?.active&&this.droidInCrossing(droid,dt));}
+  update(dt,actor=null,droid=null){
     if(dt<=0)return;
     if(this.turn){
       this.turn.age=Math.min(this.turn.duration,this.turn.age+dt);this.heading=sampleCatTurn(this.turn).yaw;
@@ -143,7 +162,8 @@ export class CatMotion extends CrewMotion {
     }
     const crossing=this.crossing;
     this.waitingForCrew=Boolean(crossing&&!crossing.active&&!actor?.waitingForCat&&this.crewInCrossing(actor,crossing.seconds));
-    if(this.waitingForCrew)return;
+    this.waitingForDroid=Boolean(crossing&&!crossing.active&&!droid?.waitingForCat&&this.droidInCrossing(droid,crossing.seconds));
+    if(this.waitingForCrew||this.waitingForDroid)return;
     if(this.hop){
       this.hop.started=true;
       while(dt>0&&this.hop){
@@ -325,7 +345,7 @@ export class CatRoutine {
       this.motion.goTo(target,()=>{const rest=this.random()<.35?'look':this.random()<(100-this.energy)/(100-this.energy+this.groomNeed+1)?'sleep':'groom';this.rest(rest,this.between(7,18));});
     },'walk');
   }
-  update(dt,actor=null){
+  update(dt,actor=null,droid=null){
     if(dt<=0)return;
     this.companion=actor;
     if(this.waitForDroidFood&&!this.care.catBowlFilling){this.waitForDroidFood=false;this.fetch();}
@@ -351,10 +371,10 @@ export class CatRoutine {
     this.energy=bounded(this.energy+dt*(resting&&this.mode==='sleep'?3:-.25*CABIN_PACE.catDecay));
     this.groomNeed=bounded(this.groomNeed+dt*(resting&&this.mode==='groom'?-4:.22*CABIN_PACE.catDecay));
     this.curiosity=bounded(this.curiosity+dt*(this.motion.busy?-.8:.3));
-    this.motion.update(dt,actor);
+    this.motion.update(dt,actor,droid);
     if(this.motion.portal)this.motion.heading=this.motion.passagePose.yaw;
     if(this.motion.turn)return;
-    if(actor?.waitingForCat&&!this.motion.busy&&!this.motion.onSofa&&this.motion.z!==CAT_PORT.walkZ&&!this.pendingMove){
+    if((actor?.waitingForCat||droid?.waitingForCat)&&!this.motion.busy&&!this.motion.onSofa&&this.motion.z!==CAT_PORT.walkZ&&!this.pendingMove){
       this.depart(()=>{this.mode='walk';this.modeTime=0;this.motion.goTo({floor:this.motion.floor,x:this.motion.x},()=>this.rest('look',5));},'yield');
     }
     if(this.mode==='play'){

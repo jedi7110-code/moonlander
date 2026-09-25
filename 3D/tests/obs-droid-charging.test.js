@@ -6,7 +6,10 @@ import {createDroidChargingBay,DROID_DOCK} from '../src/obs/droid-charging.js';
 import {CABIN_AISLE,DECK} from '../src/obs/layout.js';
 import {FLOOR_Y} from '../src/obs/ship.js';
 import {DROID_STARTUP_SECONDS} from '../src/obs/droid-startup.js';
-import {sampleDroidServicePose} from '../src/obs/droid-service.js';
+import {sampleDroidServicePose,createDroidServiceRig} from '../src/obs/droid-service.js';
+import {DroidRoutine} from '../src/obs/droid-routine.js';
+import {Supplies} from '../src/obs/state.js';
+import {PlantBed} from '../src/obs/plant-state.js';
 
 test('charging slumps from the neck with grounded feet, attached arms and no powered face',()=>{
   const droid=createDroid(),v=()=>new Vector3();
@@ -120,6 +123,37 @@ test('charging bay fits left of the console, inside the hull and behind both tra
   }finally{
     bay.droid.dispose();
     const geometries=new Set(),materials=new Set();bay.dock.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+  }
+});
+
+test('charging cable stays fixed on the stand through waking, work and return instead of disappearing',()=>{
+  const bay=createDroidChargingBay(FLOOR_Y[DROID_DOCK.floor]);
+  const rig=createDroidServiceRig(bay,{cargo:[]});
+  const routine=new DroidRoutine({care:new Supplies(),brain:{plants:new PlantBed(),actStation:null},actor:{x:1040},cat:{mode:'sleep'}});
+  const modes=new Set(),cable=bay.cable,mesh=cable.children[0];
+  const geometry=mesh.geometry,material=mesh.material;
+  bay.root.updateMatrixWorld(true);const bounds=new Box3().setFromObject(cable);
+  try{
+    assert.equal(cable.name,'Fixed charging stand cable');assert.equal(cable.parent,bay.root);
+    assert.equal(bay.droid.root.getObjectByName('Droid charging connector'),undefined,'no loose connector remains on the moving droid');
+    const path=geometry.parameters.path.points;
+    assert.deepEqual(path[0].toArray(),[-.435,.74,-.555],'lower end stays attached to the power unit');
+    assert.deepEqual(path.at(-1).toArray(),[-.255,1.035,-.25],'upper end terminates inside the fixed support pad');
+    const check=()=>{
+      rig.update(routine);modes.add(routine.pose.mode);
+      assert.equal(cable.visible,true);assert.equal(mesh.visible,true);
+      assert.equal(mesh.geometry,geometry);assert.equal(mesh.material,material);
+      assert.ok(new Box3().setFromObject(cable).equals(bounds),'cable does not move or follow the departing droid');
+    };
+    check();assert.ok(routine.request('laundry'));
+    for(let i=0;i<5000&&!routine.docked;i++){routine.update(.1);check();}
+    assert.ok(routine.docked);check();
+    for(const mode of ['charging','wake','walk','work','sleep'])assert.ok(modes.has(mode),mode);
+    assert.ok(routine.request('feed'));routine.update(2);check();
+  }finally{
+    bay.droid.dispose();const geometries=new Set(),materials=new Set();
+    for(const root of [bay.root,rig.root])root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
     geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
   }
 });
