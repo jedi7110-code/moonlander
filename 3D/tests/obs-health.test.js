@@ -6,6 +6,7 @@ import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,currentAction,getStation,FLOORS} from '../src/obs/state.js';
 import {MEDICAL} from '../src/obs/layout.js';
 import {medicalReadings,medicalRecline,medicalDuration,MED_BED} from '../src/obs/medical.js';
+import {BED_ENTRY_SECONDS} from '../src/obs/bed-entry.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {GYM_MOUNT_SECONDS,GYM_BRAKE_SECONDS,GYM_DISMOUNT_SECONDS} from '../src/obs/gym-visit.js';
 
@@ -57,7 +58,8 @@ test('extended treatment stays reclined after the old 14-second checkup limit; f
   const health=new CrewHealth();health.startCondition('fever');health.value=29;health.beginTreatment();
   assert.equal(health.treatment.duration,36);assert.equal(medicalRecline(20,36),1);
   const duration=medicalDuration(36);
-  assert.ok(Math.abs(medicalRecline(duration-6.55,duration)-.5)<1e-10);assert.equal(medicalRecline(duration-1,duration),0);assert.equal(medicalRecline(duration,duration),0);
+  const entryMidpoint=MED_BED.transition-2-BED_ENTRY_SECONDS/2;
+  assert.ok(Math.abs(medicalRecline(duration-entryMidpoint,duration)-.5)<1e-10);assert.equal(medicalRecline(duration-1,duration),0);assert.equal(medicalRecline(duration,duration),0);
   const hot=medicalReadings(needs,health);health.update(20,{needs});const cooler=medicalReadings(needs,health);
   assert.ok(cooler.temperature<hot.temperature);assert.ok(cooler.pulse<hot.pulse);
 });

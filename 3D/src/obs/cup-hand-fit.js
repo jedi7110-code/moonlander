@@ -1,5 +1,6 @@
 import {MathUtils} from 'three';
 import {createGripHandGeometry} from './tablet-pose.js';
+import {cloneMiloSkinGeometry} from './milo-elbow.js';
 
 // Fit the imported fingers to their controllers before closing around the
 // small handle. Blend in while reaching, so the idle hand never changes shape
@@ -15,7 +16,7 @@ function setHandFit(root,weight,side){
   let fit=cache.variants[side];
   if(!fit){
     skin.geometry=cache.original;
-    const original=cache.original,target=createGripHandGeometry(skin,side),geometry=original.clone(),vertices=[];
+    const original=cache.original,target=createGripHandGeometry(skin,side),geometry=cloneMiloSkinGeometry(skin),vertices=[];
     const a=original.attributes,b=target.attributes;
     for(let i=0;i<a.position.count;i++){
       if(a.armRegion.getX(i)<.95||a.position.getY(i)>.934||(side&&a.position.getX(i)*side<0))continue;

@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {MeshStandardMaterial,Vector3,Quaternion} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
+import {cloneMiloSkinGeometry} from '../src/obs/milo-elbow.js';
 import {LADDER,LADDER_WRIST_OFFSET,sampleLadder,applyLadderStudy} from '../studies/milo/ladder-study.js';
 import {setLadderHandFit} from '../studies/milo/ladder-hand-fit.js';
 const bytes=await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url));
@@ -156,7 +157,7 @@ test('study hand fitting is reversible and independent of the first scrubbed fra
   const root=createMilo(material()),fresh=createMilo(material()),original=root.userData.bodySkin.geometry;
   const watch=root.userData.watch.group,watchPosition=watch.position.clone(),watchRotation=watch.quaternion.clone();
   const originalStrap=watch.getObjectByName('Fitted graphite watch strap').geometry;
-  const before=original.attributes.position.array.slice(),weights=original.attributes.skinWeight.array.slice();
+  const before=cloneMiloSkinGeometry(root.userData.bodySkin).attributes.position.array.slice(),weights=original.attributes.skinWeight.array.slice();
   for(const time of [1.4,0,2,3.5,4]){animateMilo(root,{time:0,moving:false,facing:1});applyLadderStudy(root,time);}
   animateMilo(fresh,{time:0,moving:false,facing:1});applyLadderStudy(fresh,4);
   const a=root.userData.bodySkin.geometry.attributes.position.array,b=fresh.userData.bodySkin.geometry.attributes.position.array;
@@ -165,7 +166,7 @@ test('study hand fitting is reversible and independent of the first scrubbed fra
   assert.equal(root.userData.bodySkin.geometry,original);
   assert.equal(watch.getObjectByName('Fitted graphite watch strap').geometry,originalStrap);
   assert.ok(watch.position.distanceTo(watchPosition)<1e-9&&watch.quaternion.angleTo(watchRotation)<1e-7);
-  assert.deepEqual(original.attributes.position.array,before);assert.deepEqual(original.attributes.skinWeight.array,weights);
+  assert.deepEqual(cloneMiloSkinGeometry(root.userData.bodySkin).attributes.position.array,before);assert.deepEqual(original.attributes.skinWeight.array,weights);
 });
 
 test('gripping wrists retain a round cross-section instead of a flattened paddle',()=>{

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {cloneMiloSkinGeometry} from './milo-elbow.js';
 
 // The imported fingers are longer and more widely spaced than the animation
 // rig. Fit a reversible mesh copy before bending it; never change source data.
@@ -7,7 +8,7 @@ export function setLadderHandFit(root,enabled){
   if(!skin)return;
   let fit=root.userData.ladderHandFit;
   if(!fit&&enabled){
-    const original=skin.geometry,geometry=original.clone();
+    const original=skin.geometry,geometry=cloneMiloSkinGeometry(skin);
     const {position,skinIndex,skinWeight,armRegion}=geometry.attributes;
     const bones=skin.skeleton.bones.map(b=>b.name.replace('Milo skin ',''));
     const smooth=THREE.MathUtils.smoothstep;

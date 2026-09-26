@@ -50,7 +50,7 @@ async function init(){
     for(const entry of entries){
       const sample=sampleBedEntry(kind,time,entry.sequential);applyBedEntry(entry.milo,sample);
       entry.bunk.root.visible=kind==='bunk';entry.medical.root.visible=kind==='medical';
-      if(kind==='bunk')animateBunk(entry.bunk,sample.pose);else animateMedical(entry.medical,sample.sourceTime,true,null,{patient:entry.milo});
+      if(kind==='bunk')animateBunk(entry.bunk,sample.pose);else animateMedical(entry.medical,sample.sourceTime,true,null,{patient:entry.milo,duration:sample.actionDuration,sequential:entry.sequential});
       entry.milo.userData.bandage.visible=false;updateMiloWatch(entry.milo,8);entry.milo.updateMatrixWorld(true);entry.milo.userData.bodySkin.skeleton.update();
       $(entry.sequential?'after-stage':'before-stage').textContent=sample.stage;
     }

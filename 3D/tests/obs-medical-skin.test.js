@@ -18,7 +18,7 @@ function fixture(){
 }
 test('both actual hands rest on the examination pad, beside the hips, without changing sleeping pose',()=>{
   const {patient}=fixture(),skin=patient.userData.bodySkin;
-  for(const time of [10.05,17,medicalDuration()-10.05]){
+  for(const time of [MED_BED.transition,MED_BED.transition+6.95,medicalDuration()-MED_BED.transition]){
     animateMilo(patient,{action:'medical',moving:false,time,actionTime:time});
     patient.parent.updateMatrixWorld(true);skin.skeleton.update();
     const p=skin.geometry.attributes.position,arm=skin.geometry.attributes.armRegion;
@@ -68,10 +68,11 @@ test('scan hits the connected animated skin on its first frame and follows each 
 
 test('scan reuses the deformed surface while still refreshing changed bones and geometry',()=>{
   const {patient,rig}=fixture(),skin=patient.userData.bodySkin;
-  animateMilo(patient,{action:'medical',moving:false,time:12,actionTime:12});
+  const time=MED_BED.transition+2;
+  animateMilo(patient,{action:'medical',moving:false,time,actionTime:time});
   let count=0;const vertex=skin.getVertexPosition.bind(skin);
   skin.getVertexPosition=(i,p)=>{count++;return vertex(i,p);};
-  const scan=age=>animateMedicalRig(rig,medicalTransferPose(12),age,{patient,scanning:true});
+  const scan=age=>animateMedicalRig(rig,medicalTransferPose(time),age,{patient,scanning:true});
   scan(2);assert.equal(count,skin.geometry.attributes.position.count);
   count=0;scan(2.1);assert.equal(count,0,'moving beam alone does not re-skin the patient');
   assert.ok(rig.surfaces.get(skin).mesh.geometry.drawRange.count<skin.geometry.index.count/10,'only the scan slice is ray-tested');

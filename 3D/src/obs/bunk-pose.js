@@ -2,6 +2,7 @@ import {MathUtils,Quaternion,Euler,Vector3} from 'three';
 import {applyBedTransferPose} from './bed-pose.js';
 import {BUNK_BED,BUNK_TRAY} from './recline.js';
 import {placeHand} from './dining.js';
+import {bedEntryMotion} from './bed-entry.js';
 
 export function applySleepingHands(root,recline){
   const weight=MathUtils.smoothstep(recline,.35,1);
@@ -26,5 +27,5 @@ export function applySleepingHands(root,recline){
 
 export function applyBunkVisitPose(root,visit){
   applyBedTransferPose(root,visit.pose,{...BUNK_TRAY,top:BUNK_BED.top},visit.startYaw??0);
-  applySleepingHands(root,visit.pose.recline);
+  applySleepingHands(root,visit.pose.entry===undefined?visit.pose.recline:bedEntryMotion(visit.pose.entry).lay);
 }

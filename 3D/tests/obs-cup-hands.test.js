@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {Box3,MeshStandardMaterial,Vector3} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
+import {cloneMiloSkinGeometry} from '../src/obs/milo-elbow.js';
 import {createDiningStudy,applyDiningStudy} from '../studies/milo/dining-study.js';
 import {cupGripPose,diningPhase} from '../src/obs/dining.js';
 
@@ -76,9 +77,9 @@ test('the body, reaching fingers and cup clear the dispenser and tray for the en
 test('the cup finger fit is gradual, isolated to that hand, and restores across other poses',()=>{
   const root=character(),skin=root.userData.bodySkin,original=skin.geometry;
   pose(root,0);assert.equal(skin.geometry,original);
-  const source=original.attributes.position.array.slice();
-  pose(root,.17);const early=skin.geometry.attributes.position.array.slice();
-  pose(root,1.2);const fitted=skin.geometry.attributes.position;
+  const source=cloneMiloSkinGeometry(skin).attributes.position.array.slice();
+  pose(root,.17);const early=cloneMiloSkinGeometry(skin).attributes.position.array.slice();
+  pose(root,1.2);const fitted=cloneMiloSkinGeometry(skin).attributes.position;
   for(let i=0;i<fitted.count;i++){
     const a=original.attributes;
     if(a.position.getX(i)<0||a.position.getY(i)>.934||a.armRegion.getX(i)<.95){
@@ -86,11 +87,12 @@ test('the cup finger fit is gradual, isolated to that hand, and restores across 
     }
     for(let k=0;k<3;k++)assert.ok(Math.abs(early[i*3+k]-source[i*3+k])<.003,'initial reach must not replace the hand abruptly');
   }
-  assert.deepEqual(original.attributes.position.array,source,'never modify the original skin');
+  assert.deepEqual(cloneMiloSkinGeometry({geometry:original}).attributes.position.array,source,'grip fitting must preserve neutral skin, independently of the animated elbow crease');
   const fresh=character();
   for(const extra of [{action:null},{action:'lounge',leisure:'tablet'},{action:'galley'},{action:'gym'},{action:'hydro'}]){
     pose(root,3,extra);pose(fresh,3,extra);
-    for(const key of ['position','skinIndex','skinWeight'])assert.deepEqual(skin.geometry.attributes[key].array,fresh.userData.bodySkin.geometry.attributes[key].array,'pose switches restore their own skin');
+    const a=cloneMiloSkinGeometry(skin),b=cloneMiloSkinGeometry(fresh.userData.bodySkin);
+    for(const key of ['position','skinIndex','skinWeight'])assert.deepEqual(a.attributes[key].array,b.attributes[key].array,'pose switches restore their own neutral skin');
   }
   pose(root,8);assert.equal(skin.geometry,original);
 });

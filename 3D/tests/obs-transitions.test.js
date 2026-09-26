@@ -5,6 +5,7 @@ import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,CatRoutine,Supplies,getStation,currentAction} from '../src/obs/state.js';
 import {createMilo,animateMilo,createCat,animateCat} from '../src/obs/characters.js';
 import {LOUNGE_ENTRY_SECONDS,loungeEntryAge,loungeExitPose} from '../src/obs/lounge-exit.js';
+import {MED_BED} from '../src/obs/medical.js';
 const materials=()=>new Proxy({},{get:()=>new MeshStandardMaterial()});
 function setup(id){const station=getStation(id),actor=new CrewMotion({floor:station.floor,x:station.x}),care=new Supplies(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.8});brain.health.nextIncident=Infinity;brain.cur=station;brain._startPerform(station);return{actor,brain,care};}
 test('seating pauses recovery, ignores repeated lounge clicks, and queues the newest destination',()=>{
@@ -30,14 +31,14 @@ for(const id of ['medical'])test(`${id}: an interrupted transfer returns through
     const {brain,actor}=setup(id);brain.update(elapsed);brain._go(getStation('hydro'));
     assert.ok(brain.reclineExit.duration>0);assert.equal(currentAction(brain),id);assert.equal(actor.busy,false);
     const root=createMilo(materials());let previous=null;
-    let frames=0;
-    while(brain.reclineExit&&frames++<700){
+    let frames=0;const maxFrames=Math.ceil((MED_BED.transition+.1)*60);
+    while(brain.reclineExit&&frames++<maxFrames){
       const exit=brain.reclineExit;
       animateMilo(root,{action:id,moving:false,time:elapsed,actionTime:elapsed,actionDuration:brain.curDurSec,reclineExit:exit});root.updateMatrixWorld(true);
       const head=root.userData.head.getWorldPosition(new Vector3());if(previous)assert.ok(head.distanceTo(previous)<.045);previous=head;
       brain.update(1/60);
     }
-    assert.ok(frames<700);assert.equal(brain.reclineExit,null);assert.equal(brain.actStation,'hydro');assert.ok(actor.busy);
+    assert.ok(frames<maxFrames);assert.equal(brain.reclineExit,null);assert.equal(brain.actStation,'hydro');assert.ok(actor.busy);
   }
 });
 test('capsule interruptions wait for an open lid and a completed rise before walking',()=>{

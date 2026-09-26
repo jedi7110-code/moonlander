@@ -77,7 +77,8 @@ function pointAt(rig,target,weight){
   const palm=contact.clone().multiply(hand.scale).applyQuaternion(wrist).add(hand.position);
   const delta=target.clone().sub(arm.position),upper=elbow.position.length(),lower=Math.hypot(palm.y,palm.z);
   const flex=Math.acos(THREE.MathUtils.clamp((delta.lengthSq()-palm.x*palm.x-upper*upper-lower*lower)/(2*upper*lower),-1,1));
-  const bend=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),-flex+Math.atan2(palm.z,-palm.y));
+  const hinge=Math.atan2(-elbow.position.z,-elbow.position.y);
+  const bend=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),-flex+Math.atan2(palm.z,-palm.y)+hinge);
   const localAxis=palm.clone().applyQuaternion(bend).add(elbow.position).normalize();
   const localPole=elbow.position.clone().addScaledVector(localAxis,-elbow.position.dot(localAxis)).normalize();
   const axis=delta.normalize(),pole=v(side*.55,1.18,.34).sub(arm.position);pole.addScaledVector(axis,-pole.dot(axis)).normalize();

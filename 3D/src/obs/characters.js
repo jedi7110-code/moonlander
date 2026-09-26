@@ -27,6 +27,7 @@ import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeEntryAge} from './
 import {applySeatedLegSpread} from './seated-pose.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
 import {attachMiloBody} from './milo-body.js';
+import {attachMiloElbow} from './milo-elbow.js';
 import {attachMiloWatch,updateMiloWatch} from './milo-watch.js';
 import {attachMiloBioSensor,updateMiloBioSensor} from './milo-bio-sensor.js';
 import {attachMiloBandage,updateMiloBandage} from './milo-bandage.js';
@@ -160,7 +161,7 @@ function torso(parent,m){
   return skin;
 }
 
-export function createMilo(m,headModel=new THREE.Group()) {
+export function createMilo(m,headModel=new THREE.Group(),{elbowStyle='supported'}={}) {
   const root=new THREE.Group(),body=joint(root,0,0,0);
   const pants=m.olive.clone();pants.userData.fabricMap=pants.map;pants.map=null;pants.bumpScale=.004;pants.color.setHex(0x4a5338);pants.roughness=.96;
   const hips=ball(body,pants,0,.988,0,.177,.134,.119);
@@ -199,12 +200,14 @@ export function createMilo(m,headModel=new THREE.Group()) {
   const legacy=[];body.traverse(o=>{if(o.isMesh&&!headParts.has(o)&&[m.skin,m.cloth,pants].includes(o.material))legacy.push(o);});
   const dining=createDiningProps(body,m),{mug}=dining;
   const leisure=createLeisureProps(body,m);
-  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);attachMiloBandage(root,m);
+  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);
+  if(elbowStyle==='supported')attachMiloElbow(root);
+  attachMiloBandage(root,m);
   for(const {hand} of arms)hand.scale.multiplyScalar(1.08);
   root.userData.updateWristTwists?.();attachMiloWatch(root);attachMiloBioSensor(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,sequentialBedEntry=true}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   setCupHandFit(root,0);
   setLadderHandFit(root,false);
@@ -266,7 +269,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   }
   if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top,root.userData.bunkStartYaw);
   if(action==='gym'&&!moving){if(gymVisit)applyGymVisitPose(root,gymVisit);else applyCyclingPose(root,actionTime);}
-  if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration,root.userData.medicalStartYaw);
+  if(action==='medical'&&!moving)applyMedicalPose(root,actionTime,actionDuration,root.userData.medicalStartYaw,{sequential:sequentialBedEntry});
   if(reclineExit?.id==='medical')applyMedicalPose(root,medicalExitTime(reclineExit),reclineExit.actionDuration,root.userData.medicalStartYaw);
   else if(reclineExit)applyReclinedPose(root,reclineExitProgress(reclineExit),BUNK_BED.top,root.userData.bunkStartYaw);
   if(bunkVisit)applyBunkVisitPose(root,bunkVisit);
@@ -313,6 +316,9 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
   root.userData.updateWristTwists?.();
+  // Bed IK samples world transforms before the final elevation and hand pose.
+  // Publish the completed skin transform before diagnosis can query its bounds.
+  if(bunkVisit||action==='medical'||reclineExit)root.updateMatrixWorld(true);
   updateMiloBandage(root);
   updateMiloWatch(root,shipHour);
   updateMiloBioSensor(root,health);

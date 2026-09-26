@@ -3,33 +3,36 @@ import {box,ball,cylinder,rod,pipe,label} from './materials.js';
 import {MEDICAL} from './layout.js';
 import {applyBedTransferPose} from './bed-pose.js';
 import {createMedicalRig,animateMedicalRig} from './medical-rig.js';
+import {BED_ENTRY_SECONDS,bedEntryMotion} from './bed-entry.js';
 
-export const MED_BED={x:(MEDICAL.x-700)*.022,depth:-.22,top:.62,examTop:.86,length:2.78,width:1.06,transition:10.05};
+export const MED_BED={x:(MEDICAL.x-700)*.022,depth:-.22,top:.62,examTop:.86,length:2.78,width:1.06,transition:5.05+BED_ENTRY_SECONDS+2};
 export const MED_TRANSFER={walkDepth:.78,standingDepth:.78,seatDepth:.22};
 export const medicalDuration=(course=MEDICAL.dur/1000)=>course+MED_BED.transition*2;
-export function medicalEntryTime(time,duration=medicalDuration()){
-  return Math.max(0,Math.min(time,duration-time,MED_BED.transition));
+export function medicalEntryTime(time,duration=medicalDuration(),transition=MED_BED.transition){
+  return Math.max(0,Math.min(time,duration-time,transition));
 }
-export function medicalTransferPose(time,duration=medicalDuration()){
-  const t=medicalEntryTime(time,duration),reverse=time>duration/2;
-  const seat=THREE.MathUtils.smoothstep(t,1,2.8),recline=THREE.MathUtils.smoothstep(t,5.05,8.05);
+export function medicalTransferPose(time,duration=medicalDuration(),{sequential=true}={}){
+  const lowered=5.05+(sequential?BED_ENTRY_SECONDS:3),transition=lowered+2;
+  const t=medicalEntryTime(time,duration,transition),reverse=time>duration/2;
+  const seat=THREE.MathUtils.smoothstep(t,1,2.8),recline=THREE.MathUtils.smoothstep(t,5.05,lowered);
+  const entry=THREE.MathUtils.clamp((t-5.05)/(lowered-5.05),0,1),motion=bedEntryMotion(entry);
   const elevation=(MED_BED.examTop-MED_BED.top)*THREE.MathUtils.smoothstep(t,3.15,4.75);
-  const extension=THREE.MathUtils.smoothstep(t,8.05,10.05);
-  const turn=THREE.MathUtils.smoothstep(recline,.24,.72),approach=THREE.MathUtils.smoothstep(t,0,1);
-  const stages=t<1?'approaching':t<2.8?'sitting':t<3.15?'settled':t<4.75?'elevating':t<5.05?'raised':t<8.05?'lowering':t<10.05?'deploying':'examining';
+  const extension=THREE.MathUtils.smoothstep(t,lowered,transition);
+  const turn=sequential?motion.turn:THREE.MathUtils.smoothstep(recline,.24,.72),approach=THREE.MathUtils.smoothstep(t,0,1);
+  const stages=t<1?'approaching':t<2.8?'sitting':t<3.15?'settled':t<4.75?'elevating':t<5.05?'raised':t<lowered?'lowering':t<transition?'deploying':'examining';
   const phase=reverse?({approaching:'departing',sitting:'standing',settled:'seated',elevating:'descending',lowering:'rising',deploying:'stowing'}[stages]??stages):stages;
-  const depth=THREE.MathUtils.lerp(THREE.MathUtils.lerp(MED_TRANSFER.standingDepth,MED_TRANSFER.seatDepth,seat),MED_BED.depth,turn);
-  return{phase,age:t,seat,recline,turn,approach,depth,elevation,extension};
+  const depth=THREE.MathUtils.lerp(THREE.MathUtils.lerp(MED_TRANSFER.standingDepth,MED_TRANSFER.seatDepth,seat),MED_BED.depth,sequential?motion.depth:turn);
+  return{phase,age:t,seat,recline,turn,approach,depth,elevation,extension,...(sequential?{entry,bedDepth:MED_BED.depth}:{})};
 }
 export const medicalExitTime=exit=>exit.actionDuration-exit.entryTime+exit.age;
 export function medicalRecline(time,duration=medicalDuration()){
   return medicalTransferPose(time,duration).recline;
 }
-export function applyMedicalPose(root,time,duration,startYaw=0){
-  const pose=medicalTransferPose(time,duration);
+export function applyMedicalPose(root,time,duration,startYaw=0,options){
+  const pose=medicalTransferPose(time,duration,options);
   applyBedTransferPose(root,pose,{...MED_TRANSFER,top:MED_BED.top},startYaw);
   root.userData.body.position.y+=pose.elevation;
-  const rest=THREE.MathUtils.smoothstep(pose.recline,.25,1);
+  const rest=pose.entry===undefined?THREE.MathUtils.smoothstep(pose.recline,.25,1):THREE.MathUtils.smootherstep(bedEntryMotion(pose.entry).lay,.25,1);
   for(const {arm,elbow,hand,side}of root.userData.arms){
     // Examination is palms-down beside the hips, unlike sleeping on the abdomen.
     arm.rotation.x=THREE.MathUtils.lerp(arm.rotation.x,.07,rest);
@@ -123,13 +126,14 @@ export function createMedicalBay(m,y){
   return{root,bed,platform,pistons,rig,display,lampMaterial};
 }
 
-export function animateMedical(bay,time,active,readings,{duration=medicalDuration(),treating=false,alert=false,patient=null,scanTime=time}={}){
-  const pose=medicalTransferPose(active?time:0,duration),pistonHeight=MED_BED.top-.34+pose.elevation;
+export function animateMedical(bay,time,active,readings,{duration=medicalDuration(),treating=false,alert=false,patient=null,scanTime=time,sequential=true}={}){
+  const transition=sequential?MED_BED.transition:10.05;
+  const pose=medicalTransferPose(active?time:0,duration,{sequential}),pistonHeight=MED_BED.top-.34+pose.elevation;
   bay.platform.position.y=pose.elevation;
   for(const piston of bay.pistons){piston.position.y=.13+pistonHeight/2;piston.scale.y=pistonHeight/(MED_BED.top-.34);}
-  const scanAge=THREE.MathUtils.clamp(scanTime-MED_BED.transition,0,duration-2*MED_BED.transition);
+  const scanAge=THREE.MathUtils.clamp(scanTime-transition,0,duration-2*transition);
   animateMedicalRig(bay.rig,pose,scanAge,{patient,scanning:active&&pose.phase==='examining'});
-  const phase=active?time<MED_BED.transition?'POSITIONING':time>duration-MED_BED.transition?'COMPLETE':treating?'TREATING':'ACQUIRING':readings?'LAST CHECK':'STANDBY';
+  const phase=active?time<transition?'POSITIONING':time>duration-transition?'COMPLETE':treating?'TREATING':'ACQUIRING':readings?'LAST CHECK':'STANDBY';
   bay.lampMaterial.color.setHex(alert&&!active?0xf17d68:['ACQUIRING','TREATING'].includes(phase)?0x85e3af:active?0xf3bd62:0x485e58);
   const live=['ACQUIRING','TREATING'].includes(phase);
   const key=live?`${phase}:${Math.floor(time*10)}`:phase+JSON.stringify(readings);

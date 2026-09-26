@@ -1,5 +1,6 @@
 import {Vector3,Quaternion,Matrix4,MathUtils} from 'three';
 import {relaxMiloHand} from './milo-hands.js';
+import {solveHingeArm} from './arm-ik.js';
 
 const v=(x,y,z)=>new Vector3(x,y,z);
 const smooth=t=>MathUtils.smoothstep(t,0,1);
@@ -8,15 +9,7 @@ export const MEAL_CONTACTS=[v(-.087,.028,-.040),v(0,.006,.120)];
 export const MEAL_HAND_CONTACTS=[v(0,-.085,-.035),v(-.017,-.095,-.024)];
 
 function solveArm(rig,wrist){
-  const delta=wrist.clone().sub(rig.arm.position),distance=delta.length(),axis=delta.clone().normalize();
-  const upper=-rig.elbow.position.y,lower=rig.hand.position.length();
-  const along=MathUtils.clamp((upper*upper-lower*lower+distance*distance)/(2*distance),-upper,upper);
-  const pole=v(rig.side*.65,-1,.08);pole.addScaledVector(axis,-pole.dot(axis)).normalize();
-  const humerus=axis.clone().multiplyScalar(along).addScaledVector(pole,Math.sqrt(Math.max(0,upper*upper-along*along)));
-  const forearm=delta.clone().sub(humerus);
-  const x=forearm.clone().cross(humerus).normalize(),y=humerus.clone().normalize().negate(),z=x.clone().cross(y).normalize();
-  return {upper:new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(x,y,z)),
-    lower:new Quaternion().setFromAxisAngle(v(1,0,0),-Math.acos(MathUtils.clamp(humerus.dot(forearm)/(upper*lower),-1,1))+Math.atan2(rig.hand.position.z,-rig.hand.position.y)),forearm};
+  return solveHingeArm(rig,wrist,v(rig.side*.65,-1,.08));
 }
 
 // Keep the hand along the forearm. Solve the wrist from the actual palm/finger

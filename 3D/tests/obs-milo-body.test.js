@@ -69,7 +69,7 @@ test('the collar follows the scanned neck instead of leaving wide side openings'
 test('the supplied human surface is one connected mesh across every body joint',()=>{
   const root=character(),skin=root.userData.bodySkin;
   assert.ok(skin?.isSkinnedMesh);assert.equal(root.userData.bodySource,'FinalBaseMesh.obj');
-  assert.equal(skin.skeleton.bones.length,47);
+  assert.equal(skin.skeleton.bones.length,49,'two intermediate elbow supports preserve the bend');
   const parent=Array.from({length:data.positions.length/3},(_,i)=>i),used=new Set();
   function find(i){while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
   for(let i=0;i<data.indices.length;i+=3){
@@ -334,13 +334,14 @@ test('hand proportions and position blend through both wrist joints',()=>{
   animateMilo(root,{moving:false,climbing:false,facing:1,time:0,action:null});
   const skin=root.userData.bodySkin;
   for(const {side,hand}of root.userData.arms){
-    assert.equal(hand.position.z,-.025);
+    const elbow=root.userData.arms.find(r=>r.hand===hand).elbow;
+    assert.ok(Math.abs(elbow.position.z+hand.position.z+.025)<1e-9,'the shifted elbow retains the original resting wrist location');
     assert.equal(hand.position.y,-.244);
     assert.deepEqual(hand.scale.toArray(),[1.16,1.05,1.08].map(value=>value*1.08));
     const prefix=side<0?'L':'R';
     for(let j=1;j<=2;j++){
       const driver=skin.skeleton.bones.find(b=>b.name===`Milo skin ${prefix}_wrist${j}`).parent;
-      assert.ok(Math.abs(driver.position.z-hand.position.z*j/3)<1e-9);
+      assert.ok(Math.abs(driver.position.z+elbow.position.z-(-.025*j/3))<1e-9);
       for(const axis of ['x','y','z'])assert.ok(Math.abs(driver.scale[axis]-(1+(hand.scale[axis]-1)*j/3))<1e-9);
     }
   }

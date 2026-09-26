@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {Box3,MeshStandardMaterial,Vector3} from 'three';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {loadMiloBody} from '../src/obs/milo-body.js';
+import {cloneMiloSkinGeometry} from '../src/obs/milo-elbow.js';
 import {applyMocapWalk,sampleWalk} from '../src/obs/mocap-walk.js';
 import {BathroomVisit} from '../src/obs/bathroom.js';
 
@@ -91,7 +92,7 @@ test('both boots clear the floor while one foot remains in support',()=>{
 
 test('the connected body stays finite, keeps its rest shape and joins the head during mocap',()=>{
   const root=character(),{bodySkin:skin,chest,head}=root.userData,p=skin.geometry.attributes.position;
-  const original=p.array.slice();
+  const neutral=cloneMiloSkinGeometry(skin),original=neutral.attributes.position.array.slice();neutral.dispose();
   for(let i=0;i<32;i++){
     pose(root,i/32*data.duration);skin.skeleton.update();
     const scanBase=new Vector3(0,-.030,.009).applyQuaternion(head.quaternion).add(head.position);
@@ -101,7 +102,7 @@ test('the connected body stays finite, keeps its rest shape and joins the head d
       assert.ok(v.toArray().every(Number.isFinite));assert.ok(v.length()<3);
     }
   }
-  assert.deepEqual(p.array,original);
+  const restored=cloneMiloSkinGeometry(skin);assert.deepEqual(restored.attributes.position.array,original);restored.dispose();
 });
 
 test('measured transforms do not leak into idle, the old walk, climbing or sitting',()=>{

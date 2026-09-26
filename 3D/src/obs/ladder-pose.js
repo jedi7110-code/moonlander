@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {setLadderHandFit,fitLadderGripContact,fitLadderWatch} from './ladder-hand-fit.js';
+import {solveHingeArm} from './arm-ik.js';
 
 // Shared by the cabin and the reproducible Milo study.
 export const LADDER={spacing:.28,width:.72,depth:.30,radius:.028,duration:4};
@@ -27,24 +28,13 @@ function poseGrip(rig,grip){
 
 function placeLadderHand(rig,target,inverseBody){
   const {arm,elbow,hand}=rig;
-  const delta=target.clone().sub(arm.position),distance=delta.length(),axis=delta.clone().normalize();
-  const upper=-elbow.position.y,lower=hand.position.length();
-  const along=(upper*upper-lower*lower+distance*distance)/(2*distance);
-  const bend=Math.sqrt(Math.max(0,upper*upper-along*along));
   // Keep the elbow in a nearly sagittal plane, close to its own shoulder width.
   // A fixed downward pole stays continuous when the hand passes overhead.
   // A target-derived yaw flips by 180 degrees as the wrist crosses the shoulder.
   const tuck=.10;
   const pole=new THREE.Vector3(-rig.side*tuck,-1,-.25).applyQuaternion(inverseBody);
-  pole.addScaledVector(axis,-pole.dot(axis)).normalize();
-  const humerus=axis.clone().multiplyScalar(along).addScaledVector(pole,bend);
-  const forearm=delta.clone().sub(humerus);
-  const x=forearm.clone().cross(humerus).normalize(),y=humerus.clone().normalize().negate();
-  const z=x.clone().cross(y).normalize();
-  arm.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,y,z));
-  // One hinge at the elbow: no yaw or roll in the lower arm.
-  const flex=Math.acos(THREE.MathUtils.clamp(humerus.dot(forearm)/(upper*lower),-1,1));
-  elbow.rotation.set(-flex+Math.atan2(hand.position.z,-hand.position.y),0,0);
+  const pose=solveHingeArm(rig,target,pole);
+  arm.quaternion.copy(pose.upper);elbow.rotation.set(2*Math.atan2(pose.lower.x,pose.lower.w),0,0);
   const palm=GRIP_ROTATION.clone().premultiply(inverseBody);
   hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(palm);
 }
@@ -136,6 +126,7 @@ export function applyLadderPose(root,time,options={}){
   }
   root.userData.updateWristTwists?.();
   fitLadderGripContact(root,sample.contacts,LADDER.radius,poseGrip);
+  root.userData.elbowDeformation?.update();
   fitLadderWatch(root);
   if(root.userData.bodySkin){root.userData.bodySkin.boundingBox=null;root.userData.bodySkin.boundingSphere=null;}
   return sample;

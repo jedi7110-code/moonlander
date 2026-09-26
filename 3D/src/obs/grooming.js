@@ -120,7 +120,8 @@ function solveArm(rig,target,guide,palmRotation){
   const delta=target.clone().sub(rig.arm.position),upper=rig.elbow.position.length(),lower=Math.hypot(palm.y,palm.z);
   const planarSquared=delta.lengthSq()-palm.x*palm.x;
   const flex=Math.acos(THREE.MathUtils.clamp((planarSquared-upper*upper-lower*lower)/(2*upper*lower),-1,1));
-  const elbow=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),-flex+Math.atan2(palm.z,-palm.y));
+  const hinge=Math.atan2(-rig.elbow.position.z,-rig.elbow.position.y);
+  const elbow=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),-flex+Math.atan2(palm.z,-palm.y)+hinge);
   const localAxis=palm.clone().applyQuaternion(elbow).add(rig.elbow.position).normalize();
   const localPole=rig.elbow.position.clone().addScaledVector(localAxis,-rig.elbow.position.dot(localAxis)).normalize();
   const axis=delta.normalize(),pole=guide.clone().sub(rig.arm.position);pole.addScaledVector(axis,-pole.dot(axis)).normalize();

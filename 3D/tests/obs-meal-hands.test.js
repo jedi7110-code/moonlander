@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {Box3,Matrix4,MeshStandardMaterial,Vector3} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
+import {cloneMiloSkinGeometry} from '../src/obs/milo-elbow.js';
 import {createDiningStudy,applyDiningStudy} from '../studies/milo/dining-study.js';
 import {diningPhase} from '../src/obs/dining.js';
 import {MEAL_CONTACTS,MEAL_HAND_CONTACTS} from '../src/obs/meal-pose.js';
@@ -72,7 +73,8 @@ test('meal and cup hand fits restore cleanly when switching poses in either orde
   for(const action of ['galley','hydro','galley','lounge','galley',null]){
     const fresh=character();
     for(const model of [root,fresh])animateMilo(model,{action,moving:false,leisure:'tablet',time:4,actionTime:4,actionDuration:10});
-    for(const key of ['position','skinIndex','skinWeight'])assert.deepEqual(root.userData.bodySkin.geometry.attributes[key].array,fresh.userData.bodySkin.geometry.attributes[key].array);
+    const a=cloneMiloSkinGeometry(root.userData.bodySkin),b=cloneMiloSkinGeometry(fresh.userData.bodySkin);
+    for(const key of ['position','skinIndex','skinWeight'])assert.deepEqual(a.attributes[key].array,b.attributes[key].array);
   }
   assert.equal(root.userData.bodySkin.geometry,original);
 });

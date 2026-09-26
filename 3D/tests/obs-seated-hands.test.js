@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {MeshStandardMaterial,Vector3} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
+import {cloneMiloSkinGeometry} from '../src/obs/milo-elbow.js';
 import {LOUNGE_SEAT} from '../src/obs/layout.js';
 import {setLadderHandFit} from '../studies/milo/ladder-hand-fit.js';
 import {applyLadderStudy} from '../studies/milo/ladder-study.js';
@@ -87,7 +88,7 @@ test('tablet side grip keeps the hand aligned with the forearm instead of foldin
 test('tablet thumb opposition resets for walking, sleep, medical and other seated modes',()=>{
   for(const action of [null,'bunk','medical','console','lounge']){
     const root=create(),fresh=create(),original=root.userData.bodySkin.geometry;
-    const positions=original.attributes.position.array.slice();pose(root,'tablet');
+    const positions=cloneMiloSkinGeometry(root.userData.bodySkin).attributes.position.array.slice();pose(root,'tablet');
     assert.notEqual(root.userData.bodySkin.geometry,original,'tablet closes the finger fan on a separate geometry');
     for(const model of [root,fresh])animateMilo(model,{action,moving:!action,time:17,actionTime:17,actionDuration:40,leisure:action==='lounge'?'music':null});
     for(let i=0;i<2;i++)for(const name of ['arm','elbow','hand','thumb']){
@@ -95,7 +96,7 @@ test('tablet thumb opposition resets for walking, sleep, medical and other seate
       assert.deepEqual(a.position.toArray(),b.position.toArray());assert.deepEqual(a.quaternion.toArray(),b.quaternion.toArray());
     }
     assert.equal(root.userData.bodySkin.geometry,original,'other actions restore their original hand shape');
-    assert.deepEqual(original.attributes.position.array,positions,'the shared source geometry is unchanged');
+    assert.deepEqual(cloneMiloSkinGeometry(root.userData.bodySkin).attributes.position.array,positions,'the neutral skin is unchanged; only the current elbow crease animates');
   }
 });
 

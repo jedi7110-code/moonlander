@@ -6,6 +6,7 @@ import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {setLadderHandFit} from '../src/obs/ladder-hand-fit.js';
 import {createMiloToon} from '../src/obs/milo-toon.js';
+import {cloneMiloSkinGeometry} from '../src/obs/milo-elbow.js';
 
 const data=await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url));
 await loadMiloBody(`data:application/json;base64,${data.toString('base64')}`);
@@ -17,7 +18,7 @@ const compile=material=>{
 test('Milo study preserves garment, tattoo, injury and deformation shaders through style toggles',()=>{
   const m=new Proxy({},{get:(o,key)=>o[key]??=new MeshStandardMaterial()});
   const root=createMilo(m),body=root.userData.bodySkin,original=body.material;
-  const geometry=body.geometry,positions=geometry.attributes.position.array.slice();
+  const neutral=cloneMiloSkinGeometry(body),positions=neutral.attributes.position.array.slice();neutral.dispose();
   const sourceShader=compile(original);
   for(let toggle=0;toggle<2;toggle++){
     const toon=createMiloToon(root),shader=compile(body.material);
@@ -54,6 +55,7 @@ test('Milo study preserves garment, tattoo, injury and deformation shaders throu
     toon.dispose();assert.equal(body.material,original);
     assert(!root.getObjectByName('Milo toon outline'));
   }
-  assert.deepEqual(geometry.attributes.position.array,positions,'source geometry remains unchanged');
+  const restored=cloneMiloSkinGeometry(body);
+  assert.deepEqual(restored.attributes.position.array,positions,'style toggles preserve the neutral skin beneath the elbow crease');restored.dispose();
   body.skeleton.dispose();
 });

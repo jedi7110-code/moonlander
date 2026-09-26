@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import {solveHingeArm} from './arm-ik.js';
+import {cloneMiloSkinGeometry} from './milo-elbow.js';
 
 export function createGripHandGeometry(skin,side=0){
-    const geometry=skin.geometry.clone();
+    const geometry=cloneMiloSkinGeometry(skin);
     const {position,armRegion,skinIndex,skinWeight}=geometry.attributes;
     const bones=skin.skeleton.bones.map(b=>b.name.replace('Milo skin ','')),smooth=THREE.MathUtils.smoothstep;
     const from=[.160,.185,.212,.234,.256],to=[.172,.186,.200,.214,.228];
@@ -46,22 +48,15 @@ export function applyTabletHands(root){
   for(const rig of root.userData.arms){
     const {arm,elbow,hand,side}=rig;
     const target=new THREE.Vector3(side*.17,.014,-.115).applyQuaternion(tablet.quaternion).add(tablet.position);
-    const delta=target.clone().sub(arm.position),distance=delta.length(),axis=delta.clone().normalize();
-    const upper=-elbow.position.y,lower=hand.position.length();
-    const along=(upper*upper-lower*lower+distance*distance)/(2*distance);
-    const pole=new THREE.Vector3(side,-1.3,.1);pole.addScaledVector(axis,-pole.dot(axis)).normalize();
-    const humerus=axis.clone().multiplyScalar(along).addScaledVector(pole,Math.sqrt(Math.max(0,upper*upper-along*along)));
-    const forearm=delta.clone().sub(humerus);
-    const x=forearm.clone().cross(humerus).normalize(),y=humerus.clone().normalize().negate(),z=x.clone().cross(y).normalize();
-    arm.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,y,z));
-    elbow.rotation.set(-Math.acos(THREE.MathUtils.clamp(humerus.dot(forearm)/(upper*lower),-1,1))+Math.atan2(hand.position.z,-hand.position.y),0,0);
+    const pose=solveHingeArm(rig,target,new THREE.Vector3(side,-1.3,.1)),forearm=pose.forearm;
+    arm.quaternion.copy(pose.upper);elbow.quaternion.copy(pose.lower);
     // Keep the wrist straight and distribute the turn through the forearm.
     const hy=forearm.clone().normalize().negate(),hz=new THREE.Vector3(0,-1,0).applyQuaternion(tablet.quaternion);
     hz.addScaledVector(hy,-hz.dot(hy)).normalize();const hx=hy.clone().cross(hz).normalize();
     const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(hx,hy,hz));
     hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(rotation);
     for(const finger of rig.fingers){finger.rotation.set(.15,0,0);finger.userData.links[0].rotation.x=.15;finger.userData.links[1].rotation.x=.08;}
-    rig.thumb.position.set(-side*.033,-.051,.011);
+    rig.thumb.position.set(-side*.033,-.051,.013);
     rig.thumb.rotation.set(.35,side*.15,-side*.15);rig.thumb.userData.ip.rotation.x=.1;
   }
 }

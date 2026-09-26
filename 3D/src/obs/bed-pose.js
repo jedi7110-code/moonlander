@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import {hingeAngles} from './gym.js';
+import {applySequentialBedEntry} from './bed-entry.js';
 
 const smooth=(t,a,b)=>THREE.MathUtils.smoothstep(t,a,b);
 const lerp=THREE.MathUtils.lerp;
 
 export function applyBedTransferPose(root,pose,{top,walkDepth,standingDepth,seatDepth},startYaw=0){
+  if(pose.entry>0){applySequentialBedEntry(root,pose,{top,standingDepth});return;}
   const {body,head,arms,legs}=root.userData;
   const {seat,recline,turn,depth,phase,approach}=pose;
   const lay=smooth(recline,.25,1),angle=-Math.PI/2*lay,c=Math.cos(angle),s=Math.sin(angle);

@@ -74,12 +74,13 @@ test('the seated patient and bedding rise together; arms deploy only after recli
 test('the green scan moves over actual body surfaces, pauses exactly and releases its light outside diagnosis',()=>{
   const {bay,milo}=fixture(),buffers=bay.rig.stripe.geometry.attributes.position.array;
   let first;
-  for(const age of [10.2,12,14,17]){
+  for(const offset of [.15,1.95,3.95,6.95]){
+    const age=MED_BED.transition+offset;
     animateMilo(milo,{action:'medical',moving:false,time:age,actionTime:age});
     animateMedical(bay,age,true,null,{patient:milo});assert.equal(bay.rig.scan.visible,true);
     assert.strictEqual(bay.rig.stripe.geometry.attributes.position.array,buffers);
     assert.ok(bay.rig.points.every(p=>p.y>MED_BED.examTop&&p.y<1.5));
-    if(age===17)assert.ok(bay.rig.points.some(p=>p.y>MED_BED.examTop+.14));
+    if(offset===6.95)assert.ok(bay.rig.points.some(p=>p.y>MED_BED.examTop+.14));
     const snapshot=Array.from(buffers);first??=snapshot;
     animateMedical(bay,age,true,null,{patient:milo});assert.deepEqual(Array.from(buffers),snapshot);
   }

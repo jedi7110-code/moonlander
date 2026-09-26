@@ -8,7 +8,7 @@ import {attachElbowStudy} from '../studies/milo/elbow-deformation.js';
 
 const data=JSON.parse(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url)));
 await loadMiloBody('data:application/json;base64,'+Buffer.from(JSON.stringify(data)).toString('base64'));
-function character(){return createMilo(new Proxy({},{get:(o,k)=>o[k]??=new MeshStandardMaterial()}),new Group());}
+function character(elbowStyle='legacy'){return createMilo(new Proxy({},{get:(o,k)=>o[k]??=new MeshStandardMaterial()}),new Group(),{elbowStyle});}
 function pose(root,angle,raised=0,spread=.13){
   animateMilo(root,{time:0,moving:false,action:null});root.rotation.set(0,0,0);
   for(const rig of root.userData.arms){rig.arm.rotation.set(raised,0,rig.side*spread);rig.elbow.rotation.set(-angle*Math.PI/180,0,0);}

@@ -21,7 +21,7 @@ async function init(){
     scene.add(new THREE.HemisphereLight(0xf4f5e7,0x657b7b,2.1));
     const key=new THREE.DirectionalLight(0xfff1d7,2.6);key.position.set(3,5,4);scene.add(key);
     const fill=new THREE.DirectionalLight(0xc5dce7,1.1);fill.position.set(-3,2,-2);scene.add(fill);
-    const milo=createMilo(m,head);scene.add(milo);animateMilo(milo,{moving:false,action:null,time:0});
+    const milo=createMilo(m,head,{elbowStyle:'legacy'});scene.add(milo);animateMilo(milo,{moving:false,action:null,time:0});
     const fix=index?attachElbowStudy(milo):null,skin=milo.userData.bodySkin;
     const clay=new THREE.MeshStandardMaterial({color:0xc5b6a3,roughness:.8}),surface=skin.material;
     const wireMaterial=new THREE.MeshBasicMaterial({color:0x123b34,wireframe:true,transparent:true,opacity:.42,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});

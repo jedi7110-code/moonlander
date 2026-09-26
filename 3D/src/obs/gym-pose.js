@@ -25,11 +25,12 @@ export function hingeAngles(y,z,upper,lower,bend=1){
   return{upper:bearing-bend*alpha,lower:bend*beta};
 }
 export function armHingeAngles({arm,elbow,hand},target){
-  const offset=target.clone().sub(arm.position),upper=-elbow.position.y,lower=Math.hypot(hand.position.y,hand.position.z);
+  const offset=target.clone().sub(arm.position),upper=elbow.position.length(),lower=Math.hypot(hand.position.y,hand.position.z);
   const reach=upper+lower-1e-5,distance=offset.length();
   if(distance>reach){arm.position.addScaledVector(offset,(distance-reach)/distance);offset.subVectors(target,arm.position);}
   const angles=hingeAngles(offset.y,Math.hypot(offset.x,offset.z),upper,lower,-1);
-  return {...angles,lower:angles.lower+Math.atan2(hand.position.z,-hand.position.y),yaw:Math.atan2(offset.x,offset.z)};
+  const hinge=Math.atan2(-elbow.position.z,-elbow.position.y);
+  return {...angles,upper:angles.upper-hinge,lower:angles.lower+Math.atan2(hand.position.z,-hand.position.y)+hinge,yaw:Math.atan2(offset.x,offset.z)};
 }
 
 // Approved study trajectory in bike-local coordinates. Reversing it returns
