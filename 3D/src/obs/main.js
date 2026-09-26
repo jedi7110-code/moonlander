@@ -21,7 +21,7 @@ const $=id=>document.getElementById(id);
 const icons={Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
-const stationName=id=>({plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
+const stationName=id=>({grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
 const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
@@ -92,6 +92,8 @@ function updateHUD(){
   $('milo-mood').textContent=t('mood_'+brain.mood);
   $('milo-activity').textContent=games.open?games.title:paused?words('一時停止','Paused'):actor.waitingForDroid?words('ハシゴの空き待ち','Waiting beside the ladder'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('ゲームをしにラウンジへ','Going to the lounge to play'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
   if(brain.openingWake)$('milo-activity').textContent=brain.bunkVisit?.phase==='sleeping'?words('ルーシーと眠っている','Sleeping with Lucy'):words('ルーシーと目を覚ます','Waking up with Lucy');
+  if(!paused&&brain.grooming)$('milo-activity').textContent=words(brain.grooming.pose.label,'Cutting hair and shaving at the washbasin');
+  if(!paused&&brain.groomingQueued)$('milo-activity').textContent=words('ドロイドの洗濯完了を待ってから散髪へ','Waiting for the droid to finish laundry before grooming');
   for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
   if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);
   if(!paused&&brain.loungeExit)$('milo-activity').textContent=words('ラウンジから立ち上がる','Getting up from the lounge');
@@ -177,6 +179,16 @@ function requestSupply(){
 function useStation(id){
   const station=getStation(id);
   if(!station)return;
+  if(id==='grooming'){
+    pendingHQ=false;
+    if(brain.actStation==='grooming')return;
+    if(brain.requestGrooming()){
+      showMessage(words('2階の洗面台で髪と髭を整えてくる。','I will cut my hair and shave at the washbasin on the second deck.'));
+      if(brain.actStation==='grooming')confirmOrder(id);else feedback.notify(id,'waiting');
+      view.setMode('milo');
+    }else if(brain.actStation)confirmOrder(brain.actStation);
+    updateHUD();return;
+  }
   if(!brain.health.critical&&station.supply&&!care.has(station.supply)){feedback.notify(id,'blocked');audio.tone(190,.18,.025);showMessage(words('在庫がない。コンソールから配送を頼もう。','No stock left. We need to order a shipment at the console.'));updateHUD();return;}
   pendingHQ=false;brain._go(station);confirmOrder(brain.actStation);
 }
@@ -278,7 +290,7 @@ async function start(){
       if(!paused&&visible&&!games.open){
         accumulator+=dt;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0,elapsed);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
       if(visible){view.startupLighting?.update(paused||games.open||firstVisibleFrame?0:frameDt);feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);firstVisibleFrame=false;if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}

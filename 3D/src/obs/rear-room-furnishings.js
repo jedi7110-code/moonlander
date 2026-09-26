@@ -45,6 +45,52 @@ function crumpledLaundry(source){
   return mesh;
 }
 
+function sweatshirtTrim(shirt,cloth,print){
+  const rib=cloth.clone();rib.name='Laundry / navy rib knit';rib.color.setHex(0x202a43);
+  // A crew-neck band follows the actual opening instead of covering the hanger.
+  const collar=new THREE.Shape();collar.moveTo(-.035,1.51);collar.lineTo(-.043,1.505);
+  collar.bezierCurveTo(-.040,1.425,.040,1.425,.043,1.505);collar.lineTo(.035,1.51);
+  collar.bezierCurveTo(.030,1.450,-.030,1.450,-.035,1.51);collar.closePath();
+  const neck=new THREE.Mesh(new THREE.ShapeGeometry(collar,12),rib);neck.name='Sweatshirt crew-neck rib';neck.position.z=.083;shirt.add(neck);
+  box(shirt,rib,0,.825,.041,.143,.056,.084,.002).name='Sweatshirt hem rib';
+  for(const side of [-1,1])box(shirt,rib,side*.101,.802,.041,.033,.050,.084,.002).name='Sweatshirt cuff rib';
+  // Keep the supplied transparent artwork's aspect ratio; the print sits just
+  // above the fabric so it cannot flicker with the front face.
+  const chest=new THREE.Mesh(new THREE.PlaneGeometry(.132,.132*1195/1366),print);
+  chest.name='PAXCREATION / MEGURO WARD chest print';chest.position.set(0,1.31,.084);shirt.add(chest);
+}
+
+function workShirtTrim(shirt,cloth,leftPatch,rightPatch){
+  const seam=cloth.clone();seam.name='Laundry / brown work shirt seams';seam.color.multiplyScalar(.64);
+  const trim=cloth.clone();trim.name='Laundry / brown work shirt collar and flaps';trim.color.multiplyScalar(.91);
+  const panel=(name,points,z,material=cloth)=>{
+    const shape=new THREE.Shape();shape.moveTo(...points[0]);for(const point of points.slice(1))shape.lineTo(...point);shape.closePath();
+    const mesh=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.002,bevelEnabled:false,steps:1,curveSegments:1}),material);
+    mesh.name=name;mesh.position.z=z;mesh.castShadow=mesh.receiveShadow=true;shirt.add(mesh);return mesh;
+  };
+  const button=(x,y,z)=>{
+    const mesh=cylinder(shirt,seam,x,y,z,.0036,.002,.0036,8);mesh.rotation.x=Math.PI/2;mesh.name='Work shirt button';
+  };
+  box(shirt,trim,0,1.127,.083,.014,.652,.004).name='Work shirt button placket';
+  for(const y of [1.432,1.333,1.235,1.137,1.039,.941,.843])button(0,y,.089);
+  for(const side of [-1,1]){
+    const x=side*.046;
+    const collar=panel('Work shirt pointed collar',[[side*.035,1.51],[side*.053,1.467],[side*.026,1.406],[side*.004,1.451]],.084,trim);
+    const positions=collar.geometry.attributes.position;
+    for(let i=0;i<positions.count;i++)positions.setZ(i,positions.getZ(i)+(1.51-positions.getY(i))*.13);
+    collar.geometry.computeVertexNormals();
+    panel('Work shirt pocket seam',[[x-.034,1.337],[x-.034,1.245],[x-.021,1.227],[x+.021,1.227],[x+.034,1.245],[x+.034,1.337]],.083,seam);
+    panel('Work shirt chest pocket',[[x-.032,1.335],[x-.032,1.246],[x-.020,1.230],[x+.020,1.230],[x+.032,1.246],[x+.032,1.335]],.085);
+    panel('Work shirt pocket flap',[[x-.034,1.338],[x-.034,1.315],[x-.022,1.302],[x+.022,1.302],[x+.034,1.315],[x+.034,1.338]],.088,trim);
+    button(x,1.318,.093);
+    // Anatomical right appears on the viewer's left, matching the supplied shirt.
+    const width=side<0?.060:.074,aspect=side<0?544/1097:648/1574;
+    const patch=new THREE.Mesh(new THREE.PlaneGeometry(width,width*aspect),side<0?rightPatch:leftPatch);
+    patch.name=side<0?'Work shirt / PXC right chest patch':'Work shirt / PAX CREATION left chest patch';
+    patch.position.set(x,1.374,.084);shirt.add(patch);
+  }
+}
+
 function laundry(root,m,wearMaterials){
   // Stacked front-loading washer/dryer: round doors face the cabin entrance.
   for(const [i,name]of ['Washing machine','Dryer'].entries()){
@@ -72,6 +118,8 @@ function laundry(root,m,wearMaterials){
   rod(closet,m.metal,[-.38,1.76,.12],[.38,1.76,.12],.018);
   const whiteCloth=m.cloth.clone();whiteCloth.name='Laundry / white cotton';
   whiteCloth.color.setHex(0xffffff);whiteCloth.map=null;
+  const navyCloth=whiteCloth.clone();navyCloth.name='Laundry / indigo navy sweatshirt';navyCloth.color.setHex(0x28334e);
+  const brownCloth=whiteCloth.clone();brownCloth.name='Laundry / brown cotton work shirt';brownCloth.color.setHex(0x746448);brownCloth.roughness=1;
   for(let i=0;i<3;i++){
     const garment=new THREE.Group();garment.name='Hanging garment';garment.position.x=-.27+i*.27;closet.add(garment);
     const hanger=new THREE.Group();hanger.name='Shirt hanger';garment.add(hanger);
@@ -80,12 +128,20 @@ function laundry(root,m,wearMaterials){
     hanger.userData.shoulderContacts=[[-.075,1.581,.16],[.075,1.581,.16]];
     for(const tip of hanger.userData.shoulderContacts)rod(hanger,m.metal,[0,1.615,.16],tip,.007);
     rod(hanger,m.metal,...hanger.userData.shoulderContacts,.007);
-    // One continuous shirt surface: sleeves cannot overlap the torso or neighbours.
-    const points=[[-.035,1.51],[-.075,1.49],[-.12,1.38],[-.085,1.32],[-.07,1.37],[-.07,.74],
+    // The middle garment has long, hanging sleeves with a clear underarm gap.
+    // Keep all three silhouettes separated within the existing wardrobe.
+    const sweatshirt=i===1,workShirt=i===0;
+    const points=sweatshirt?[[-.035,1.51],[-.075,1.49],[-.102,1.43],[-.119,1.20],[-.118,.778],[-.084,.778],[-.080,1.23],[-.070,1.34],[-.070,.798],
+      [.070,.798],[.070,1.34],[.080,1.23],[.084,.778],[.118,.778],[.119,1.20],[.102,1.43],[.075,1.49],[.035,1.51],[.028,1.47],[.015,1.455],[-.015,1.455],[-.028,1.47]]:
+      workShirt?[[-.035,1.51],[-.075,1.49],[-.12,1.38],[-.093,1.315],[-.083,1.35],[-.087,.84],[-.075,.80],[-.046,.79],
+      [.046,.79],[.075,.80],[.087,.84],[.083,1.35],[.093,1.315],[.12,1.38],[.075,1.49],[.035,1.51],[.025,1.465],[0,1.44],[-.025,1.465]]:
+      [[-.035,1.51],[-.075,1.49],[-.12,1.38],[-.085,1.32],[-.07,1.37],[-.07,.74],
       [.07,.74],[.07,1.37],[.085,1.32],[.12,1.38],[.075,1.49],[.035,1.51],[.026,1.46],[-.026,1.46]];
     const shape=new THREE.Shape();shape.moveTo(...points[0]);for(const p of points.slice(1))shape.lineTo(...p);shape.closePath();
-    const shirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.08,bevelEnabled:false,steps:1,curveSegments:1}),whiteCloth);
-    shirt.name='Seamless T-shirt';shirt.position.set(0,.10,.12);shirt.castShadow=shirt.receiveShadow=true;garment.add(shirt);
+    const shirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.08,bevelEnabled:sweatshirt||workShirt,bevelThickness:.0015,bevelSize:.0015,bevelSegments:1,steps:1,curveSegments:1}),sweatshirt?navyCloth:workShirt?brownCloth:whiteCloth);
+    shirt.name=sweatshirt?'Hanging sweatshirt':workShirt?'Hanging work shirt':'Seamless T-shirt';shirt.position.set(0,.10,.12);shirt.castShadow=shirt.receiveShadow=true;garment.add(shirt);
+    if(sweatshirt)sweatshirtTrim(shirt,navyCloth,m.sweatshirtPrint);
+    if(workShirt)workShirtTrim(shirt,brownCloth,m.workShirtPatchLeft,m.workShirtPatchRight);
   }
   for(let i=0;i<3;i++)box(closet,whiteCloth,0,.45+i*.08,.12,.59,.075,.39,.018).name='Folded clothing';
   // Use Milo's actual left/right boots, at their worn size, without a separate prop model.

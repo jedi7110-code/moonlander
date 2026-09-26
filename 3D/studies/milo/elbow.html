@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>マイロ / 肘の曲がり方スタディ</title><link rel="stylesheet" href="./elbow.css"></head>
+<body><main>
+  <header><div><p class="eyebrow">TARAIRON / MILO STUDY</p><h1>肘の曲がり方。</h1><p class="intro">内側は折りたたみ、外側は厚みを残す。左右で同じポーズを比較。</p></div><span class="study-tag">STUDY</span></header>
+  <section class="comparison" aria-label="腕の変形の比較">
+    <canvas id="elbow-canvas" aria-label="左は現在の腕、右は肘の変形を調整した腕"></canvas>
+    <div class="portrait-label baseline"><span class="eyebrow">BEFORE</span><strong>現在</strong></div>
+    <div class="portrait-label current"><span class="eyebrow">AFTER</span><strong>調整版</strong></div>
+    <div id="loading" role="status">マイロを読み込み中…</div><p id="error" role="alert" hidden></p>
+  </section>
+  <section class="controls" aria-label="腕の操作">
+    <div class="timeline-heading"><label for="bend">肘の曲げ角度</label><output id="bend-output" for="bend">90°</output></div>
+    <input id="bend" type="range" min="0" max="140" step="1" value="90" disabled>
+    <div class="toolbar"><div class="presets" aria-label="角度"><button data-bend="0" disabled>伸ばす</button><button data-bend="60" disabled>60°</button><button data-bend="90" disabled>90°</button><button data-bend="120" disabled>120°</button><button data-bend="140" disabled>深く曲げる</button></div><button id="play" disabled>曲げ伸ばしを再生</button><div class="views" aria-label="視点"><button data-view="side" aria-pressed="true" disabled>肘・横</button><button data-view="oblique" disabled>肘・斜め</button><button data-view="front" disabled>上半身</button></div></div>
+    <div class="settings"><label>腕 <select id="arm" aria-label="確認する腕" disabled><option value="1">左腕</option><option value="-1">右腕</option></select></label><label>姿勢 <select id="pose" aria-label="姿勢" disabled><option value="relaxed">腕を下げる</option><option value="reach">前へ持ち上げる</option><option value="overhead">腕を高く上げる</option></select></label><label><input id="wire" type="checkbox" disabled> 肘のポリゴン</label><label>表示 <select id="shading" aria-label="表示" disabled><option value="toon">トゥーン</option><option value="clay">形状確認</option></select></label><span id="status" role="status">スタディのみ</span></div>
+  </section>
+</main>
+<script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script>
+<script type="module" src="./elbow-study.js"></script></body></html>

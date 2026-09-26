@@ -6,8 +6,21 @@ import {makeXRWideGeometry} from './xr-geometry.js';
 export async function materials() {
   const loader = new THREE.TextureLoader();
   const base=import.meta.env?.BASE_URL??'/3D/';
-  const maps = await Promise.all(['enamel','steel','twill','fur','industrial-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`)));
+  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight]=await Promise.all([
+    Promise.all(['enamel','steel','twill','fur','industrial-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
+    loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.png`),
+    loader.loadAsync(`${base}assets/obs/workshirt-patch-left.png`),
+    loader.loadAsync(`${base}assets/obs/workshirt-patch-right.png`),
+  ]);
   maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
+  sweatshirtPrint.colorSpace=THREE.SRGBColorSpace;sweatshirtPrint.anisotropy=4;
+  for(const map of [workShirtPatchLeft,workShirtPatchRight]){
+    // Keep the original artwork on disk; the small sewn patches need only 512px.
+    const image=map.image,canvas=document.createElement('canvas');
+    canvas.width=Math.min(512,image.width);canvas.height=Math.round(canvas.width*image.height/image.width);
+    const context=canvas.getContext('2d');context.imageSmoothingQuality='high';context.drawImage(image,0,0,canvas.width,canvas.height);
+    map.image=canvas;map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;map.needsUpdate=true;
+  }
   const standard = (color, roughness=.65, metalness=.15, more={}) => new THREE.MeshStandardMaterial({color,roughness,metalness,...more});
   const fur=standard(0x252b31,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.003});
   const furLight=standard(0xd8d6cc,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.003});
@@ -62,6 +75,9 @@ export async function materials() {
     rubber:standard(0x151c1d,.93,.02),
     olive:standard(0x859273,.93,0,{map:maps[2],bumpMap:maps[2],bumpScale:.005}),
     cloth:standard(0xe1ded1,.95,0,{bumpMap:maps[2],bumpScale:.002}),
+    sweatshirtPrint:standard(0xffffff,.98,0,{name:'Laundry / PAXCREATION chest print',map:sweatshirtPrint,alphaTest:.12,side:THREE.DoubleSide}),
+    workShirtPatchLeft:standard(0xffffff,1,0,{name:'Laundry / PAX CREATION left chest patch',map:workShirtPatchLeft,alphaTest:.12,side:THREE.DoubleSide}),
+    workShirtPatchRight:standard(0xffffff,1,0,{name:'Laundry / PXC right chest patch',map:workShirtPatchRight,alphaTest:.12,side:THREE.DoubleSide}),
     evaCloth:standard(0xd8dad0,.91,.02,{bumpMap:maps[2],bumpScale:.004}),
     evaHelmet:standard(0xbcc5c4,.29,.72),
     evaVisor:new THREE.MeshPhysicalMaterial({color:0x0b1217,roughness:.13,metalness:.58,clearcoat:1,clearcoatRoughness:.10}),

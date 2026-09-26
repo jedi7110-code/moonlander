@@ -49,7 +49,7 @@ async function init(){
     for(const [id,value]of [['baseline-date',studyDate(start,1)],['current-date',studyDate(start,day)]]){
       $(id).dateTime=value;$(id).textContent=value.replaceAll('-','.')+' / 08:00';
     }
-    $('growth-description').textContent=day===1?'短髪A・髭なし':day<5?'毛流れに沿って伸び始め・薄い無精髭':day<10?'毛束と毛先が伸びる・頬と顎に無精髭':day<15?'前のスタディの長さへ・濃い無精髭':'前のスタディの髪型・最終の長さ';
+    $('growth-description').textContent=state.progress===0?'短髪A・髭なし':state.progress<.3?'成長3倍：毛流れに沿って伸び始め・薄い無精髭':state.progress<.65?'成長3倍：毛束と毛先が伸びる・頬と顎に無精髭':state.progress<1?'成長3倍：前のスタディの長さへ・濃い無精髭':'前のスタディの髪型・最終の長さ';
     $('day16-link').href='./grooming.html?time=0&start='+start;
     for(const button of document.querySelectorAll('[data-day]'))button.setAttribute('aria-pressed',Number(button.dataset.day)===Math.floor(day));
     if(url)updateURL();dirty=true;

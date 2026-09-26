@@ -40,6 +40,6 @@ export class BathroomVisit {
     const outside=BATHROOM_OUTSIDE_DEPTH,inside=BATHROOM_INSIDE_DEPTH;
     const depth=phase==='enter'?outside+(inside-outside)*s:phase==='leave'?inside+(outside-inside)*s:['close','use','reopen'].includes(phase)?inside:outside;
     // Automatic doors: turn toward the opening, then walk through the cleared frame.
-    return{opening,depth,walkDistance:Math.abs(depth-(phase==='enter'?outside:inside)),moving:['enter','leave'].includes(phase),inside:depth<-1.72,reach:0,turn:phase==='reach'?s:1,yaw:phase==='reopen'?Math.PI*(1-s):['leave','shut'].includes(phase)?0:Math.PI,phase};
+    return{opening,depth,walkDistance:Math.abs(depth-(phase==='enter'?outside:inside)),moving:['enter','leave'].includes(phase),inside:depth<-1.72,reach:0,turn:phase==='reach'?s:1,yaw:phase==='reopen'?Math.PI*(1-s):['leave','shut'].includes(phase)?0:Math.PI,phase,turnProgress:t};
   }
 }

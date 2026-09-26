@@ -47,9 +47,13 @@ export function reachMeal(root,index,prop,reach){
   const upper=arm.quaternion.clone(),lower=elbow.quaternion.clone(),neutral=hand.quaternion.clone();
   const grip=mealGripPose(rig,prop,index),contactArm=solveArm(rig,grip.position);
   const wrist=contactArm.upper.clone().multiply(contactArm.lower).invert().multiply(grip.rotation);
-  const retreat=index===0?.18:Math.min(.18,Math.max(0,grip.position.z-rest.z)*.45);
   const target=rest.lerp(grip.position,reach),arc=Math.sin(Math.PI*reach);
-  target.y+=.24*arc;target.z-=retreat*arc;
+  // Lift beside the torso and then reach forward over the worktop. Pulling
+  // the wrist backwards at mid-reach folded the right upper arm into the ribs.
+  target.y+=.32*arc;
+  target.x+=rig.side*.075*arc;
+  // Delay the forward part slightly until the relaxed fingers clear the lip.
+  target.z-=.06*arc;
   const pose=solveArm(rig,target);
   arm.quaternion.copy(upper.slerp(pose.upper,reach));elbow.quaternion.copy(lower.slerp(pose.lower,reach));
   hand.quaternion.copy(neutral).slerp(wrist,smooth((reach-.35)/.65));

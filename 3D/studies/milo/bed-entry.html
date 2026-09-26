@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>マイロ / ベッドへの乗り方スタディ</title><link rel="stylesheet" href="./bed-entry.css"></head>
+<body><main>
+  <header><div><p class="eyebrow">TARAIRON / MILO STUDY</p><h1>左足から、ゆっくり横になる。</h1><p class="intro">左足を乗せてから右足へ。ベッドと治療台の動きを比較。</p></div><span class="study-tag">STUDY</span></header>
+  <nav class="places" aria-label="設備"><button data-kind="bunk" aria-pressed="true" disabled>ベッド</button><button data-kind="medical" aria-pressed="false" disabled>治療台</button></nav>
+  <section class="comparison" aria-label="ベッドに乗る動きの比較">
+    <canvas id="entry-canvas" aria-label="左は従来、右は左足から順に乗るスタディ"></canvas>
+    <div class="portrait-label baseline"><span class="eyebrow">BEFORE</span><strong>従来</strong><span>両足を同時に</span></div>
+    <div class="portrait-label current"><span class="eyebrow">STUDY</span><strong>左足 → 右足</strong></div>
+    <div id="before-stage" class="portrait-note baseline"></div><div id="after-stage" class="portrait-note current" role="status"></div>
+    <div id="loading" role="status">マイロとベッドを読み込み中…</div><p id="error" role="alert" hidden></p>
+  </section>
+  <section class="controls" aria-label="動きの確認">
+    <div class="timeline-heading"><label for="time">再生位置</label><output id="clock" for="time">0.00秒</output></div>
+    <input id="time" type="range" min="0" max="17.05" step=".01" value="6.6" disabled>
+    <div class="toolbar"><button id="play" class="play" disabled>再生</button><button id="restart" disabled>最初から</button><div class="presets"><button data-phase="seat" disabled>座る</button><button data-phase="left" disabled>左足</button><button data-phase="right" disabled>右足</button><button data-phase="lie" disabled>横になる</button></div><div class="views" aria-label="視点"><button data-view="oblique" aria-pressed="true" disabled>斜め</button><button data-view="front" disabled>正面</button><button data-view="feet" disabled>足側</button><button data-view="top" disabled>上から</button></div></div>
+    <div class="settings"><label>速度 <select id="speed" aria-label="再生速度" disabled><option value=".5">0.5倍</option><option value="1" selected>1倍</option></select></label><span>ドラッグ：回転 ／ ホイール：拡大縮小</span><span id="status">スタディのみ</span></div>
+  </section>
+</main><script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script><script type="module" src="./bed-entry-study.js"></script></body></html>

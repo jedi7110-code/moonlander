@@ -5,9 +5,23 @@ const segments=64,bandWidth=.020,bandThickness=.0022;
 function mesh(parent,geometry,material,name){
   const m=new THREE.Mesh(geometry,material);m.name=name;m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;
 }
-function disc(parent,radius,depth,z,material,name){
-  const m=mesh(parent,new THREE.CylinderGeometry(radius,radius,depth,64),material,name);
+function disc(parent,radius,depth,z,material,name,openFront=false){
+  const geometry=new THREE.CylinderGeometry(radius,radius,depth,64);
+  if(openFront){
+    // The dial closes the front. A second metal cap 0.1 mm below it fights
+    // for the same depth values in OBS's fixed-distance 40 m camera.
+    const indices=geometry.groups.filter(group=>group.materialIndex!==1)
+      .flatMap(group=>Array.from(geometry.index.array.slice(group.start,group.start+group.count)));
+    geometry.setIndex(indices);geometry.clearGroups();
+  }
+  const m=mesh(parent,geometry,material,name);
   m.rotation.x=Math.PI/2;m.position.z=z;return m;
+}
+function dialLayer(part,order){
+  // Keep scene occlusion, but draw the sub-millimetre dial stack in its physical
+  // order without quantizing each hand into the next hand's depth buffer.
+  part.renderOrder=order;part.material.depthWrite=false;part.material.depthFunc=THREE.LessDepth;
+  part.castShadow=false;
 }
 function faceTexture(){
   if(typeof document==='undefined')return null;
@@ -33,12 +47,12 @@ function faceTexture(){
 
 // Intersect the actual skinned wrist with the two strap-edge planes. This
 // avoids a circular cuff floating around the flattened, twisting forearm.
-function wristSections(skin,watch){
+export function wristSections(skin,watch,width=bandWidth,count=segments){
   if(!skin)return null;
   skin.skeleton.update();const p=skin.geometry.attributes.position,index=skin.geometry.index.array;
   const inverse=watch.matrixWorld.clone().invert().multiply(skin.matrixWorld),points=[];
   for(let i=0;i<p.count;i++)points.push(skin.applyBoneTransform(i,new THREE.Vector3().fromBufferAttribute(p,i)).applyMatrix4(inverse));
-  return [-bandWidth/2,bandWidth/2].map(y=>{
+  return [-width/2,width/2].map(y=>{
     const edges=[];
     for(let i=0;i<index.length;i+=3){
       const tri=[points[index[i]],points[index[i+1]],points[index[i+2]]];
@@ -47,8 +61,8 @@ function wristSections(skin,watch){
       for(let j=0;j<3;j++){const a=tri[j],b=tri[(j+1)%3];if((a.y<=y&&b.y>y)||(b.y<=y&&a.y>y))hits.push(a.clone().lerp(b,(y-a.y)/(b.y-a.y)));}
       if(hits.length===2)edges.push(hits);
     }
-    return Array.from({length:segments},(_,i)=>{
-      const a=i/segments*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let radius=Infinity;
+    return Array.from({length:count},(_,i)=>{
+      const a=i/count*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let radius=Infinity;
       for(const [p,q] of edges){
         const ex=q.x-p.x,ez=q.z-p.z,det=dx*ez-dz*ex;if(Math.abs(det)<1e-10)continue;
         const t=(p.x*ez-p.z*ex)/det,u=(p.x*dz-p.z*dx)/det;
@@ -58,11 +72,12 @@ function wristSections(skin,watch){
     });
   });
 }
-function strapGeometry(radii){
+export function strapGeometry(radii,{width=bandWidth,thickness=bandThickness,clearance=.0005}={}){
+  const segments=radii[0].length;
   const positions=[],indices=[];
   for(let ring=0;ring<4;ring++)for(let i=0;i<segments;i++){
-    const edge=ring%2,a=i/segments*Math.PI*2,r=radii[edge][i]+.0005+(ring>=2?bandThickness:0);
-    positions.push(Math.cos(a)*r,(edge-.5)*bandWidth,Math.sin(a)*r);
+    const edge=ring%2,a=i/segments*Math.PI*2,r=radii[edge][i]+clearance+(ring>=2?thickness:0);
+    positions.push(Math.cos(a)*r,(edge-.5)*width,Math.sin(a)*r);
   }
   for(const [a,b] of [[0,1],[1,3],[3,2],[2,0]])for(let i=0;i<segments;i++){
     const j=(i+1)%segments,A=a*segments+i,B=a*segments+j,C=b*segments+j,D=b*segments+i;
@@ -93,8 +108,9 @@ export function attachMiloWatch(root){
   const caseGroup=new THREE.Group();caseGroup.name='GMT case 42 mm';watch.add(caseGroup);
   caseGroup.rotation.z=Math.PI/2;
   caseGroup.position.z=Math.max(radii[0][16],radii[1][16])+.001;
-  disc(caseGroup,.0217,.010,.0033,steel,'Brushed steel case');
+  disc(caseGroup,.0217,.010,.0033,steel,'Brushed steel case',true);
   const face=mesh(caseGroup,new THREE.CircleGeometry(.0217,64),new THREE.MeshStandardMaterial({color:0xffffff,map:faceTexture(),roughness:.55,metalness:.12}),'GMT dial and bezel image');face.position.z=.0084;
+  dialLayer(face,1);
   for(const x of [-.008,.008])for(const y of [-.021,.021]){
     const lug=mesh(caseGroup,new THREE.BoxGeometry(.0045,.009,.006),steel,'Case lug');
     lug.position.set(x,y,-.003);lug.rotation.x=-Math.sign(y)*.55;
@@ -103,6 +119,7 @@ export function attachMiloWatch(root){
   const gmt=hand(caseGroup,'GMT hand',.0148,.00065,.0087,red,true);
   const hour=hand(caseGroup,'Hour hand',.010,.0019,.0090,lume),minute=hand(caseGroup,'Minute hand',.015,.0011,.0093,lume);
   const second=hand(caseGroup,'Fixed seconds',.0158,.00035,.0096,red);
+  [gmt,hour,minute,second].forEach((pivot,i)=>dialLayer(pivot.children[0],i+2));
   disc(caseGroup,.0012,.0007,.010,steel,'Hand pinion');
   // Only the hands move relative to the case. Batch all rigid steel in case space.
   const parts=caseGroup.children.filter(part=>part.isMesh&&part.material===steel);

@@ -4,7 +4,7 @@ import {box,cylinder,rod,pipe} from './materials.js';
 // Shared geometry and materials are merged with the static cabin.
 export function addFireExtinguishers(parent,m,floors){
   const unit=new THREE.Group();
-  const red=new THREE.MeshStandardMaterial({name:'Fire extinguisher / red enamel',color:0xd63827,roughness:.43,metalness:.06});
+  const red=new THREE.MeshStandardMaterial({name:'Fire extinguisher / red enamel',color:0xa23f35,roughness:.43,metalness:.06});
   const black=new THREE.MeshStandardMaterial({name:'Fire extinguisher / hose',color:0x202525,roughness:.78});
   const white=new THREE.MeshStandardMaterial({name:'Fire extinguisher / gauge',color:0xf3f1df,roughness:.52});
 

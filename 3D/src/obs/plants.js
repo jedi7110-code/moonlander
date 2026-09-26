@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import {box,ball,cylinder,rod,pipe,label} from './materials.js';
 import {CABIN_LIGHT_COLOR} from './lighting.js';
+import {createCondensateSight} from './condensate.js';
 
 function waterRecovery(root,m){
-  const glass=new THREE.MeshStandardMaterial({color:0xc5e1d9,transparent:true,opacity:.23,roughness:.12,metalness:.05,depthWrite:false});
   const water=new THREE.MeshStandardMaterial({color:0x9bd7c8,roughness:.10,metalness:.15});
   const hood=box(root,m.metal,0,2.56,-.68,2.90,.16,.70,.025);hood.name='Humidity recovery hood';
   for(let i=0;i<24;i++)box(root,m.black,-1.31+i*.114,2.56,-.318,.06,.06,.012);
@@ -21,11 +21,8 @@ function waterRecovery(root,m){
   box(root,m.metal,2.03,1.86,-.60,.65,.055,.37,.015).name='Condensate tray';
   box(root,water,2.03,1.893,-.60,.52,.007,.23).name='Recovered condensate';
   // Only the condensate inspection segment is transparent; nutrient lines are opaque.
-  const sight=rod(root,glass,[1.73,.50,-.53],[1.73,.88,-.53],.044);sight.name='Condensate sight tube';
-  for(const y of [.50,.88])cylinder(root,m.metal,1.73,y,-.53,.058,.045);
+  const condensate=createCondensateSight(root,m.metal);
   pipe(root,m.black,[[1.73,.50,-.53],[1.73,.42,-.76],[.53,.32,-.76]],.034).name='Filtered condensate return';
-  const drops=[];
-  for(let i=0;i<3;i++)drops.push(ball(root,water,1.73,.55+i*.10,-.53,.025,.025,.025));
   cylinder(root,m.enamel,2.18,1.53,-.54,.12,.40).name='Replaceable filter cartridge';
   for(const y of [1.32,1.74])cylinder(root,m.metal,2.18,y,-.54,.14,.04);
   label(root,'FILTER',2.18,1.53,-.407,.19,.10,{size:40});
@@ -43,7 +40,7 @@ function waterRecovery(root,m){
     label(root,text,1.87+i*.30,.30,-.472,.10,.10,{size:48});
     pipe(root,m.black,[[1.87+i*.30,.45,-.57],[1.87+i*.30,.48,-.83],[1.25,.24,-.83],[.6,.24,-.83]],.012);
   }
-  return{rotor,drops,water};
+  return{rotor,condensate,water};
 }
 
 // Curved leaf surface, with a raised midrib and a softly corrugated edge.
@@ -110,7 +107,7 @@ export function createPlantRack(m,x){
 }
 export function animatePlants(rack,bed,time){
   rack.recovery.rotor.rotation.z=-time*3.2;
-  rack.recovery.drops.forEach((drop,i)=>{drop.position.y=.83-((time*.12+i*.10)%.28);});
+  rack.recovery.condensate.update(time);
   rack.rows.forEach((row,i)=>{
     const growth=bed.rows[i].growth,ready=growth>=1;
     row.plants.forEach((plant,j)=>{plant.scale.setScalar(.25+.75*growth);plant.rotation.z=Math.sin(time*.65+j+i)*.008;});

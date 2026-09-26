@@ -13,7 +13,7 @@ export class StationFeedback {
       if(!station&&!this.notice)this.notify(this.selected.id,'done');
       this.selected=null;return;
     }
-    this.selected.phase=brain.state==='playingGame'?'active':paused?'waiting':actor.busy?'moving':['performing','reading','orderingSupply'].includes(brain.state)?'active':'waiting';
+    this.selected.phase=brain.state==='playingGame'?'active':paused?'waiting':actor.busy?'moving':['performing','grooming','reading','orderingSupply'].includes(brain.state)?'active':'waiting';
   }
   get summary(){return this.notice||this.selected||(this.hovered?{id:this.hovered,phase:'hover'}:null);}
   signal(id,reducedMotion=false){

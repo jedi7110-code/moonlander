@@ -37,7 +37,7 @@ test('02 has laundry and clothes; 03 has food and household supplies',()=>{
         minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);
       }
       assert.ok(maxZ-minZ>.025,'folds have real depth instead of a flat white panel');
-      const shirts=[];room.traverse(o=>{if(o.name==='Seamless T-shirt')shirts.push(new Box3().setFromObject(o));});
+      const shirts=[];room.traverse(o=>{if(['Seamless T-shirt','Hanging sweatshirt','Hanging work shirt'].includes(o.name))shirts.push(new Box3().setFromObject(o));});
       assert.equal(shirts.length,3);
       shirts.sort((a,b)=>a.min.x-b.min.x);
       for(let i=1;i<shirts.length;i++)assert(shirts[i].min.x-shirts[i-1].max.x>.025,'shirts and sleeves have a visible gap, without coplanar overlap');
@@ -46,7 +46,7 @@ test('02 has laundry and clothes; 03 has food and household supplies',()=>{
       room.traverse(o=>{
         if(o.name==='Wardrobe boot')boots.push(o);
         if(o.name!=='Shirt hanger')return;
-        const shirt=o.parent.getObjectByName('Seamless T-shirt');
+        const shirt=o.parent.getObjectByName('Seamless T-shirt')??o.parent.getObjectByName('Hanging sweatshirt')??o.parent.getObjectByName('Hanging work shirt');
         for(const tip of o.userData.shoulderContacts){
           const point=o.localToWorld(new Vector3(...tip));
           const hit=new Raycaster(point.clone().add(new Vector3(0,0,.10)),new Vector3(0,0,-1)).intersectObject(shirt)[0];

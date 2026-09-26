@@ -6,6 +6,7 @@ const cabinFloor=floor=>floor===0?DECK.HABITATION:floor===1?DECK.OPERATIONS:floo
 
 export const GYM={id:'gym',floor:2,x:840,need:'exercise',dur:16000};
 export const PLANT={id:'plant',floor:2,x:385,need:null,dur:9000};
+export const GROOMING={id:'grooming',floor:DECK.HABITATION,x:700-1.88/.022,need:null,dur:58000};
 export const MEDICAL={id:'medical',floor:DECK.OPERATIONS,x:912,need:null,dur:14000};
 export const CABIN_AISLE={crewZ:.78,catZ:2.20,deckBack:-1.81,deckFront:2.55,crossingClearance:48};
 export const HYDRO_TRAY={depth:.40,z:-.40,cupZ:-.28,standZ:.10};
@@ -20,6 +21,6 @@ export const EVA={id:'eva',floor:DECK.OPERATIONS,x:1111,need:null,dur:8000};
 export const AIRLOCK={id:'airlock',floor:DECK.OPERATIONS,x:1260,need:null,dur:8000};
 export const INNER_HATCH={id:'innerHatch',floor:DECK.OPERATIONS,x:990,need:null,dur:8000};
 export const EVA_PASSAGE={floor:DECK.OPERATIONS,x:1022,approach:48,clearance:27,openTime:.7};
-export const STATIONS=[...sharedStations.filter(station=>station.id!=='stereo').map(station=>({...station,floor:cabinFloor(station.floor),...(station.id==='hydro'?{x:528}:{}),...(['galley','hydro'].includes(station.id)?{dur:station.id==='galley'?10000:8000}:{})})),GYM,MEDICAL,EVA,AIRLOCK,INNER_HATCH,PLANT];
+export const STATIONS=[...sharedStations.filter(station=>station.id!=='stereo').map(station=>({...station,floor:cabinFloor(station.floor),...(station.id==='hydro'?{x:528}:{}),...(['galley','hydro'].includes(station.id)?{dur:station.id==='galley'?10000:8000}:{})})),GYM,MEDICAL,EVA,AIRLOCK,INNER_HATCH,PLANT,GROOMING];
 export const getStation=id=>STATIONS.find(station=>station.id===id);
 export {LADDER_X};

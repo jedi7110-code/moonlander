@@ -73,7 +73,7 @@ function headAssembly(parent,m,names){
   const head=group(parent,'OBS droid / chamfered visor head');
   plate(head,m,outline(.116,.104,.025),-.105,.237,T.dark,outline(.103,.090,.016));
   plate(head,m,outline(.124,.107,.025),.139,.008,T.paint,outline(.104,.087,.014));
-  box(head,m,[0,0,-.091],[.212,.179,.017],T.vent);
+  box(head,m,[0,0,-.091],[.212,.179,.017],T.headRear);
   box(head,m,[0,0,.113],[.211,.177,.020],T.dark);
   folded(head,m,[[-.088,.140,-.065],[-.095,.114,.180],[.095,.114,.180],[.088,.140,-.065]]);
   folded(head,m,[[-.088,.140,-.065],[-.121,.108,-.065],[-.128,.086,.174],[-.095,.114,.180]]);

@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>マイロ / 15日間のスタディ</title><link rel="stylesheet" href="./growth.css"></head>
 <body>
   <main>
-    <header><div><p class="eyebrow">TARAIRON / APPEARANCE STUDY 02</p><h1>船内で過ごす、15日間。</h1><p class="intro">DAY 1は髪型A。DAY 15は、前のスタディで作った最終の長さ。</p></div><span class="study-tag">STUDY</span></header>
+    <header><div><p class="eyebrow">TARAIRON / APPEARANCE STUDY 02</p><h1>船内で過ごす、15日間。</h1><p class="intro">DAY 1は髪型A。成長速度は3倍。前のスタディの最終の長さで止まります。</p></div><span class="study-tag">STUDY</span></header>
     <section class="comparison" aria-label="マイロの髪と髭の経日比較">
       <canvas id="growth-canvas" aria-label="左はDAY 1、右は選択した日のマイロ。髪と髭の成長を比較する3Dビュー"></canvas>
       <div class="portrait-label baseline"><span class="eyebrow">出発時 / BASELINE</span><strong>DAY 1</strong><time id="baseline-date"></time></div>
@@ -16,7 +16,7 @@
       <input id="growth-day" type="range" min="1" max="15" step=".01" value="15" aria-label="経過日数" disabled>
       <div class="ticks"><span>DAY 1</span><span>DAY 5</span><span>DAY 10</span><span>DAY 15</span></div>
       <div class="toolbar"><div class="day-presets" aria-label="日数を選ぶ"><button data-day="1" disabled>DAY 1</button><button data-day="5" disabled>DAY 5</button><button data-day="10" disabled>DAY 10</button><button data-day="15" disabled>DAY 15</button></div><button id="growth-play" class="play" disabled>15日間を再生</button><div class="views" aria-label="視点"><button data-view="oblique" aria-pressed="true" disabled>斜め</button><button data-view="front" aria-pressed="false" disabled>正面</button><button data-view="side" aria-pressed="false" disabled>横</button><button data-view="body" aria-pressed="false" disabled>全身</button></div></div>
-      <div class="settings"><label for="start-date">DAY 1の開始日 <input id="start-date" type="date" value="2026-09-24"></label><a id="day16-link" href="./grooming.html" style="color:var(--accent);font-size:13px">DAY 16：洗面台で散髪・髭剃り →</a><p>トゥーン・輪郭線1.2px ／ スタディのみ。本編の外見は変更していません。</p></div>
+      <div class="settings"><label for="start-date">DAY 1の開始日 <input id="start-date" type="date" value="2026-09-24"></label><a id="day16-link" href="./grooming.html" style="color:var(--accent);font-size:13px">DAY 16：洗面台で散髪・髭剃り →</a><p>トゥーン・輪郭線1.2px ／ OBSも同じ成長速度。2階の奥のゲートを押すと散髪できます。</p></div>
     </section>
     <p style="font-size:12px"><a href="./rear-rooms.html" style="color:var(--accent)">奥部屋の作業：設備室・備蓄倉庫 →</a></p>
   </main>

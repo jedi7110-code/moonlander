@@ -24,12 +24,12 @@ function bitmap(width,height){
   return {width,height,data,pixel,rect,line,disc,ring,texture};
 }
 
-export const DROID_TILES=Object.freeze({paint:0,dark:1,steel:2,bright:3,copper:4,rubber:5,bearing:6,vent:7,circuit:8,panel:9,limb:10,neck:11,brass:12,cloth:13,strap:14,foot:15});
+export const DROID_TILES=Object.freeze({paint:0,dark:1,steel:2,bright:3,copper:4,rubber:5,bearing:6,vent:7,circuit:8,panel:9,limb:10,neck:11,brass:12,cloth:13,headRear:14,foot:15});
 
 export function createDroidSurfaceAtlas(){
   const b=bitmap(512,512),n=128;
   // Muted grey-green covers separate the droid from the pale cabin wall panels.
-  const colors=[[128,136,126],[39,45,40],[96,106,103],[155,169,167],[116,70,47],[26,31,28],[74,82,76],[116,125,116],[48,57,48],[132,140,126],[119,130,120],[79,91,84],[165,137,69],[174,177,156],[52,60,51],[106,117,106]];
+  const colors=[[128,136,126],[39,45,40],[96,106,103],[155,169,167],[116,70,47],[26,31,28],[74,82,76],[116,125,116],[48,57,48],[132,140,126],[119,130,120],[79,91,84],[165,137,69],[174,177,156],[128,136,126],[106,117,106]];
   let seed=3817;const random=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
   for(let tile=0;tile<16;tile++){
     const x0=tile%4*n,y0=Math.floor(tile/4)*n,c=colors[tile];
@@ -38,12 +38,12 @@ export function createDroidSurfaceAtlas(){
       const shade=(edge<4?-.12:0)+(tile===3?Math.sin(x*.027)*.16:0);
       b.pixel(x0+x,y0+y,c.map(v=>v*(1+shade)+grain+stain));
     }
-    if([0,6,7,8,9,10,15].includes(tile)){
+    if([0,6,7,8,9,10,14,15].includes(tile)){
       b.line(x0+6,y0+6,x0+121,y0+6,1,[196,198,175],.5);b.line(x0+121,y0+7,x0+121,y0+121,1,[35,42,34],.5);
       for(const x of [12,115])for(const y of [12,115]){
         b.disc(x0+x,y0+y,4,[40,45,36]);b.disc(x0+x-.5,y0+y-.7,2.7,[114,121,105]);b.line(x0+x-2,y0+y,x0+x+2,y0+y,1,[26,33,27]);
       }
-      for(let i=0;i<45;i++){
+      for(let i=0;i<(tile===DROID_TILES.headRear?0:45);i++){
         const x=x0+4+random()*118,y=y0+4+random()*118;b.line(x,y,x+random()*7,y+(random()-.5)*2,.6,[41,47,38],.45);
       }
     }
@@ -56,7 +56,21 @@ export function createDroidSurfaceAtlas(){
       const x=x0+27+i*22;b.line(x,y0+22,x+8,y0+39,1.4,i%2?[110,75,43]:[162,151,104]);b.line(x+8,y0+39,x+8,y0+96,1.4,[35,40,31]);b.disc(x+8,y0+100,4,[167,141,82]);
     }
     if(tile===9){b.rect(x0+24,y0+30,80,22,[44,54,45]);for(let i=0;i<6;i++)b.rect(x0+30+i*11,y0+35,6,10,[169,178,143]);b.rect(x0+26,y0+80,61,3,[65,74,60]);b.rect(x0+26,y0+88,42,3,[65,74,60]);}
-    if([13,14,15].includes(tile))for(let y=25;y<112;y+=11)b.line(x0+14,y0+y,x0+113,y0+y,1,[43,54,43],.4);
+    if(tile===DROID_TILES.headRear){
+      // The rear head cover has a compact upper heat sink and a separate lower
+      // access plate. Its own atlas slot leaves the backpack's full vents intact.
+      b.rect(x0+25,y0+21,78,45,[25,32,27]);
+      b.line(x0+26,y0+21,x0+101,y0+21,.7,[67,76,65]);
+      for(let i=0;i<7;i++){
+        const y=y0+25+i*5.5;
+        b.rect(x0+29,y,70,2,[98,109,98]);
+        b.line(x0+29,y,x0+98,y,.55,[160,167,148],.7);
+      }
+      b.rect(x0+38,y0+91,52,19,[56,65,56]);
+      b.line(x0+38,y0+91,x0+89,y0+91,.7,[96,106,91],.7);
+      for(let i=0;i<5;i++)b.rect(x0+44+i*8,y0+96,2,9,[25,33,27]);
+    }
+    if([13,15].includes(tile))for(let y=25;y<112;y+=11)b.line(x0+14,y0+y,x0+113,y0+y,1,[43,54,43],.4);
   }
   return b.texture();
 }

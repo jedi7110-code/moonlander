@@ -4,7 +4,8 @@ import {readFile} from 'node:fs/promises';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {loadMiloBody} from '../src/obs/milo-body.js';
-import {createMilo} from '../src/obs/characters.js';
+import {createMilo,animateMilo} from '../src/obs/characters.js';
+import {GroomingVisit,GROOMING_TURN_SECONDS} from '../src/obs/grooming-visit.js';
 import {headGeometry,MILO_HEAD_FORWARD} from '../src/obs/head.js';
 import {createVanity,createGroomingTools,prepareGroomingMotion,sampleGrooming,TOOL_GRIP,VANITY,GROOMING_DURATION} from '../studies/milo/grooming-model.js';
 import {growthCycleAtDay,studyDate} from '../studies/milo/growth-model.js';
@@ -13,10 +14,11 @@ await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../p
 const bytes=await readFile(new URL('../public/assets/obs/head/LeePerrySmith.glb',import.meta.url));
 const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
 const makeMaterials=()=>new Proxy({},{get:(o,k)=>o[k]??=new THREE.MeshStandardMaterial()});
-function fixture(){
+function fixture(origin=new THREE.Vector3()){
   const m=makeMaterials(),metals={shell:m.dark,alloy:m.metal},head=new THREE.Group();head.scale.setScalar(.055);head.userData.faceForward=MILO_HEAD_FORWARD;
   const face=new THREE.Mesh(headGeometry(gltf.scene.getObjectByName('LeePerrySmith').geometry,MILO_HEAD_FORWARD/.055),m.skin);face.name='Milo scanned head';head.add(face);
-  const root=createMilo(m,head),station=createVanity(m,metals),tools=createGroomingTools(root.userData.body,m,metals),motion=prepareGroomingMotion(root,station,tools);
+  const root=createMilo(m,head),station=createVanity(m,metals);station.root.position.add(origin);
+  const tools=createGroomingTools(root.userData.body,m,metals),motion=prepareGroomingMotion(root,station,tools,{origin});
   return{root,station,tools,motion};
 }
 
@@ -98,6 +100,69 @@ test('seeking and replaying produce the same pose with no stale arm or tool tran
   const sample=()=>[...root.userData.arms.flatMap(rig=>[rig.arm,rig.elbow,rig.hand]),tools.clipper,tools.shaver].map(node=>[...node.position.toArray(),...node.quaternion.toArray()]);
   motion.update(14);const original=sample();motion.update(46);motion.update(0);motion.update(14);
   assert.deepEqual(sample(),original);motion.dispose();
+});
+
+test('entering, settling at the mirror and walking out do not snap the body or limbs',()=>{
+  const {root,motion}=fixture(),{body,chest,head,arms,legs}=root.userData;
+  const nodes=[body,chest,head,...arms.flatMap(r=>[r.arm,r.elbow,r.hand]),...legs.flatMap(r=>[r.leg,r.knee,r.boot])];
+  const pose=()=>nodes.map(node=>({position:node.getWorldPosition(new THREE.Vector3()),rotation:node.getWorldQuaternion(new THREE.Quaternion())}));
+  for(const [start,end]of [[0,5.5],[48,GROOMING_DURATION]]){
+    motion.update(start);let previous=pose();
+    for(let frame=1;frame<=Math.round((end-start)*120);frame++){
+      const time=start+frame/120;motion.update(time);const next=pose();
+      next.forEach((p,i)=>{
+        assert.ok(p.position.distanceTo(previous[i].position)<.065,`limb ${i} jumps at ${time}`);
+        assert.ok(p.rotation.angleTo(previous[i].rotation)<.15,`joint ${i} snaps at ${time}`);
+      });previous=next;
+    }
+  }
+  motion.dispose();
+});
+
+test('a live doorway turn preserves the arriving gait from either direction before easing to rest',()=>{
+  const {root,motion}=fixture(),{body,chest,head,arms,legs}=root.userData;
+  const nodes=[body,chest,head,...arms.flatMap(r=>[r.arm,r.elbow,r.hand]),...legs.flatMap(r=>[r.leg,r.knee,r.boot])];
+  for(const facing of [-1,1])for(const distance of [.16,.73]){
+    root.rotation.y=facing*Math.PI/2;root.position.set(0,0,.78);
+    animateMilo(root,{moving:true,time:0,walkDistance:distance,action:null,dt:0,facing});
+    const snapshot=()=>nodes.map(n=>({p:n.getWorldPosition(new THREE.Vector3()),q:n.getWorldQuaternion(new THREE.Quaternion())}));
+    let previous=snapshot();const visit=new GroomingVisit(.5);visit.startYaw=root.rotation.y;motion.beginVisit();
+    for(let frame=0;frame<=(GROOMING_TURN_SECONDS+5.5)*120;frame++){
+      motion.update(visit.time,visit.pose);const current=snapshot();
+      current.forEach((p,i)=>{
+        assert.ok(p.p.distanceTo(previous[i].p)<.065,`arrival limb ${i} jumps at ${visit.age}`);
+        assert.ok(p.q.angleTo(previous[i].q)<.15,`arrival joint ${i} snaps at ${visit.age}`);
+        if(frame===0)assert.ok(p.p.distanceTo(previous[i].p)<1e-8&&p.q.angleTo(previous[i].q)<1e-6,'first frame retains the incoming pose');
+      });
+      previous=current;visit.update(1/120);
+    }
+  }
+  motion.dispose();
+});
+
+test('moving the study to the second-floor room preserves palm contact and charging-dock positions',()=>{
+  const offset=new THREE.Vector3(-1.88,3.392,0),a=fixture(),b=fixture(offset);
+  for(const time of [0,8,12,17.5,23,29,35,42,47,54]){
+    a.motion.update(time);b.motion.update(time);
+    for(const key of ['clipper','shaver']){
+      const expected=a.tools[key].getWorldPosition(new THREE.Vector3()).add(offset);
+      assert.ok(expected.distanceTo(b.tools[key].getWorldPosition(new THREE.Vector3()))<1e-7);
+    }
+    for(let i=0;i<2;i++){
+      const expected=a.root.userData.arms[i].hand.localToWorld(TOOL_GRIP.clone()).add(offset);
+      assert.ok(expected.distanceTo(b.root.userData.arms[i].hand.localToWorld(TOOL_GRIP.clone()))<1e-7);
+    }
+  }
+  a.motion.dispose();b.motion.dispose();
+});
+
+test('a recovering patient keeps the medical bandage while using the washbasin',()=>{
+  const {root,motion}=fixture();
+  motion.update(12,{health:{bandageTime:100}});
+  assert.equal(root.userData.bandage.visible,true);
+  motion.update(12,{health:{bandageTime:0}});
+  assert.equal(root.userData.bandage.visible,false);
+  motion.dispose();
 });
 
 test('both arms keep a single elbow hinge and move continuously through pickup, handover and return',()=>{

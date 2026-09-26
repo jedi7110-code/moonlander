@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {Box3,MeshStandardMaterial,Vector3} from 'three';
+import {Box3,Matrix4,MeshStandardMaterial,Vector3} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {createDiningStudy,applyDiningStudy} from '../studies/milo/dining-study.js';
@@ -75,4 +75,35 @@ test('meal and cup hand fits restore cleanly when switching poses in either orde
     for(const key of ['position','skinIndex','skinWeight'])assert.deepEqual(root.userData.bodySkin.geometry.attributes[key].array,fresh.userData.bodySkin.geometry.attributes[key].array);
   }
   assert.equal(root.userData.bodySkin.geometry,original);
+});
+
+test('the right upper arm and sleeve do not fold inside out while lifting or returning the bowl',()=>{
+  const root=character(),study=kitchen(),skin=root.userData.bodySkin,a=skin.geometry.attributes,index=skin.geometry.index;
+  const faces=[];
+  for(let i=0;i<index.count;i+=3){
+    const ids=[index.getX(i),index.getX(i+1),index.getX(i+2)];
+    // Anatomical right is -X; include the sleeve-to-armpit transition.
+    if(ids.every(j=>a.position.getX(j)<-.11&&a.position.getY(j)>1.25&&a.position.getY(j)<1.44&&a.armRegion.getX(j)>.5))faces.push(ids);
+  }
+  assert.ok(faces.length>100);
+  const vertices=[...new Set(faces.flat())],p=[],normals=[];
+  const normal=new Vector3(),edge=new Vector3(),outward=new Vector3();
+  for(let frame=0;frame<=300;frame++){
+    const time=frame/30;applyDiningStudy(study,root,'galley',time);root.updateMatrixWorld(true);skin.skeleton.update();
+    const attrs=skin.geometry.attributes,matrices=skin.skeleton.bones.map((bone,j)=>new Matrix4().multiplyMatrices(bone.matrixWorld,skin.skeleton.boneInverses[j]));
+    for(const i of vertices){
+      p[i]=skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(attrs.position,i)).applyMatrix4(skin.matrixWorld);
+      const source=new Vector3().fromBufferAttribute(attrs.normal,i),sum=new Vector3();
+      for(let k=0;k<4;k++){
+        const weight=attrs.skinWeight.array[i*4+k];
+        if(weight)sum.addScaledVector(source.clone().transformDirection(matrices[attrs.skinIndex.array[i*4+k]]),weight);
+      }
+      normals[i]=sum;
+    }
+    for(const [a,b,c]of faces){
+      normal.subVectors(p[b],p[a]).cross(edge.subVectors(p[c],p[a]));
+      outward.copy(normals[a]).add(normals[b]).add(normals[c]);
+      assert.ok(normal.dot(outward)>0,`right sleeve folds inside out at ${time}s`);
+    }
+  }
 });

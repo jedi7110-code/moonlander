@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {MeshStandardMaterial,Vector3} from 'three';
+import {BoxGeometry,LessDepth,Mesh,MeshStandardMaterial,PerspectiveCamera,Raycaster,Vector2,Vector3} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {updateMiloWatch} from '../src/obs/milo-watch.js';
@@ -49,6 +49,38 @@ test('watch hands match the ship HUD minute, including noon and midnight, withou
     assert.ok(Math.abs(w.gmt.rotation.z+minutes/1440*tau)<1e-10,'24-hour hand also reads ship time, with no timezone offset');
     assert.equal(w.second.rotation.z,0);
   }
+});
+
+test('the dial stack stays visible at OBS depth precision and remains hidden by foreground objects',()=>{
+  const root=character(),watch=root.userData.watch;updateMiloWatch(root,0);
+  const casing=watch.group.getObjectByName('GMT case 42 mm');
+  casing.removeFromParent();casing.position.set(0,0,0);casing.rotation.set(0,0,0);casing.updateMatrixWorld(true);
+  const parts=[];casing.traverse(part=>{if(part.isMesh)parts.push(part);});
+  const camera=new PerspectiveCamera(24,1,.1,150),ray=new Raycaster(),levels=2**24-1;
+  const cover=new Mesh(new BoxGeometry(.06,.06,.001),new MeshStandardMaterial());
+  cover.position.z=.03;cover.updateMatrixWorld(true);
+  function visibleAt(x,y,occluded=false){
+    const pixel=new Vector3(x,y,.0084).project(camera);ray.setFromCamera(new Vector2(pixel.x,pixel.y),camera);
+    const nearest=new Map();
+    for(const hit of ray.intersectObjects(occluded?[...parts,cover]:parts,false))if(!nearest.has(hit.object))nearest.set(hit.object,hit);
+    const draws=[...nearest.values()].sort((a,b)=>a.object.renderOrder-b.object.renderOrder||a.object.material.id-b.object.material.id||a.distance-b.distance);
+    let depth=levels,visible=null;
+    for(const hit of draws){
+      const material=hit.object.material,z=Math.round((hit.point.clone().project(camera).z*.5+.5)*levels);
+      const passes=material.depthFunc===LessDepth?z<depth:z<=depth;
+      if(material.depthTest&&!passes)continue;
+      visible=hit.object;if(material.depthWrite)depth=z;
+    }
+    return visible;
+  }
+  for(const distance of [39.997,39.999,40,40.0001,40.0002,40.001,40.003]){
+    camera.position.set(0,0,distance);camera.lookAt(0,0,0);camera.updateMatrixWorld(true);
+    assert.equal(visibleAt(.012,0)?.name,'GMT dial and bezel image','the metal cap must not cover the dial');
+    assert.equal(visibleAt(0,.004)?.name,'Fixed seconds blade','overlapping needles retain their physical stacking order');
+    assert.equal(visibleAt(0,0)?.name,'Unified steel watch housing','the pinion remains above the hands');
+    assert.equal(visibleAt(0,.004,true),cover,'the watch cannot show through a foreground arm or object');
+  }
+  cover.geometry.dispose();cover.material.dispose();root.userData.bodySkin.skeleton.dispose();
 });
 
 test('animation resets, sub-minute ticks and pause leave the displayed watch time unchanged',async()=>{

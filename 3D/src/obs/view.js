@@ -7,6 +7,7 @@ import {createMilo,animateMilo} from './characters.js';
 import {loadCabinLucy as loadLucy,createCabinLucy as createLucy,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
 import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
+import {createHarvestDelivery} from './harvest-delivery.js';
 import {loadMiloHead} from './head.js';
 import {animateDelivery} from './delivery.js';
 import {animateBathroom} from './bathroom.js';
@@ -31,6 +32,10 @@ import {updateMiloBandage} from './milo-bandage.js';
 import {createDroidChargingBay,DROID_DOCK} from './droid-charging.js';
 import {createDroidServiceRig} from './droid-service.js';
 import {CabinStartupLighting} from './startup-lighting.js';
+import {Reflector} from 'three/addons/objects/Reflector.js';
+import {attachHairGrowth} from './hair-growth.js';
+import {createGroomingTools,prepareGroomingMotion} from './grooming.js';
+import {createMachinedMetals} from './machined-metals.js';
 
 export class ObservationView {
   static async create(canvas,{cabinStyle='cartoon'}={}){
@@ -65,8 +70,21 @@ export class ObservationView {
     this.droidService=createDroidServiceRig(this.droidBay,this.ship);this.scene.add(this.droidService.root);
     // Preserve the powered-down pose until the live routine is attached.
     this.droidService.actorRoot.position.copy(this.droidBay.root.position);
+    this.hairGrowth=attachHairGrowth(head);this.hairGrowth.setGrowth(0);
     this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
+    this.harvestDelivery=createHarvestDelivery(m,this.scene);
+    this.groomingTools=createGroomingTools(this.milo.userData.body,m,createMachinedMetals());
+    this.groomingMotion=prepareGroomingMotion(this.milo,this.ship.groomingStation,this.groomingTools,{origin:this.ship.groomingStation.origin});
     this.characterToon=[createMiloToon(this.milo),createLucyToon(this.cat)];
+    for(const tool of Object.values(this.groomingTools)){
+      tool.visible=false;
+      tool.traverse(part=>{if(part.material?.anisotropy>0)part.material.defines.USE_UV='';});
+    }
+    this.groomingMirror=new Reflector(new THREE.PlaneGeometry(.72,.89),{color:0xa8b5b5,textureWidth:256,textureHeight:384,clipBias:.002,multisample:0});
+    this.groomingMirror.getRenderTarget().stencilBuffer=true;this.groomingMirror.visible=false;
+    this.restingMirror=new THREE.Mesh(new THREE.PlaneGeometry(.72,.89),new THREE.MeshStandardMaterial({color:0xa8b5b5,metalness:1,roughness:.08}));
+    this.restingMirror.material.userData.cabinKeepSurface=true;
+    this.ship.groomingStation.mirror.add(this.groomingMirror,this.restingMirror);
     this.camera=new THREE.PerspectiveCamera(24,1,.1,150);
     this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -166,7 +184,7 @@ export class ObservationView {
     this.targetCenter.copy(this.center);
   }
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null,xrFrame=null){
-    const action=currentAction(brain),catMotion=catRoutine.motion;
+    const action=brain.harvestDelivery&&!actor.busy?'plant':currentAction(brain),catMotion=catRoutine.motion;
     const actionTime=brain.reclineExit?.actionTime??brain.loungeExit?.actionTime??(brain.loungeEntry?0:brain.state==='performing'?brain.curDurSec-brain.performT:time);
     animateGym(this.ship.gym,brain.gymVisit?.pedalTime??brain.gymPedalTime??0);
     animateBunk(this.ship.bunk,brain.bunkVisit?.pose);
@@ -175,16 +193,17 @@ export class ObservationView {
     if(actor.climbing)this.cabinClimb??={startHeight:positionY(FLOORS[actor.floor].y),startYaw:this.milo.rotation.y};
     else this.cabinClimb=null;
     const bathroom=brain.bathroom?.pose;
-    if(action==='plant')this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
+    if(action==='plant'&&!brain.harvestDelivery)this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
     if(['galley','hydro'].includes(action))this.milo.position.z=CABIN_AISLE.crewZ-diningApproach(action)*diningPhase(actionTime,brain.curDurSec).approach;
     if(action==='gym')this.milo.position.z=brain.gymVisit?.pose.depth??BIKE.depth;
     if(brain.gymVisit)brain.gymVisit.startYaw??=this.milo.rotation.y;
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
-    animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
+    if(!brain.grooming)animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit});
     if(actor.climbing){
       const nextX=actor.queue[1]?.x??actor.x,endYaw=(Math.sign(nextX-actor.x)||actor.facing)*Math.PI/2;
       applyCabinLadder(this.milo,{...this.cabinClimb,height:positionY(actor.y),endHeight:positionY(actor.queue[0].y),endYaw});
     }
+    this.harvestDelivery.update(this.milo,brain);
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
       const cleaning=this.droidRoutine?.door===id?{opening:this.droidRoutine.opening,inside:false}:null;
       animateBathroom(fixture,brain.bathroom?.id===id?bathroom:cleaning);
@@ -215,6 +234,16 @@ export class ObservationView {
     if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
     if(brain.reclineExit?.id==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineExitProgress(brain.reclineExit));
     if(brain.bunkVisit)this.milo.position.z=brain.bunkVisit.pose.depth;
+    const grooming=brain.grooming;
+    if(grooming){
+      if(grooming.startYaw===null){grooming.startYaw=this.milo.rotation.y;this.groomingMotion.beginVisit();}
+      const pose=grooming.pose;
+      this.groomingMotion.update(grooming.time,{...pose,health:brain.health});this.hairGrowth.setGrowth(pose.hair,pose.beard);
+    }else this.hairGrowth.setGrowth(brain.hairGrowth?.progress??0);
+    for(const tool of Object.values(this.groomingTools))tool.visible=Boolean(grooming);
+    // A close grooming view is the only desktop view needing a second scene render.
+    this.groomingMirror.visible=Boolean(grooming)&&this.viewHeight<8&&!this.renderer.xr.isPresenting;
+    this.restingMirror.visible=!this.groomingMirror.visible;
     if(!paused)this.ship.fan.rotation.z+=dt*3.0;
     animateDelivery(this.ship,care,this.reducedMotion);
     this.ship.foodGroup.visible=(this.droidRoutine?care.catBowl>0:care.has('catfood'))||catRoutine.mode==='eat';
@@ -240,5 +269,5 @@ export class ObservationView {
     try{this.renderer.render(this.scene,this.camera);}
     finally{quality?.endFrame();}
   }
-  dispose(){this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

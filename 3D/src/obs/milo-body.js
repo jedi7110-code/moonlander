@@ -37,7 +37,7 @@ vec2 miloFrontFolds(vec3 p){
 }
 `;
 
-let bodyData=null,tattooMaps=null;
+let bodyData=null,tattooMaps=null,tattooRightUpper=null,shirtBackPrint=null;
 export function sampleMiloNeckline(geometry){
   if(!geometry)return null;
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
@@ -59,8 +59,14 @@ export async function loadMiloBody(url=`${import.meta.env?.BASE_URL??'/3D/'}asse
   const data=await response.json();
   if(typeof document!=='undefined'){
     const loader=new THREE.TextureLoader(),base=import.meta.env?.BASE_URL??'/3D/';
-    tattooMaps=await Promise.all(['tattoo-cosmo-atomic-bold.png','tattoo-cat-red.png'].map(name=>loader.loadAsync(`${base}assets/obs/milo/${name}`)));
-    for(const map of tattooMaps){map.colorSpace=THREE.NoColorSpace;map.anisotropy=4;}
+    const maps=await Promise.all(['tattoo-cosmo-atomic-bold.png','tattoo-cat-red.png','tshirt-back-print.png','tattoo-right-upper.png'].map(name=>loader.loadAsync(`${base}assets/obs/milo/${name}`)));
+    tattooMaps=maps.slice(0,2);shirtBackPrint=maps[2];tattooRightUpper=maps[3];
+    for(const map of [...tattooMaps,tattooRightUpper]){map.colorSpace=THREE.NoColorSpace;map.anisotropy=4;}
+    // Keep the original PNG on disk; a 1K upload is enough for the garment print.
+    const artwork=shirtBackPrint.image,canvas=document.createElement('canvas');
+    canvas.width=Math.min(1024,artwork.width);canvas.height=Math.round(canvas.width*artwork.height/artwork.width);
+    const context=canvas.getContext('2d');context.imageSmoothingQuality='high';context.drawImage(artwork,0,0,canvas.width,canvas.height);
+    shirtBackPrint.image=canvas;shirtBackPrint.colorSpace=THREE.SRGBColorSpace;shirtBackPrint.anisotropy=4;shirtBackPrint.needsUpdate=true;
   }
   bodyData=data;return bodyData;
 }
@@ -268,13 +274,18 @@ export function attachMiloBody(root,m,pants,legacy){
   geometry.setAttribute('bruiseMask',new THREE.BufferAttribute(bruiseMask,1));
   geometry.setAttribute('bruiseUv',new THREE.BufferAttribute(bruiseUv,2));
   const material=m.skin.clone(),fabricMap=pants.userData.fabricMap??pants.bumpMap;material.roughness=.84;
+  const shirtColor=new THREE.Color(0xabaeac);
   material.userData.bruiseStrength={value:0};
+  material.shirtBackPrint=shirtBackPrint;
+  material.tattooRightUpper=tattooRightUpper;
   material.side=THREE.DoubleSide;material.shadowSide=THREE.BackSide;
   if(fabricMap){material.bumpMap=fabricMap.clone();material.bumpMap.repeat.set(18,24);material.bumpMap.needsUpdate=true;material.bumpScale=.006;}
   material.onBeforeCompile=shader=>{
     shader.uniforms.bruiseStrength=material.userData.bruiseStrength;
     shader.uniforms.tattooAtom={value:tattooMaps?.[0]??null};shader.uniforms.tattooCat={value:tattooMaps?.[1]??null};shader.uniforms.tattooStrength={value:tattooMaps ? .88 : 0};
-    shader.uniforms.shirtColor={value:m.cloth.color};shader.uniforms.trouserColor={value:pants.color};shader.uniforms.trouserMap={value:fabricMap};
+    shader.uniforms.tattooRightUpper={value:tattooRightUpper};
+    shader.uniforms.shirtBackPrint={value:shirtBackPrint};shader.uniforms.shirtBackPrintStrength={value:shirtBackPrint?1:0};
+    shader.uniforms.shirtColor={value:shirtColor};shader.uniforms.trouserColor={value:pants.color};shader.uniforms.trouserMap={value:fabricMap};
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float bruiseMask; varying float vBruiseMask; attribute vec2 bruiseUv; varying vec2 vBruiseUv; attribute float armRegion; attribute vec2 tattooUv; attribute float tattooMask; varying vec2 vTattooUv; varying float vTattooMask; varying float vArmRegion; varying vec3 vBodyPosition; varying vec2 vMiloUv;'+kneeFoldShader).replace('#include <begin_vertex>',`#include <begin_vertex>
       vBruiseMask=bruiseMask;vBruiseUv=bruiseUv;
       vBodyPosition=position;vArmRegion=armRegion;vMiloUv=uv;vTattooUv=tattooUv;vTattooMask=tattooMask;
@@ -294,7 +305,7 @@ export function attachMiloBody(root,m,pants,legacy){
       float crotchFold=-frontFolds.x+.30*frontFolds.y;
       transformed+=normal*trouserVertex*(.0009*clothFold+(.0015*kneeShape+.0007*calfShape)*crossFold+.0028*backKneeShape*backKneeFold+.0017*waistShape*waistFold+.0022*crotchShape*crotchFold);
     `);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform float bruiseStrength;varying float vBruiseMask;varying vec2 vBruiseUv;uniform vec3 shirtColor;uniform vec3 trouserColor;uniform sampler2D trouserMap;uniform sampler2D tattooAtom;uniform sampler2D tattooCat;uniform float tattooStrength;varying vec2 vTattooUv;varying float vTattooMask;varying float vArmRegion;varying vec3 vBodyPosition;varying vec2 vMiloUv;'+kneeFoldShader+armBruiseShader).replace('#include <color_fragment>',`#include <color_fragment>
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform float bruiseStrength;varying float vBruiseMask;varying vec2 vBruiseUv;uniform vec3 shirtColor;uniform vec3 trouserColor;uniform sampler2D trouserMap;uniform sampler2D tattooAtom;uniform sampler2D tattooCat;uniform sampler2D tattooRightUpper;uniform float tattooStrength;uniform sampler2D shirtBackPrint;uniform float shirtBackPrintStrength;varying vec2 vTattooUv;varying float vTattooMask;varying float vArmRegion;varying vec3 vBodyPosition;varying vec2 vMiloUv;'+kneeFoldShader+armBruiseShader).replace('#include <color_fragment>',`#include <color_fragment>
       float side=abs(vBodyPosition.x);
       float neckline=1.563-.020*(vBodyPosition.z+.009)/max(length(vec2(vBodyPosition.x,vBodyPosition.z+.009)),.001);
       if(vBodyPosition.y>neckline)discard;
@@ -363,7 +374,22 @@ export function attachMiloBody(root,m,pants,legacy){
       float garmentLines=clamp(frontFly+handPocket+cargoEdge+cargoFlap+rearEdge+rearFlap,0.0,1.0);
       trouserSurface=mix(trouserSurface,trouserColor*.78,cargoOuter*.62+rearPocket*.55);
       trouserSurface=mix(trouserSurface,trouserColor*.42,garmentLines);
-      diffuseColor.rgb=mix(mix(diffuseColor.rgb,shirtColor*(1.0-.09*max(collar,cuff)),shirt),trouserSurface,trousers);
+      // Reuse the fabric map as neutral, stretched yarns and fine knit grain.
+      // The UVs follow the skin; mipmaps soften the heather at a distance.
+      float yarnTone=dot(texture2D(trouserMap,vMiloUv*vec2(3.0,14.0)).rgb,vec3(.2126,.7152,.0722));
+      float fiberTone=dot(weave,vec3(.2126,.7152,.0722));
+      float heather=mix(.86,1.14,smoothstep(.02,.13,yarnTone))*mix(.96,1.04,smoothstep(.02,.13,fiberTone));
+      vec3 shirtSurface=shirtColor*heather*(1.0-.09*max(collar,cuff));
+      diffuseColor.rgb=mix(mix(diffuseColor.rgb,shirtSurface,shirt),trouserSurface,trousers);
+      // Bind-space coordinates follow the same skin as the shirt, including bends.
+      // Reverse X for a readable rear view; keep the complete supplied aspect ratio.
+      vec2 backPrintUv=vec2(.5-vBodyPosition.x/.30,.5+(vBodyPosition.y-1.425)/(.30*1808.0/3538.0));
+      float backPrintFrame=step(0.0,backPrintUv.x)*step(backPrintUv.x,1.0)*step(0.0,backPrintUv.y)*step(backPrintUv.y,1.0);
+      float backPrintMask=backPrintFrame*smoothstep(.025,.065,-vBodyPosition.z)*(1.0-smoothstep(.05,.20,vArmRegion))*shirt*(1.0-trousers)*shirtBackPrintStrength;
+      if(backPrintMask>.001){
+        vec4 printInk=texture2D(shirtBackPrint,clamp(backPrintUv,0.0,1.0));
+        diffuseColor.rgb=mix(diffuseColor.rgb,printInk.rgb,printInk.a*backPrintMask);
+      }
       float tattooFrame=1.0-smoothstep(.98,1.0,max(abs(vTattooUv.x-.5),abs(vTattooUv.y-.5))*2.0);
       if(tattooFrame*vTattooMask*tattooStrength>0.001){
         vec2 uv=clamp(vTattooUv,0.0,1.0);
@@ -371,10 +397,21 @@ export function attachMiloBody(root,m,pants,legacy){
         // and white paper (cat) remain bare skin, including antialiased edges.
         vec4 artwork=vBodyPosition.x<0.0?texture2D(tattooCat,uv):texture2D(tattooAtom,uv);
         float pigment=min(artwork.r,min(artwork.g,artwork.b));
-        float red=clamp((artwork.r-max(artwork.g,artwork.b))*2.5,0.0,1.0);
-        vec3 inkColor=diffuseColor.rgb*mix(vec3(.15,.19,.18),vec3(.80,.055,.035),red);
+        // Render the cat's red source strokes with the same dark tattoo ink.
+        vec3 inkColor=diffuseColor.rgb*vec3(.15,.19,.18);
         float ink=artwork.a*(1.0-smoothstep(.40,.96,pigment))*tattooFrame*vTattooMask*tattooStrength*(1.0-shirt)*(1.0-trousers);
         diffuseColor.rgb=mix(diffuseColor.rgb,inkColor,ink);
+      }
+      // Anatomical right is -X. Set the artwork 8 mm below the sleeve hem so
+      // a little more shows while the upper portion stays masked by the shirt.
+      vec2 upperTattooUv=vec2(.5+(vBodyPosition.z+.035)/.130,.5+(vBodyPosition.y-1.287)/(.130*182.0/388.0));
+      float upperTattooFrame=1.0-smoothstep(.98,1.0,max(abs(upperTattooUv.x-.5),abs(upperTattooUv.y-.5))*2.0);
+      float upperTattooMask=upperTattooFrame*smoothstep(.215,.240,-vBodyPosition.x)*smoothstep(.90,.98,vArmRegion)*(1.0-shirt)*(1.0-trousers)*tattooStrength;
+      if(upperTattooMask>.001){
+        vec4 artwork=texture2D(tattooRightUpper,clamp(upperTattooUv,0.0,1.0));
+        float pigment=min(artwork.r,min(artwork.g,artwork.b));
+        float ink=artwork.a*(1.0-smoothstep(.40,.96,pigment))*upperTattooMask;
+        diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(.15,.19,.18),ink);
       }
       // Pigment below intact skin: no blood, cuts, displacement or wet gloss.
       diffuseColor.rgb=miloBruisedSkin(diffuseColor.rgb,vBruiseUv,vBruiseMask,
@@ -383,9 +420,9 @@ export function attachMiloBody(root,m,pants,legacy){
       #include <normal_fragment_maps>
       float trouserBumpMask=(1.0-smoothstep(1.065,1.085,vBodyPosition.y))*(1.0-smoothstep(.2,.5,vArmRegion));
       normal=normalize(mix(smoothBodyNormal,normal,trouserBumpMask));
-    `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.96,trousers);');
+    `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.96,shirt);\nroughnessFactor=mix(roughnessFactor,.96,trousers);');
   };
-  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-bruise-v23';
+  material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-bruise-v28-upper-tattoo-visible';
   const mesh=new THREE.SkinnedMesh(geometry,material);mesh.name='Continuous sample-based human body';
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;body.add(mesh);
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});

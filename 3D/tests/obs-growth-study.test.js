@@ -7,11 +7,12 @@ import {headGeometry} from '../src/obs/head.js';
 import {trimSuppliedNape} from '../src/obs/supplied-hair.js';
 import {growthAtDay,studyDate,addHairGrowthTargets,setHairGrowth,createGrowingBeard,beardCoverage} from '../studies/milo/growth-model.js';
 
-test('growth is continuous from unchanged DAY 1 and capped at DAY 15',()=>{
+test('hair and beard grow three times as fast without exceeding the approved final length',()=>{
   assert.deepEqual(growthAtDay(1),{day:1,progress:0,beardMm:0});
   let previous=growthAtDay(1);
-  for(let day=1.1;day<=15;day+=.1){const current=growthAtDay(day);assert.ok(current.progress>previous.progress);assert.ok(current.beardMm>previous.beardMm);previous=current;}
-  assert.equal(growthAtDay(8).progress,.5);assert.equal(growthAtDay(15).progress,1);
+  for(let day=1.1;day<5.6;day+=.1){const current=growthAtDay(day);assert.ok(current.progress>previous.progress);assert.ok(current.beardMm>previous.beardMm);previous=current;}
+  assert.equal(growthAtDay(2).progress,3/14);assert.equal(growthAtDay(1+14/3).progress,1);
+  assert.equal(growthAtDay(8).progress,1);assert.equal(growthAtDay(15).progress,1);
   assert.deepEqual(growthAtDay(-1),growthAtDay(1));assert.deepEqual(growthAtDay(30),growthAtDay(15));
   assert.deepEqual(growthAtDay('invalid'),growthAtDay(1));
 });

@@ -93,3 +93,36 @@ test('sofa approach, retargeting and pause preserve traffic ownership',()=>{
   let arrivals=0;s.cat.motion.goTo({floor:CAT_SOFA.floor,x:CAT_SOFA.floorX-100},()=>{arrivals++;s.cat.rest('look',100);});
   for(let i=0;i<10*60;i++)s.step();assert.equal(arrivals,1);assert.ok(!s.cat.motion.waitingForDroid);
 });
+
+test('feeding finishes when a hungry cat reaches the bowl behind the droid, without a mutual wait',()=>{
+  for(const turns of [false,true])for(const dt of [1/120,1/60,1/30,.1]){
+    const care=new Supplies(),actor=new CrewMotion({floor:0,x:1000}),cat=new CatRoutine(care,{random:()=>.5,turns});
+    cat.motion=new CatMotion({floor:2,x:CAT_BOWL.approachX,turns});cat.motion.heading=Math.PI/2;
+    cat.rest('look',1000);cat.hunger=100;
+    const routine=new DroidRoutine({care,actor,cat,brain:{plants:{ready:0}}});
+    assert.ok(routine.request('feed'));
+    let meals=0,waited=false;
+    const eat=care.eatCatFood.bind(care);care.eatCatFood=()=>{const ate=eat();if(ate)meals++;return ate;};
+    const step=()=>{
+      actor.waitingForDroid=routine.blocksCrew(actor,dt);
+      advanceCabinTraffic(actor,cat,dt,routine);routine.update(dt);
+      const c=cat.motion,p=routine.position;
+      if(!c.hidden&&Math.abs((870-c.y)*.016+c.elevation-p.y)<.5){
+        assert.ok(Math.hypot((c.x-LADDER_X)*.022-p.x,c.z-p.z)>.62,'the cat stays clear while the droid pours and leaves');
+      }
+      waited||=Boolean(c.waitingForDroid);
+    };
+    for(let time=0;time<120&&routine.step?.kind!=='guard';time+=dt)step();
+    assert.equal(routine.step?.kind,'guard');assert.equal(routine.carriedFood,true);
+    cat.fetch();
+    const paused=JSON.stringify([routine.pose,cat.motion,care.supplies,care.catBowl]);
+    advanceCabinTraffic(actor,cat,0,routine);routine.update(0);
+    assert.equal(JSON.stringify([routine.pose,cat.motion,care.supplies,care.catBowl]),paused);
+    for(let time=0;time<120&&(!routine.docked||!meals);time+=dt){step();if(routine.docked)routine.restUntil=Infinity;}
+    assert.ok(waited,'the arriving cat waits in front of the occupied bowl approach');
+    assert.ok(routine.docked,`feeding must return to the dock (turns=${turns}, dt=${dt})`);
+    assert.equal(routine.completed.feed,1);assert.equal(routine.disposedWaste,1);
+    assert.equal(meals,1,'Lucy eats the newly filled portion once');
+    assert.equal(care.catBowl,0);assert.equal(care.supplies.catfood,2,'neither waiting nor feeding duplicates or wastes food');
+  }
+});

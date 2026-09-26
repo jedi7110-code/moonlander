@@ -11,7 +11,7 @@ export const DROID_HOME={x:-11.92,y:6.804,z:-.52,floor:0,yaw:0};
 export const DROID_FLOORS=FLOORS.map(f=>(870-f.y)*.016);
 // Metres from the shaft centre, with separate side holds for the two aisle depths.
 export const DROID_LADDER_TRAFFIC=Object.freeze({droidWaitX:1.15,crewWaitX:1.35,crewClearX:1.5});
-const STATIONS={cargo:'hatch',harvest:'plant',toilet:'toilet',shower:'shower',cook:'galley'};
+const STATIONS={cargo:'hatch',harvest:'plant',laundry:'grooming',toilet:'toilet',shower:'shower',cook:'galley'};
 export const DROID_PACE=1.6;
 export const DROID_LANE=1.48;
 const LANE=DROID_LANE,SPEED=.58*DROID_PACE,CLIMB_SPEED=.40*DROID_PACE;
@@ -52,7 +52,13 @@ export class DroidRoutine {
   occupied(job){
     const station=STATIONS[job];
     if(station&&(this.brain?.actStation===station||this.brain?.bathroom?.id===station))return true;
-    return job==='feed'&&(this.cat?.mode==='eat'||this.cat?.mode==='fetch'||this.cat?.pendingMove?.kind==='fetch');
+    if(job!=='feed')return false;
+    const fetching=this.cat?.mode==='fetch'||this.cat?.pendingMove?.kind==='fetch';
+    // A cat waiting outside our crossing is queued, not occupying the bowl.
+    // Finish the current refill and leave so Lucy can enter; an active crossing
+    // or a cat already eating keeps priority over the droid.
+    const yielding=this.job==='feed'&&this.cat?.motion?.waitingForDroid&&!this.cat.motion.crossing?.active;
+    return this.cat?.mode==='eat'||(fetching&&!yielding);
   }
   reserveForCrew(station,callback){
     if(this.station!==station){this.crewRequest=null;return false;}

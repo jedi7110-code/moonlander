@@ -29,6 +29,7 @@ const POSES=[
   {id:'tablet',label:'端末を持つ'},
   {id:'medical',label:'診察台'},
   {id:'injury',label:'腕の怪我'},
+  {id:'fever',label:'発熱・センサー警告'},
   {id:'hydro',label:'水飲み'},
   {id:'galley',label:'キッチン'},
   {id:'gym',label:'サイクリング'},
@@ -79,7 +80,7 @@ async function start(){
   const easingSelect=document.createElement('select');easingSelect.id='ladder-easing';
   easingSelect.add(new Option('あり（滑らか）','on'));easingSelect.add(new Option('なし（変更前）','off'));
   easingLabel.append(easingSelect);$('ladder-options').insertBefore(easingLabel,$('support'));
-  let current=POSES.find(p=>p.id===entryPose)??POSES[1],time=entryPose==='medical'?12:entryPose==='tablet'?3:0,watchTime=0,paused=appearanceMode||['medical','tablet','seat','injury'].includes(entryPose),last=performance.now();
+  let current=POSES.find(p=>p.id===entryPose)??POSES[1],time=entryPose==='medical'?12:entryPose==='tablet'?3:0,watchTime=0,paused=appearanceMode||['medical','tablet','seat','injury','fever'].includes(entryPose),last=performance.now();
   const duration=()=>current.id==='gym'?GYM_STUDY_DURATION:DINING_ACTIONS.includes(current.id)?diningStudyDuration(current.id):current.id==='tablet'?36:current.id==='medical'?medicalDuration():current.id==='mocap'?walkData.duration:current.id==='ladder'?LADDER.duration:8;
   const originalArms=milo.userData.arms.map(({arm})=>arm.position.clone());
   const bandageLabel=document.createElement('label'),bandageToggle=document.createElement('input');
@@ -98,7 +99,7 @@ async function start(){
     let diningStage;
     if(gym.root.visible)diningStage=applyGymStudy(gym,milo,time);
     else if(dining.root.visible)diningStage=applyDiningStudy(dining,milo,current.id,time);
-    else animateMilo(milo,{moving:current.id==='walk'||current.id==='mocap',walkStyle:current.id==='walk'?'legacy':'measured',climbing:current.id==='climb',waiting:false,facing:1,action:current.id==='medical'?'medical':['seat','tablet'].includes(current.id)?'lounge':null,leisure:current.id==='tablet'?'tablet':null,health:current.id==='injury'?{condition:{kind:'injury',age:time},needsCare:true}:null,time,walkDistance:time*walkData.cycleDistance/walkData.duration,actionTime:time,actionDuration:duration()});
+    else animateMilo(milo,{moving:current.id==='walk'||current.id==='mocap',walkStyle:current.id==='walk'?'legacy':'measured',climbing:current.id==='climb',waiting:false,facing:1,action:current.id==='medical'?'medical':['seat','tablet'].includes(current.id)?'lounge':null,leisure:current.id==='tablet'?'tablet':null,health:['injury','fever'].includes(current.id)?{condition:{kind:current.id,age:time},needsCare:true}:null,time,walkDistance:time*walkData.cycleDistance/walkData.duration,actionTime:time,actionDuration:duration()});
     lounge.visible=['seat','tablet'].includes(current.id);
     if(lounge.visible)milo.position.z=LOUNGE_SEAT.depth;
     medical.root.visible=current.id==='medical';
@@ -130,8 +131,8 @@ async function start(){
       target.copy(milo.userData.arms[side].hand.getWorldPosition(new THREE.Vector3()));target.y+=.035;
       az=side===0?.7:-.7;el=.12;camera.zoom=5;
     }
-    if(view==='watch'){
-      const watch=milo.userData.watch.group;watch.getWorldPosition(target);camera.zoom=6;
+    if(view==='watch'||view==='bio-sensor'){
+      const watch=milo.userData[view==='bio-sensor'?'bioSensor':'watch'].group;watch.getWorldPosition(target);camera.zoom=6;
       controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(0,.5,3).applyQuaternion(watch.getWorldQuaternion(new THREE.Quaternion())));
       camera.lookAt(target);resize();controls.update();return;
     }
@@ -171,6 +172,7 @@ async function start(){
   $('view').add(new Option('左手・握り拡大','grip-left'));
   $('view').add(new Option('右手・握り拡大','grip-right'));
   $('view').add(new Option('時計拡大','watch'));
+  $('view').add(new Option('左手首・生体センサー','bio-sensor'));
   $('view').add(new Option('梯子・斜め横','ladder-side'));
   for(const entry of POSES){
     const button=document.createElement('button');button.textContent=entry.label;button.setAttribute('aria-pressed',entry===current);button.onclick=()=>{current=entry;time=entry.id==='medical'?12:entry.id==='tablet'?3:0;updateUrl({pose:entry.id});for(const child of $('poses').children)child.setAttribute('aria-pressed',child===button);pose();setView();};$('poses').append(button);

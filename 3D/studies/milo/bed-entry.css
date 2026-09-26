@@ -1,0 +1,2 @@
+@import './elbow.css';
+.places{display:flex;gap:7px;margin:0 0 12px}.places button{min-width:92px}.comparison{height:clamp(360px,calc(100dvh - 342px),860px)}.portrait-label>span:last-child{font-size:11px;color:var(--muted)}.portrait-note{bottom:14px}.settings select{font:inherit}.settings #status{margin-left:auto}.presets{flex-wrap:wrap}header{margin-bottom:14px}@media(max-width:800px){.comparison{height:420px}.toolbar{gap:8px}.portrait-label strong{font-size:17px!important}.portrait-note{max-width:calc(50% - 28px)}.settings #status{width:auto}}

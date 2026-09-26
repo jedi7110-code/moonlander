@@ -11,7 +11,8 @@ const data=JSON.parse(await readFile(new URL('../src/obs/milo-walk-cycle.json',i
 const body=await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url));
 await loadMiloBody(`data:application/json;base64,${body.toString('base64')}`);
 const character=()=>createMilo(new Proxy({},{get:(o,k)=>o[k]??=new MeshStandardMaterial()}));
-const idle={time:0,moving:false,climbing:false,facing:1,action:null};
+// Sample gait poses without advancing the independent heading and planted turn.
+const idle={time:0,dt:0,moving:false,climbing:false,facing:1,action:null};
 function pose(root,time){animateMilo(root,idle);applyMocapWalk(root,data,time);root.updateMatrixWorld(true);}
 
 test('the measured clip is compact, finite, traceable and periodically smooth',()=>{

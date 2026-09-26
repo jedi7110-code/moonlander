@@ -10,6 +10,7 @@ import {LOUNGE_EXIT_SECONDS,LOUNGE_ENTRY_SECONDS} from './lounge-exit.js';
 import {reclineProgress,RECLINE_EXIT_SECONDS} from './recline.js';
 import {GymVisit,GYM_TURN_SECONDS,GYM_TURN_DECAY} from './gym-visit.js';
 import {BunkVisit,BUNK_TRANSITION_DECAY} from './bunk-visit.js';
+import {HairGrowthClock,GroomingVisit} from './grooming-visit.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 export const OPENING_SLEEP_SECONDS=3;
@@ -29,8 +30,10 @@ export class CabinBrain extends Brain {
     this.baseWalkSpeed=this.actor.walkSpeed;this.baseClimbSpeed=this.actor.climbSpeed;
     this.bathroom=null;this.afterActivity=null;
     this.plants=new PlantBed();
+    this.harvestDelivery=null;this.kitchenGreens=0;
     this.dayMs=CABIN_PACE.dayMs;this.clock=8*this.dayMs/24;
     this.openingWake=null;
+    this.hairGrowth=new HairGrowthClock();this.grooming=null;
   }
   beginWakeUp(){
     if(this.bunkVisit)return false;
@@ -59,6 +62,9 @@ export class CabinBrain extends Brain {
   }
   update(dt){
     if(this.state==='playingGame')return;
+    const harvest=this.harvestDelivery;
+    const grooming=this.grooming;
+    this.hairGrowth.update(dt,Boolean(grooming));
     const exit=this.loungeExit;
     const gym=this.gymVisit;
     const bunk=this.bunkVisit;
@@ -82,6 +88,20 @@ export class CabinBrain extends Brain {
       for(const [need,rate]of [['energy',.6],['thirst',.35],['hygiene',.55]])this.needs[need]=Math.max(0,this.needs[need]-dt*rate);
     }
     super.update(dt);
+    if(harvest&&this.harvestDelivery===harvest){
+      if(harvest.phase==='pickup'){
+        harvest.age+=dt;
+        if(harvest.age>=1.4){harvest.phase='carrying';harvest.age=0;this.deliverHarvest();}
+      }else if(harvest.phase==='placing'){
+        harvest.age=Math.min(3.6,harvest.age+dt);
+        if(harvest.age>=2.5&&!harvest.deposited){this.kitchenGreens=harvest.count;harvest.deposited=true;}
+        if(harvest.age>=3.6){this.harvestDelivery=null;super._endPerform();this.finishDeparture();}
+      }
+    }
+    if(grooming&&this.grooming===grooming){
+      grooming.update(dt);
+      if(grooming.done){this.hairGrowth.reset();this.grooming=null;super._endPerform();this.finishDeparture();}
+    }
     if(!this.openingWake&&this.bunkVisit?.phase==='sleeping'&&this.needs.energy>=100)this._endPerform();
     if(gym&&this.gymVisit===gym)gym.update(dt);
     if(bunk&&this.bunkVisit===bunk)bunk.update(bunkDt);
@@ -108,15 +128,18 @@ export class CabinBrain extends Brain {
   }
   _maybeWant(){
     if(this.health.urgent){this._go(getStation('medical'));return;}
+    if(this.groomingQueued)return;
     if(this.care.depleted&&!this.care.delivery){this.requestSupplies();return;}
     if(this.care.delivery)return;
     super._maybeWant();
   }
   _choose(){
     if(this.health.urgent){this._go(getStation('medical'));return;}
+    if(this.groomingQueued)return;
     if(['goingToSupplyConsole','orderingSupply'].includes(this.state))return;
     if(this.plants.ready&&this.care.supplies.food<this.care.capacity.food&&Math.min(...Object.values(this.needs))>30&&!this.health.needsCare){this._go(getStation('plant'));return;}
     const ready=!this.health.needsCare&&this.needs.energy>30&&this.needs.thirst>25&&this.needs.hunger>25&&this.needs.hygiene>25&&this.needs.bladder>25;
+    if(ready&&this.hairGrowth.due){this.requestGrooming();return;}
     if(ready&&this.exercise<48&&(this.exercise<25||this.exercise<=Math.min(...Object.values(this.needs)))){this._go(getStation('gym'));return;}
     if(Math.min(...Object.values(this.needs))>CABIN_PACE.autonomousNeedThreshold&&this.exercise>=48){this.idleT=0;return;}
     super._choose();
@@ -124,7 +147,9 @@ export class CabinBrain extends Brain {
   _usable(station){return station.id!=='stereo'&&!(station.id==='gym'&&this.health.needsCare)&&super._usable(station);}
   _go(station){
     station=getStation(station?.id);if(!station)return false;
-    if(this.droidRoutine?.reserveForCrew(station.id,()=>this._go(station)))return true;
+    if(station.id==='grooming'&&(this.actStation==='grooming'||this.groomingQueued))return true;
+    this.cancelQueuedGrooming();
+    if(this.droidRoutine?.reserveForCrew(station.id,()=>{this.groomingQueued=false;this._go(station);})){this.groomingQueued=station.id==='grooming';return true;}
     if(station.id==='medical'&&this.state==='performing'&&this.cur?.id==='medical')return true;
     if(this.deferDeparture(()=>this._go(station)))return true;
     if(station.id!=='lounge')this.nextLeisure=null;
@@ -142,6 +167,10 @@ export class CabinBrain extends Brain {
     return true;
   }
   _startPerform(station,seated=false){
+    if(station.id==='grooming'){
+      this.cur=station;this.state='grooming';this.actKey='perform';this.actStation='grooming';this.recoverNeed=null;
+      this.grooming=new GroomingVisit(this.hairGrowth.progress);return;
+    }
     if(station.id==='bunk'&&!this.bunkVisit){
       this.cur=station;this.state='enteringBunk';this.actKey='perform';this.actStation='bunk';this.recoverNeed=null;
       this.bunkVisit=new BunkVisit({
@@ -195,6 +224,10 @@ export class CabinBrain extends Brain {
     if(this.cur?.id==='plant'){
       const count=this.plants.harvest(this.care);this.plants.tend();
       this.scene.obsUI?.plantResult?.(count);
+      if(count){
+        this.harvestDelivery={phase:'pickup',age:0,count,deposited:false};
+        this.state='harvestDelivery';this.recoverNeed=null;return;
+      }
     }
     if(this.bathroom){this.state='leavingBathroom';this.recoverNeed=null;this.bathroom.requestExit();return;}
     if(this.cur?.id==='medical'){
@@ -206,6 +239,9 @@ export class CabinBrain extends Brain {
     this.finishDeparture();
   }
   deferDeparture(callback){
+    this.cancelQueuedGrooming();
+    if(this.harvestDelivery){this.afterActivity=callback;return true;}
+    if(this.grooming){this.afterActivity=callback;return true;}
     if(this.bunkVisit){this.afterActivity=callback;this.state='leavingBunk';this.recoverNeed=null;this.bunkVisit.requestExit();return true;}
     if(this.loungeEntry){this.afterActivity=callback;return true;}
     if(this.reclineExit){this.afterActivity=callback;return true;}
@@ -228,6 +264,26 @@ export class CabinBrain extends Brain {
     return true;
   }
   finishDeparture(){const callback=this.afterActivity;this.afterActivity=null;callback?.();}
+  deliverHarvest(){
+    if(!this.harvestDelivery)return;
+    const go=()=>{
+      if(!this.harvestDelivery)return;
+      this.harvestDelivery.phase='carrying';this.actKey='going';this.actStation='galley';
+      // Put the greens on the clear right-hand preparation counter, not the hob.
+      this.actor.goTo({floor:2,x:(-10.0/.022)+700},()=>{
+        if(!this.harvestDelivery)return;
+        this.harvestDelivery.phase='placing';this.harvestDelivery.age=0;
+        this.actKey='perform';this.actStation='galley';
+      });
+    };
+    if(this.droidRoutine?.reserveForCrew('galley',go)){this.harvestDelivery.phase='waiting';return;}
+    go();
+  }
+  requestGrooming(){
+    if(this.health.critical){this._go(getStation('medical'));return false;}
+    return this._go(getStation('grooming'));
+  }
+  cancelQueuedGrooming(){if(this.groomingQueued){this.groomingQueued=false;if(this.droidRoutine)this.droidRoutine.crewRequest=null;}}
   beginLoungeExit(){
     if(!this.loungeExit)this.loungeExit={age:0,leisure:this.leisure,actionTime:Math.max(0,(this.curDurSec??0)-(this.performT??0)),duration:this.curDurSec??32};
     this.state='leavingLounge';this.actKey='perform';this.actStation='lounge';this.recoverNeed=null;
@@ -295,6 +351,9 @@ export class CabinBrain extends Brain {
       this._go(getStation('medical'));return this.health.needsCare?words('医療区画で手当てを受けてくる。','I will get treatment in the medical bay.'):words('医療区画で健診を受けてくる。','I will run a checkup in the medical bay.');
     }
     if(this.health.critical){this._go(getStation('medical'));return words('先に医療区画へ行く。もう作業を続けられない。','I need medical care first. I cannot keep working.');}
+    if(/散髪|バリカン|髭剃|ひげ剃|髪を切|髪を刈|haircut|shave|grooming/i.test(text)){
+      this.requestGrooming();return words('2階の洗面台で髪と髭を整えてくる。','I will cut my hair and shave at the washbasin on the second deck.');
+    }
     if(/野菜|菜園|栽培|収穫|プラント|plant|harvest|garden|vegetable/i.test(text)){
       this._go(getStation('plant'));return words('栽培棚を見てくる。育った野菜は収穫しよう。','I will check the plants and harvest any mature greens.');
     }

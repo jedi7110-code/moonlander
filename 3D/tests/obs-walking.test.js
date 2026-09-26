@@ -95,7 +95,8 @@ test('gait follows distance, not elapsed time, and action poses reset it',()=>{
   const root=character();pose(root,.2);const capture=()=>root.userData.legs.flatMap(({leg,knee,boot})=>[...leg.rotation.toArray(),...knee.rotation.toArray(),...boot.rotation.toArray()]);
   const first=capture();pose(root,.2,1,{time:90});assert.deepEqual(capture(),first);
   pose(root,.4);assert.notDeepEqual(capture(),first);
-  pose(root,.4,1,{moving:false,action:'hydro',actionTime:2,actionDuration:5});
+  // Isolate the action pose from the independently tested planted turn.
+  pose(root,.4,1,{moving:false,action:'hydro',actionTime:2,actionDuration:5,dt:0});
   for(const {leg,knee,boot}of root.userData.legs)assert.deepEqual([leg.rotation.x,knee.rotation.x,boot.rotation.x],[0,0,0]);
   assert.equal(root.userData.dining.mug.visible,true);
 });

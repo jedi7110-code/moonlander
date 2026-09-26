@@ -17,6 +17,9 @@ import {HATCH_TRAVEL} from './delivery.js';
 import {createWasteIncinerator} from './waste-incinerator.js';
 import {createScreenGlow} from './screen-glow.js';
 import {displayFrame} from './display-frame.js';
+import {createVanity} from './grooming.js';
+import {createMachinedMetals} from './machined-metals.js';
+import {createCargoStowage,createCargoVentilation} from './cargo-bay.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -28,6 +31,10 @@ export const RECESSED_OPENINGS=['shower','toilet','hatch'].map(id=>{
   return{id,floor:station.floor,left:x-half,right:x+half,bottom:y+.04,top:y+(id==='hatch'?2.22:2.56)};
 });
 export const HABITAT_VIEW={centerY:6.35,minHeight:16.1,panMinY:-.6,panMaxY:13.4};
+export function groomingGateBounds(){
+  const gate=REAR_ROOM_GATES[DECK.HABITATION];
+  return new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(gate.x,gate.floor+1.31,gate.front+.06),new THREE.Vector3(2.12,2.66,.24));
+}
 
 export function createDeckFloor(m,y,level){
   const root=new THREE.Group();root.name='Deck floor '+level;
@@ -197,7 +204,9 @@ function hatch(parent,animated,m,x,y) {
   for(const h of [.15,2.17])box(parent,m.metal,x,y+h,-2.51,1.80,.10,1.68);
   const door=new THREE.Group();door.position.set(x-.85,y,-1.67);animated.add(door);
   door.name='Pocket supply shutter';
-  box(door,m.enamel,.85,1.15,0,1.7,1.92,.10,.10);
+  const paint=m.enamel.clone();paint.name='Industrial / oxblood supply hatch';
+  paint.color.setHex(0x793537);paint.roughness=.72;paint.metalness=.24;
+  box(door,paint,.85,1.15,0,1.7,1.92,.10,.10).name='Oxblood supply hatch leaf';
   box(door,m.dark,.85,1.63,.065,.6,.40,.025,.05);
   box(door,m.dark,.85,.96,.057,.45,.12,.016,.012);
   box(door,m.metal,.85,.98,.07,.30,.028,.024,.007);
@@ -305,6 +314,12 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
     gateWall(staticRoot,m.enamel,{left:-3.435,right:-.405,bottom:g.floor+.07,top:g.floor+2.81,z:-1.68,depth:.12,openingClearance:.02,gates:[g]});
     const gate=createBulkheadGate(m,g,sourceMaterials);staticRoot.add(gate.root);animated.add(gate.lights);
   }
+  const groomingStation=createVanity(m,createMachinedMetals()),groomingGate=REAR_ROOM_GATES[DECK.HABITATION];
+  groomingStation.origin=new THREE.Vector3(groomingGate.x,groomingGate.floor,0);
+  groomingStation.root.position.add(groomingStation.origin);staticRoot.add(groomingStation.root);
+  // Keep the fixture batched with the cabin; only the mirror and tool mounts need transforms.
+  staticRoot.updateMatrixWorld(true);
+  for(const mount of [groomingStation.mirror,...Object.values(groomingStation.docks)])animated.attach(mount);
   for(const [level,y]of FLOOR_Y.entries())catPort(staticRoot,m,positionX(CAT_PORT.x),y,level);
   // The upper shaft is a visible continuation, not an additional playable deck.
   const ladder=createAccessLadder(m);staticRoot.add(ladder);
@@ -351,20 +366,15 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
   }
   engine(staticRoot,m,5.65,0);
   const supplyHatch=hatch(staticRoot,animated,m,positionX(1110),0);
-  for(let i=0;i<3;i++)box(staticRoot,i===1?m.teal:m.olive,11.78,.26+i*.48,-.61,1.23,.46,.89,.07);
+  staticRoot.add(createCargoStowage(m));
   const bowlX=positionX(CAT_BOWL.x),bowlY=FLOOR_Y[CAT_BOWL.floor],bowlZ=CAT_BOWL.depth;
   cylinder(staticRoot,m.metal,bowlX,bowlY+.07,bowlZ,.16,.10,.20,28);
   cylinder(staticRoot,m.dark,bowlX,bowlY+.121,bowlZ,.16,.012,.16,28);
   const foodGroup=new THREE.Group();foodGroup.position.set(bowlX,bowlY,bowlZ);animated.add(foodGroup);
   const catFood=new THREE.MeshStandardMaterial({name:'Cat food / brown kibble',color:CAT_BOWL.foodColor,roughness:.9});
   for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,catFood,Math.cos(a)*r,CAT_BOWL.foodHeight,Math.sin(a)*r,.025,.018,.022);}
-  const fan=new THREE.Group();fan.position.set(12.08,2.14,-1.32);animated.add(fan);
-  const fanRim=new THREE.Mesh(new THREE.TorusGeometry(.34,.039,12,36),m.metal);fan.add(fanRim);
-  // Four radial blades, not four full diameters superimposed at the hub.
-  for(let i=0;i<4;i++){
-    const angle=i*Math.PI/2,blade=box(fan,m.dark,-Math.sin(angle)*.19,Math.cos(angle)*.19,0,.14,.25,.035,.017);
-    blade.rotation.z=angle;
-  }
+  const ventilation=createCargoVentilation(m),fan=ventilation.rotor;
+  staticRoot.add(ventilation.root);animated.add(fan);
   const cargo=[];
   ['food','water','catfood'].forEach((key,i)=>{
     const group=new THREE.Group();group.name='Delivery '+key;group.position.set(positionX(1110)+(i-1)*.70,.675,.32);group.visible=false;animated.add(group);
@@ -384,14 +394,14 @@ export function buildShip(sourceMaterials,{mergeStatic=true}={}) {
   STATIONS.forEach(({id,x,floor:level})=>{
     const w=id==='galley'?3.06:id==='plant'?2.90:id==='medical'?5.10:id==='eva'?3.65:['airlock','innerHatch'].includes(id)?.62:1.9;
     const fixtureX=id==='galley'?-10.05:id==='airlock'?evaBay.hatch.position.x:id==='innerHatch'?evaBay.innerHatch.position.x:id==='medical'?MED_BED.x-.52:positionX(x);
-    const bounds=id==='plant'?new THREE.Box3().setFromObject(plants.root).expandByScalar(.04):id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
+    const bounds=id==='grooming'?groomingGateBounds():id==='plant'?new THREE.Box3().setFromObject(plants.root).expandByScalar(.04):id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
     const {mesh,group,material}=createStationInteraction(id,bounds,pickMaterial);
-    if(id!=='lounge')group.position.z=1.75;
+    if(id!=='lounge'&&id!=='grooming')group.position.z=1.75;
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
   addCabinDressing(staticRoot,m,FLOOR_Y);
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
-  return {staticMesh:mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk,washerDoor,washerClothes,incinerator};
+  return {staticMesh:mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation};
 }
