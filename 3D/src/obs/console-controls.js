@@ -55,7 +55,8 @@ function indicator(parent,m,x,y,color=2,w=.025,h=.018){
 }
 function key(parent,m,x,y,{color=null,ivory=false,w=.039,h=.037}={}){
   box(parent,m.socket,x,y,.018,w+.009,h+.009,.021);
-  box(parent,color===null?(ivory?m.ivory:m.key):m.lenses[color],x,y,.034,w,h,.025,.003).name='Console pushbutton';
+  // Plain caps: a 3 mm corner radius is invisible from the cabin cameras but costs 25x the triangles.
+  box(parent,color===null?(ivory?m.ivory:m.key):m.lenses[color],x,y,.034,w,h,.025).name='Console pushbutton';
   // A short engraved key legend is visible even on the unlit caps.
   box(parent,color===null?m.socket:m.ivory,x,y-.003,.047,w*.37,.002,.001);
 }

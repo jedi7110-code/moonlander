@@ -184,3 +184,23 @@ export function batchStatic(root,{xrLOD=false}={}) {
     }
     merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
 }
+
+// The shadow pass costs one draw per material batch (135 in the cabin); triangles
+// barely matter. One position-only copy of every opaque front-sided batch casts the
+// identical shadow in a single draw, while the batches keep receiving shadows.
+// Three r155 calls onBeforeRender in every visible pass but not in its shadow pass,
+// so an empty draw range there keeps the proxy out of all visible views.
+export function createStaticShadowProxy(batches){
+  const casters=batches.children.filter(({isMesh,castShadow,material:mat})=>isMesh&&castShadow&&!Array.isArray(mat)&&
+    mat.side===THREE.FrontSide&&mat.shadowSide==null&&!mat.transparent&&!(mat.alphaTest>0)&&!mat.alphaMap);
+  if(!casters.length)return null;
+  batches.updateMatrixWorld(true);
+  const geometry=mergeGeometries(casters.map(mesh=>new THREE.BufferGeometry()
+    .setAttribute('position',mesh.geometry.attributes.position.clone()).applyMatrix4(mesh.matrixWorld)),false);
+  for(const mesh of casters)mesh.castShadow=false;
+  const proxy=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial());
+  proxy.name='Cabin shadow proxy';proxy.castShadow=true;proxy.frustumCulled=false;
+  proxy.onBeforeRender=()=>{geometry.drawRange.count=0;};
+  proxy.onAfterRender=()=>{geometry.drawRange.count=Infinity;};
+  return proxy;
+}

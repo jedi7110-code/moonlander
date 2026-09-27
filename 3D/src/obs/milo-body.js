@@ -38,6 +38,8 @@ vec2 miloFrontFolds(vec3 p){
 `;
 
 let bodyData=null,tattooMaps=null,tattooRightUpper=null,shirtBackPrint=null;
+// Pose changes only flag the skin bounds; the next raycast recomputes them.
+export function invalidateMiloSkinBounds(skin){if(skin)skin.userData.poseBoundsStale=true;}
 export function sampleMiloNeckline(geometry){
   if(!geometry)return null;
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
@@ -425,6 +427,12 @@ export function attachMiloBody(root,m,pants,legacy){
   material.customProgramCacheKey=()=> 'milo-continuous-body-tshirt-trousers-tattoos-bruise-v28-upper-tattoo-visible';
   const mesh=new THREE.SkinnedMesh(geometry,material);mesh.name='Continuous sample-based human body';
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;body.add(mesh);
+  // Only raycasts need pose-accurate bounds. Discarding them every frame made the
+  // renderer's depth sort CPU-skin all body vertices again on every frame.
+  mesh.raycast=function(raycaster,intersects){
+    if(this.userData.poseBoundsStale){this.boundingBox=null;this.boundingSphere=null;this.userData.poseBoundsStale=false;}
+    THREE.SkinnedMesh.prototype.raycast.call(this,raycaster,intersects);
+  };
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});
   mesh.customDepthMaterial.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vBodyPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvBodyPosition=position;');

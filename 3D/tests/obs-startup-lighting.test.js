@@ -241,3 +241,27 @@ test('restarting and disposing lighting restores shaders without accumulating ho
   }
   geometry.dispose();material.dispose();
 });
+
+test('short-range fills marked for shaders light lit materials in range with the PointLight falloff',()=>{
+  const root=new Group(),geometry=new BoxGeometry(),lit=new MeshStandardMaterial(),basic=new MeshBasicMaterial();
+  root.add(new Mesh(geometry,lit),new Mesh(geometry,basic));root.position.set(1,2,3);
+  const fill=new PointLight(0xffcb9c,4,4.2,2);fill.position.set(0,1.66,.4);fill.userData.cabinShaderLight=true;
+  const ordinary=new PointLight(0xffffff,40,20,2);root.add(fill,ordinary);
+  const effect=new CabinStartupLighting([root],{start:false}),{on,positions,colors,falloff}=effect.shaderLights;
+  assert.equal(on.value,1);assert.equal(positions.value.length,1,'only marked lights move into the shaders');
+  assert.deepEqual(positions.value[0].toArray(),[1,3.66,3.4],'world position');
+  assert.deepEqual(colors.value[0].toArray(),fill.color.clone().multiplyScalar(4).toArray(),'colour times intensity, like PointLight');
+  assert.deepEqual(falloff.value[0].toArray(),[4.2,2]);
+  const compile=(material,source)=>{const shader={uniforms:{},vertexShader:source.vertexShader,fragmentShader:source.fragmentShader};material.onBeforeCompile(shader);return shader;};
+  const standard=compile(lit,ShaderLib.standard);
+  assert.equal(standard.uniforms.cabinShaderLightPositions,positions,'shared uniforms, no per-material copies');
+  assert.match(standard.fragmentShader,/#define CABIN_SHADER_LIGHTS 1/);
+  const loop=standard.fragmentShader.indexOf('RE_Direct(directLight, geometry, material, reflectedLight);');
+  assert.ok(loop>0&&loop<standard.fragmentShader.indexOf('#include <lights_fragment_end>'),'added to the direct light sum before indirect light');
+  assert.match(standard.fragmentShader,/if \(lightDistance < cabinShaderLightFalloff\[i\]\.x\)/,'pixels out of range skip the light');
+  assert.match(standard.fragmentShader,/getDistanceAttenuation\(lightDistance, cabinShaderLightFalloff\[i\]\.x, cabinShaderLightFalloff\[i\]\.y\)/);
+  const unlit=compile(basic,ShaderLib.basic);
+  assert.doesNotMatch(unlit.fragmentShader,/CABIN_SHADER_LIGHTS/);assert.equal(unlit.uniforms.cabinShaderLightPositions,undefined);
+  assert.notEqual(lit.customProgramCacheKey(),basic.customProgramCacheKey());
+  effect.dispose();geometry.dispose();lit.dispose();basic.dispose();
+});

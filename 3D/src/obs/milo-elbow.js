@@ -1,4 +1,5 @@
 import {Bone,MathUtils,Matrix4,Skeleton} from 'three';
+import {invalidateMiloSkinBounds} from './milo-body.js';
 
 // Preserve the approved study hinge, skin weights and inner crease in OBS.
 export const ELBOW_CENTRE_Z=-.054;
@@ -104,7 +105,7 @@ export function attachMiloElbow(root){
       rig.bend=2*Math.acos(MathUtils.clamp(Math.abs(rig.elbow.quaternion.w),0,1));
     }
     updateSurface(skin.geometry,rigs);
-    skin.boundingBox=null;skin.boundingSphere=null;
+    invalidateMiloSkinBounds(skin);
   }
   root.userData.updateWristTwists=update;update();
   return root.userData.elbowDeformation={geometry,changed,update,dispose(){

@@ -29,7 +29,7 @@ import {applySeatedLegSpread} from './seated-pose.js';
 import {attachMiloSpine,updateMiloSpine} from './milo-spine.js';
 import {attachMiloNeck,setMiloNeckProtraction,updateMiloNeck} from './milo-neck.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
-import {attachMiloBody} from './milo-body.js';
+import {attachMiloBody,invalidateMiloSkinBounds} from './milo-body.js';
 import {attachMiloElbow} from './milo-elbow.js';
 import {attachMiloWatch,updateMiloWatch} from './milo-watch.js';
 import {attachMiloBioSensor,updateMiloBioSensor} from './milo-bio-sensor.js';
@@ -339,7 +339,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   updateMiloWatch(root,shipHour);
   updateMiloBioSensor(root,health);
   // Raycast bounds must follow the current pose, not the first observed pose.
-  if(root.userData.bodySkin){root.userData.bodySkin.boundingBox=null;root.userData.bodySkin.boundingSphere=null;}
+  invalidateMiloSkinBounds(root.userData.bodySkin);
 }
 
 function coatBall(parent,material,x,y,z,w,h,d){

@@ -126,3 +126,26 @@ test('feeding finishes when a hungry cat reaches the bowl behind the droid, with
     assert.equal(care.catBowl,0);assert.equal(care.supplies.catfood,2,'neither waiting nor feeding duplicates or wastes food');
   }
 });
+
+test('a cat still on its way from another deck does not hold the droid at the bowl with food in hand',()=>{
+  const dt=1/60,care=new Supplies(),actor=new CrewMotion({floor:0,x:1000}),cat=new CatRoutine(care,{random:()=>.5});
+  cat.motion=new CatMotion({floor:1,x:900});cat.rest('look',1000);cat.hunger=100;
+  const routine=new DroidRoutine({care,actor,cat,brain:{plants:{ready:0}}});
+  assert.ok(routine.request('feed'));
+  let meals=0;const eat=care.eatCatFood.bind(care);care.eatCatFood=()=>{const ate=eat();if(ate)meals++;return ate;};
+  const step=()=>{
+    actor.waitingForDroid=routine.blocksCrew(actor,dt);advanceCabinTraffic(actor,cat,dt,routine);routine.update(dt);if(routine.docked)routine.restUntil=Infinity;
+    const c=cat.motion,p=routine.position;
+    if(!c.hidden&&Math.abs((870-c.y)*.016+c.elevation-p.y)<.5)assert.ok(Math.hypot((c.x-LADDER_X)*.022-p.x,c.z-p.z)>.62,'Lucy queues clear of the pouring droid');
+  };
+  for(let time=0;time<120&&routine.step?.kind!=='guard';time+=dt)step();
+  assert.equal(routine.step?.kind,'guard');assert.equal(routine.carriedFood,true);
+  cat.fetch();assert.ok(cat.mode==='fetch'||cat.pendingMove?.kind==='fetch','Lucy is heading for the bowl');
+  let held=0;
+  for(;held<10&&routine.step?.kind==='guard';held+=dt)step();
+  assert.ok(held<.5,`the droid pours instead of standing ${held.toFixed(1)} s until Lucy arrives`);
+  for(let time=0;time<180&&(!routine.docked||!meals);time+=dt)step();
+  assert.ok(routine.docked);assert.equal(routine.completed.feed,1);
+  assert.equal(meals,1,'Lucy eats the delivered portion once');
+  assert.equal(care.catBowl,0);assert.equal(care.supplies.catfood,2,'no food is duplicated or lost');
+});

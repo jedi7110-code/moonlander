@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_AMBIENCE,limitCabinLights} from './lighting.js';
+import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_AMBIENCE,limitCabinLights,limitShadowCasters} from './lighting.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {materials} from './materials.js';
+import {materials,createStaticShadowProxy} from './materials.js';
 import {buildShip,positionX,positionY,HABITAT_VIEW} from './ship.js';
 import {createMilo,animateMilo} from './characters.js';
 import {loadCabinLucy as loadLucy,createCabinLucy as createLucy,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
@@ -57,7 +57,7 @@ export class ObservationView {
       view.cabinToon=createCabinToon(roots);
       view.cabinToon.setStyle(cabinStyle);
       // Practical lighting also exists in studies that don't replay startup.
-      view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat],{reducedMotion:view.reducedMotion,start:false});
+      view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,start:false});
       if(characterViews)view.characterCamera=new CharacterCamera(view);
       return view;
     }catch(error){view.dispose();throw error;}
@@ -75,6 +75,7 @@ export class ObservationView {
     const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
     this.ship=buildShip(m,{floorBuilder});limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
+    this.shadowProxy=createStaticShadowProxy(this.ship.staticMesh);if(this.shadowProxy)this.scene.add(this.shadowProxy);
     this.droidBay=createDroidChargingBay(positionY(FLOORS[DROID_DOCK.floor].y));this.scene.add(this.droidBay.root);
     this.droidService=createDroidServiceRig(this.droidBay,this.ship);this.scene.add(this.droidService.root);
     // Preserve the powered-down pose until the live routine is attached.
@@ -103,11 +104,12 @@ export class ObservationView {
     this.listeners=[];this.bindControls();
     const stars=new Float32Array(420*3);for(let i=0;i<420;i++){stars[i*3]=(Math.sin(i*162.2)*.5)*90;stars[i*3+1]=(Math.sin(i*714.1)*.5)*52+5;stars[i*3+2]=-9-Math.abs(Math.sin(i))*10;}
     const starGeo=new THREE.BufferGeometry();starGeo.setAttribute('position',new THREE.BufferAttribute(stars,3));this.scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0x9bafb5,size:.028,transparent:true,opacity:.36})));
+    limitShadowCasters(this.scene);
   }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
   startLighting(){
     if(this.startupLighting){this.startupLighting.restart(this.reducedMotion);return;}
-    this.startupLighting=new CabinStartupLighting([this.ship.staticMesh,this.ship.animated,this.droidBay.root,this.droidService.root,this.milo,this.cat],{reducedMotion:this.reducedMotion});
+    this.startupLighting=new CabinStartupLighting([this.ship.staticMesh,this.ship.animated,this.droidBay.root,this.droidService.root,this.harvestDelivery.root,this.milo,this.cat,this.mouse.root],{reducedMotion:this.reducedMotion});
   }
   targetAt(event){
     const rect=this.canvas.getBoundingClientRect();this.pointer.set((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);this.raycaster.setFromCamera(this.pointer,this.camera);
@@ -298,5 +300,5 @@ export class ObservationView {
     try{this.renderer.render(this.scene,this.camera);}
     finally{quality?.endFrame();}
   }
-  dispose(){this.characterCamera?.dispose();this.catRun?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

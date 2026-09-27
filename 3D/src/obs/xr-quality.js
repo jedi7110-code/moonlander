@@ -32,6 +32,8 @@ export class ObservationXRQuality {
     this.endFrame();
     if(this.view.renderer.shadowMap)this.set(this.view.renderer.shadowMap,'enabled',false);
     for(const light of this.lights)this.set(light,'visible',false);
+    const shaderLights=this.view.startupLighting?.shaderLights;
+    if(shaderLights)this.set(shaderLights.on,'value',0);
     const wide=mode==='all';
     for(const mesh of this.ink){
       // Only the selected character keeps its ink pass in VR.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {Group,MeshStandardMaterial,Raycaster,Vector3} from 'three';
+import {Group,Matrix4,MeshStandardMaterial,Raycaster,Vector3} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {medicalTransferPose,medicalDuration,MED_BED} from '../src/obs/medical.js';
@@ -70,14 +70,19 @@ test('scan reuses the deformed surface while still refreshing changed bones and 
   const {patient,rig}=fixture(),skin=patient.userData.bodySkin;
   const time=MED_BED.transition+2;
   animateMilo(patient,{action:'medical',moving:false,time,actionTime:time});
-  let count=0;const vertex=skin.getVertexPosition.bind(skin);
-  skin.getVertexPosition=(i,p)=>{count++;return vertex(i,p);};
   const scan=age=>animateMedicalRig(rig,medicalTransferPose(time),age,{patient,scanning:true});
-  scan(2);assert.equal(count,skin.geometry.attributes.position.count);
-  count=0;scan(2.1);assert.equal(count,0,'moving beam alone does not re-skin the patient');
-  assert.ok(rig.surfaces.get(skin).mesh.geometry.drawRange.count<skin.geometry.index.count/10,'only the scan slice is ray-tested');
+  scan(2);
+  // The bulk bake must match three's own per-vertex skinning in cabin coordinates.
+  const surface=rig.surfaces.get(skin).mesh.geometry,position=surface.attributes.position,baked=position.version;
+  const toRig=new Matrix4().copy(rig.root.matrixWorld).invert().multiply(skin.matrixWorld),expected=new Vector3(),actual=new Vector3();
+  for(let i=0;i<position.count;i+=97){
+    skin.getVertexPosition(i,expected).applyMatrix4(toRig);
+    assert.ok(actual.fromBufferAttribute(position,i).distanceTo(expected)<1e-5,`vertex ${i} follows the skin`);
+  }
+  scan(2.1);assert.equal(position.version,baked,'moving beam alone does not re-skin the patient');
+  assert.ok(surface.drawRange.count<skin.geometry.index.count/10,'only the scan slice is ray-tested');
   patient.userData.arms[0].elbow.rotation.x-=.01;scan(2.2);
-  assert.equal(count,skin.geometry.attributes.position.count);
-  count=0;skin.geometry.attributes.position.needsUpdate=true;scan(2.3);
-  assert.equal(count,skin.geometry.attributes.position.count);
+  assert.equal(position.version,baked+1,'changed bones re-skin the patient once');
+  skin.geometry.attributes.position.needsUpdate=true;scan(2.3);
+  assert.equal(position.version,baked+2,'changed geometry re-skins the patient once');
 });

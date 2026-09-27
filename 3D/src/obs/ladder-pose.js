@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {setLadderHandFit,fitLadderGripContact,fitLadderWatch} from './ladder-hand-fit.js';
 import {solveHingeArm} from './arm-ik.js';
+import {invalidateMiloSkinBounds} from './milo-body.js';
 
 // Shared by the cabin and the reproducible Milo study.
 export const LADDER={spacing:.28,width:.72,depth:.30,radius:.028,duration:4};
@@ -128,7 +129,7 @@ export function applyLadderPose(root,time,options={}){
   fitLadderGripContact(root,sample.contacts,LADDER.radius,poseGrip);
   root.userData.elbowDeformation?.update();
   fitLadderWatch(root);
-  if(root.userData.bodySkin){root.userData.bodySkin.boundingBox=null;root.userData.bodySkin.boundingSphere=null;}
+  invalidateMiloSkinBounds(root.userData.bodySkin);
   return sample;
 }
 

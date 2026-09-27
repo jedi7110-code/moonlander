@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {Group,Matrix3,Matrix4,Mesh,MeshStandardMaterial,Vector3} from 'three';
+import {Group,Matrix3,Matrix4,Mesh,MeshStandardMaterial,Raycaster,Vector3} from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {headGeometry} from '../src/obs/head.js';
 import {loadMiloBody,sampleMiloNeckline} from '../src/obs/milo-body.js';
@@ -433,4 +433,20 @@ test('twisted wrist shading follows the relaxed surface rather than the bind-spa
     assert.ok(sum.normalize().dot(normal)>.995,'skinned normals must agree with the actual unbroken forearm surface');checked++;
   }
   assert.ok(checked>300);geometry.dispose();
+});
+
+test('pointer bounds follow new poses without being rebuilt every frame',()=>{
+  const root=character(),skin=root.userData.bodySkin,ray=new Raycaster();
+  const settle=()=>{root.updateMatrixWorld(true);skin.skeleton.update();};
+  const pick=point=>{ray.set(new Vector3(point.x,point.y,point.z+3),new Vector3(0,0,-1));return ray.intersectObject(skin,false).length>0;};
+  animateMilo(root,{action:'idle',moving:false,time:1,actionTime:1});settle();
+  assert.ok(pick(new Vector3(0,1.2,0)),'standing torso is pickable');
+  // The renderer's depth sort rebuilds a missing sphere by skinning every vertex.
+  const bounds=skin.boundingSphere;
+  animateMilo(root,{action:'idle',moving:false,time:1.1,actionTime:1.1});settle();
+  assert.equal(skin.boundingSphere,bounds,'posing keeps the cached bounds');
+  assert.ok(pick(new Vector3(0,1.2,0)));
+  // A raised hand leaves the standing bounds; the elbow update alone must refresh them.
+  root.userData.arms[0].arm.rotation.set(Math.PI,0,0);root.userData.updateWristTwists();settle();
+  assert.ok(pick(root.userData.arms[0].hand.getWorldPosition(new Vector3())),'raised hand is pickable');
 });

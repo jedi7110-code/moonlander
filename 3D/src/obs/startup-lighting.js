@@ -1,5 +1,6 @@
 // Cabin-space lighting: a ceiling power-up mask plus always-on practical spill.
 // No extra real-time lights or draw calls, including in Quest's culled-light mode.
+import {Color,Vector2,Vector3} from 'three';
 import {LADDER_LIGHT_LAYOUT,EVA_SPOT_LAYOUT} from './lighting.js';
 export const STARTUP_LIGHT_DELAY=1;
 export const STARTUP_LIGHT_SECONDS=1.6;
@@ -135,11 +136,52 @@ const fragmentHeader=`
   #endif
 `;
 
+// Short-range point lights (see limitCabinLights) evaluated in the material's own
+// RE_Direct, exactly like three's PointLight, but only by pixels within range:
+// three's forward loop charges every lit pixel of the ship for every light.
+const shaderLightHeader=count=>`
+  #define CABIN_SHADER_LIGHTS ${count}
+  uniform float cabinShaderLightsOn;
+  uniform vec3 cabinShaderLightPositions[CABIN_SHADER_LIGHTS];
+  uniform vec3 cabinShaderLightColors[CABIN_SHADER_LIGHTS];
+  uniform vec2 cabinShaderLightFalloff[CABIN_SHADER_LIGHTS];
+`;
+const shaderLightLoop=`
+  #ifdef RE_Direct
+    if (cabinShaderLightsOn > 0.5) {
+      for (int i = 0; i < CABIN_SHADER_LIGHTS; i++) {
+        vec3 toLight = cabinShaderLightPositions[i] - vCabinBootWorld;
+        float lightDistance = length(toLight);
+        // Both attenuation models reach exactly zero at the cutoff distance.
+        if (lightDistance < cabinShaderLightFalloff[i].x) {
+          directLight.direction = normalize((viewMatrix * vec4(toLight, 0.0)).xyz);
+          directLight.color = cabinShaderLightColors[i] * getDistanceAttenuation(lightDistance, cabinShaderLightFalloff[i].x, cabinShaderLightFalloff[i].y);
+          #ifdef LEGACY_LIGHTS
+            directLight.color *= PI;
+          #endif
+          directLight.visible = true;
+          RE_Direct(directLight, geometry, material, reflectedLight);
+        }
+      }
+    }
+  #endif
+  #include <lights_fragment_end>
+`;
+
 export class CabinStartupLighting {
   constructor(roots,{reducedMotion=false,start=true}={}){
     this.reducedMotion=reducedMotion;this.time=0;this.done=false;this.materials=[];
     this.active={value:1};this.levels={value:new Float32Array(STARTUP_CIRCUITS)};
     this.roomLevels={value:new Float32Array(STARTUP_CIRCUITS)};
+    const lights=[];
+    for(const root of roots)root?.traverse(light=>{if(light.isPointLight&&light.userData.cabinShaderLight)lights.push(light);});
+    // XR switches these off together with the scene's real point lights.
+    this.shaderLights={
+      on:{value:1},
+      positions:{value:lights.map(light=>light.getWorldPosition(new Vector3()))},
+      colors:{value:lights.map(light=>new Color().copy(light.color).multiplyScalar(light.intensity))},
+      falloff:{value:lights.map(light=>new Vector2(light.distance,light.decay))},
+    };
     const materials=new Set();
     for(const root of roots)root?.traverse(mesh=>{
       if(!mesh.isMesh||/toon outline$/.test(mesh.name))return;
@@ -152,6 +194,7 @@ export class CabinStartupLighting {
       const compile=material.onBeforeCompile,key=material.customProgramCacheKey,baseKey=key.call(material);
       const fixture=material.emissiveIntensity>1||/diffuser|light lens/i.test(material.name);
       const spill=!fixture&&!material.isMeshBasicMaterial;
+      const lit=lights.length&&!material.isMeshBasicMaterial;
       const effect=this;
       const wrapped=function(shader,renderer){
         compile.call(this,shader,renderer);
@@ -159,6 +202,11 @@ export class CabinStartupLighting {
         if(!shader.vertexShader.includes('#include <project_vertex>')||!shader.fragmentShader.includes('#include <tonemapping_fragment>'))return;
         shader.uniforms.cabinBootActive=effect.active;shader.uniforms.cabinBootLevels=effect.levels;shader.uniforms.cabinBootRoomLevels=effect.roomLevels;
         shader.vertexShader=vertexHeader+shader.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n'+vertexPosition);
+        if(lit&&shader.fragmentShader.includes('#include <lights_fragment_end>')){
+          const {on,positions,colors,falloff}=effect.shaderLights;
+          Object.assign(shader.uniforms,{cabinShaderLightsOn:on,cabinShaderLightPositions:positions,cabinShaderLightColors:colors,cabinShaderLightFalloff:falloff});
+          shader.fragmentShader=shaderLightHeader(lights.length)+shader.fragmentShader.replace('#include <lights_fragment_end>',shaderLightLoop);
+        }
         shader.fragmentShader=(fixture?'#define CABIN_BOOT_FIXTURE\n':'')+(spill?'#define CABIN_PRACTICAL_SPILL\n':'')+fragmentHeader+shader.fragmentShader.replace('#include <tonemapping_fragment>',
           `if (cabinBootActive > 0.5) gl_FragColor.rgb *= cabinBootPower();
           #ifdef CABIN_PRACTICAL_SPILL
@@ -166,7 +214,7 @@ export class CabinStartupLighting {
           #endif
           #include <tonemapping_fragment>`);
       };
-      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v7-'+Number(fixture)+'-'+Number(spill);material.needsUpdate=true;
+      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v8-'+Number(fixture)+'-'+Number(spill)+'-'+(lit?lights.length:0);material.needsUpdate=true;
       this.materials.push({material,compile,key,wrapped});
     }
     if(!start)this.update(STARTUP_TOTAL_SECONDS);

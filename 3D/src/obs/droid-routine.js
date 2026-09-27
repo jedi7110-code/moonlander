@@ -59,7 +59,11 @@ export class DroidRoutine {
     // Finish the current refill and leave so Lucy can enter; an active crossing
     // or a cat already eating keeps priority over the droid.
     const yielding=this.job==='feed'&&this.cat?.motion?.waitingForDroid&&!this.cat.motion.crossing?.active;
-    return this.cat?.mode==='eat'||(fetching&&!yielding);
+    // With food in hand at the bowl, only a cat already eating holds the pour. A
+    // cat still on its way (possibly decks away) queues at the approach, and
+    // blocksDroid still keeps an active crossing clear.
+    const delivering=this.job==='feed'&&this.carriedFood;
+    return this.cat?.mode==='eat'||(fetching&&!yielding&&!delivering);
   }
   reserveForCrew(station,callback){
     if(this.station!==station){this.crewRequest=null;return false;}
