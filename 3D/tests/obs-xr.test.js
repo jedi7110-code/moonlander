@@ -89,6 +89,16 @@ test('head tracking owns the camera, focus follows translation, and ending resto
   s.immersive.dispose();
 });
 
+test('ending VR restores the desktop character angle and first-person choice',async()=>{
+  const s=setup();await s.immersive.ready;
+  const camera=s.view.characterCamera={selected:'cat',angle:'right',firstPerson:true,select(mode){this.selected=mode;this.angle='front';this.firstPerson=false;}};
+  const setMode=s.view.setMode.bind(s.view);s.view.setMode=mode=>{camera.select(mode);setMode(mode);};
+  await s.immersive.toggle();assert.equal(camera.selected,'all');assert.equal(camera.firstPerson,false);
+  s.view.setMode('droid');await s.session.end();
+  assert.equal(camera.selected,'cat');assert.equal(camera.angle,'right');assert.equal(camera.firstPerson,true);
+  s.immersive.dispose();
+});
+
 test('permission denial and renderer setup failures leave the desktop camera usable and permit retry',async()=>{
   for(const options of [{reject:{name:'NotAllowedError'}},{setupError:true}]){
     const s=setup(options);await s.immersive.ready;await s.immersive.toggle();

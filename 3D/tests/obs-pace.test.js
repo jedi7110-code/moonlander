@@ -5,6 +5,8 @@ import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,CatRoutine,getStation} from '../src/obs/state.js';
 import {CABIN_PACE} from '../src/obs/pace.js';
 import {BUNK_TRANSITION_DECAY} from '../src/obs/bunk-visit.js';
+import {LOUNGE_ENTRY_SECONDS,LOUNGE_EXIT_SECONDS,LOUNGE_TRANSITION_DECAY} from '../src/obs/lounge-exit.js';
+import {LOUNGE_STOW_SECONDS} from '../src/obs/lounge-handling.js';
 
 const setup=()=>{
   const care=new Supplies(),actor=new CrewMotion(),scene={time:{delayedCall(){}},sound:{add(){return{play(){},once(_event,fn){fn();},destroy(){}};}},obsUI:{hideWant(){},showWant(){},flashMonitor(){}}};
@@ -30,8 +32,19 @@ test('cat appetite slows without stretching movement or sleep recovery',()=>{
 });
 test('low physical needs shorten leisure and postpone exercise',()=>{
   const {brain}=setup();brain.needs.hunger=40;brain._startPerform(getStation('lounge'));assert.equal(brain.curDurSec,8);
-  brain.update(2.4);brain._endPerform();brain.update(2.8);Object.keys(brain.needs).forEach(key=>brain.needs[key]=80);brain.needs.hygiene=20;brain.exercise=1;
+  brain.update(LOUNGE_ENTRY_SECONDS);brain._endPerform();brain.update(LOUNGE_STOW_SECONDS);brain.update(LOUNGE_EXIT_SECONDS);
+  assert.equal(brain.state,'idle');Object.keys(brain.needs).forEach(key=>brain.needs[key]=80);brain.needs.hygiene=20;brain.exercise=1;
   brain._choose();assert.equal(brain.actStation,'shower');
+});
+test('lounge entry, putting items away and exit preserve the needs budget at their authored speed',()=>{
+  const {brain}=setup();brain.health.nextIncident=Infinity;brain._startPerform(getStation('lounge'));
+  const entryDecay=brain._decayMul('hunger');brain.update(1);assert.equal(brain.loungeEntry.age,1);
+  brain.update(LOUNGE_ENTRY_SECONDS-1);const seatedDecay=brain._decayMul('hunger');
+  assert.ok(Math.abs(entryDecay/seatedDecay-LOUNGE_TRANSITION_DECAY)<1e-9);
+  brain._endPerform();assert.ok(Math.abs(brain._decayMul('hunger')/seatedDecay-LOUNGE_TRANSITION_DECAY)<1e-9);
+  brain.update(1);assert.equal(brain.loungeStow.age,1);brain.update(LOUNGE_STOW_SECONDS-1);
+  assert.ok(Math.abs(brain._decayMul('hunger')/seatedDecay-LOUNGE_TRANSITION_DECAY)<1e-9);
+  brain.update(1);assert.equal(brain.loungeExit.age,1);
 });
 test('capsule boarding has a reduced depletion budget without speeding up the motion',()=>{
   const {brain}=setup();brain._startPerform(getStation('bunk'));

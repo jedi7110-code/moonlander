@@ -10,12 +10,15 @@ export const GROOMING={id:'grooming',floor:DECK.HABITATION,x:700-1.88/.022,need:
 export const MEDICAL={id:'medical',floor:DECK.OPERATIONS,x:912,need:null,dur:14000};
 export const CABIN_AISLE={crewZ:.78,catZ:2.20,deckBack:-1.81,deckFront:2.55,crossingClearance:48};
 export const HYDRO_TRAY={depth:.40,z:-.40,cupZ:-.28,standZ:.10};
-export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66};
+export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,turnInset:.65,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66};
 export const CAT_SCALE=.8;
 export const CAT_BOWL={floor:2,x:490,depth:.89,approachX:490+18*CAT_SCALE,foodHeight:.14,foodColor:0x7e5532};
 // Stand beyond the lower-hinged loading flap's forward sweep.
 export const WASTE_INCINERATOR={floor:2,x:-12.10,z:-.39,width:.80,height:.96,depth:.86,approachZ:1.02,depositAt:1.7,insertDuration:3.1,burnDuration:3};
 export const LOUNGE_SEAT={depth:.06,top:.48,centerDepth:-.10,cushionDepth:.60};
+export const LOUNGE_TABLE={x:8.25,z:1.03,width:1.51,depth:.80};
+// Enter from the open left end, then sidestep between the cushion and table.
+export const LOUNGE_ACCESS={sideX:-1.45,gapZ:.43};
 export const CAT_SOFA={floor:DECK.HABITATION,floorX:1005,seatX:1035,approachZ:.89};
 export const EVA={id:'eva',floor:DECK.OPERATIONS,x:1111,need:null,dur:8000};
 export const AIRLOCK={id:'airlock',floor:DECK.OPERATIONS,x:1260,need:null,dur:8000};

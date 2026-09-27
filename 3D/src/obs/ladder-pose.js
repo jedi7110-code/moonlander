@@ -18,7 +18,7 @@ const limbs=[
 const GRIP_ROTATION=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-2.8);
 export const LADDER_WRIST_OFFSET=new THREE.Vector3(0,-.0675,-.0355).applyQuaternion(GRIP_ROTATION).negate();
 const FINGER_GRIP=[[.675,.05,.535],[.89,.335,.445],[.99,.055,.26],[.575,.05,.05]];
-function poseGrip(rig,grip){
+export function poseGrip(rig,grip){
   for(const [i,finger]of rig.fingers.entries()){
     const angles=FINGER_GRIP[rig.side<0?3-i:i];
     finger.rotation.set(angles[0]*grip,0,0);finger.userData.links[0].rotation.set(angles[1]*grip,0,0);finger.userData.links[1].rotation.set(angles[2]*grip,0,0);
@@ -26,7 +26,7 @@ function poseGrip(rig,grip){
   rig.thumb.rotation.set(.85*grip,0,-rig.side*.10);rig.thumb.userData.ip.rotation.set(0,0,0);
 }
 
-function placeLadderHand(rig,target,inverseBody){
+export function placeLadderHand(rig,target,inverseBody){
   const {arm,elbow,hand}=rig;
   // Keep the elbow in a nearly sagittal plane, close to its own shoulder width.
   // A fixed downward pole stays continuous when the hand passes overhead.

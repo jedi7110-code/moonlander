@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import {box,ball} from './materials.js';
-import {placeHand} from './dining.js';
+import {box,ball,batchStatic} from './materials.js';
+import {solveArm} from './meal-pose.js';
+import {applyWalkingPose} from './walking.js';
 
-export const HARVEST_DOCK=new THREE.Vector3(-10.0,1.043,-.22);
+export const HARVEST_DOCK=new THREE.Vector3(-10.0,1.043,-.10);
 const smooth=(a,b,t)=>THREE.MathUtils.smoothstep(t,a,b),v=(...a)=>new THREE.Vector3(...a);
 
 export function createHarvestDelivery(m,scene){
@@ -19,15 +20,28 @@ export function createHarvestDelivery(m,scene){
       leaf.rotation.set(Math.cos(a)*.55,a,Math.sin(a)*.55);
     }
   }
+  const contents=batchStatic(tray);tray.clear();tray.add(contents);
   function update(milo,brain){
-    const delivery=brain.harvestDelivery,{body,arms}=milo.userData;
+    const delivery=brain.harvestDelivery,{body,arms,chest,head}=milo.userData;
     tray.visible=Boolean(delivery||brain.kitchenGreens);
     if(!tray.visible)return;
     if(!delivery){tray.position.copy(HARVEST_DOCK);tray.quaternion.identity();return;}
-    const age=delivery.age,placing=delivery.phase==='placing',pickup=delivery.phase==='pickup';
+    const placing=delivery.phase==='placing',pickup=delivery.phase==='pickup';
+    // Let the normal planted-foot turn face the counter before reaching for it.
+    const age=placing?Math.max(0,delivery.age-1.6):delivery.age;
+    if(placing){
+      const step=smooth(0,.8,age)*(1-smooth(2.8,3.6,age));
+      milo.position.z=.78-.35*step;
+      if(step>0&&step<1)applyWalkingPose(milo,.35*step);
+      const lean=.26*smooth(.5,1.4,age)*(1-smooth(2.6,3.5,age));
+      chest.rotation.x=lean;const pivot=v(0,1.08,0);
+      chest.position.copy(pivot).sub(pivot.clone().applyQuaternion(chest.quaternion));chest.updateMatrix();
+      for(const rig of arms)rig.arm.position.set(rig.side*.207,1.488,0).applyMatrix4(chest.matrix);
+      head.position.set(0,1.637,-.009).applyMatrix4(chest.matrix);head.rotation.x+=lean*.6;
+    }
     // Holding height follows the torso; the final approach lands on the counter.
     body.updateWorldMatrix(true,true);
-    const carried=body.localToWorld(v(0,1.03,.40)),rotation=body.getWorldQuaternion(new THREE.Quaternion());
+    const carried=body.localToWorld(v(0,1.13,.40)),rotation=body.getWorldQuaternion(new THREE.Quaternion());
     const deposit=placing?smooth(.65,2.5,age):0;
     tray.position.copy(carried).lerp(HARVEST_DOCK,deposit);
     tray.quaternion.copy(rotation).slerp(new THREE.Quaternion().setFromAxisAngle(v(0,1,0),Math.PI),deposit);
@@ -35,14 +49,15 @@ export function createHarvestDelivery(m,scene){
     tray.visible=!pickup||age>=.75;
     for(const rig of arms){
       const {arm,elbow,hand,fingers,thumb,side}=rig;
-      const before=[arm.quaternion.clone(),elbow.quaternion.clone(),hand.quaternion.clone()];
+      const restWrist=body.worldToLocal(hand.getWorldPosition(v()));
+      const restRotation=body.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(hand.getWorldQuaternion(new THREE.Quaternion()));
       const point=tray.localToWorld(v(side*.219,.060,0));
       const contact=body.worldToLocal(point);
-      const y=v(0,.22,-.975).normalize(),z=v(-side,0,0),x=y.clone().cross(z);
+      const y=v(0,.22,-.975).normalize(),z=v(side,0,0),x=y.clone().cross(z);
       const q=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,y,z));
-      const wrist=contact.sub(v(0,-.085,0).multiply(hand.scale).applyQuaternion(q));
-      placeHand(rig,wrist,q,0);
-      [arm,elbow,hand].forEach((joint,i)=>joint.quaternion.slerp(before[i],1-grip));
+      const wrist=restWrist.lerp(contact.sub(v(0,-.085,0).multiply(hand.scale).applyQuaternion(q)),grip),pose=solveArm(rig,wrist);
+      arm.quaternion.copy(pose.upper);elbow.quaternion.copy(pose.lower);
+      hand.quaternion.copy(pose.upper).multiply(pose.lower).invert().multiply(restRotation.slerp(q,grip));
       for(const finger of fingers){finger.rotation.x=.38*grip;finger.userData.links[0].rotation.x=.72*grip;finger.userData.links[1].rotation.x=.42*grip;}
       thumb.rotation.z=side*.24*grip;
     }

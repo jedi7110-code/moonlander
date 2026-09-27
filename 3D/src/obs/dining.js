@@ -5,6 +5,7 @@ import {relaxMiloHand} from './milo-hands.js';
 import {setCupHandFit,setMealHandFit} from './cup-hand-fit.js';
 import {reachMeal} from './meal-pose.js';
 import {CABIN_AISLE,HYDRO_TRAY} from './layout.js';
+import {createCupWater,updateCupWater} from './cup-water.js';
 
 const clamp=THREE.MathUtils.clamp,lerp=THREE.MathUtils.lerp;
 const smooth=value=>{const t=clamp(value,0,1);return t*t*(3-2*t);};
@@ -46,7 +47,7 @@ export function createDiningProps(body,m){
   lathe(mug,m.white,[[0,-.064],[.032,-.064],[.039,-.056],[.046,.059],[.045,.067],[.041,.068],[.039,.057],[.033,-.052],[0,-.052]],'Hollow enamel cup');
   const handle=new THREE.Mesh(new THREE.TorusGeometry(.032,.006,12,32),m.white);
   handle.position.set(.066,.003,0);handle.scale.y=1.18;mug.add(handle);
-  const water=ball(mug,m.water??m.metal,0,-.026,0,.033,.002,.033);water.name='Cup liquid surface';
+  const water=createCupWater();mug.add(water);
   lathe(bowl,steel,[[0,-.042],[.061,-.042],[.080,-.025],[.102,.034],[.108,.041],[.107,.047],[.102,.047],[.096,.035],[.074,-.023],[0,-.031]],'Open meal bowl');
   const mealMaterial=new THREE.MeshStandardMaterial({color:0xad8649,roughness:.92});
   const meal=ball(bowl,mealMaterial,0,.017,0,.088,.015,.088);
@@ -152,7 +153,8 @@ export function applyDiningPose(root,action,time,duration=action==='galley'?6:5,
     mug.position.copy(rest).lerp(contact,lift);
     dockProp(root,mug,docks?.mug,hold,v(.17,1.134,.40));
     reachCup(root,mug,reach,grasp);
-    water.visible=tilt<.35;water.position.y=-.026-.015*smooth((progress-.42)/.2);
+    const waterNormal=v(0,1,0).applyQuaternion(mug.getWorldQuaternion(new THREE.Quaternion()).invert());
+    updateCupWater(water,.047-.018*smooth((progress-.42)/.2),waterNormal);
     if(head.userData.setMouthMotion)head.userData.setMouthMotion(0,tilt>.6?.22:0);
     return;
   }

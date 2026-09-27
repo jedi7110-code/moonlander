@@ -4,9 +4,10 @@ import {cloneMiloSkinGeometry} from './milo-elbow.js';
 
 // Fit the imported fingers to their controllers before closing around the
 // small handle. Blend in while reaching, so the idle hand never changes shape
-// abruptly. The meal grip fits both hands; the cup still affects its side only.
+// abruptly. Meal grips fit both hands; cup and teaser grips affect only theirs.
 export const setCupHandFit=(root,weight)=>setHandFit(root,weight,1);
 export const setMealHandFit=(root,weight)=>setHandFit(root,weight,0);
+export const setTeaserHandFit=(root,weight)=>setHandFit(root,weight,-1);
 function setHandFit(root,weight,side){
   const skin=root.userData.bodySkin;if(!skin)return;
   let cache=root.userData.diningHandFit;

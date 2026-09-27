@@ -8,6 +8,7 @@ import {createDroid,DROID_SPEC} from '../src/obs/droid-model.js';
 import {sampleDroidServicePose,droidLadderContact,createDroidServiceRig} from '../src/obs/droid-service.js';
 import {createAccessLadder} from '../src/obs/ship.js';
 import {DROID_STARTUP_SECONDS} from '../src/obs/droid-startup.js';
+import {DROID_LADDER_LANDING,LADDER_ENTRY} from '../src/obs/pace.js';
 
 function setup(job){
   const care=new Supplies(),brain={plants:new PlantBed(),actStation:null},actor={x:1040,climbing:false};
@@ -288,15 +289,20 @@ test('ascending and descending hands show their backs to the camera and grip the
   }
 });
 
-test('ladder travel covers one deck in about 5.3 seconds in both directions',()=>{
+test('ladder travel retains its pace with a slower supported landing on each destination deck',()=>{
   const {routine}=setup('feed');
+  routine.travel(0,0,.34);routine.travel(1,0,1.34);
   const climbs=routine.steps.filter(s=>s.kind==='climb');
   assert.ok(climbs.some(s=>s.to.y>s.from.y)&&climbs.some(s=>s.to.y<s.from.y));
   for(const climb of climbs){
-    const perDeck=climb.duration/Math.abs(climb.to.floor-climb.from.floor);
+    const extra=LADDER_ENTRY.seconds-LADDER_ENTRY.droidHeight/(.40*DROID_PACE)+(climb.landingDuration?climb.landingDuration-DROID_LADDER_LANDING.height/(.40*DROID_PACE):0);
+    const perDeck=(climb.duration-extra)/Math.abs(climb.to.floor-climb.from.floor);
     assert.ok(perDeck>5&&perDeck<5.5,'a single deck is 1.6 times faster than the former 8.5 seconds');
+    assert.equal(Boolean(climb.landingDuration),climb.to.y<climb.from.y);
+    if(climb.to.y<climb.from.y)assert.equal(climb.to.z,climb.to.floor===2?.34:1.34,'destination is behind the opening');
   }
   while(routine.step.kind!=='climb')routine.update(.05);
+  routine.update(LADDER_ENTRY.seconds-routine.age);
   const from=routine.position.y,direction=Math.sign(routine.step.to.y-from);
   routine.update(1);
   assert.ok(Math.abs((routine.position.y-from)*direction-.40*DROID_PACE)<1e-6,'live motion advances at the faster planned speed');

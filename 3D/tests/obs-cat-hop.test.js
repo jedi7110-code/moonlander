@@ -26,7 +26,7 @@ test('retargeting a jump finishes the landing before reversing, including pause'
   const position=[cat.x,cat.elevation,cat.z],age=cat.hop.age;
   cat.update(0);cat.goTo({floor:2,x:800},()=>latest++);
   assert.deepEqual([cat.x,cat.elevation,cat.z],position);assert.equal(cat.hop.age,age);
-  advance(cat,35);assert.equal(old,0);assert.equal(latest,1);assert.equal(cat.floor,2);assert.equal(cat.elevation,0);assert.equal(cat.onSofa,false);
+  advance(cat,35+2*cat.passageWalkSeconds);assert.equal(old,0);assert.equal(latest,1);assert.equal(cat.floor,2);assert.equal(cat.elevation,0);assert.equal(cat.onSofa,false);
 });
 test('jump poses fold the legs in flight and recover without changing size',()=>{
   const material=new MeshStandardMaterial(),root=createCat(new Proxy({},{get:()=>material}));

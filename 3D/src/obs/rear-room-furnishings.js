@@ -63,8 +63,9 @@ function sweatshirtTrim(shirt,cloth,print){
 function workShirtTrim(shirt,cloth,leftPatch,rightPatch){
   const seam=cloth.clone();seam.name='Laundry / brown work shirt seams';seam.color.multiplyScalar(.64);
   const trim=cloth.clone();trim.name='Laundry / brown work shirt collar and flaps';trim.color.multiplyScalar(.91);
-  const panel=(name,points,z,material=cloth)=>{
+  const panel=(name,points,z,material=cloth,hole=null)=>{
     const shape=new THREE.Shape();shape.moveTo(...points[0]);for(const point of points.slice(1))shape.lineTo(...point);shape.closePath();
+    if(hole){const opening=new THREE.Path();opening.moveTo(...hole[0]);for(const point of hole.slice(1))opening.lineTo(...point);opening.closePath();shape.holes.push(opening);}
     const mesh=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.002,bevelEnabled:false,steps:1,curveSegments:1}),material);
     mesh.name=name;mesh.position.z=z;mesh.castShadow=mesh.receiveShadow=true;shirt.add(mesh);return mesh;
   };
@@ -79,10 +80,14 @@ function workShirtTrim(shirt,cloth,leftPatch,rightPatch){
     const positions=collar.geometry.attributes.position;
     for(let i=0;i<positions.count;i++)positions.setZ(i,positions.getZ(i)+(1.51-positions.getY(i))*.13);
     collar.geometry.computeVertexNormals();
-    panel('Work shirt pocket seam',[[x-.034,1.337],[x-.034,1.245],[x-.021,1.227],[x+.021,1.227],[x+.034,1.245],[x+.034,1.337]],.083,seam);
-    panel('Work shirt chest pocket',[[x-.032,1.335],[x-.032,1.246],[x-.020,1.230],[x+.020,1.230],[x+.032,1.246],[x+.032,1.335]],.085);
-    panel('Work shirt pocket flap',[[x-.034,1.338],[x-.034,1.315],[x-.022,1.302],[x+.022,1.302],[x+.034,1.315],[x+.034,1.338]],.088,trim);
-    button(x,1.318,.093);
+    const pocket=[[x-.032,1.335],[x-.032,1.246],[x-.020,1.230],[x+.020,1.230],[x+.032,1.246],[x+.032,1.335]];
+    // The seam is a border, not a second filled pocket behind the fabric.
+    // Both meet at one surface; the flap has enough clearance for the distant
+    // OBS camera's depth buffer as well as a close first-person view.
+    panel('Work shirt pocket seam',[[x-.034,1.337],[x-.034,1.245],[x-.021,1.227],[x+.021,1.227],[x+.034,1.245],[x+.034,1.337]],.085,seam,pocket);
+    panel('Work shirt chest pocket',pocket,.085);
+    panel('Work shirt pocket flap',[[x-.034,1.338],[x-.034,1.315],[x-.022,1.302],[x+.022,1.302],[x+.034,1.315],[x+.034,1.338]],.091,trim);
+    button(x,1.318,.096);
     // Anatomical right appears on the viewer's left, matching the supplied shirt.
     const width=side<0?.060:.074,aspect=side<0?544/1097:648/1574;
     const patch=new THREE.Mesh(new THREE.PlaneGeometry(width,width*aspect),side<0?rightPatch:leftPatch);

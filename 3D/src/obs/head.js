@@ -107,6 +107,7 @@ export function headGeometry(source,forward=0){
       n.setXYZ(i,nx/length,ny/length,nz/length);
     }
   }
+  geometry.setAttribute('headRestPosition',geometry.attributes.position.clone());
   indexed.dispose();geometry.computeBoundingBox();geometry.computeBoundingSphere();return geometry;
 }
 
@@ -258,12 +259,12 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
     shader.uniforms.facialHairStrength=facialHairStrength;
     shader.uniforms.proceduralHair=proceduralHair;
     shader.uniforms.napeTattoo={value:napeTattoo};
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;\nuniform float mouthMotion;').replace('#include <begin_vertex>',`#include <begin_vertex>
-      vHeadPosition = position;
-      float lipLine = 0.45 - pow(abs(position.x + 0.11), 2.0) * 0.20;
-      float jaw = (1.0 - smoothstep(lipLine - 0.025, lipLine + 0.025, position.y))
-        * smoothstep(-0.9, -0.2, position.y) * smoothstep(1.6, 2.1, position.z)
-        * (1.0 - smoothstep(0.55, 0.95, abs(position.x + 0.11)));
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 headRestPosition;\nvarying vec3 vHeadPosition;\nuniform float mouthMotion;').replace('#include <begin_vertex>',`#include <begin_vertex>
+      vHeadPosition = headRestPosition;
+      float lipLine = 0.45 - pow(abs(headRestPosition.x + 0.11), 2.0) * 0.20;
+      float jaw = (1.0 - smoothstep(lipLine - 0.025, lipLine + 0.025, headRestPosition.y))
+        * smoothstep(-0.9, -0.2, headRestPosition.y) * smoothstep(1.6, 2.1, headRestPosition.z)
+        * (1.0 - smoothstep(0.55, 0.95, abs(headRestPosition.x + 0.11)));
       transformed.y -= mouthMotion * 0.20 * jaw;
     `);
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;\nuniform sampler2D napeTattoo;\nuniform float facialHairStrength;\nuniform float proceduralHair;').replace('#include <color_fragment>',`#include <color_fragment>
@@ -286,7 +287,7 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
       ${NAPE_TATTOO_GLSL}
     `);
   };
-  material.customProgramCacheKey=()=> 'obs-milo-scan-v9-nape-tattoo';
+  material.customProgramCacheKey=()=> 'obs-milo-scan-v10-anchored-neck';
   const source=gltf.scene.getObjectByName('LeePerrySmith');
   if(!source?.isMesh)throw new Error('Milo head mesh is missing');
   const suppliedHair=await loadSuppliedHair(base+'supplied-hair/');
@@ -295,12 +296,12 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
   group.userData.faceForward=MILO_HEAD_FORWARD;
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});
   mesh.customDepthMaterial.onBeforeCompile=shader=>{
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvHeadPosition=position;');
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 headRestPosition;\nvarying vec3 vHeadPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvHeadPosition=headRestPosition;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vHeadPosition;').replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
       ${eyeOpeningMask}
     `);
   };
-  mesh.customDepthMaterial.customProgramCacheKey=()=> 'milo-open-eyelid-shadow-v2';
+  mesh.customDepthMaterial.customProgramCacheKey=()=> 'milo-open-eyelid-shadow-v3-anchored-neck';
   let hair=createHair(hairSource);hair.position.z=forward;group.add(hair);
   const mouth=new THREE.Mesh(new THREE.SphereGeometry(1,24,12),new THREE.MeshStandardMaterial({color:0x25140f,roughness:1}));
   mouth.position.set(-.11,.405,2.285+forward);mouth.visible=false;group.add(mouth);

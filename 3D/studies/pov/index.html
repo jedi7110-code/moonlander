@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>OBS — 彼らの目線</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script>
+</head>
+<body>
+  <main>
+    <header><div><span class="eyebrow">TARAIRON / POINT OF VIEW</span><h1>彼らの目線</h1></div><span class="sample">視点サンプル</span></header>
+    <nav aria-label="キャラクターの視点">
+      <button data-character="milo" aria-pressed="true"><b>マイロ</b><span>MILO</span></button>
+      <button data-character="cat" aria-pressed="false"><b>ルーシー</b><span>LUCY</span></button>
+      <button data-character="droid" aria-pressed="false"><b>ドロイド</b><span>3817</span></button>
+      <button id="wide" aria-pressed="false"><b>全景</b><span>OVERVIEW</span></button>
+    </nav>
+    <section class="viewport" aria-label="船内の視点サンプル">
+      <canvas id="ship-view" tabindex="0" aria-label="マウスを動かすか、指でなぞって見回す"></canvas>
+      <div id="eyelids" aria-hidden="true" hidden><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path id="upper-lid"/><path id="lower-lid"/></svg><i class="sleep-dim"></i></div>
+      <div class="view-badge"><span id="mode-label">MILO / 本人視点</span><span id="eye-height"></span></div>
+      <div id="reticle" aria-hidden="true"></div>
+      <div class="look-meter" aria-hidden="true"><i id="look-dot"></i></div>
+      <div id="loading" role="status">船内を準備しています…</div>
+    </section>
+    <footer>
+      <div class="actions"><button id="outside" aria-pressed="false">外から首を見る</button><button id="center">正面に戻す</button><button id="walk">移動を試す</button><button id="sleep">ベッドで眠る</button><button id="pause" aria-pressed="false">一時停止</button><label class="floor-tone">床色 <select id="floor-tone"><option value="grey">濃いグレー</option><option value="brown" selected>濃いブラウン</option></select></label></div>
+      <div class="caption"><p id="hint">マウス移動で見回す · スマホは指でなぞる</p><p id="limits"></p></div>
+    </footer>
+  </main>
+  <script type="module" src="./study.js"></script>
+</body>
+</html>

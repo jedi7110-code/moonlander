@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MeshStandardMaterial,Vector3} from 'three';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
+import {LOUNGE_ENTRY_SECONDS,LOUNGE_EXIT_SECONDS} from '../src/obs/lounge-exit.js';
 const create=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 const pose=(root,options={})=>{
   animateMilo(root,{action:'lounge',moving:false,time:3,actionTime:3,...options});
@@ -29,14 +30,14 @@ test('all chair poses open the knees while ankles stay under the body and soles 
 test('knee spread closes smoothly when standing and is restored smoothly on sitting',()=>{
   for(const transition of ['loungeEntry','loungeExit']){
     const root=create();let previous;
-    const duration=transition==='loungeEntry'?2.4:2.8;
+    const duration=transition==='loungeEntry'?LOUNGE_ENTRY_SECONDS:LOUNGE_EXIT_SECONDS;
     for(let i=0;i<=Math.round(duration*60);i++){
       pose(root,{[transition]:{age:i/60}});
       const positions=root.userData.legs.map(({knee})=>knee.getWorldPosition(new Vector3()));
       if(previous)positions.forEach((p,j)=>assert.ok(p.distanceTo(previous[j])<.035));
       previous=positions;
     }
-    const width=Math.abs(previous[0].x-previous[1].x);
+    const width=Math.hypot(previous[0].x-previous[1].x,previous[0].z-previous[1].z);
     assert.ok(transition==='loungeEntry'?width>.38:Math.abs(width-.2)<1e-8);
   }
 });

@@ -91,7 +91,7 @@ export function attachMiloBody(root,m,pants,legacy){
     for(let j=1;j<=2;j++){
       const driver=new THREE.Group();driver.position.copy(arms[i].hand.position);driver.position.z*=j/3;arms[i].elbow.add(driver);
       driver.scale.set(1,1,1).lerp(arms[i].hand.scale,j/3);
-      drivers[`${prefix}_wrist${j}`]=driver;wrists.push({driver,hand:arms[i].hand,fraction:j/3});
+      drivers[`${prefix}_wrist${j}`]=driver;wrists.push({driver,hand:arms[i].hand,side:arms[i].side,fraction:j/3});
     }
   }
   const bones=data.bones.map(spec=>{const bone=new THREE.Bone();bone.name='Milo skin '+spec.name;drivers[spec.name].add(bone);return bone;});
@@ -455,11 +455,17 @@ export function attachMiloBody(root,m,pants,legacy){
   }
   mesh.bind(new THREE.Skeleton(bones,inverses),new THREE.Matrix4());mesh.normalizeSkinWeights();
   for(const surface of legacy)surface.visible=false;
-  root.userData.updateWristTwists=()=>{for(const {driver,hand,fraction}of wrists){
+  root.userData.updateWristTwists=()=>{for(const {driver,hand,side,fraction}of wrists){
     // Spread the hand's offset and proportions across the forearm-to-palm blend.
     driver.position.copy(hand.position);driver.position.z*=fraction;
     driver.scale.set(1,1,1).lerp(hand.scale,fraction);
-    driver.quaternion.identity().slerp(hand.quaternion,fraction);
+    // Interpolate roll on the anatomical palms-in branch. A shortest-path
+    // slerp from identity flips the forearm skin when the hand crosses 180°.
+    const q=hand.quaternion,twist=new THREE.Quaternion(0,q.y,0,q.w).normalize();
+    const neutral=side*Math.PI/2;
+    const angle=neutral+THREE.MathUtils.euclideanModulo(2*Math.atan2(twist.y,twist.w)-neutral+Math.PI,Math.PI*2)-Math.PI;
+    const swing=q.clone().multiply(twist.clone().invert());
+    driver.quaternion.identity().slerp(swing,fraction).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),angle*fraction));
   }};
   root.userData.bodySkin=mesh;root.userData.bodySource=data.source;return mesh;
 }

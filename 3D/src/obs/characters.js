@@ -19,12 +19,15 @@ export {relaxMiloHand} from './milo-hands.js';
 import {applyCallingPose} from './calling.js';
 import {CAT_LIMBS,applyCatLegPose,placeCatPaw} from './cat-walk.js';
 import {createLeisureProps,applyLeisurePose,applyDeskHands} from './leisure.js';
+import {applyLoungeHandling} from './lounge-handling.js';
 import {setTabletHandFit} from './tablet-pose.js';
 import {setLadderHandFit} from './ladder-hand-fit.js';
 import {setCupHandFit} from './cup-hand-fit.js';
 import {updateInjuryAppearance} from './injury-appearance.js';
 import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeEntryAge} from './lounge-exit.js';
 import {applySeatedLegSpread} from './seated-pose.js';
+import {attachMiloSpine,updateMiloSpine} from './milo-spine.js';
+import {attachMiloNeck,setMiloNeckProtraction,updateMiloNeck} from './milo-neck.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
 import {attachMiloBody} from './milo-body.js';
 import {attachMiloElbow} from './milo-elbow.js';
@@ -201,14 +204,18 @@ export function createMilo(m,headModel=new THREE.Group(),{elbowStyle='supported'
   const dining=createDiningProps(body,m),{mug}=dining;
   const leisure=createLeisureProps(body,m);
   root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);
+  attachMiloSpine(root);
+  attachMiloNeck(root);
   if(elbowStyle==='supported')attachMiloElbow(root);
   attachMiloBandage(root,m);
   for(const {hand} of arms)hand.scale.multiplyScalar(1.08);
   root.userData.updateWristTwists?.();attachMiloWatch(root);attachMiloBioSensor(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,sequentialBedEntry=true}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,sequentialBedEntry=true}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
+  setMiloNeckProtraction(root,0);
+  root.userData.spineCurve=null;
   setCupHandFit(root,0);
   setLadderHandFit(root,false);
   setTabletHandFit(root,action==='lounge'&&!moving&&leisure==='tablet');
@@ -224,9 +231,15 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   const seated=['lounge','console'].includes(action)&&!moving;
   const dining=['galley','hydro'].includes(action)&&!moving;
   const calling=callingTime!==null&&!moving&&!action;
-  const desired=bathroom?root.userData.bathroomStartYaw+angleDelta(root.userData.bathroomStartYaw,bathroom.yaw??0)*(bathroom.turn??1):dining||climbing||calling?Math.PI:walking||waiting?(facing||1)*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
-  const authored=bathroom||bunkVisit||gymVisit||(action==='medical'&&!moving)||reclineExit||(action==='bunk'&&!moving);
+  const desired=bathroom?root.userData.bathroomStartYaw+angleDelta(root.userData.bathroomStartYaw,bathroom.yaw??0)*(bathroom.turn??1):dining||climbing||calling?Math.PI:walking||waiting?walkYaw??(facing||1)*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
+  const authored=bathroom||bunkVisit||gymVisit||loungeEntry||loungeExit||(action==='medical'&&!moving)||reclineExit||(action==='bunk'&&!moving);
   if(authored){delete root.userData.headingTurn;delete root.userData.standingTurn;}
+  else if(walking&&Number.isFinite(walkYaw)){
+    // Follow a curved aisle continuously instead of restarting a finite turn
+    // at each small change of tangent. Normal straight-aisle turns stay authored.
+    delete root.userData.headingTurn;delete root.userData.standingTurn;
+    root.rotation.y+=angleDelta(root.rotation.y,desired)*(1-Math.exp(-8*Math.min(dt,.1)));
+  }
   else advanceMiloTurn(root,desired,dt,!walking&&!climbing&&!seated&&!loungeExit&&!loungeEntry&&action!=='gym');
   body.position.y=walking?0:Math.sin(time*1.5)*.003;
   body.position.x=0;body.position.z=0;body.rotation.set(0,0,0);chest.scale.x=1+Math.sin(time*1.6)*.006;
@@ -261,6 +274,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
   if(seated&&action==='lounge'&&!leisure)applyDeskHands(root);
   applyCallingPose(root,calling?callingTime:null,dt);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
+  if(seated&&action==='lounge'&&leisure&&loungeDocks)applyLoungeHandling(root,leisure,actionTime,{docks:loungeDocks,stow:loungeStow,entering:Boolean(loungeEntry)});
   if(loungeExit)applyLoungeExit(root,loungeExit);
   if(loungeEntry)applyLoungeEntry(root,loungeEntry);
   if(seated){
@@ -316,6 +330,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,action,ti
     applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
   root.userData.updateWristTwists?.();
+  updateMiloSpine(root);
+  updateMiloNeck(root);
   // Bed IK samples world transforms before the final elevation and hand pose.
   // Publish the completed skin transform before diagnosis can query its bounds.
   if(bunkVisit||action==='medical'||reclineExit)root.updateMatrixWorld(true);

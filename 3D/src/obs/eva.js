@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {box,ball,cylinder,rod,label} from './materials.js';
-import {EVA_PASSAGE} from './layout.js';
+import {EVA_PASSAGE,CABIN_AISLE} from './layout.js';
 import {hangingSuit} from './eva-suit.js';
 import {createEquipmentRack} from './eva-equipment.js';
 import {EVA_SPOT_LAYOUT} from './lighting.js';
@@ -98,8 +98,29 @@ export function createEVABay(m,y){
   });
   root.add(createEVASpotlights(m,y));
   const hatch=createEVAHatch(m,y),innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
+  root.add(createEVAPartitions(m,y));
   const equipmentRack=createEquipmentRack(m,y);root.add(equipmentRack);
   return{root,suits,hatch,innerHatch,equipmentRack};
+}
+
+// Fixed pressure partitions belong to the ship, not the removable viewing wall.
+// Their octagonal openings fit the existing frames while the surrounding wall
+// reaches the widened deck's front edge in every camera mode.
+export function createEVAPartitions(m,y){
+  const root=new THREE.Group();root.name='Permanent airlock partitions';
+  const front=CABIN_AISLE.deckFront,back=-1.87;
+  for(const x of [EVA_BAY.innerX,EVA_BAY.hatchX]){
+    const top=x===EVA_BAY.innerX?3.396:3.242;
+    const shape=new THREE.Shape();shape.moveTo(back,0);shape.lineTo(front,0);shape.lineTo(front,top);shape.lineTo(back,top);shape.closePath();
+    // Bury the return edge inside the frame instead of duplicating its reveal.
+    const left=EVA_BAY.depth-1.405,right=EVA_BAY.depth+1.405,bottom=.155,high=2.605,cut=.17;
+    const points=[[left+cut,bottom],[right-cut,bottom],[right,bottom+cut],[right,high-cut],[right-cut,high],[left+cut,high],[left,high-cut],[left,bottom+cut]].reverse();
+    const opening=new THREE.Path();opening.moveTo(...points[0]);for(const point of points.slice(1))opening.lineTo(...point);opening.closePath();shape.holes.push(opening);
+    const bulkhead=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.20,bevelEnabled:false,steps:1}),m.enamel);
+    bulkhead.name='Hatch bulkhead return';bulkhead.position.set(x+.155,y,0);bulkhead.rotation.y=-Math.PI/2;bulkhead.castShadow=bulkhead.receiveShadow=true;root.add(bulkhead);
+    box(root,m.metal,x-.057,y+1.38,EVA_BAY.depth+1.645,.024,2.94,.07).name='Hatch return steel edge';
+  }
+  return root;
 }
 
 export function animateAirlock(door,signal,opening){

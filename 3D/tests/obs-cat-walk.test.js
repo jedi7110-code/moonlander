@@ -96,7 +96,7 @@ test('leg skins stay continuous and grounded, without reallocation or residual g
 });
 test('the wall passage measures its actual depth travel and does not advance the gait while hidden',()=>{
   const cat=new CatMotion({floor:0,x:CAT_PORT.x});cat.goTo({floor:1,x:800});
-  for(let i=0;i<240;i++){
+  for(let i=0;i<25*60&&!cat.hidden;i++){
     const z=cat.z,distance=cat.portalWalkDistance;cat.update(1/60);
     assert.ok(Math.abs(cat.portalWalkDistance-distance-Math.abs(cat.z-z))<1e-9);
   }

@@ -8,7 +8,7 @@ const smooth=t=>MathUtils.smoothstep(t,0,1);
 export const MEAL_CONTACTS=[v(-.087,.028,-.040),v(0,.006,.120)];
 export const MEAL_HAND_CONTACTS=[v(0,-.085,-.035),v(-.017,-.095,-.024)];
 
-function solveArm(rig,wrist){
+export function solveArm(rig,wrist){
   return solveHingeArm(rig,wrist,v(rig.side*.65,-1,.08));
 }
 

@@ -4,6 +4,10 @@ import {MeshStandardMaterial} from 'three';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,CatRoutine,getStation} from '../src/obs/state.js';
 import {createMilo,animateMilo,createCat,animateCat} from '../src/obs/characters.js';
+import {createLoungeTable} from '../src/obs/ship.js';
+import {updateTableLeisureProps} from '../src/obs/lounge-table-props.js';
+import {LOUNGE_STOW_SECONDS} from '../src/obs/lounge-handling.js';
+import {LOUNGE_ENTRY_SECONDS,LOUNGE_EXIT_SECONDS} from '../src/obs/lounge-exit.js';
 
 function setup(random=()=>0){
   const care=new Supplies(),actor=new CrewMotion({floor:getStation('lounge').floor,x:1060});let opened=0;
@@ -16,23 +20,25 @@ test('first lounge click rests, en-route clicks do not queue chess, seated click
   assert.equal(brain.clickLounge(),'relax');assert.equal(brain.gamePending,false);
   assert.equal(brain.clickLounge(),'moving');assert.equal(opened(),0);
   for(let i=0;i<120;i++)actor.update(1/60);
-  assert.equal(brain.clickLounge(),'pending');assert.equal(brain.isSeatedInLounge(),false);brain.update(2.4);
+  assert.equal(brain.clickLounge(),'pending');assert.equal(brain.isSeatedInLounge(),false);brain.update(LOUNGE_ENTRY_SECONDS);
   assert.ok(brain.isSeatedInLounge());assert.equal(brain.leisure,'tablet');assert.equal(opened(),0);
   const version=actor.commandVersion;
-  assert.equal(brain.clickLounge(),'chess');assert.equal(opened(),1);assert.equal(actor.commandVersion,version);
+  assert.equal(brain.clickLounge(),'chess');assert.equal(opened(),0);assert.ok(brain.loungeStow);assert.equal(actor.commandVersion,version);
+  assert.equal(brain.clickLounge(),'pending');brain.update(0);assert.equal(brain.loungeStow.age,0);
+  brain.update(LOUNGE_STOW_SECONDS);assert.equal(opened(),1);assert.equal(actor.commandVersion,version);
   assert.equal(brain.clickLounge(),'pending');assert.equal(opened(),1);
 });
 test('random lounge activities vary between visits and never launch a game on their own',()=>{
   const {brain,opened}=setup(()=>.99);brain.catRoutine={canPlayLounge:()=>true,inviteLounge(){}};
   const modes=[];
-  for(let i=0;i<5;i++){brain._startPerform(getStation('lounge'));brain.update(2.4);modes.push(brain.leisure);assert.ok(brain.curDurSec>=32);brain._endPerform();brain.update(2.8);}
+  for(let i=0;i<5;i++){brain._startPerform(getStation('lounge'));brain.update(LOUNGE_ENTRY_SECONDS);modes.push(brain.leisure);assert.ok(brain.curDurSec>=32);brain._endPerform();brain.update(LOUNGE_STOW_SECONDS);brain.update(LOUNGE_EXIT_SECONDS);}
   assert.equal(modes[0],'cat');assert.ok(modes.includes('music'));assert.ok(modes.every((m,i)=>!i||m!==modes[i-1]));assert.equal(opened(),0);
   brain.catRoutine.canPlayLounge=()=>false;brain._startPerform(getStation('lounge'));assert.notEqual(brain.leisure,'cat');
 });
 test('cat joins using the existing sofa hop and stops playing when chess starts',()=>{
   const {brain,care,actor}=setup(()=>.99),cat=new CatRoutine(care,{random:()=>.5});brain.catRoutine=cat;
   cat.hunger=80;cat.energy=80;brain.actor.x=getStation('lounge').x;
-  brain._startPerform(getStation('lounge'));brain.update(2.4);assert.equal(brain.leisure,'cat');
+  brain._startPerform(getStation('lounge'));brain.update(LOUNGE_ENTRY_SECONDS);assert.equal(brain.leisure,'cat');
   for(let i=0;i<1200&&cat.mode!=='play';i++)cat.update(1/60,actor);
   assert.equal(cat.mode,'play');assert.ok(cat.motion.onSofa);assert.equal(cat.motion.floor,getStation('lounge').floor);
   brain.requestGame();cat.update(1/60,actor);assert.equal(cat.mode,'play');assert.ok(cat.playRelease);assert.equal(cat.playHost,null);
@@ -40,6 +46,7 @@ test('cat joins using the existing sofa hop and stops playing when chess starts'
 });
 test('leisure props only appear in their mode and animations remain finite',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),root=createMilo(m),cat=createCat(m);
+  const tableProps=createLoungeTable(m).userData.loungeProps;
   for(const mode of ['tablet','music','cat']){
     for(let i=0;i<120;i++){
       animateMilo(root,{moving:false,climbing:false,facing:1,action:'lounge',time:i/15,actionTime:i/15,actionDuration:40,leisure:mode,catReady:true});
@@ -47,7 +54,11 @@ test('leisure props only appear in their mode and animations remain finite',()=>
       for(const model of [root,cat]){model.updateMatrixWorld(true);model.traverse(node=>assert.ok(node.matrixWorld.elements.every(Number.isFinite)));}
     }
     assert.equal(root.userData.leisure.tablet.visible,mode==='tablet');assert.equal(root.userData.leisure.phones.visible,mode==='music');assert.equal(root.userData.leisure.toy.visible,mode==='cat');
+    updateTableLeisureProps(tableProps,root.userData.leisure);
+    for(const key of ['tablet','phones','toy']){assert.equal(tableProps[key].visible,true);assert.equal(root.userData.leisure[key].visible,false,'the table object is the only rendered copy, even while held');}
   }
   animateMilo(root,{moving:true,climbing:false,facing:1,time:0,action:null});
   for(const key of ['tablet','phones','toy'])assert.equal(root.userData.leisure[key].visible,false);
+  updateTableLeisureProps(tableProps,root.userData.leisure);
+  for(const key of ['tablet','phones','toy'])assert.equal(tableProps[key].visible,true);
 });

@@ -20,7 +20,7 @@ export function finishCabinFixtures(view){
   // Both the resting cup and Milo's held copy use the same clean ceramic.
   const mugs=[...Object.values(view.ship.diningDocks).map(dock=>dock.mug),view.milo.userData.dining?.mug];
   for(const mug of mugs)if(mug)mug.traverse(mesh=>{
-    if(mesh.isMesh&&mesh.name!=='Cup liquid surface')mesh.material=whiteCeramic;
+    if(mesh.isMesh&&!mesh.userData.cupWater)mesh.material=whiteCeramic;
   });
 
   const rack=view.ship.plants;

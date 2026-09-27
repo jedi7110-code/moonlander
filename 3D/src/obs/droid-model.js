@@ -8,7 +8,7 @@ const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z),DOWN=V(0,-1,0),UP=V(0,1,0);
 const TAU=Math.PI*2,clamp=THREE.MathUtils.clamp;
 export const DROID_SPEC=Object.freeze({serial:'3817',height:1.72,shoulderHalfWidth:.175,upperLeg:.34,middleLeg:.29,lowerLeg:.35,upperArm:.31,forearm:.295,stepPeriod:1.4,stance:.64});
 export const DROID_POSTURE=Object.freeze({idleLean:.13,walkLean:.18,bodyZ:-.02});
-export const DROID_EXPRESSIONS=Object.freeze({neutral:'通常',happy:'喜び',sad:'悲しみ',surprised:'驚き',angry:'怒り',sleepy:'眠い'});
+export const DROID_EXPRESSIONS=Object.freeze({neutral:'通常',happy:'喜び',sad:'悲しみ',surprised:'驚き',angry:'怒り',strained:'大変',sleepy:'眠い'});
 
 function wornTexture(){
   const n=128,data=new Uint8Array(n*n*4);let seed=3817;
@@ -177,6 +177,9 @@ function expressionPaths(expression){
     else if(expression==='sad'){
       paths.push(faceArc(x,.025,.017,.024,Math.PI,TAU));
       paths.push([[x+side*.019,.041],[x,.055],[x-side*.016,.057]]);
+    }else if(expression==='strained'){
+      paths.push([[x+side*.018,.042],[x-side*.012,.025],[x+side*.018,.009]]);
+      paths.push([[x+side*.018,.055],[x-side*.016,.067]]);
     }else if(expression==='angry')paths.push([[x+side*.019,.050],[x-side*.018,.026],[x+side*.019,.002]]);
     else if(expression==='sleepy'){
       paths.push([[x-.020,.036],[x+.020,.036]]);
@@ -185,6 +188,7 @@ function expressionPaths(expression){
   }
   if(expression==='happy')paths.push(faceArc(0,-.053,.028,.018,Math.PI,TAU));
   else if(expression==='surprised')paths.push(faceArc(0,-.056,.010,.012));
+  else if(expression==='strained')paths.push([[-.023,-.060],[-.012,-.054],[0,-.061],[.012,-.054],[.023,-.060]]);
   else paths.push([[-.018,-.057],[.018,-.057]]);
   return paths;
 }
@@ -447,14 +451,18 @@ export function solveDroidLimb(origin,target,upper,lower,pole){
   const bend=pole.clone().addScaledVector(axis,-pole.dot(axis)).normalize();
   return origin.clone().addScaledVector(axis,along).addScaledVector(bend,Math.sqrt(Math.max(0,upper*upper-along*along)));
 }
-function solveDroidLeg(origin,target){
+function solveDroidLeg(origin,target,stableHinge=false){
   const axis=target.clone().sub(origin).normalize();
   const forward=V(0,0,1).addScaledVector(axis,-axis.z).normalize();
   // The thigh leans toward the toe; the second hinge folds back. This extra
   // degree of freedom remains deterministic when scrubbing the walk cycle.
   const knee=origin.clone().addScaledVector(axis,DROID_SPEC.upperLeg*Math.cos(.43))
     .addScaledVector(forward,DROID_SPEC.upperLeg*Math.sin(.43));
-  const hock=solveDroidLimb(knee,target,DROID_SPEC.middleLeg,DROID_SPEC.lowerLeg,V(0,0,-1));
+  // While stepping from the deck, the ankle passes the knee's height. Keep
+  // the same hinge plane instead of flipping its bend at that horizontal line.
+  const lowerAxis=target.clone().sub(knee);
+  const pole=stableHinge?V(0,-lowerAxis.z,lowerAxis.y):V(0,0,-1);
+  const hock=solveDroidLimb(knee,target,DROID_SPEC.middleLeg,DROID_SPEC.lowerLeg,pole);
   return {knee,hock};
 }
 function orient(group,start,end){group.position.copy(start);group.quaternion.setFromUnitVectors(DOWN,end.clone().sub(start).normalize());}
@@ -566,7 +574,7 @@ export function createDroid({detail='study'}={}){
       const origin=fromChassis(V(l.side*.125,0,0));
       const step=walk?droidFootstep(time,l.side):{point:V(l.side*.137,.099,.045),yaw:0,stance:true};
       const target=pose.feet?.[l.side<0?0:1]?V(...pose.feet[l.side<0?0:1]):step.point.clone().sub(root.position).applyAxisAngle(UP,-route.yaw);
-      const {knee,hock}=solveDroidLeg(origin,target);
+      const {knee,hock}=solveDroidLeg(origin,target,Boolean(pose.entry));
       orient(l.upper,origin,knee);orient(l.middle,knee,hock);orient(l.lower,hock,target);
       l.foot.position.copy(target);l.foot.rotation.set(0,pose.footYaws?.[l.side<0?0:1]??step.yaw-route.yaw,0);
       feet.push({...step,local:target.clone(),knee:knee.clone(),hock:hock.clone(),hip:origin.clone()});

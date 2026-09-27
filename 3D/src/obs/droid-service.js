@@ -5,11 +5,20 @@ import {LADDER} from './ladder-pose.js';
 import {CABIN_LADDER} from './cabin-ladder.js';
 import {CAT_BOWL,WASTE_INCINERATOR as WASTE} from './layout.js';
 import {sampleDroidTurn} from './droid-turn.js';
+import {DROID_LADDER_LANDING,LADDER_ENTRY} from './pace.js';
+import {fitLadderEntryBody} from './ladder-entry.js';
 
 const mix=THREE.MathUtils.lerp,clamp=THREE.MathUtils.clamp;
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const V=(...v)=>new THREE.Vector3(...v),UP=V(0,1,0);
 const lerpPoint=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t));
+
+export function droidServiceExpression(p){
+  if(p.mode==='charging'||p.returning)return 'sleepy';
+  if(p.action==='food-pour')return 'happy';
+  if(p.carrying==='cargo'||(p.action==='cargo-pick'&&p.age>=p.duration*.5))return 'strained';
+  return 'neutral';
+}
 
 // Local surface dimensions and vertical offset from the carrying hands.
 // The live rig replaces these defaults with measurements of its actual props.
@@ -104,6 +113,34 @@ export function sampleDroidServicePose(p,loads=LOADS){
     out.hands=hands.map(hand=>hand.point);out.handWeight=weight;out.gripKind='ladder';out.wristRotation=[-2.55,Math.PI,0];
     out.handGripWeights=hands.map(hand=>1-Math.sin(Math.PI*hand.swing));
     out.feet=[-1,1].map(side=>lerpPoint([side*.137,.099,.045],droidLadderContact(p.y,side,false).point,weight));
+    const landing=p.climb.from>p.climb.to&&Math.abs(p.y-p.climb.to)<=DROID_LADDER_LANDING.height;
+    if(Math.abs(p.y-p.climb.from)<LADDER_ENTRY.droidHeight||landing){
+      // The same fixed supports work in reverse: hands hold while the feet
+      // step behind the ladder, and release only after both soles are down.
+      const start=landing?p.climb.to:p.climb.from,anchor=start+(landing?1:Math.sign(p.climb.to-start))*LADDER_ENTRY.droidHeight;
+      const u=Math.abs(p.y-start)/LADDER_ENTRY.droidHeight,ease=THREE.MathUtils.smootherstep;
+      const reach=ease(u,.16,.38),transfer=ease(u,.4,.96),depth=landing?(p.climb.endDepth??(start>0?1.34:.34)):(p.climb.startDepth??.34),z=p.z??.34,upper=depth>1;
+      const rung=CABIN_LADDER.rungBase+Math.round((start+1.24-CABIN_LADDER.rungBase)/LADDER.spacing)*LADDER.spacing;
+      out.hipHeight=mix(mix(start+.905,start+(upper?.66:.905),reach),anchor+.82,transfer)-p.y;
+      out.bodyZ=z-mix(mix(depth-DROID_POSTURE.bodyZ,upper?.80:.36,reach),.385,transfer);
+      out.lean=mix(mix(DROID_POSTURE.idleLean,upper?.55:.12,reach),.12,transfer);
+      out.handWeight=reach;out.handGripWeights=[];
+      out.hands=[-1,1].map(side=>{
+        const c=droidLadderContact(anchor,side,true),shift=ease(u,side===-1?.79:.90,side===-1?.90:1);
+        out.handGripWeights.push(ease(u,.29,.38)*mix(1,1-Math.sin(Math.PI*c.swing),shift));
+        return [c.point[0],mix(rung,anchor+c.point[1],shift)-p.y,z-mix(CABIN_LADDER.depth,.34-c.point[2],shift)];
+      });
+      out.feet=[-1,1].map(side=>{
+        const c=droidLadderContact(anchor,side,false),step=ease(u,side===-1?.4:.62,side===-1?.61:.81);
+        const rungY=CABIN_LADDER.rungBase+Math.floor((anchor+c.point[1]-.099-LADDER.radius-CABIN_LADDER.rungBase+1e-8)/LADDER.spacing)*LADDER.spacing;
+        const settle=ease(u,.86,1),footY=mix(rungY+.099+LADDER.radius,anchor+c.point[1],settle),footZ=mix(CABIN_LADDER.depth,.34-c.point[2],settle);
+        return [side*.137,mix(start+.099,footY,step)-p.y,z-mix(depth-.045,footZ,step)];
+      });
+      const supports=out.feet.map((point,i)=>({target:V(...point),offset:V((i?1:-1)*.125,0,0),length:.92}));
+      if(reach===1)out.hands.forEach((point,i)=>supports.push({target:V(...point),offset:V((i?1:-1)*DROID_SPEC.shoulderHalfWidth,.47,0).applyAxisAngle(V(1,0,0),out.lean),length:.56}));
+      const fitted=fitLadderEntryBody(V(0,out.hipHeight,out.bodyZ),supports);out.hipHeight=fitted.y;out.bodyZ=fitted.z;
+      out[landing?'landing':'entry']={progress:landing?1-u:u};
+    }
     out.nod=-.10;return out;
   }
   switch(p.action){
@@ -211,11 +248,11 @@ export function createDroidServiceRig(bay,ship){
   }));
   let lastStamp=null;
   function update(routine){
-    const p=routine.pose,stamp=p.mode==='charging'?`charging/${routine.care.preparedMeals??0}/${routine.stored.length}/${routine.washerLoaded}`:[p.time,p.mode,p.action].join('/');if(stamp===lastStamp)return;lastStamp=stamp;
+    const p=routine.pose,expression=droidServiceExpression(p),stamp=p.mode==='charging'?`charging/${routine.care.preparedMeals??0}/${routine.stored.length}/${routine.washerLoaded}`:[p.time,p.mode,p.action,expression].join('/');if(stamp===lastStamp)return;lastStamp=stamp;
     ship.incinerator?.update(routine.incineratorOpen,routine.time<routine.incineratingUntil&&routine.incineratorOpen===0);
     const model=sampleDroidServicePose(p,loads),droid=bay.droid;
     actorRoot.position.set(p.x,p.y,p.z);actorRoot.rotation.y=p.yaw;
-    droid.face.setExpression(p.mode==='charging'?'sleepy':'neutral');droid.update(p.time,'service',model);
+    droid.face.setExpression(expression);droid.update(p.time,'service',model);
     bay.mode=p.mode;
     root.updateMatrixWorld(true);
     for(const g of Object.values(props))g.visible=false;

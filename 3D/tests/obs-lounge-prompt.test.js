@@ -6,6 +6,8 @@ import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,getStation} from '../src/obs/state.js';
 import {ObservationView} from '../src/obs/view.js';
 import {loungeGamePromptAvailable,loungeGamePromptPosition,updateLoungeGamePrompt} from '../src/obs/lounge-prompt.js';
+import {LOUNGE_STOW_SECONDS} from '../src/obs/lounge-handling.js';
+import {LOUNGE_ENTRY_SECONDS,LOUNGE_EXIT_SECONDS} from '../src/obs/lounge-exit.js';
 
 test('the invitation appears only after sitting and opens the chooser without walking again',()=>{
   let opened=0,kind='unset';
@@ -16,14 +18,15 @@ test('the invitation appears only after sitting and opens the chooser without wa
   brain.clickLounge();assert.equal(loungeGamePromptAvailable(brain),false);
   for(let i=0;i<120;i++)actor.update(1/60);
   assert.ok(brain.loungeEntry);assert.equal(loungeGamePromptAvailable(brain),false);
-  brain.update(2.4);assert.equal(loungeGamePromptAvailable(brain),true);
+  brain.update(LOUNGE_ENTRY_SECONDS);assert.equal(loungeGamePromptAvailable(brain),true);
   assert.equal(loungeGamePromptAvailable(brain,true),false);
   const version=actor.commandVersion;
-  assert.equal(brain.requestGame(),true);assert.equal(opened,1);assert.equal(kind,null);
+  assert.equal(brain.requestGame(),true);assert.equal(opened,0);assert.ok(brain.loungeStow);
   assert.equal(actor.commandVersion,version);assert.equal(loungeGamePromptAvailable(brain),false);
+  brain.update(LOUNGE_STOW_SECONDS);assert.equal(opened,1);assert.equal(kind,null);
   assert.equal(brain.requestGame(),false);assert.equal(opened,1);
   brain.finishGame();assert.ok(brain.loungeExit);assert.equal(loungeGamePromptAvailable(brain),false);
-  brain.update(2.8);assert.equal(loungeGamePromptAvailable(brain),false);
+  brain.update(LOUNGE_EXIT_SECONDS);assert.equal(loungeGamePromptAvailable(brain),false);
 });
 
 test('the invitation follows the head and stays above it at desktop and mobile sizes',()=>{

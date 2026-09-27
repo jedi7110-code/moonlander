@@ -1,9 +1,10 @@
 import {FLOORS,LADDER_X,getStation,CAT_PORT,CAT_BOWL,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
 import {CAT_RISE_TIME} from './cat-rest.js';
-import {CABIN_PACE,LADDER_PACE} from './pace.js';
+import {CABIN_PACE,LADDER_PACE,LADDER_LANDING,LADDER_ENTRY} from './pace.js';
 import {createCatTurn,sampleCatTurn,angleDelta} from './cat-turn.js';
 import {APPROVED_RESTS,approvedRestRelease} from './cat-approved-rest.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
+import {CabinMouseChase} from './mouse-chase.js';
 
 export const CAT_WALK_SPEED=18;
 const CAT_FREE_REST_MODES=new Set(['look','groom','sleep','stretch','prone']);
@@ -37,7 +38,8 @@ export class CrewMotion {
     // Retargeting on a ladder preserves the current height, including mid-climb.
     if(this.y!==FLOORS[target.floor].y){
       if(this.x!==LADDER_X)queue.push({type:'walk',x:LADDER_X});
-      queue.push({type:'climb',floor:target.floor,y:FLOORS[target.floor].y});
+      queue.push({type:'climb',floor:target.floor,y:FLOORS[target.floor].y,startY:this.y,
+        mounting:this.y===FLOORS[this.floor].y});
     }
     queue.push({type:'walk',x:target.x});this.queue=queue;this.onArrive=onArrive||null;
   }
@@ -45,7 +47,15 @@ export class CrewMotion {
     this.knockTime=Math.max(0,this.knockTime-dt);
     const seg=this.queue[0];if(!seg)return;
     const key=seg.type==='climb'?'y':'x',speed=seg.type==='climb'?this.climbSpeed:this.walkSpeed;
-    const delta=seg[key]-this[key],step=speed*dt;
+    const delta=seg[key]-this[key];let landingSpeed=1;
+    if(seg.type==='climb'&&delta>0){
+      // Ease into the final weight transfer; keep the rest of the climb's pace.
+      const remaining=delta*.016,t=Math.max(0,Math.min(1,(remaining-LADDER_LANDING.height)/(LADDER_LANDING.slowFrom-LADDER_LANDING.height)));
+      const finalSpeed=LADDER_LANDING.height/.016/LADDER_LANDING.seconds/speed;
+      landingSpeed=finalSpeed+(1-finalSpeed)*t*t*(3-2*t);
+    }
+    const mounting=seg.type==='climb'&&seg.mounting&&Math.abs(this.y-seg.startY)*.016<LADDER_ENTRY.miloHeight-1e-8;
+    const step=mounting?Math.min(LADDER_ENTRY.miloHeight/.016-Math.abs(this.y-seg.startY),LADDER_ENTRY.miloHeight/.016/LADDER_ENTRY.seconds*dt):speed*landingSpeed*dt;
     if(key==='x')this.walkDistance+=Math.min(Math.abs(delta),step);
     if(key==='x'&&Math.abs(delta)>.01)this.facing=Math.sign(delta);
     if(Math.abs(delta)<=step){this[key]=seg[key];if(seg.type==='climb')this.floor=seg.floor;this.queue.shift();if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}}
@@ -55,7 +65,7 @@ export class CrewMotion {
 
 export class CatMotion extends CrewMotion {
   constructor({turns=false,...options}={}){super({floor:CAT_SOFA.floor,x:1035,walkSpeed:CAT_WALK_SPEED,...options});this.turns=turns;this.heading=null;this.turn=null;this.onSofa=this.floor===CAT_SOFA.floor&&this.x>=CAT_SOFA.seatX;this.elevation=this.onSofa?LOUNGE_SEAT.top:0;this.z=this.onSofa?LOUNGE_SEAT.centerDepth:CAT_PORT.walkZ;this.hop=null;this.portalWalkDistance=0;this.depthWalkDistance=0;this.portal=null;this.destination=null;this.onDestination=null;this.waitingForCrew=false;}
-  get busy(){return Boolean(this.turn||this.portal||this.hop)||super.busy;}
+  get busy(){return Boolean(this.chase||this.turn||this.portal||this.hop)||super.busy;}
   face(yaw){
     if(!this.turns)return false;
     if(this.heading===null){this.heading=yaw;return false;}
@@ -73,6 +83,7 @@ export class CatMotion extends CrewMotion {
     return null;
   }
   get climbing(){return false;}
+  get passageWalkSeconds(){return Math.abs(CAT_PORT.walkZ-CAT_PORT.turnInset-CAT_PORT.insideZ)/(this.walkSpeed*.022);}
   get hidden(){return this.portal?.phase==='transit';}
   goTo(target,onArrive){
     if(!target||!FLOORS[target.floor])return;
@@ -97,7 +108,7 @@ export class CatMotion extends CrewMotion {
     this.queue.push({type:'walk',x:crossing?CAT_PORT.x:this.destination.x});
     if(!crossing&&!this.onSofa&&(this.destination.z!==CAT_PORT.walkZ||(this.destination.x===this.x&&this.z!==this.destination.z)))this.queue.push({type:'depth',z:this.destination.z});
     this.onArrive=()=>{
-      if(crossing){this.portal={from:this.floor,to:this.destination.floor,phase:'turnIn',age:0,duration:this.turns?1.15:.4,yaw:this.heading??this.facing*Math.PI/2};return;}
+      if(crossing){this.portal={from:this.floor,to:this.destination.floor,phase:'turnIn',age:0,duration:4,yaw:this.heading??this.facing*Math.PI/2};return;}
       const callback=this.onDestination;this.destination=null;this.onDestination=null;callback?.();
     };
   }
@@ -106,7 +117,7 @@ export class CatMotion extends CrewMotion {
     const segment=this.queue[0];
     let min=this.x,max=this.x,seconds=0,active=false;
     if(this.hop){min=CAT_SOFA.floorX;max=CAT_SOFA.seatX;seconds=1;active=this.hop.up||this.hop.started||this.hop.phase!=='prepare';}
-    else if(this.portal&&['enter','exit'].includes(this.portal.phase)){seconds=this.portal.duration-this.portal.age;active=this.portal.age>0;}
+    else if(this.portal&&this.portal.phase!=='transit'){seconds=this.portal.duration-this.portal.age;active=this.portal.age>0;}
     else if(segment?.type==='depth'&&Math.abs(segment.z-this.z)>.001){
       if(Math.min(this.z,segment.z)>CABIN_AISLE.catZ-.08&&!segment.started)return null;
       seconds=Math.abs(segment.z-this.z)/(this.walkSpeed*.022)+.4;active=Boolean(segment.started)||this.z<CABIN_AISLE.catZ-.08;
@@ -195,19 +206,22 @@ export class CatMotion extends CrewMotion {
     while(dt>0&&this.portal){
       const p=this.portal,step=Math.min(dt,p.duration-p.age);p.age+=step;dt-=step;
       const t=p.age/p.duration,s=t*t*(3-2*t),previousZ=this.z;
-      if(p.phase==='enter')this.z=CAT_PORT.walkZ+(CAT_PORT.insideZ-CAT_PORT.walkZ)*s;
+      const turnZ=CAT_PORT.walkZ-CAT_PORT.turnInset;
+      if(p.phase==='enter')this.z=t===1?CAT_PORT.insideZ:turnZ+(CAT_PORT.insideZ-turnZ)*t;
       if(p.phase==='transit')this.y=FLOORS[p.from].y+(FLOORS[p.to].y-FLOORS[p.from].y)*s;
-      if(p.phase==='exit')this.z=CAT_PORT.insideZ+(CAT_PORT.walkZ-CAT_PORT.insideZ)*s;
-      if(p.phase==='enter'||p.phase==='exit')this.portalWalkDistance+=Math.abs(this.z-previousZ);
+      if(p.phase==='exit')this.z=CAT_PORT.insideZ+(turnZ-CAT_PORT.insideZ)*t;
+      // Step inward while turning; the nose/tail never swing into the front wall.
+      if(p.phase==='turnIn'||p.phase==='turnOut')this.z=CAT_PORT.walkZ-CAT_PORT.turnInset*Math.abs(Math.cos(this.passagePose.yaw));
+      if(p.phase!=='transit')this.portalWalkDistance+=Math.abs(this.z-previousZ);
       // Navigation owns the same heading as the rendered passage. In particular
       // the final turn-out frame must survive removal of the portal object.
       this.heading=this.passagePose.yaw;
       if(p.age<p.duration)break;
       p.age=0;
-      if(p.phase==='turnIn'){p.phase='enter';p.duration=2.8;return;}
+      if(p.phase==='turnIn'){p.phase='enter';p.duration=this.passageWalkSeconds;return;}
       else if(p.phase==='enter'){p.phase='transit';p.duration=1.6+Math.abs(p.to-p.from)*1.5;}
-      else if(p.phase==='transit'){this.floor=p.to;this.y=FLOORS[p.to].y;p.phase='exit';p.duration=2.8;return;}
-      else if(p.phase==='exit'){p.phase='turnOut';p.duration=this.turns?1.15:.4;this.facing=Math.sign(this.destination.x-CAT_PORT.x)||1;}
+      else if(p.phase==='transit'){this.floor=p.to;this.y=FLOORS[p.to].y;p.phase='exit';p.duration=this.passageWalkSeconds;return;}
+      else if(p.phase==='exit'){p.phase='turnOut';p.duration=4;this.facing=Math.sign(this.destination.x-CAT_PORT.x)||1;}
       else{this.portal=null;this.z=CAT_PORT.walkZ;this.plan();}
     }
   }
@@ -215,7 +229,9 @@ export class CatMotion extends CrewMotion {
     const p=this.portal;if(!p)return null;
     const t=p.age/p.duration,s=t*t*(3-2*t);
     const yaw=this.turnPose?.yaw??(p.phase==='turnIn'?p.yaw+Math.atan2(Math.sin(Math.PI-p.yaw),Math.cos(Math.PI-p.yaw))*s:p.phase==='enter'?Math.PI:p.phase==='turnOut'?this.facing*Math.PI/2*s:0);
-    const crouch=p.phase==='turnIn'?s:p.phase==='turnOut'?1-s:1;
+    // Walk upright across the cabin and only duck at the low duct opening.
+    const nearMouth=Math.max(0,Math.min(1,(CAT_PORT.wallZ+.9-this.z)/.9));
+    const crouch=nearMouth*nearMouth*(3-2*nearMouth);
     return{phase:p.phase,yaw,crouch};
   }
 }
@@ -256,13 +272,15 @@ export class Supplies {
 }
 
 export class CatRoutine {
-  constructor(care,{random=Math.random,turns=false}={}){
+  constructor(care,{random=Math.random,turns=false,mouseChase=false}={}){
     this.care=care;this.random=random;this.motion=new CatMotion({turns});
     this.hunger=this.between(48,90);this.energy=this.between(35,80);this.groomNeed=this.between(20,80);this.curiosity=this.between(30,90);
     this.rest('sleep',this.between(8,16));this.companion=null;this.followLeft=0;this.retargetIn=0;
     this.bunkWake=null;
+    this.mouseChase=mouseChase?new CabinMouseChase({random}):null;
   }
   beginBunkWake(visit){
+    this.mouseChase?.cancel(this);
     const bunk=getStation('bunk');
     this.motion.floor=bunk.floor;this.motion.x=bunk.x+24;this.motion.y=FLOORS[bunk.floor].y;
     this.motion.queue=[];this.motion.onArrive=null;this.motion.destination=null;this.motion.onDestination=null;
@@ -290,7 +308,7 @@ export class CatRoutine {
   }
   between(min,max){return min+(max-min)*this.random();}
   get poseYaw(){return this.motion.turns?(this.motion.turnPose?.yaw??this.motion.heading):!this.motion.busy&&CAT_FREE_REST_MODES.has(this.mode)?this.restYaw:this.motion.laneYaw;}
-  canPlayLounge(){return this.motion.floor===CAT_SOFA.floor&&!this.motion.portal&&!this.motion.hop&&this.hunger>35&&this.energy>25&&this.mode!=='fetch'&&!this.pendingMove&&Math.abs(this.motion.x-CAT_SOFA.seatX)<220;}
+  canPlayLounge(){return !this.mouseChase?.controlled&&this.motion.floor===CAT_SOFA.floor&&!this.motion.portal&&!this.motion.hop&&this.hunger>35&&this.energy>25&&this.mode!=='fetch'&&!this.pendingMove&&Math.abs(this.motion.x-CAT_SOFA.seatX)<220;}
   inviteLounge(brain){
     this.playHost=brain;
     this.depart(()=>{
@@ -314,6 +332,7 @@ export class CatRoutine {
     this.motion.face(this.restYaw??this.motion.facing*Math.PI/2);
   }
   depart(run,kind){
+    if(kind!=='mouse')this.mouseChase?.cancel(this);
     if(this.mode==='play'&&!this.motion.busy){this.pendingMove={run,kind};this.playHost=null;this.playRelease??={age:0};return;}
     if(!this.motion.busy&&APPROVED_RESTS[this.mode]&&this.remaining>0){
       this.pendingMove={run,kind};this.remaining=Math.min(this.remaining,approvedRestRelease(this.mode,this.modeTime));return;
@@ -348,6 +367,7 @@ export class CatRoutine {
   update(dt,actor=null,droid=null){
     if(dt<=0)return;
     this.companion=actor;
+    const chasing=this.mouseChase?.update(dt,this);
     if(this.waitForDroidFood&&!this.care.catBowlFilling){this.waitForDroidFood=false;this.fetch();}
     const wake=this.bunkWake?.visit;
     if(wake&&((wake.phase==='rising'&&wake.age>=CAT_WAKE_LAND_SECONDS)||['seated','standing','retracting','sealing','departing','done'].includes(wake.phase)))this.finishBunkWake();
@@ -371,6 +391,7 @@ export class CatRoutine {
     this.energy=bounded(this.energy+dt*(resting&&this.mode==='sleep'?3:-.25*CABIN_PACE.catDecay));
     this.groomNeed=bounded(this.groomNeed+dt*(resting&&this.mode==='groom'?-4:.22*CABIN_PACE.catDecay));
     this.curiosity=bounded(this.curiosity+dt*(this.motion.busy?-.8:.3));
+    if(chasing)return;
     this.motion.update(dt,actor,droid);
     if(this.motion.portal)this.motion.heading=this.motion.passagePose.yaw;
     if(this.motion.turn)return;
@@ -407,5 +428,5 @@ export class CatRoutine {
   fetch(){if(this.care.catBowlFilling){this.waitForDroidFood=true;return;}if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=CAT_WALK_SPEED;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX,z:CAT_BOWL.depth},()=>{if(this.care.eatCatFood()){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
 }
 
-export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
+export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeStow||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
 export {FLOORS,getStation};

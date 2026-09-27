@@ -84,24 +84,29 @@ test('the cup tilts around its lip contact and lowers again',()=>{
   pose(root,'hydro',5);assert.ok(Math.abs(dining.mug.rotation.x)<1e-10);assert.equal(dining.mug.position.y,1.134);
 });
 
-test('the liquid stays thin and inside the cup when raised, tilted, lowered and reused',()=>{
+test('water remains visible, level and inside the cup when raised, tilted, lowered and reused',()=>{
   const root=character(),{water}=root.userData.dining,position=water.geometry.attributes.position;
-  const scale=water.scale.toArray();let highest=-Infinity,lowest=Infinity;
+  let highest=-Infinity,lowest=Infinity;
   for(let repeat=0;repeat<2;repeat++){
     for(let frame=0;frame<=180;frame++){
       pose(root,'hydro',frame/180*5);
-      assert.deepEqual(water.scale.toArray(),scale,'water level must not stretch the surface');
+      assert.equal(water.visible,true,'water does not disappear while drinking');
+      assert.equal(water.material.metalness,0);assert.ok(water.material.transparent);
+      let low=Infinity,high=-Infinity;
       for(let i=0;i<position.count;i++){
         const p=new Vector3().fromBufferAttribute(position,i).applyMatrix4(water.matrix);
         assert.ok(p.y>-.052&&p.y<.057,'the liquid stays between the inner bottom and rim');
         const innerRadius=.033+(p.y+.052)/.109*.006;
         assert.ok(Math.hypot(p.x,p.z)<innerRadius,'the liquid stays inside the cup wall');
+        const world=water.localToWorld(new Vector3().fromBufferAttribute(position,i));
+        low=Math.min(low,world.y);high=Math.max(high,world.y);
       }
+      assert.ok(high-low<1e-7,'the surface stays horizontal as the cup tilts');
       highest=Math.max(highest,water.position.y);lowest=Math.min(lowest,water.position.y);
     }
     pose(root,null,0,5,{moving:true});
   }
-  assert.ok(highest-lowest>.014);assert.ok(water.scale.y<.003);
+  assert.ok(highest>.03,'the resting cup is visibly filled');assert.ok(highest-lowest>.014);
 });
 
 test('prop paths are continuous, pause with action time, and reset after interruption',()=>{

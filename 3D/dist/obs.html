@@ -7,10 +7,10 @@
   <title>TARAIRON | 遠心重力生活区画 3D</title>
   <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船内猫ルーシーの暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/3D/assets/favi.ico">
-  <script type="module" crossorigin src="/3D/assets/obs-CUWROJPz.js"></script>
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-Drt93lXh.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-w5NX9vKm.js">
-  <link rel="stylesheet" crossorigin href="/3D/assets/obs-DuVGBmYr.css">
+  <script type="module" crossorigin src="/3D/assets/obs-OY5FxR8-.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-ByUN_pnm.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-erV2oLHG.js">
+  <link rel="stylesheet" crossorigin href="/3D/assets/obs-BgV4ySFB.css">
 </head>
 <body>
   <main id="observation">
@@ -38,15 +38,23 @@
       <canvas id="ship-view" aria-label="遠心重力生活区画の三層。マイロと船内猫ルーシーが暮らしている" tabindex="0"></canvas>
       <div class="view-top"><span>SECTION A—A <b>/</b> HABITAT</span><div class="camera-tools">
         <button id="view-all" class="icon-button active" data-tip="全景" aria-label="全景" aria-pressed="true"><i data-lucide="scan"></i></button>
-        <button id="view-milo" class="icon-button" data-tip="マイロ" aria-label="マイロに寄る" aria-pressed="false"><i data-lucide="user-round"></i></button>
-        <button id="view-cat" class="icon-button" data-tip="ルーシー" aria-label="ルーシーに寄る" aria-pressed="false"><i data-lucide="cat"></i></button>
-        <button id="view-droid" class="icon-button" data-tip="ドロイド" aria-label="ドロイドに寄る" aria-pressed="false"><i data-lucide="bot"></i></button>
+        <div class="character-camera" data-camera-character="milo">
+          <button id="view-milo" class="icon-button" data-tip="マイロ" aria-label="マイロに寄る" aria-pressed="false" aria-expanded="false" aria-controls="character-view-controls"><i data-lucide="user-round"></i></button>
+          <div id="character-view-controls" class="character-view-controls" role="group" aria-label="キャラクターの視点" hidden>
+            <button id="follow-angle" class="icon-button" aria-label="俯瞰角度を切り替える" data-tip="俯瞰角度を切り替える"><i data-lucide="rotate-cw" aria-hidden="true"></i></button>
+            <button id="first-person" class="icon-button" aria-label="本人視点" aria-pressed="false" data-tip="本人視点"><i data-lucide="eye" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <div class="character-camera" data-camera-character="cat"><button id="view-cat" class="icon-button" data-tip="ルーシー" aria-label="ルーシーに寄る" aria-pressed="false" aria-expanded="false" aria-controls="character-view-controls"><i data-lucide="cat"></i></button></div>
+        <div class="character-camera" data-camera-character="droid"><button id="view-droid" class="icon-button" data-tip="ドロイド" aria-label="ドロイドに寄る" aria-pressed="false" aria-expanded="false" aria-controls="character-view-controls"><i data-lucide="bot"></i></button></div>
         <span class="tool-divider"></span>
         <button id="zoom-out" class="icon-button" data-tip="縮小" aria-label="縮小"><i data-lucide="minus"></i></button>
         <button id="zoom-in" class="icon-button" data-tip="拡大" aria-label="拡大"><i data-lucide="plus"></i></button>
         <button id="obs-vr" type="button" class="icon-button vr-button" data-tip="立体表示 / Meta Quest" aria-label="立体表示 / Meta Quest" aria-pressed="false" disabled>3D</button>
         <button id="obs-fullscreen" class="icon-button" data-tip="全画面" aria-label="全画面"><i data-lucide="maximize"></i></button>
       </div></div>
+      <div id="first-person-eyelids" class="first-person-eyelids" aria-hidden="true" hidden><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path id="first-person-upper-lid"/><path id="first-person-lower-lid"/></svg></div>
+      <div id="first-person-hint" class="first-person-hint" hidden></div>
       <div id="station-status" class="station-status" role="status" aria-live="polite" aria-atomic="true" hidden><span class="signal-lamp" aria-hidden="true"></span><strong id="station-name"></strong><span id="station-phase"></span></div>
       <div id="call-alert" class="call-alert" hidden><button id="acknowledge"><i data-lucide="radio"></i><span id="call-text"></span><i data-lucide="arrow-up-right"></i></button></div>
       <div id="lounge-game-prompt" class="call-alert" hidden><button id="open-lounge-games" type="button" aria-haspopup="dialog" aria-controls="cabin-games"><i data-lucide="swords" aria-hidden="true"></i><span data-ja="ラウンジゲーム" data-en="Lounge games">ラウンジゲーム</span><i data-lucide="arrow-up-right" aria-hidden="true"></i></button></div>

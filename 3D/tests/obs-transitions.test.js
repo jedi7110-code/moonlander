@@ -4,7 +4,8 @@ import {MeshStandardMaterial,Vector3} from 'three';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,CatRoutine,Supplies,getStation,currentAction} from '../src/obs/state.js';
 import {createMilo,animateMilo,createCat,animateCat} from '../src/obs/characters.js';
-import {LOUNGE_ENTRY_SECONDS,loungeEntryAge,loungeExitPose} from '../src/obs/lounge-exit.js';
+import {LOUNGE_ENTRY_SECONDS,LOUNGE_EXIT_SECONDS,loungeEntryAge,loungeExitPose} from '../src/obs/lounge-exit.js';
+import {LOUNGE_STOW_SECONDS} from '../src/obs/lounge-handling.js';
 import {MED_BED} from '../src/obs/medical.js';
 const materials=()=>new Proxy({},{get:()=>new MeshStandardMaterial()});
 function setup(id){const station=getStation(id),actor=new CrewMotion({floor:station.floor,x:station.x}),care=new Supplies(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.8});brain.health.nextIncident=Infinity;brain.cur=station;brain._startPerform(station);return{actor,brain,care};}
@@ -13,14 +14,14 @@ test('seating pauses recovery, ignores repeated lounge clicks, and queues the ne
   assert.equal(brain.clickLounge(),'pending');brain.update(.7);assert.ok(brain.needs.fun<fun);
   brain._go(getStation('hydro'));brain._go(getStation('galley'));assert.equal(actor.busy,false);
   const age=brain.loungeEntry.age;brain.update(0);assert.equal(brain.loungeEntry.age,age);
-  brain.update(LOUNGE_ENTRY_SECONDS);assert.equal(brain.state,'leavingLounge');assert.equal(actor.busy,false);
-  brain.update(2.8);assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
+  brain.update(LOUNGE_ENTRY_SECONDS);brain.update(LOUNGE_STOW_SECONDS);assert.equal(brain.state,'leavingLounge');assert.equal(actor.busy,false);
+  brain.update(LOUNGE_EXIT_SECONDS);assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
 });
 test('seating keeps the soles grounded and the hips continuous through the first seated frame',()=>{
   const root=createMilo(materials());root.rotation.y=.15;let previous=null;
-  for(let i=0;i<=145;i++){
-    const age=Math.min(i/60,2.4),entry=i<144?{age}:null;
-    root.position.z=entry?loungeExitPose(loungeEntryAge(age)).depth:.06;
+  for(let i=0;i<=Math.ceil(LOUNGE_ENTRY_SECONDS*60)+1;i++){
+    const age=Math.min(i/60,LOUNGE_ENTRY_SECONDS),entry=age<LOUNGE_ENTRY_SECONDS?{age}:null;
+    const passage=entry?loungeExitPose(loungeEntryAge(age)):{x:0,depth:.06};root.position.set(passage.x,0,passage.depth);
     animateMilo(root,{action:'lounge',moving:false,facing:1,time:age,actionTime:0,leisure:'tablet',loungeEntry:entry});root.updateMatrixWorld(true);
     const point=root.userData.hips.getWorldPosition(new Vector3());if(previous)assert.ok(point.distanceTo(previous)<.025);previous=point;
     for(const {boot}of root.userData.legs)assert.ok(boot.localToWorld(new Vector3(0,-.107,0)).y>-.008);

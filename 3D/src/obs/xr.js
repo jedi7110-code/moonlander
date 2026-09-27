@@ -133,7 +133,8 @@ export class ObservationXR {
     const v=this.view,c=v.camera;
     this.quality=new ObservationXRQuality(v);this.picker=new XRCharacterPicker(v);
     this.saved={parent:c.parent,position:c.position.clone(),quaternion:c.quaternion.clone(),scale:c.scale.clone(),fov:c.fov,aspect:c.aspect,near:c.near,far:c.far,
-      mode:v.mode,zoom:v.zoom,center:v.center.clone(),targetCenter:v.targetCenter.clone(),viewHeight:v.viewHeight,targetHeight:v.targetHeight};
+      mode:v.mode,zoom:v.zoom,center:v.center.clone(),targetCenter:v.targetCenter.clone(),viewHeight:v.viewHeight,targetHeight:v.targetHeight,
+      characterCamera:v.characterCamera?{angle:v.characterCamera.angle,firstPerson:v.characterCamera.firstPerson}:null};
     this.rig=new THREE.Group();this.rig.name='XR viewer';v.scene.add(this.rig);this.rig.add(c);
     this.navigation=new XRNavigation(this.rig);this.followPoint=new THREE.Vector3();this.followDelta=new THREE.Vector3();this.followRoot=null;this.menuOpen=false;
     c.position.set(0,0,0);c.quaternion.identity();c.scale.setScalar(1);
@@ -255,6 +256,7 @@ export class ObservationXR {
       for(const key of ['fov','aspect','near','far'])c[key]=s[key];c.updateProjectionMatrix();
       for(const key of ['mode','zoom','viewHeight','targetHeight'])v[key]=s[key];
       v.center.copy(s.center);v.targetCenter.copy(s.targetCenter);v.zoomAnchor=null;
+      if(v.characterCamera){v.characterCamera.select(s.mode);if(s.characterCamera)Object.assign(v.characterCamera,s.characterCamera);}
       this.rig.removeFromParent();this.rig=null;this.saved=null;
       if(!this.disposed){v.resize();v.onModeChange?.(v.mode);}
     }

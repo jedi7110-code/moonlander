@@ -36,7 +36,7 @@ test('all bitmap expressions swap UVs without reallocating textures or geometry;
       assert.equal(droid.face.expression,expression);assert.equal(face.geometry,geometry);assert.equal(face.material.map,map);
       const uv=geometry.attributes.uv.array;assert.ok([...uv].every(x=>x>=0&&x<=1));seen.add([...uv].join(','));
     }
-    assert.equal(seen.size,6);assert.equal(droid.face.setExpression('missing'),false);
+    assert.equal(seen.size,Object.keys(DROID_EXPRESSIONS).length);assert.equal(droid.face.setExpression('missing'),false);
     droid.update(0,'charging');assert.equal(face.visible,false);droid.update(0,'idle');assert.equal(face.visible,true);
   }finally{droid.dispose();}
 });

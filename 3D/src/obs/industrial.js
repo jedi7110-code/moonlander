@@ -69,6 +69,7 @@ export function industrialMaterials(source){
     white:make('equipment enamel',0xdeded2,.84,.18,paint,{bumpScale:.004}),
     rubber:make('rubber',0x131714,.9,.04,steel,{bumpScale:.003}),
     wetSteel:make('wet chain',0x697477,.24,.92,steel,{envMapIntensity:1.15,bumpScale:.004}),
+    hookYellow:make('load hook safety yellow',0xd0ad24,.64,.28,paint,{bumpScale:.0015}),
     pipeSteel:make('pipe casing',0x85836f,.65,.75,steel),
     cable:make('cable jacket',0x151b19,.42,.12,steel,{bumpScale:.002}),
     brass:make('aged brass',0x9c7840,.54,.8,steel),
@@ -98,10 +99,54 @@ function cableRun(root,m,left,right,y,z,count=4,sag=.42){
 function chain(root,m,x,top,bottom,z){
   const geometry=new THREE.TorusGeometry(.064,.018,6,12);
   geometry.scale(1,1.43,1);
+  let last;
   for(let i=0,y=top;y>bottom;y-=.123,i++){
     const mesh=new THREE.Mesh(geometry,m.wetSteel);mesh.position.set(x+Math.sin(i*.17)*.012,y,z);
     mesh.rotation.y=i%2?Math.PI/2:.12;mesh.castShadow=true;root.add(mesh);
+    last=mesh.position.clone();
   }
+  return last;
+}
+
+function liftingHook(root,m,attachment){
+  // The perpendicular connector passes through the final chain link and eye.
+  const connector=new THREE.Mesh(new THREE.TorusGeometry(.032,.011,6,12),m.wetSteel);
+  connector.geometry.scale(1,1.45,1);connector.rotation.y=Math.PI/2;
+  connector.position.copy(attachment);connector.position.y-=.09;
+  connector.castShadow=true;root.add(connector);
+  const hook=new THREE.Group();hook.name='Forged yellow safety hook';
+  hook.position.copy(attachment);hook.position.y-=.14;hook.scale.setScalar(.86);root.add(hook);
+
+  const eye=new THREE.Mesh(new THREE.TorusGeometry(.040,.012,8,16),m.hookYellow);
+  eye.geometry.scale(1,1.25,1);eye.position.y=-.055;eye.castShadow=true;hook.add(eye);
+  cylinder(hook,m.hookYellow,0,-.120,0,.037,.030,.037,12).name='Hook swivel collar';
+  cylinder(hook,m.wetSteel,0,-.143,0,.026,.014,.026,12);
+  cylinder(hook,m.hookYellow,0,-.155,0,.029,.024,.029,6);
+
+  // Forged, tapered C profile: heavy lower bowl, a narrow upturned nose,
+  // and a real throat opening. Rounded bevels continue around both edges.
+  const shape=new THREE.Shape();shape.moveTo(-.006,-.145);
+  shape.quadraticCurveTo(-.030,-.140,-.053,-.179);
+  shape.bezierCurveTo(-.067,-.215,-.124,-.313,-.131,-.369);
+  shape.bezierCurveTo(-.147,-.445,-.097,-.497,-.037,-.488);
+  shape.bezierCurveTo(.040,-.487,.100,-.404,.130,-.314);
+  shape.bezierCurveTo(.134,-.299,.130,-.287,.122,-.289);
+  shape.bezierCurveTo(.105,-.289,.104,-.304,.094,-.326);
+  shape.bezierCurveTo(.061,-.398,.018,-.440,-.029,-.438);
+  shape.bezierCurveTo(-.073,-.436,-.080,-.410,-.068,-.370);
+  shape.bezierCurveTo(-.050,-.313,-.004,-.239,.018,-.192);
+  shape.quadraticCurveTo(.030,-.164,-.006,-.145);
+  const geometry=new THREE.ExtrudeGeometry(shape,{depth:.036,steps:1,curveSegments:8,bevelEnabled:true,bevelSegments:2,bevelSize:.009,bevelThickness:.010});
+  geometry.translate(0,0,-.018);
+  const body=new THREE.Mesh(geometry,m.hookYellow);body.name='Tapered forged hook body';body.castShadow=body.receiveShadow=true;hook.add(body);
+
+  // A thin safety latch closes the throat without filling the hollow body.
+  const from=new THREE.Vector3(.021,-.186,.012),to=new THREE.Vector3(.120,-.309,.012);
+  const latch=box(hook,m.hookYellow,0,0,0,.015,from.distanceTo(to)+.016,.014,.004);
+  latch.name='Hook safety latch';latch.position.copy(from).add(to).multiplyScalar(.5);
+  latch.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize());
+  const hinge=cylinder(hook,m.wetSteel,from.x,from.y,0,.010,.065,.010,10);hinge.rotation.x=Math.PI/2;
+  hinge.name='Safety latch pivot pin';
 }
 
 function hoist(root,m,x,y){
@@ -110,13 +155,12 @@ function hoist(root,m,x,y){
   for(const dx of [-.25,.25]){const wheel=cylinder(root,m.metal,x+dx,y+2.96,z,.11,.20,.11,12);wheel.rotation.x=Math.PI/2;}
   box(root,m.yellow,x,y+2.62,z,.43,.43,.28,.06);
   for(const dx of [-.12,.12]){const stripe=box(root,m.dark,x+dx,y+2.62,z+.15,.07,.37,.012);stripe.rotation.z=-.45;}
-  chain(root,m,x-.12,y+2.43,y+.63,z);chain(root,m,x+.12,y+2.43,y+1.03,z+.05);
-  // Open hook, rather than another closed chain link.
-  const hook=new THREE.Mesh(new THREE.TorusGeometry(.11,.031,8,18,Math.PI*1.55),m.wetSteel);
-  hook.position.set(x-.12,y+.57,z);hook.rotation.z=.4;root.add(hook);
+  const loadEnd=chain(root,m,x-.12,y+2.43,y+.63,z);
+  chain(root,m,x+.12,y+2.43,y+1.03,z+.05);
+  liftingHook(root,m,loadEnd);
 }
 
-export function addIndustrialDeck(root,m,y,level){
+export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
   const front=CABIN_AISLE.deckFront+.19;
   if(level===DECK.HABITATION)for(const x of LOUNGE_LIGHTS){
     for(const dx of [-.47,.47])rod(root,m.dark,[x+dx,y+2.98,-.08],[x+dx,y+2.69,-.08],.022);
@@ -193,7 +237,7 @@ export function addIndustrialDeck(root,m,y,level){
     pipe(root,m.cable,[[x-width*.3,y+1.61,-1.24],[x-width*.3,y+1.30,-1.24],[x+width*.3,y+1.24,-1.24],[x+width*.3,y+1.61,-1.24]],.025);
   }
   // Grated edge strips: surfaces are flush and the ladder opening stays open.
-  for(const side of [-1,1])for(let i=0;i<57;i++){
+  if(floorDetails)for(const side of [-1,1])for(let i=0;i<57;i++){
     const x=side*(.75+i*.214);
     box(root,m.dark,x,y+.009,2.19,.018,.017,.54);
     if(i%4===0)box(root,m.metal,x,y+.019,2.19,.024,.017,.53);
@@ -202,7 +246,7 @@ export function addIndustrialDeck(root,m,y,level){
     hoist(root,m,11.36,y);
     chain(root,m,-12.77,y+3.09,y+.18,front+.16);
     // Condensation sheen belongs beside coolant equipment, not the galley.
-    for(const [x,width] of [[5.69,1.76],[11.43,1.32]]){
+    if(floorDetails)for(const [x,width] of [[5.69,1.76],[11.43,1.32]]){
       box(root,m.wetFloor,x,y+.024,1.49,width,.009,1.87,.003);
       for(let i=0;i<19;i++)box(root,m.dark,x-width/2+i*width/19,y+.032,1.49,.021,.014,1.85);
     }

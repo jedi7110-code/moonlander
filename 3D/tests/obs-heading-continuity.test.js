@@ -8,7 +8,9 @@ import {GymVisit} from '../src/obs/gym-visit.js';
 import {BunkVisit} from '../src/obs/bunk-visit.js';
 import {medicalDuration} from '../src/obs/medical.js';
 import {applyCabinLadder} from '../src/obs/cabin-ladder.js';
-import {CatRoutine,CatMotion,Supplies} from '../src/obs/state.js';
+import {CatRoutine,CatMotion,Supplies,CrewMotion} from '../src/obs/state.js';
+import {LADDER_X} from '../src/obs/layout.js';
+import {positionY} from '../src/obs/ship.js';
 
 const character=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 function continuity(root,label,limit=.09){
@@ -71,10 +73,13 @@ test('both ladder transfers meet walking headings without changing rung-locked c
   for(const up of [true,false])for(const startYaw of [-Math.PI/2,Math.PI/2])for(const endYaw of [-Math.PI/2,Math.PI/2]){
     root.rotation.y=startYaw;const check=continuity(root,'ladder');
     const startHeight=up?0:3.392,endHeight=up?3.392:0;
-    for(let i=0;i<=360;i++){
-      const height=startHeight+(endHeight-startHeight)*i/360;
+    const actor=new CrewMotion({floor:up?2:1,x:LADDER_X});actor.goTo({floor:up?1:2,x:LADDER_X});
+    for(let i=0;i<=1200;i++){
+      const height=positionY(actor.y);
       animateMilo(root,{moving:false,facing:1,action:null,time:i/60});
       applyCabinLadder(root,{height,startHeight,endHeight,startYaw,endYaw});check();
+      if(Math.abs(height-endHeight)<1e-8)break;
+      actor.update(1/60);
     }
     animateMilo(root,{moving:true,facing:Math.sign(endYaw),action:null,time:6});check();
   }

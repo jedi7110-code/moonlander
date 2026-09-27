@@ -88,6 +88,6 @@ test('a wall entry waits for the person and later exits fully onto the front ais
   const {actor,cat,step}=setup(1,CAT_PORT.x);actor.x=CAT_PORT.x;cat.motion.goTo({floor:2,x:760},()=>cat.rest('look',100));
   for(let i=0;i<60;i++)step();assert(cat.motion.waitingForCrew);assert.equal(cat.motion.z,CAT_PORT.walkZ);
   actor.goTo({floor:1,x:CAT_PORT.x+200});
-  for(let i=0;i<18*60;i++)step();
+  for(let i=0;i<(18+2*cat.motion.passageWalkSeconds)*60;i++)step();
   assert.equal(cat.motion.floor,2);assert.equal(cat.motion.busy,false);assert.equal(cat.motion.z,CAT_PORT.walkZ);assert.equal(cat.motion.hidden,false);
 });

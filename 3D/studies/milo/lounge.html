@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>マイロ / ラウンジの動作スタディー</title>
+  <link rel="stylesheet" href="./lounge.css">
+  <script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script>
+</head>
+<body><main>
+  <header><div><p class="eyebrow">TARAIRON / MILO STUDY</p><h1>ラウンジの動作</h1></div><p class="tag">通常カメラ</p></header>
+  <nav class="items" aria-label="確認する小物">
+    <button data-item="tablet" aria-pressed="true" disabled>パッド端末</button><button data-item="music" aria-pressed="false" disabled>ヘッドホン</button><button data-item="cat" aria-pressed="false" disabled>猫じゃらし</button>
+    <span>手に取る → 使う → 元へ戻す</span>
+  </nav>
+  <section class="stage" aria-label="ラウンジの動作チェック">
+    <canvas id="lounge-canvas" aria-label="通常カメラで見るマイロとラウンジ。ドラッグで回転、ホイールで拡大。"></canvas>
+    <div class="badge"><span id="item-name">パッド端末</span><strong id="phase" role="status">手に取る</strong></div>
+    <div id="loading" role="status">ラウンジを準備しています…</div><p id="error" role="alert" hidden></p>
+  </section>
+  <section class="controls" aria-label="動作の操作">
+    <div class="timeline-heading"><label for="time">動作の位置</label><output id="clock" for="time">0.00 秒</output></div>
+    <input id="time" type="range" min="0" max="16.2" value="2.4" step="0.01" disabled>
+    <div class="toolbar">
+      <div class="playback"><button id="play" aria-pressed="false" disabled>再生</button><button id="restart" disabled>最初から</button><label>速度 <select id="speed" aria-label="再生速度" disabled><option value=".25">0.25倍</option><option value=".5">0.5倍</option><option value="1" selected>1倍</option></select></label><label><input id="loop" type="checkbox" disabled> 繰り返し</label></div>
+      <div class="phases" aria-label="動作の場面"><button data-phase="enter" disabled>横歩きで入る</button><button data-phase="sit" disabled>座る</button><button data-phase="take" disabled>手に取る</button><button data-phase="use" disabled>使う</button><button data-phase="put" disabled>元へ戻す</button><button data-phase="stand" disabled>立ち上がる</button><button data-phase="leave" disabled>横歩きで出る</button></div>
+    </div>
+    <div class="footer"><p>ドラッグで回転 · ホイール／ピンチで拡大 · スライダーでコマ送り</p><div class="views" aria-label="カメラ"><button data-view="front" disabled>正面</button><button data-view="oblique" aria-pressed="true" disabled>斜め</button><button data-view="side" disabled>横</button><button data-view="hands" disabled>手元</button></div></div>
+  </section>
+</main><script type="module" src="./lounge-study.js"></script></body>
+</html>

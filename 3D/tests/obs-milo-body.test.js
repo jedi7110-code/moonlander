@@ -69,7 +69,7 @@ test('the collar follows the scanned neck instead of leaving wide side openings'
 test('the supplied human surface is one connected mesh across every body joint',()=>{
   const root=character(),skin=root.userData.bodySkin;
   assert.ok(skin?.isSkinnedMesh);assert.equal(root.userData.bodySource,'FinalBaseMesh.obj');
-  assert.equal(skin.skeleton.bones.length,49,'two intermediate elbow supports preserve the bend');
+  assert.equal(skin.skeleton.bones.length,53,'four spine levels and two elbow supports preserve the bends');
   const parent=Array.from({length:data.positions.length/3},(_,i)=>i),used=new Set();
   function find(i){while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
   for(let i=0;i<data.indices.length;i+=3){

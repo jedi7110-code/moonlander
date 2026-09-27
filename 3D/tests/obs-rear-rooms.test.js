@@ -5,6 +5,24 @@ import {REAR_ROOM_GATES,FLOOR_Y} from '../src/obs/ship.js';
 import {createRearRoomFurnishings} from '../src/obs/rear-room-furnishings.js';
 import {createMilo} from '../src/obs/characters.js';
 
+test('work-shirt seams frame the pocket instead of stacking filled panels beneath it',()=>{
+  const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});
+  const room=createRearRoomFurnishings(m,REAR_ROOM_GATES[1]),shirt=room.getObjectByName('Hanging work shirt');room.updateMatrixWorld(true);
+  const seams=shirt.getObjectsByProperty('name','Work shirt pocket seam'),pockets=shirt.getObjectsByProperty('name','Work shirt chest pocket'),flaps=shirt.getObjectsByProperty('name','Work shirt pocket flap');
+  assert.equal(pockets.length,2);
+  for(let i=0;i<2;i++){
+    const x=(i===0?-1:1)*.046;
+    const point=shirt.localToWorld(new Vector3(x,1.27,.15)),ray=new Raycaster(point,new Vector3(0,0,-1));
+    assert.equal(ray.intersectObject(seams[i],false).length,0,'no hidden seam face under the pocket centre');
+    assert.ok(ray.intersectObject(pockets[i],false).length>0,'the pocket remains solid');
+    const seam=new Box3().setFromObject(seams[i]),pocket=new Box3().setFromObject(pockets[i]),flap=new Box3().setFromObject(flaps[i]);
+    assert.ok(Math.abs(seam.max.z-pocket.max.z)<1e-7,'border and pocket join flush');
+    assert.ok(flap.min.z-pocket.max.z>.0039,'flap clears the pocket and its outlines');
+    assert.ok(pocket.min.z-new Box3().setFromBufferAttribute(shirt.geometry.attributes.position).max.z-shirt.getWorldPosition(new Vector3()).z>.003,'pocket clears the base fabric');
+  }
+  room.traverse(mesh=>mesh.geometry?.dispose());material.dispose();
+});
+
 test('02 has laundry and clothes; 03 has food and household supplies',()=>{
   assert.deepEqual(REAR_ROOM_GATES.map(g=>g.room),['operations','laundry','stores']);
   assert(REAR_ROOM_GATES.every(g=>g.x===REAR_ROOM_GATES[0].x&&g.width===REAR_ROOM_GATES[0].width&&g.height===REAR_ROOM_GATES[0].height),'all entrances have the same size and alignment');

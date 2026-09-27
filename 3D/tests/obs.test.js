@@ -71,13 +71,26 @@ test('Milo eye surfaces meet the scanned eyelids without holes from oblique view
 function advance(actor,seconds){for(let i=0;i<seconds*60;i++)actor.update(1/60);}
 test('the lounge table clears the seat and its props rest on the top without a gap',()=>{
   const material=new MeshStandardMaterial(),table=createLoungeTable(new Proxy({},{get:()=>material}));
+  table.updateMatrixWorld(true);
   const bounds=name=>new Box3().setFromObject(table.getObjectByName(name));
   const top=bounds('Tabletop'),pedestal=bounds('Table pedestal');
   assert.ok(top.max.y-LOUNGE_SEAT.top>.30&&top.max.y-LOUNGE_SEAT.top<.34);
   assert.ok(top.min.y>LOUNGE_SEAT.top+.20);
   assert.ok(Math.abs(pedestal.min.y)<1e-7);
   assert.ok(Math.abs(pedestal.max.y-top.min.y)<1e-7);
-  for(const name of ['Table book','Table cup'])assert.ok(Math.abs(bounds(name).min.y-top.max.y)<1e-7);
+  const book=bounds('Table book'),cup=bounds('Table cup');
+  assert.ok(Math.abs(book.min.y-top.max.y)<1e-7);
+  assert.ok(Math.abs(cup.min.y-book.max.y)<1e-7,'the unused cup rests on the red book');
+  for(const name of ['Table pad terminal','Table headphones','Table cat teaser']){
+    const item=bounds(name);
+    assert.ok(Math.abs(item.min.y-top.max.y)<1e-7,`${name} rests on the tabletop`);
+    assert.ok(item.min.x>top.min.x&&item.max.x<top.max.x&&item.min.z>top.min.z&&item.max.z<top.max.z,`${name} stays inside the table edge`);
+  }
+  table.updateMatrixWorld(true);
+  const coffee=table.getObjectByName('Table coffee surface'),center=coffee.getWorldPosition(new Vector3());
+  const hit=new Raycaster(center.clone().add(new Vector3(0,.3,0)),new Vector3(0,-1,0)).intersectObject(table,true)[0];
+  assert.equal(hit.object,coffee,'the cup is open and reveals coffee below the rim');
+  assert.ok(center.y<bounds('Table cup').max.y-.02);
   table.traverse(mesh=>mesh.geometry?.dispose());material.dispose();
 });
 test('the rotating habitat belongs to the mothership, while Barramundi remains the lander',async()=>{
@@ -172,7 +185,7 @@ test('supplies are finite and never regenerate without an order',()=>{
 test('cat eats only on reaching the bowl and consumes one delivery',()=>{
   const care=new Supplies(),cat=new CatRoutine(care);cat.fetch();cat.update(1);assert.equal(care.has('catfood'),true);
   const laneDetour=2*(CAT_PORT.walkZ-CAT_BOWL.depth)/(cat.motion.walkSpeed*.022);
-  for(let i=0;i<(45+laneDetour)*60&&cat.mode!=='eat';i++)cat.update(1/60);
+  for(let i=0;i<(45+laneDetour+2*cat.motion.passageWalkSeconds)*60&&cat.mode!=='eat';i++)cat.update(1/60);
   assert.equal(cat.mode,'eat');assert.equal(cat.motion.floor,CAT_BOWL.floor);assert.equal(cat.motion.x,CAT_BOWL.approachX);assert.equal(cat.motion.facing,-1);assert.equal(care.supplies.catfood,2);assert.equal(cat.hunger,100);
 });
 test('the bowl is between the galley and water station, with the cat eating beside it',()=>{

@@ -116,13 +116,11 @@ export function createMedicalBay(m,y){
   box(root,m.enamel,4.39,y+1.33,-1.30,1.15,.24,.12,.014);
   for(let i=0;i<4;i++){
     cylinder(root,i%2?m.metal:m.teal,4.03+i*.24,y+1.33,-1.20,.062,.085,.062,20).rotation.x=Math.PI/2;
-    pipe(root,m.rubber,[[4.03+i*.24,y+1.27,-1.18],[4.08+i*.24,y+.96,-1.17],[4.16+i*.24,y+1.05,-1.14]],.015);
   }
   box(root,m.dark,6.14,y+1.63,-1.25,.45,.81,.25,.025);
   label(root,'AUTO\nSCAN',6.14,y+1.68,-1.10,.32,.24,{size:56});
   const lampMaterial=new THREE.MeshBasicMaterial({color:0x485e58,toneMapped:false});
   box(root,lampMaterial,6.14,y+1.96,-1.10,.22,.055,.025,.007);
-  for(const side of [-1,1])pipe(root,m.rubber,[[6.14+side*.09,y+1.30,-1.13],[6.14+side*.16,y+1.11,-1.10],[6.3+side*.1,y+1.23,-1.09]],.014);
   return{root,bed,platform,pistons,rig,display,lampMaterial};
 }
 

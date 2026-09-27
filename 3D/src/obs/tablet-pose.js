@@ -43,17 +43,31 @@ export function setTabletHandFit(root,enabled){
   if(fit)skin.geometry=enabled?fit.geometry:fit.original;
 }
 
+function tabletGripRotation(rig){
+  if(rig.tabletGripRotation)return rig.tabletGripRotation;
+  // Keep the approved finger-pad contact in tablet space as the reading
+  // posture changes. Re-aiming the wrist from each forearm moves the pads off it.
+  const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.12,0,0));
+  const shoulder=new THREE.Vector3(rig.side*.207,1+.488*Math.cos(.32),.488*Math.sin(.32));
+  const reference={...rig,arm:{position:shoulder}};
+  const target=new THREE.Vector3(rig.side*.17,.014,-.115).applyQuaternion(rotation).add(new THREE.Vector3(0,1.32,.46));
+  const {forearm}=solveHingeArm(reference,target,new THREE.Vector3(rig.side,-1.3,.1));
+  const hy=forearm.normalize().negate(),hz=new THREE.Vector3(0,-1,0).applyQuaternion(rotation);
+  hz.addScaledVector(hy,-hz.dot(hy)).normalize();const hx=hy.clone().cross(hz).normalize();
+  rig.tabletGripRotation=rotation.invert().multiply(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(hx,hy,hz)));
+  return rig.tabletGripRotation;
+}
+
 export function applyTabletHands(root){
   const {tablet}=root.userData.leisure;
   for(const rig of root.userData.arms){
     const {arm,elbow,hand,side}=rig;
     const target=new THREE.Vector3(side*.17,.014,-.115).applyQuaternion(tablet.quaternion).add(tablet.position);
-    const pose=solveHingeArm(rig,target,new THREE.Vector3(side,-1.3,.1)),forearm=pose.forearm;
+    const rotation=tablet.quaternion.clone().multiply(tabletGripRotation(rig));
+    const alignedElbow=target.clone().add(new THREE.Vector3(0,hand.position.length(),0).applyQuaternion(rotation));
+    const pose=solveHingeArm(rig,target,alignedElbow.sub(arm.position));
     arm.quaternion.copy(pose.upper);elbow.quaternion.copy(pose.lower);
     // Keep the wrist straight and distribute the turn through the forearm.
-    const hy=forearm.clone().normalize().negate(),hz=new THREE.Vector3(0,-1,0).applyQuaternion(tablet.quaternion);
-    hz.addScaledVector(hy,-hz.dot(hy)).normalize();const hx=hy.clone().cross(hz).normalize();
-    const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(hx,hy,hz));
     hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(rotation);
     for(const finger of rig.fingers){finger.rotation.set(.15,0,0);finger.userData.links[0].rotation.x=.15;finger.userData.links[1].rotation.x=.08;}
     rig.thumb.position.set(-side*.033,-.051,.013);

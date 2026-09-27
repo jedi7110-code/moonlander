@@ -16,12 +16,12 @@ test('droid has a smaller expression head and complete finite three-dimensional 
   }finally{droid.dispose();}
 });
 
-test('all six expressions replace each other and survive motion updates without rebuilding geometry',()=>{
+test('all seven expressions replace each other and survive motion updates without rebuilding geometry',()=>{
   const droid=createDroid();
   try{
     const geometryIds=()=>{const ids=[];droid.head.traverse(o=>{if(o.geometry)ids.push(o.geometry.uuid);});return ids;};
     const original=geometryIds();
-    assert.equal(Object.keys(DROID_EXPRESSIONS).length,6);
+    assert.equal(Object.keys(DROID_EXPRESSIONS).length,7);
     for(const name of Object.keys(DROID_EXPRESSIONS)){
       assert.equal(droid.face.setExpression(name),true);droid.update(1.16,'walk');
       assert.equal(droid.face.expression,name);

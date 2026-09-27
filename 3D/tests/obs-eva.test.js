@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Box3,Group,MeshStandardMaterial,Vector3} from 'three';
-import {DECK,EVA,EVA_PASSAGE,STATIONS,getStation} from '../src/obs/layout.js';
+import {DECK,EVA,EVA_PASSAGE,STATIONS,getStation,CABIN_AISLE} from '../src/obs/layout.js';
 import {getStation as sharedStation} from '../../js/obs/layout.js?v=15';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies} from '../src/obs/state.js';
@@ -37,6 +37,9 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
   globalThis.document={createElement(){return{getContext(){return{fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};}};}};
   try{bay=createEVABay(m,3.392);}finally{delete globalThis.document;}
   assert.equal(bay.suits.length,3);bay.root.updateMatrixWorld(true);
+  const partitions=bay.root.getObjectByName('Permanent airlock partitions');
+  assert.ok(partitions?.visible,'the bay owns both partitions independently of the first-person wall');
+  assert.ok(Math.abs(new Box3().setFromObject(partitions).max.z-CABIN_AISLE.deckFront)<1e-6,'both partitions reach the widened deck edge');
   const bounds=bay.suits.map(suit=>new Box3().setFromObject(suit));
   for(let i=0;i<3;i++){
     assert.equal(bay.suits[i].userData.suitNumber,i+1);assert.ok(bounds[i].min.y>3.392+.20);assert.ok(bounds[i].max.y<3.392+2.8);

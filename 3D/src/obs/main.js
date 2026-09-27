@@ -16,17 +16,20 @@ import {Sprout} from 'lucide';
 import {PLANT} from './layout.js';
 import {healthDisplay} from './health-display.js';
 import {DroidRoutine} from './droid-routine.js';
+import {Eye} from 'lucide';
+import {updateCharacterCameraUI,updateFirstPersonOverlay} from './character-camera-ui.js';
 
 const $=id=>document.getElementById(id);
-const icons={Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
+const icons={Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
 const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
-const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true}),audio=new CabinAudio();
+const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
 let paused=false,elapsed=0,view=null,immersive=null,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
 let idleCamera=null,unbindIdleCamera=null;
+let mousePreviewPending=new URLSearchParams(location.search).get('preview')==='mouse';
 const timers=[];
 let messageTimer=null;
 function dismissMessage(){
@@ -102,6 +105,8 @@ function updateHUD(){
   const passage=cat.motion.portal;
   $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...(catStates[cat.mode]??['立っている','Standing']));
   if(cat.bunkWake)$('cat-activity').textContent=cat.bunkWake.visit.phase==='sleeping'?words('マイロと眠っている','Sleeping with Milo'):words('マイロと目を覚ます','Waking up with Milo');
+  const pursuit=cat.mouseChase?.pose;
+  if(pursuit)$('cat-activity').textContent=pursuit.phase==='chase'?words('ネズミを追いかける','Chasing a mouse'):pursuit.phase==='braking'?words('逃げたネズミを見送る','Watching the mouse escape'):pursuit.phase==='turn'?words('ネズミへ向きを変える','Turning toward the mouse'):words('ネズミの様子をうかがう','Watching a mouse');
   for(const [key,stock]of Object.entries(care.supplies)){
     $('stock-'+key).textContent=`${stock}/${care.capacity[key]}`;
     const button=document.querySelector(`[data-use="${key}"]`),labels={food:['食事','Eat'],water:['水を飲む','Drink'],catfood:['ルーシーに餌を出す','Feed Lucy']};
@@ -114,6 +119,7 @@ function updateHUD(){
   $('request-supply').setAttribute('aria-label',words('コンソールから物資配送を依頼','Order supplies at console'));
   document.querySelectorAll('[id^="view-"]').forEach(button=>{if(!['view-all','view-milo','view-cat','view-droid'].includes(button.id))return;const selected=button.id==='view-'+view?.mode;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
   $('camera-label').textContent=view?.mode==='droid'?`3817 / ${view.droidRoutine.label}`:{all:'CAM 01 / WIDE',milo:'CAM 02 / MILO',cat:'CAM 03 / LUCY',manual:'CAM / MANUAL'}[view?.mode]||'CAM 01 / WIDE';
+  updateCharacterCameraUI(document,view,words);
   const signal=feedback.summary,status=$('station-status');status.hidden=!signal;
   if(signal){
     const phases={hover:['',''],inspect:['在庫確認','Inventory'],moving:['移動中','En route'],waiting:['指示待機','Queued'],active:['使用中','In use'],done:['完了','Completed'],blocked:['補給待ち','Supply required'],stocked:['在庫あり','Already stocked'],unloading:['荷受け中','Unloading'],delivered:['補給済み','Delivered'],acknowledged:['応答済み','Acknowledged']};
@@ -237,15 +243,19 @@ $('hq-message').addEventListener('click',headquarters);
 document.querySelectorAll('[data-use]').forEach(button=>button.addEventListener('click',()=>useSupply(button.dataset.use)));
 $('request-supply').addEventListener('click',requestSupply);
 for(const mode of ['all','milo','cat','droid'])$('view-'+mode).addEventListener('click',()=>view?.setMode(mode));
+$('follow-angle').addEventListener('click',()=>view?.characterCamera?.cycleAngle());
+$('first-person').addEventListener('click',()=>view?.characterCamera?.toggleFirstPerson());
 $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').addEventListener('click',()=>view?.changeZoom(1/1.3));
 if(!document.fullscreenEnabled)$('obs-fullscreen').hidden=true;
 $('obs-fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('observation').requestFullscreen();}catch{showMessage(words('全画面に切り替えられませんでした。','Fullscreen is unavailable.'),'SYSTEM');}});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'&&!$('health-alert').hidden){event.preventDefault();setHealthDetails(false,true);return;}
   if(games.open)return;
+  if(event.key==='Escape'){dismissMessage();view?.setMode('all');return;}
   if(event.target.closest('input,textarea,button')||event.metaKey||event.ctrlKey||event.altKey)return;
+  if(event.key.toLowerCase()==='r'&&view?.characterCamera?.active){view.characterCamera.look.reset();return;}
   const supply={f:'food',w:'water',c:'catfood'}[event.key.toLowerCase()];
-  if(supply){event.preventDefault();useSupply(supply);}else if(event.code==='Space'){event.preventDefault();setPause(!paused);}else if(event.key==='Escape'){dismissMessage();view?.setMode('all');}
+  if(supply){event.preventDefault();useSupply(supply);}else if(event.code==='Space'){event.preventDefault();setPause(!paused);}
 });
 function visibilityChanged(){previous=performance.now();accumulator=0;audio.pause((immersive?.active?!immersive.visible:document.hidden)||paused||games.open);}
 document.addEventListener('visibilitychange',visibilityChanged);
@@ -253,11 +263,13 @@ refreshIcons();localize();
 
 async function start(){
   try{
-    view=await ObservationView.create($('ship-view'));
+    view=await ObservationView.create($('ship-view'),{characterViews:true});
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
     view.onModeChange=mode=>{idleCamera.modeChanged();immersive?.focus(mode);updateHUD();};
+    view.onCameraChange=()=>{idleCamera.modeChanged();view.hover(null);updateHUD();};
+    view.onFirstPersonFrame=(rest,active)=>updateFirstPersonOverlay(document,rest,active,words);
     view.onStation=id=>{
       if(id==='lounge'){loungeClick();return;}
       if(id==='console'){requestSupply();return;}
@@ -289,6 +301,7 @@ async function start(){
       idleCamera.update(now,{blocked:immersive.active||paused||!visible||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
       if(!paused&&visible&&!games.open){
         accumulator+=dt;
+        if(mousePreviewPending&&cat.mouseChase.canReact(cat)){cat.mouseChase.appear(cat,cat.motion.floor);mousePreviewPending=false;}
         // The shared 2D brain uses a 60 Hz tick for its social timer.
         while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0,elapsed);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}

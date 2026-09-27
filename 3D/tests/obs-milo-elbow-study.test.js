@@ -39,7 +39,7 @@ test('the study keeps the original body, tattoo UVs and bind pose intact',()=>{
   assert.deepEqual(skin.geometry.attributes.position.array,sourcePositions,'return exactly from deep flexion without cumulative drift');
   const weights=skin.geometry.attributes.skinWeight;
   for(let i=0;i<weights.count;i++)assert.ok(Math.abs(weights.getX(i)+weights.getY(i)+weights.getZ(i)+weights.getW(i)-1)<1e-6);
-  study.dispose();assert.equal(skin.geometry,before);assert.equal(skin.skeleton.bones.length,47);
+  study.dispose();assert.equal(skin.geometry,before);assert.equal(skin.skeleton.bones.length,51);
   pose(root,0,0,0);const restored=points(root);assert.ok(a.every((point,i)=>point.distanceTo(restored[i])<2e-6));
 });
 test('both elbow surfaces remain oriented and retain area throughout flexion',()=>{

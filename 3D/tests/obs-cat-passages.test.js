@@ -13,7 +13,7 @@ test('same-deck routes stay on the floor without using a passage',()=>{
 test('floor changes enter a wall, hide for transit, and emerge before walking away',()=>{
   const cat=new CatMotion({floor:0,x:800}),phases=[];let arrived=0,transitFrames=0;
   cat.goTo({floor:2,x:1000},()=>arrived++);
-  for(let i=0;i<30*60;i++){
+  for(let i=0;i<65*60;i++){
     cat.update(1/60);assert.equal(cat.climbing,false);assert.ok(cat.queue.every(part=>part.type==='walk'));
     if(cat.portal){if(phases.at(-1)!==cat.portal.phase)phases.push(cat.portal.phase);assert.equal(cat.x,CAT_PORT.x);}
     if(cat.hidden){transitFrames++;assert.equal(cat.z,CAT_PORT.insideZ);assert.ok(cat.y>=FLOORS[0].y&&cat.y<=FLOORS[2].y);assert.equal(arrived,0);}
@@ -27,21 +27,21 @@ test('retargeting before a hole replaces the old route without entering it',()=>
 });
 test('retargeting inside the wall preserves the occupied passage and only the newest callback',()=>{
   const cat=new CatMotion({floor:0,x:CAT_PORT.x});let old=0,latest=0;
-  cat.goTo({floor:2,x:1155},()=>old++);advance(cat,4);assert.equal(cat.hidden,true);
+  cat.goTo({floor:2,x:1155},()=>old++);for(let i=0;i<25*60&&!cat.hidden;i++)cat.update(1/60);assert.equal(cat.hidden,true);
   const position=[cat.x,cat.y,cat.z],exit=cat.portal.to;
   cat.goTo({floor:1,x:940},()=>latest++);assert.deepEqual([cat.x,cat.y,cat.z],position);assert.equal(cat.portal.to,exit);
-  advance(cat,30);assert.equal(old,0);assert.equal(latest,1);assert.equal(cat.floor,1);assert.equal(cat.x,940);
+  advance(cat,80);assert.equal(old,0);assert.equal(latest,1);assert.equal(cat.floor,1);assert.equal(cat.x,940);
 });
 test('pause preserves passage progress and invalid orders do not replace a valid route',()=>{
   const cat=new CatMotion({floor:1,x:CAT_PORT.x});cat.goTo({floor:0,x:800});advance(cat,1);
   const pose=cat.passagePose,position=[cat.x,cat.y,cat.z],age=cat.portal.age;
   cat.update(0);cat.goTo({floor:10,x:500});assert.deepEqual(cat.passagePose,pose);assert.deepEqual([cat.x,cat.y,cat.z],position);assert.equal(cat.portal.age,age);
-  advance(cat,20);assert.equal(cat.floor,0);assert.equal(cat.x,800);
+  advance(cat,50);assert.equal(cat.floor,0);assert.equal(cat.x,800);
 });
 test('the crouched cat clears the mouth and disappears tail-last behind the wall',()=>{
   const material=new MeshStandardMaterial(),root=createCat(new Proxy({},{get:()=>material})),motion=new CatMotion({floor:0,x:CAT_PORT.x});
   motion.goTo({floor:1,x:900});let time=0,sawPartial=false;
-  for(let i=0;i<4*60;i++){
+  for(let i=0;i<25*60;i++){
     time+=1/60;motion.update(1/60);const passage=motion.passagePose;
     root.position.set(0,0,motion.z);animateCat(root,{time,moving:passage?.phase==='enter',climbing:false,facing:motion.facing,mode:'walk',passage});root.updateMatrixWorld(true);
     if(passage?.phase==='enter'){
