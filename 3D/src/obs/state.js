@@ -48,9 +48,9 @@ export class CrewMotion {
     const seg=this.queue[0];if(!seg)return;
     const key=seg.type==='climb'?'y':'x',speed=seg.type==='climb'?this.climbSpeed:this.walkSpeed;
     const delta=seg[key]-this[key];let landingSpeed=1;
-    if(seg.type==='climb'&&delta>0){
-      // Ease into the final weight transfer; keep the rest of the climb's pace.
-      const remaining=delta*.016,t=Math.max(0,Math.min(1,(remaining-LADDER_LANDING.height)/(LADDER_LANDING.slowFrom-LADDER_LANDING.height)));
+    if(seg.type==='climb'){
+      // Ease into the final weight transfer in both directions; keep the rest of the climb's pace.
+      const remaining=Math.abs(delta)*.016,t=Math.max(0,Math.min(1,(remaining-LADDER_LANDING.height)/(LADDER_LANDING.slowFrom-LADDER_LANDING.height)));
       const finalSpeed=LADDER_LANDING.height/.016/LADDER_LANDING.seconds/speed;
       landingSpeed=finalSpeed+(1-finalSpeed)*t*t*(3-2*t);
     }

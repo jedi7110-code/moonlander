@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {MeshStandardMaterial,Vector3} from 'three';
+import {MeshStandardMaterial,Quaternion,Vector3} from 'three';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {loadMiloBody} from '../src/obs/milo-body.js';
-import {applyCabinLadder,CABIN_LADDER} from '../src/obs/cabin-ladder.js';
+import {applyCabinLadder,CABIN_LADDER,ladderStanceDepth} from '../src/obs/cabin-ladder.js';
 import {LADDER,LADDER_WRIST_OFFSET} from '../src/obs/ladder-pose.js';
 import {createAccessLadder,positionY} from '../src/obs/ship.js';
 import {CrewMotion} from '../src/obs/state.js';
@@ -38,8 +38,15 @@ test('mounting keeps soles on the deck until both hands grip, then transfers one
         const sole=rig.boot.localToWorld(new Vector3(0,-.107,.12)),target=entry.feet.find(f=>f.side===rig.side);
         assert.ok(sole.distanceTo(target.point)<1e-5,'actual sole meets its support');
         if(u<=.4||rig.side===1&&u<=.62){
-          assert.ok(Math.abs(sole.y-start-.003)<1e-5,'foot remains on the floor until its turn');
-          assert.ok(Math.abs(sole.z-depth+.133)<1e-5,'planted foot does not slide into the opening');
+          // Over a well, without a turn, the right sole steps (lifted) from the aisle
+          // stance to the edge stance between u=.25 and .31; the left one stays. On
+          // the deck no sole slides.
+          const aisle=depth-.133,edge=ladderStanceDepth(depth)-.133,onDeck=Math.abs(sole.y-start-.003)<1e-5;
+          if(u<=.25||u>=.31||aisle===edge||rig.side===-1){
+            assert.ok(onDeck,'foot remains on the floor until its turn');
+            assert.ok(Math.abs(sole.z-(u>=.31&&rig.side===1?edge:aisle))<1e-5,'planted foot does not slide into the opening');
+          }else if(onDeck)assert.ok([aisle,edge].some(z=>Math.abs(sole.z-z)<1e-5),'a foot on the deck stands at the aisle or the edge stance');
+          else assert.ok(sole.y>start+.003&&sole.z<aisle&&sole.z>edge,'a moving foot is lifted between the two stances');
         }
         if(rig.side===-1&&u>=.61&&u<=.81){
           const rung=(sole.y-LADDER.radius-CABIN_LADDER.rungBase)/LADDER.spacing;
@@ -51,6 +58,50 @@ test('mounting keeps soles on the deck until both hands grip, then transfers one
         const target=root.localToWorld(c.point.clone().add(LADDER_WRIST_OFFSET));
         assert.ok(wrist.distanceTo(target)<.001,`hand remains on its intended rung at ${start}->${end}, ${u}: ${wrist.distanceTo(target)}`);
       }
+    }
+  }
+});
+const SOLE_SUPPORT=[[-.04,-.107,-.09],[.04,-.107,-.09],[-.055,-.107,.105],[.055,-.107,.105],[-.02,-.107,.175],[.02,-.107,.175]];
+function mountFeet(root,deck){
+  root.updateMatrixWorld(true);
+  return root.userData.legs.map(rig=>({side:rig.side,ankle:rig.boot.getWorldPosition(new Vector3()),rotation:rig.boot.getWorldQuaternion(new Quaternion()),
+    clearance:Math.min(...SOLE_SUPPORT.map(p=>rig.boot.localToWorld(new Vector3(...p)).y))-deck-.003}));
+}
+test('turning from the aisle to face the ladder steps around planted soles instead of skating',()=>{
+  const root=create(),loaded=.0005;
+  for(const [start,end,depth]of [[0,3.392,.78],[3.392,0,1.34]])for(const startYaw of [Math.PI/2,-Math.PI/2]){
+    const label=`${start}->${end}, from ${startYaw.toFixed(2)}`,drift={'-1':0,'1':0},spin={'-1':0,'1':0},lifted=new Set();let previous=null;
+    // Sample the deck part of the mount, before the first foot is raised to a rung.
+    for(let i=0;i<=240;i++){
+      const u=.4*i/240,height=start+Math.sign(end-start)*CABIN_LADDER.transfer*u;
+      root.position.set(0,height,depth);animateMilo(root,{time:0,moving:false});
+      const {entry}=applyCabinLadder(root,{height,startHeight:start,endHeight:end,startYaw,endYaw:startYaw,startDepth:depth});
+      const feet=mountFeet(root,start);
+      assert.ok(entry.reachError<1e-6,`${label}: legs retain their lengths at ${u}`);
+      assert.ok(feet.some(f=>f.clearance<loaded),`${label}: one sole carries the body at ${u}`);
+      for(const foot of feet){
+        assert.ok(foot.clearance>-1e-6,`${label}: no floor penetration at ${u}`);
+        if(foot.clearance>.008)lifted.add(foot.side);
+        const prior=previous?.find(f=>f.side===foot.side);
+        if(prior&&prior.clearance<loaded&&foot.clearance<loaded){
+          drift[foot.side]+=Math.hypot(foot.ankle.x-prior.ankle.x,foot.ankle.z-prior.ankle.z);
+          spin[foot.side]+=foot.rotation.angleTo(prior.rotation);
+        }
+      }
+      previous=feet;
+    }
+    for(const side of [-1,1]){
+      assert.ok(drift[side]<.003,`${label}: a loaded boot slides ${(drift[side]*1000).toFixed(1)} mm while turning`);
+      assert.ok(spin[side]<.01,`${label}: a loaded boot spins ${spin[side].toFixed(3)} rad while turning`);
+    }
+    assert.equal(lifted.size,2,`${label}: both feet step into the ladder-facing stance`);
+    assert.ok(Math.abs(Math.sin(root.rotation.y))<1e-9&&Math.cos(root.rotation.y)<0,`${label}: faces the ladder before the first rung step`);
+    // Over a well the right foot ends at the edge stance, and the left foot too
+    // when the turn's last step carried it there; otherwise it waits at the aisle.
+    for(const rig of root.userData.legs){
+      const sole=rig.boot.localToWorld(new Vector3(0,-.107,.12)),edge=ladderStanceDepth(depth)-.133;
+      const expected=rig.side===1||startYaw<0?edge:depth-.133;
+      assert.ok(Math.abs(sole.x+rig.side*.1)<1e-5&&Math.abs(sole.z-expected)<1e-5,`${label}: ends in the mounting stance`);
     }
   }
 });
@@ -130,16 +181,21 @@ test('descending onto either deck steps straight backwards with planted feet and
     assert.ok(landing&&landing.reachError<1e-6,'both legs can reach without stretching');
     const soles=root.userData.legs.map(r=>({side:r.side,p:r.boot.localToWorld(new Vector3(0,-.107,.12))}));
     const first=soles.find(f=>f.side===1).p,second=soles.find(f=>f.side===-1).p;
+    const aisle=depth-.133,edge=ladderStanceDepth(depth)-.133;
     for(const {side,p}of soles){
       assert.ok(p.y>=end+.003-1e-6,'no floor penetration');
       assert.ok(Math.abs(p.x+side*.1)<1e-6,'step backwards, without a sideways drift');
       assert.ok(p.distanceTo(landing.feet.find(f=>f.side===side).point)<1e-6,'actual boot meets the target');
+      // A sole on the deck stands at the edge stance of a well or at the aisle stance, never in between.
+      if(Math.abs(p.y-end-.003)<1e-6)assert.ok([aisle,edge].some(z=>Math.abs(p.z-z)<1e-6),'a foot on the deck does not slide');
+      if(u>=.75)assert.ok(Math.abs(p.z-aisle)<1e-6&&Math.abs(p.y-end-.003)<1e-6,'steps back from the edge to the aisle before walking');
     }
     if(u>=.14&&u<=.39){
       const rung=(second.y-CABIN_LADDER.rungBase-LADDER.radius)/LADDER.spacing;
       assert.ok(Math.abs(rung-Math.round(rung))<1e-6&&Math.abs(second.z-.03)<1e-6,'following foot supports weight on a real rung');
     }
-    if(u>=.38){planted??=first.clone();assert.ok(first.distanceTo(planted)<1e-6,'planted foot must not slide while the second descends');}
+    // Over a well the first foot stays planted at the edge until u=.69, then steps back to the aisle.
+    if(u>=.38&&(aisle===edge||u<=.69)){planted??=first.clone();assert.ok(first.distanceTo(planted)<1e-6,'planted foot must not slide while the second descends');}
     if(firstAt===null&&first.y<end+.00301)firstAt=u;
     if(secondAt===null&&second.y<end+.00301)secondAt=u;
     if(u>=.21&&u<=.62)for(const c of landing.contacts){
@@ -152,7 +208,7 @@ test('descending onto either deck steps straight backwards with planted feet and
     assert.equal(root.rotation.y,Math.PI,'do not turn away before landing');
   }
   assert.ok(secondAt-firstAt>.2,'two distinct footfalls with a supported weight transfer');
-  assert.ok(Math.abs(planted.z-(depth-.133))<1e-6,'land on the bridge behind the opening');
+  assert.ok(Math.abs(planted.z-(ladderStanceDepth(depth)-.133))<1e-6,'land on the bridge behind the opening, at its edge stance');
   }
 });
 

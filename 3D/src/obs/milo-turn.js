@@ -65,12 +65,47 @@ function segmentRotation(a,b,forward,rest){
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,y,z)).multiply(new THREE.Quaternion().setFromUnitVectors(rest.clone().normalize(),v(0,-1,0)));
 }
 
+// Shift the pelvis toward the loaded foot, in the plan's horizontal plane.
+export function miloTurnSway(plan,state){
+  const support=state.feet.find(foot=>foot.side===state.support).position.clone().sub(plan.origin);support.y=0;
+  return support.normalize().multiplyScalar(.014*state.swing*state.envelope);
+}
+
+// Solve both legs from the current pelvis to sampled world-space feet. Authored
+// transfers that place the pelvis themselves share this with standing turns.
+export function placeMiloTurnLegs(root,feet){
+  const {body,legs}=root.userData,bodyQ=body.getWorldQuaternion(new THREE.Quaternion());
+  for(const rig of legs){
+    const foot=feet.find(f=>f.side===rig.side),target=body.worldToLocal(foot.position.clone()),hip=rig.leg.position;
+    const axis=target.clone().sub(hip),distance=axis.length();axis.normalize();
+    const a=rig.knee.position.length(),b=rig.boot.position.length(),along=THREE.MathUtils.clamp((a*a-b*b+distance*distance)/(2*distance),-a,a);
+    // Share yaw through the hip and knee; do not put all the twist in the ankle.
+    const footForward=v(0,0,1).applyQuaternion(foot.quaternion).applyQuaternion(bodyQ.clone().invert());
+    const forward=footForward.lerp(v(0,0,1),.45).normalize(),bend=forward.clone().addScaledVector(axis,-forward.dot(axis)).normalize();
+    const joint=hip.clone().addScaledVector(axis,along).addScaledVector(bend,Math.sqrt(Math.max(0,a*a-along*along)));
+    const upper=segmentRotation(hip,joint,forward,rig.knee.position),lower=segmentRotation(joint,target,forward,rig.boot.position);
+    rig.leg.quaternion.copy(upper);rig.knee.quaternion.copy(upper).invert().multiply(lower);
+    rig.boot.quaternion.copy(bodyQ).multiply(lower).invert().multiply(foot.quaternion);
+  }
+}
+
+// The head (and optionally the chest) leads the turn and settles before it ends.
+export function applyMiloTurnLead(root,plan,state,upperBody=true){
+  const {chest,head,arms}=root.userData;
+  const lead=Math.sign(plan.delta)*state.envelope*(1-state.progress)*Math.min(1,Math.abs(plan.delta)/.7);
+  if(upperBody){
+    chest.rotation.y+=.045*lead;chest.updateMatrix();
+    for(const {arm,side}of arms)arm.position.set(side*.207,1.488,0).applyMatrix4(chest.matrix);
+  }
+  head.rotation.y+=.16*lead;chest.updateMatrix();
+  head.position.set(0,1.607,0).applyMatrix4(chest.matrix).sub(v(0,-.030,.009).applyQuaternion(head.quaternion));
+}
+
 export function applyMiloTurn(root,plan,progress,{upperBody=true,weight=1}={}){
-  const state=sampleMiloTurn(plan,progress),{body,legs,chest,head,arms}=root.userData;
+  const state=sampleMiloTurn(plan,progress),{body,legs}=root.userData;
   const originals=weight<1?{position:body.position.clone(),joints:legs.flatMap(r=>[r.leg,r.knee,r.boot]).map(j=>j.quaternion.clone())}:null;
   const worldQ=root.getWorldQuaternion(new THREE.Quaternion()),inverse=worldQ.clone().invert();
-  const support=state.feet.find(foot=>foot.side===state.support).position.clone().sub(plan.origin);support.y=0;
-  support.normalize().multiplyScalar(.014*state.swing*state.envelope).applyQuaternion(inverse);
+  const support=miloTurnSway(plan,state).applyQuaternion(inverse);
   body.position.x+=support.x;body.position.z+=support.z;body.position.y=-.010*state.envelope;
   root.updateWorldMatrix(true,true);
   // A planted ankle must stay reachable even when the pelvis travels around it.
@@ -83,30 +118,12 @@ export function applyMiloTurn(root,plan,progress,{upperBody=true,weight=1}={}){
     drop=Math.max(drop,rig.leg.position.y-target.y-Math.sqrt(Math.max(.01,length*length-dx*dx-dz*dz)));
   }
   body.position.y-=drop;root.updateWorldMatrix(true,true);
-  const bodyQ=body.getWorldQuaternion(new THREE.Quaternion());
-  for(const rig of legs){
-    const foot=state.feet.find(f=>f.side===rig.side),target=body.worldToLocal(foot.position.clone()),hip=rig.leg.position;
-    const axis=target.clone().sub(hip),distance=axis.length();axis.normalize();
-    const a=rig.knee.position.length(),b=rig.boot.position.length(),along=THREE.MathUtils.clamp((a*a-b*b+distance*distance)/(2*distance),-a,a);
-    // Share yaw through the hip and knee; do not put all the twist in the ankle.
-    const footForward=v(0,0,1).applyQuaternion(foot.quaternion).applyQuaternion(bodyQ.clone().invert());
-    const forward=footForward.lerp(v(0,0,1),.45).normalize(),bend=forward.clone().addScaledVector(axis,-forward.dot(axis)).normalize();
-    const joint=hip.clone().addScaledVector(axis,along).addScaledVector(bend,Math.sqrt(Math.max(0,a*a-along*along)));
-    const upper=segmentRotation(hip,joint,forward,rig.knee.position),lower=segmentRotation(joint,target,forward,rig.boot.position);
-    rig.leg.quaternion.copy(upper);rig.knee.quaternion.copy(upper).invert().multiply(lower);
-    rig.boot.quaternion.copy(bodyQ).multiply(lower).invert().multiply(foot.quaternion);
-  }
+  placeMiloTurnLegs(root,state.feet);
   if(originals){
     body.position.lerpVectors(originals.position,body.position.clone(),weight);
     legs.flatMap(r=>[r.leg,r.knee,r.boot]).forEach((j,i)=>j.quaternion.slerpQuaternions(originals.joints[i],j.quaternion.clone(),weight));
   }
-  const lead=Math.sign(plan.delta)*state.envelope*(1-state.progress)*Math.min(1,Math.abs(plan.delta)/.7);
-  if(upperBody){
-    chest.rotation.y+=.045*lead;chest.updateMatrix();
-    for(const {arm,side}of arms)arm.position.set(side*.207,1.488,0).applyMatrix4(chest.matrix);
-  }
-  head.rotation.y+=.16*lead;chest.updateMatrix();
-  head.position.set(0,1.607,0).applyMatrix4(chest.matrix).sub(v(0,-.030,.009).applyQuaternion(head.quaternion));
+  applyMiloTurnLead(root,plan,state,upperBody);
   root.updateWorldMatrix(true,true);return state;
 }
 
