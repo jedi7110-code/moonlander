@@ -1,19 +1,18 @@
 import {MouseChase} from './lucy-run-motion.js';
 import {CAT_PORT,FLOORS} from './layout.js';
 import {createCatTurn,angleDelta} from './cat-turn.js';
+import {MOUSE_ROUTES} from './mouse-route.js';
 
 const toWorld=x=>(x-700)*.022,toCabin=x=>700+x/.022;
-const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
 const INTERRUPTIBLE=new Set(['idle','look','sleep','groom','stretch','prone','walk','follow']);
 
-// Keep Lucy on her unobstructed aisle. The much smaller mouse follows the
-// skirting behind the fixtures; neither animal changes decks during pursuit.
+// Neither animal changes decks during pursuit.
 export class CabinMouseChase {
   constructor({random=Math.random}={}){
     this.random=random;this.sim=new MouseChase({random});this.sim.wait=Infinity;
     this.wait=75+random()*85;this.center=0;this.controlled=false;this.preparing=false;
   }
-  get mouse(){return {...this.sim.mouse,x:this.center+this.sim.mouse.x,z:CAT_PORT.wallZ+.14};}
+  get mouse(){return {...this.sim.mouse,x:this.center+this.sim.mouse.x};}
   get direction(){return this.sim.direction;}
   get pose(){return this.controlled?this.sim.cat:null;}
   canReact(cat){
@@ -28,8 +27,8 @@ export class CabinMouseChase {
   }
   appear(cat,floor=Math.min(FLOORS.length-1,Math.floor(this.random()*FLOORS.length))){
     if(this.sim.active||!FLOORS[floor])return false;
-    const x=toWorld(cat.motion.x),direction=x>0?-1:1;
-    this.center=clamp(x+direction*3.15,-7.7,7.7);this.sync(cat);
+    this.sim.route=MOUSE_ROUTES[floor];
+    this.center=this.sim.route.center;this.sync(cat);
     this.sim.appear(floor);this.sim.cat.floor=-1;
     if(floor===cat.motion.floor&&this.canReact(cat)){
       this.preparing=true;

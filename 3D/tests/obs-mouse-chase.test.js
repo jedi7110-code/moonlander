@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {CatRoutine,Supplies,FLOORS,CrewMotion,advanceCabinTraffic} from '../src/obs/state.js';
 import {CAT_PORT} from '../src/obs/layout.js';
 import {RUN_SPEED,MOUSE_WALK_SPEED} from '../src/obs/lucy-run-motion.js';
+import {Box3,MeshStandardMaterial,Raycaster,Vector3} from 'three';
+import {buildShip,FLOOR_Y,HABITAT_VIEW} from '../src/obs/ship.js';
+import {MOUSE_ROUTES} from '../src/obs/mouse-route.js';
+import {createCabinMouse} from '../src/obs/mouse.js';
 
 function fixture({floor=2,x=510,facing=1}={}){
   const cat=new CatRoutine(new Supplies(),{turns:true,mouseChase:true,random:()=>.5});
@@ -17,14 +21,14 @@ test('OBS uses the approved study chase on every floor without teleporting Lucy 
     const cat=fixture({floor,x:facing===1?510:1000,facing}),start=cat.motion.x,route=cat.mouseChase;
     assert.equal(route.appear(cat,floor),true);assert.equal(cat.motion.x,start);
     let previous=start,fastest=0,travel=0;
-    for(let i=0;i<900&&route.controlled;i++){
+    for(let i=0;i<1800&&route.controlled;i++){
       cat.update(1/60);
       assert.equal(cat.motion.floor,floor);assert.equal(cat.motion.y,FLOORS[floor].y);assert.equal(cat.motion.z,CAT_PORT.walkZ);
       assert.ok(Math.abs(cat.motion.x-previous)*.022<=RUN_SPEED/60+1e-8,'no position jumps');
       travel+=Math.abs(cat.motion.x-previous)*.022;previous=cat.motion.x;
       fastest=Math.max(fastest,route.pose?.speed??0);
     }
-    assert.ok(fastest>2.5);assert.ok(travel>4);assert.equal(route.controlled,false);assert.equal(route.mouse.visible,false);
+    assert.ok(fastest>1.5);assert.ok(travel>.45);assert.equal(route.controlled,false);assert.equal(route.mouse.visible,false);
     assert.equal(cat.motion.chase,null);assert.equal(cat.motion.turn,null);assert.ok(route.wait>60);
   }
 });
@@ -42,7 +46,7 @@ test('other floors and occupied activities do not interrupt Lucy',()=>{
   const cat=fixture();cat.mouseChase.appear(cat,0);advance(cat,12);
   assert.equal(cat.motion.x,510);assert.equal(cat.motion.floor,2);assert.equal(cat.mouseChase.controlled,false);
   assert.equal(cat.mouseChase.mouse.visible,true);assert.equal(cat.mouseChase.mouse.phase,'walk');
-  advance(cat,36);assert.equal(cat.mouseChase.mouse.visible,false);
+  advance(cat,53);assert.equal(cat.mouseChase.mouse.visible,false);
   for(const property of ['onSofa','portal','hop']){
     const occupied=fixture();occupied.motion[property]=true;
     occupied.mouseChase.appear(occupied,2);assert.equal(occupied.mouseChase.controlled,false);
@@ -79,6 +83,68 @@ test('occasional mice select all three floors and do not spawn again immediately
   for(const random of [()=>0,()=>.5,()=>.99]){
     const cat=fixture(),route=cat.mouseChase;route.random=random;route.wait=.01;
     cat.update(1/60);assert.equal(route.mouse.floor,Math.floor(random()*3));assert.equal(route.mouse.visible,true);
-    advance(cat,48);assert.equal(route.mouse.visible,false);assert.ok(route.wait>50);
+    advance(cat,65);assert.equal(route.mouse.visible,false);assert.ok(route.wait>50);
   }
+});
+
+test('rear furniture hides both ends, while the mouse follows a visible, supported route through its gaps',()=>{
+  const ctx=new Proxy({measureText:t=>({width:t.length*8}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:()=>{}});
+  const material=new MeshStandardMaterial();let ship;
+  globalThis.document={createElement:()=>({getContext:()=>ctx})};
+  try{ship=buildShip(new Proxy({},{get:()=>material}),{mergeStatic:false});}finally{delete globalThis.document;}
+  const meshes=[],geometries=new Set(),materials=new Set();
+  for(const root of [ship.staticMesh,ship.animated]){
+    root.updateMatrixWorld(true);
+    root.traverseVisible(mesh=>{if(mesh.isMesh&&mesh.material.visible!==false&&mesh.material.opacity!==0)meshes.push(mesh);});
+    root.traverse(mesh=>{if(mesh.geometry)geometries.add(mesh.geometry);if(mesh.material)materials.add(mesh.material);});
+  }
+  const eye=new Vector3(0,HABITAT_VIEW.centerY+1.6,Math.sqrt(40**2-1.6**2)),ray=new Raycaster();
+  const boxes=meshes.map(mesh=>new Box3().setFromObject(mesh));
+  try{
+    for(const [floor,route]of MOUSE_ROUTES.entries()){
+      const y=FLOOR_Y[floor];let visible=0;
+      for(let i=0;i<=240;i++){
+        const p=route.sample(route.length*i/240),x=route.center+p.x,z=p.z,head=new Vector3(x,y+.07,z);
+        ray.set(eye,head.clone().sub(eye).normalize());ray.far=eye.distanceTo(head)-.01;
+        if(!ray.intersectObjects(meshes,false).length)visible++;
+        ray.set(new Vector3(x,y+.10,z),new Vector3(0,-1,0));ray.far=.12;
+        assert.ok(ray.intersectObjects(meshes,false).some(hit=>Math.abs(hit.point.y-y)<.02),'floor supports every part of the route');
+        const body=new Box3(new Vector3(x-.045,y+.025,z-.045),new Vector3(x+.045,y+.12,z+.045));
+        assert.ok(!boxes.some(box=>box.intersectsBox(body)),`furniture clearance on deck ${floor}, sample ${i}`);
+      }
+      assert.ok(visible/241>.7,'the crossing remains visible between the hiding places');
+      for(const direction of [-1,1])for(const distance of [0,route.length]){
+        const p=route.sample(distance,direction);
+        assert.ok(p.z<-.7,'both endpoints return to the rear furniture');
+        for(const cameraX of [-8,0,8])for(const along of [-.26,-.1,0,.1]){
+          const camera=eye.clone();camera.x=cameraX;
+          const target=new Vector3(route.center+p.x+Math.sin(p.yaw)*along,y+.07,p.z+Math.cos(p.yaw)*along);
+          ray.set(camera,target.clone().sub(camera).normalize());ray.far=camera.distanceTo(target)-.01;
+          assert.ok(ray.intersectObjects(meshes,false).length,'head, body and tail hide behind furniture before appearing/disappearing');
+        }
+      }
+    }
+  }finally{
+    geometries.forEach(geometry=>geometry.dispose());
+    materials.forEach(m=>{m.map?.dispose();m.bumpMap?.dispose();m.roughnessMap?.dispose();m.dispose();});
+  }
+});
+
+test('curved travel drives the mouse gait and heading without clipping it at imaginary walls',()=>{
+  const cat=fixture(),chase=cat.mouseChase;cat.mode='eat';chase.appear(cat,1);
+  let previous=chase.mouse,distance=0;
+  for(let i=0;i<65*60&&chase.mouse.visible;i++){
+    chase.update(1/60,cat);const mouse=chase.mouse;
+    const step=Math.hypot(mouse.x-previous.x,mouse.z-previous.z);
+    assert.ok(step<=MOUSE_WALK_SPEED/60+.00004);
+    if(step>1e-5){
+      const angle=Math.atan2(mouse.x-previous.x,mouse.z-previous.z);
+      assert.ok(Math.cos(mouse.yaw-angle)>.98,'nose follows the curve');
+    }
+    distance+=step;previous=mouse;
+  }
+  assert.equal(chase.mouse.visible,false);
+  assert.ok(Math.abs(chase.mouse.distance-distance)<.003,'footfall distance includes turns into the rear gaps');
+  const mouse=createCabinMouse({clipAtStudyWalls:false});
+  mouse.root.traverse(part=>{if(part.material)assert.equal(part.material.clippingPlanes.length,0);});
 });

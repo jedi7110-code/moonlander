@@ -15,7 +15,7 @@ function furTexture(){
   map.minFilter=THREE.LinearMipmapLinearFilter;map.generateMipmaps=true;map.needsUpdate=true;
   return map;
 }
-export function createCabinMouse(){
+export function createCabinMouse({clipAtStudyWalls=true}={}){
   const root=new THREE.Group();root.name='Wall mouse';
   const body=new THREE.Group();root.add(body);
   const head=new THREE.Group();body.add(head);
@@ -27,7 +27,7 @@ export function createCabinMouse(){
   const glint=new THREE.MeshBasicMaterial({color:0xcac8b8});
   const whiskerMat=new THREE.LineBasicMaterial({color:0x514d42,transparent:true,opacity:.66,depthWrite:false});
   const clip=[new THREE.Plane(new THREE.Vector3(1,0,0),4.12),new THREE.Plane(new THREE.Vector3(-1,0,0),4.12)];
-  for(const m of [fur,muzzle,skin,earSkin,tailSkin,eye,glint,whiskerMat]){m.clippingPlanes=clip;m.clipShadows=true;}
+  for(const m of [fur,muzzle,skin,earSkin,tailSkin,eye,glint,whiskerMat]){m.clippingPlanes=clipAtStudyWalls?clip:[];m.clipShadows=true;}
   const sphere=new THREE.SphereGeometry(1,16,10),limbGeometry=new THREE.CylinderGeometry(1,1,1,7);
   const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
   function ellipsoid(parent,mat,pos,size,name){

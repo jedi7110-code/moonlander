@@ -1,0 +1,37 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>ネズミの出入り</title>
+<style>body{margin:0;background:#17201d;color:#dce1d4;font:14px system-ui}header{height:64px;box-sizing:border-box;padding:12px;display:flex;align-items:center;gap:12px}button,select{padding:7px;background:#303d38;color:inherit;border:1px solid #82917a;border-radius:4px}input{flex:1;min-width:100px}canvas{display:block;width:100vw;height:calc(100vh - 64px)}</style>
+<header><b>ネズミの出入り</b><select id="deck" aria-label="フロア"><option value="0">操縦区画</option><option value="1" selected>ラウンジ</option><option value="2">生活区画</option></select><button id="reverse">方向を反転</button><button id="play">再生</button><input id="position" aria-label="経路上の位置" type="range" min="0" max="1" step=".001" value="0"><output id="status">読み込み中</output></header><canvas></canvas>
+<script type="module">
+import {ObservationView} from './obs/view.js';
+import {MOUSE_ROUTES} from './obs/mouse-route.js';
+import {FLOOR_Y} from './obs/ship.js';
+import {MouseChase} from './obs/lucy-run-motion.js';
+const view=await ObservationView.create(document.querySelector('canvas'));
+view.milo.visible=false;view.cat.visible=false;view.droidService.root.visible=false;view.ship.medical.rig.root.visible=false;
+const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
+$('deck').value=['0','1','2'].includes(params.get('floor'))?params.get('floor'):'1';
+$('position').value=Math.max(0,Math.min(1,Number(params.get('position'))||0));
+let direction=1,frame=0,simulation;
+function stop(){cancelAnimationFrame(frame);frame=0;$('play').textContent='再生';}
+function render(mouse=null){
+  const floor=Number($('deck').value),route=MOUSE_ROUTES[floor],progress=Number($('position').value),distance=progress*route.length;
+  const pose=mouse??{...route.sample(distance,direction),distance,age:distance/.22,speed:.22,phase:'walk',phaseTime:0};
+  view.mouse.root.visible=true;view.mouse.root.position.set(route.center+pose.x,FLOOR_Y[floor],pose.z);view.mouse.root.rotation.y=pose.yaw;view.mouse.update(pose);
+  const width=innerWidth,height=innerHeight-64,camera=view.camera;
+  camera.fov=40;camera.aspect=width/height;camera.near=.02;
+  camera.position.set(route.center+.65,FLOOR_Y[floor]+2.55,8);camera.lookAt(route.center,FLOOR_Y[floor]+.55,-.2);camera.updateProjectionMatrix();
+  view.renderer.setSize(width,height,false);view.cabinToon.update(width,height,6.5,15);view.renderer.render(view.scene,camera);
+  $('status').value=`${Math.round(progress*100)}%`;
+}
+$('position').oninput=()=>{stop();render();};$('deck').onchange=()=>{stop();$('position').value=0;render();};
+$('reverse').onclick=()=>{stop();direction*=-1;render();};
+$('play').onclick=()=>{
+  if(frame){stop();return;}
+  const floor=Number($('deck').value),route=MOUSE_ROUTES[floor];
+  simulation=new MouseChase({catFloor:-1});simulation.route=route;simulation.cat.x=-direction;simulation.appear(floor);
+  $('play').textContent='停止';let last=performance.now();
+  const step=now=>{simulation.update(Math.min(.05,(now-last)/1000));last=now;$('position').value=simulation.mouse.travel/route.length;render(simulation.mouse);if(simulation.active)frame=requestAnimationFrame(step);else stop();};
+  frame=requestAnimationFrame(step);
+};
+addEventListener('resize',()=>render());render();
+</script></html>

@@ -86,7 +86,7 @@ export function runCycle(phase){
     bodyZ:.009*Math.sin(2*Math.PI*phase)};
 }
 
-// A local, fixed-length crossing; the cabin adapter places it beside Lucy.
+// The study uses a straight crossing; OBS supplies a route around its furniture.
 export class MouseChase {
   constructor({random=Math.random,catFloor=0,mouseFloor=null,direction=1}={}){
     this.random=random;this.direction=direction;this.time=0;this.wait=75+random()*85;
@@ -100,7 +100,8 @@ export class MouseChase {
     // her to another deck. It is fine for a mouse to pass on a different deck.
     this.direction=this.cat.x>0?-1:1;
     const d=this.direction;
-    Object.assign(this.mouse,{x:-4.42*d,floor,z:-.67,visible:true,speed:0,age:0,distance:0,phase:'emerge',phaseTime:0,spotted:false});
+    Object.assign(this.mouse,{x:-4.42*d,floor,z:-.67,yaw:d*Math.PI/2,visible:true,speed:0,age:0,distance:0,travel:0,phase:'emerge',phaseTime:0,spotted:false});
+    if(this.route)Object.assign(this.mouse,this.route.sample(0,d));
     this.active=true;this.events++;this.cat.age=0;
     this.cat.phase=this.cat.floor===floor?'watch':'idle';
     this.startYaw=this.cat.yaw;this.turnAge=0;
@@ -118,14 +119,14 @@ export class MouseChase {
     if(!this.active){this.wait-=dt;if(this.wait<=0)this.appear();return;}
     mouse.age+=dt;cat.age+=dt;
     if(mouse.visible){
-      const oldX=mouse.x;
+      const previous=mouse.travel,length=this.route?.length??8.84;
       if(mouse.age<MOUSE_TIMING.emerge){
         const u=mouse.age/MOUSE_TIMING.emerge;
         mouse.phase='emerge';mouse.phaseTime=mouse.age;
-        mouse.x=(-4.42+.58*smooth(0,1,u))*d;
+        mouse.travel=.58*smooth(0,1,u);
         mouse.speed=.58*6*u*(1-u)/MOUSE_TIMING.emerge;
       }else if(mouse.age<MOUSE_WALK_AT){
-        mouse.x=-3.84*d;mouse.speed=0;
+        mouse.travel=.58;mouse.speed=0;
         mouse.phase=mouse.age<MOUSE_TIMING.emerge+MOUSE_TIMING.survey?'survey':'settle';
         mouse.phaseTime=mouse.age-MOUSE_TIMING.emerge-(mouse.phase==='settle'?MOUSE_TIMING.survey:0);
       }else{
@@ -133,19 +134,18 @@ export class MouseChase {
         mouse.phaseTime+=dt;
         // The cat noticing the mouse starts the escape, not elapsed time alone.
         // An unseen mouse (including one on another deck) keeps walking.
-        if(!mouse.spotted&&mouse.phaseTime>=MOUSE_TIMING.notice&&cat.floor===mouse.floor&&cat.phase==='watch'){
+        if(!mouse.spotted&&mouse.phaseTime>=MOUSE_TIMING.notice&&mouse.travel>=(this.route?.noticeDistance??0)&&cat.floor===mouse.floor&&cat.phase==='watch'){
           mouse.spotted=true;mouse.phase='run';mouse.phaseTime=0;cat.phase='notice';cat.age=0;
         }
         const beat=mouse.phaseTime%1.37;
         const desired=mouse.spotted?(beat>1.14&&beat<1.30?.12*MOUSE_PACE:MOUSE_RUN_SPEED+.32*MOUSE_PACE*Math.sin(mouse.phaseTime*17)):MOUSE_WALK_SPEED;
         mouse.speed=approach(mouse.speed,desired,dt*(mouse.spotted?9*MOUSE_PACE:.35));
-        mouse.x+=mouse.speed*dt*d;
+        mouse.travel=Math.min(length,mouse.travel+mouse.speed*dt);
       }
-      mouse.distance+=Math.abs(mouse.x-oldX);
-      // Keep the route fixed; moving the root sideways also dragged planted
-      // paws across the deck. Body/head motion is handled above the foot rig.
-      mouse.z=-.67;
-      if(mouse.x*d>=4.42){mouse.visible=false;mouse.phase='hidden';cat.age=0;if(cat.phase!=='idle')cat.phase='braking';}
+      mouse.distance+=mouse.travel-previous;
+      if(this.route)Object.assign(mouse,this.route.sample(mouse.travel,d));
+      else{mouse.x=(-4.42+mouse.travel)*d;mouse.z=-.67;}
+      if(mouse.travel>=length){mouse.visible=false;mouse.phase='hidden';cat.age=0;if(cat.phase!=='idle')cat.phase='braking';}
     }
     if(cat.floor!==mouse.floor){cat.speed=0;if(!mouse.visible)this.finish();return;}
     if(cat.phase==='notice'&&cat.age>.35){cat.phase=Math.abs(this.turnDelta)>.1?'turn':'chase';cat.age=0;}
@@ -158,7 +158,7 @@ export class MouseChase {
       const gap=(mouse.x-cat.x)*d;
       // Lucy waits until the mouse is ahead. Keep a nose-to-mouse clearance,
       // and decelerate before the wall even if the mouse has already escaped.
-      desired=Math.min(RUN_SPEED,Math.max(0,(gap-.64)*3*CAT_PACE),Math.sqrt(2*3.4*CAT_PACE*Math.max(0,3.65-cat.x*d)));
+      desired=Math.min(RUN_SPEED,Math.max(0,(gap-.64)*3*CAT_PACE),Math.sqrt(2*3.4*CAT_PACE*Math.max(0,(this.route?.stopX(d)??3.65)-cat.x*d)));
     }
     cat.speed=approach(cat.speed,desired,dt*(desired>cat.speed?CAT_ACCELERATION:CAT_BRAKING));
     const distance=cat.speed*dt;cat.x+=distance*d;cat.distance+=distance;

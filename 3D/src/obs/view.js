@@ -82,7 +82,7 @@ export class ObservationView {
     this.droidService.actorRoot.position.copy(this.droidBay.root.position);
     this.hairGrowth=attachHairGrowth(head);this.hairGrowth.setGrowth(0);
     this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
-    this.catRun=createLucyRunRig(this.cat);this.mouse=createCabinMouse();this.mouse.root.visible=false;this.scene.add(this.mouse.root);
+    this.catRun=createLucyRunRig(this.cat);this.mouse=createCabinMouse({clipAtStudyWalls:false});this.mouse.root.visible=false;this.scene.add(this.mouse.root);
     this.harvestDelivery=createHarvestDelivery(m,this.scene);
     this.groomingTools=createGroomingTools(this.milo.userData.body,m,createMachinedMetals());
     this.groomingMotion=prepareGroomingMotion(this.milo,this.ship.groomingStation,this.groomingTools,{origin:this.ship.groomingStation.origin});
@@ -257,8 +257,8 @@ export class ObservationView {
     if(!paused&&run&&run.speed>.45)this.catRun.update({distance:run.distance,speed:run.speed});
     this.mouse.root.visible=Boolean(mouse?.visible);
     if(mouse?.visible){
-      this.mouse.root.position.set(mouse.x,positionY(FLOORS[mouse.floor].y),mouse.z);this.mouse.root.rotation.y=pursuit.direction*Math.PI/2;
-      this.mouse.setBounds(pursuit.center-4.12,pursuit.center+4.12);this.mouse.update(mouse);
+      this.mouse.root.position.set(mouse.x,positionY(FLOORS[mouse.floor].y),mouse.z);this.mouse.root.rotation.y=mouse.yaw;
+      this.mouse.update(mouse);
     }
     if(action==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineProgress(actionTime,brain.curDurSec,BUNK_BED.transition));
     if(brain.reclineExit?.id==='bunk')this.milo.position.z=THREE.MathUtils.lerp(.78,BUNK_BED.depth,reclineExitProgress(brain.reclineExit));
