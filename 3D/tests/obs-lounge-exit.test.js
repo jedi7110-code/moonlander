@@ -26,6 +26,13 @@ test('natural completion rises before returning to idle, without granting more r
   brain.update(LOUNGE_EXIT_SECONDS);assert.equal(brain.state,'idle');assert.equal(brain.loungeExit,null);
   assert.equal(actor.x,loungeApproachX());
 });
+test('a natural lounge exit starts the next needed activity without an idle delay',()=>{
+  const {actor,brain}=setup();brain.needs.hunger=30;brain._endPerform();
+  brain.update(LOUNGE_STOW_SECONDS);assert.equal(brain.state,'leavingLounge');
+  brain.update(LOUNGE_EXIT_SECONDS);
+  assert.equal(brain.loungeExit,null);assert.equal(actor.x,loungeApproachX());
+  assert.equal(brain.state,'goingTo');assert.equal(brain.actStation,'galley');assert.ok(actor.busy);
+});
 test('the walking route stops beside the table before the lounge entry starts',()=>{
   const actor=new CrewMotion({floor:getStation('lounge').floor,x:1000}),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care:new Supplies(),random:()=>.8});
   brain.health.nextIncident=Infinity;brain._go(getStation('lounge'));

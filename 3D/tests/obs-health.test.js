@@ -19,24 +19,51 @@ function setup(){
 }
 function advance(brain,seconds,actor=null){for(let i=0;i<Math.ceil(seconds*60);i++){actor?.update(1/60);brain.update(1/60);}}
 
-test('health starts well, has an incident grace period, and does not progress on a zero tick',()=>{
+test('health starts well, waits at least 30 running minutes, and does not progress on a zero tick',()=>{
   const health=new CrewHealth({random:()=>0});
   assert.equal(health.value,100);assert.equal(health.stage,'healthy');assert.equal(health.duration,14);
-  for(let i=0;i<149;i++)health.update(1,{needs,activity:'eva'});
+  for(let i=0;i<1799;i++)health.update(1,{needs,activity:'eva'});
   assert.equal(health.condition,null);
   const before=JSON.stringify(health);health.update(0,{needs});assert.equal(JSON.stringify(health),before);
   health.update(1,{needs,activity:'eva'});
   assert.equal(health.condition.kind,'injury');assert.equal(health.condition.source,'fitting');
   assert.equal(health.startCondition('fever'),false);assert.equal(health.startCondition('unknown'),false);
 });
-test('rest and medical activity are protected; persistent poor needs can cause fever',()=>{
+test('rest and medical activity discard fatigue and overdue incident opportunities',()=>{
   for(const activity of ['bunk','medical','toilet','shower']){
-    const health=new CrewHealth({random:()=>0});health.cooldown=0;health.nextIncident=0;
-    health.update(50,{needs:{...needs,hygiene:5},activity});assert.equal(health.condition,null);
+    const health=new CrewHealth({random:()=>0});
+    health.update(300,{needs:{...needs,hygiene:5}}); // Enter rest with sustained exposure.
+    health.update(3600,{needs:{...needs,hygiene:5},activity});assert.equal(health.condition,null);
+    assert.equal(health.exposure,0);assert.ok(health.nextIncident>=health.clock+1800);
+    health.update(1,{needs:{...needs,hygiene:5},activity:'eva'});assert.equal(health.condition,null);
   }
-  const health=new CrewHealth();health.cooldown=0;health.nextIncident=Infinity;
-  health.update(44,{needs:{...needs,hygiene:5}});assert.equal(health.condition,null);
-  health.update(1,{needs:{...needs,hygiene:5}});assert.equal(health.condition.kind,'fever');
+});
+test('persistent poor needs raise fever risk only at the infrequent check, never guarantee it',()=>{
+  for(const roll of [.4,.99]){
+    const health=new CrewHealth({random:()=>0});health.random=()=>roll;
+    health.update(1799,{needs:{...needs,hygiene:5}});assert.equal(health.condition,null);
+    health.update(1,{needs:{...needs,hygiene:5}});
+    if(roll===.4){assert.equal(health.condition.kind,'fever');assert.equal(health.condition.source,'fatigue');}
+    else{assert.equal(health.condition,null);assert.ok(health.nextIncident>=health.clock+1800);}
+  }
+  const rested=new CrewHealth({random:()=>0});rested.random=()=>.4;
+  rested.update(300,{needs:{...needs,hygiene:5}});rested.update(1500,{needs});
+  assert.equal(rested.condition,null,'resolved fatigue must not raise a later fever roll');
+});
+test('fitting, climbing, exercise and tired walking have a low injury chance rather than a guaranteed accident',()=>{
+  for(const context of [{activity:'eva'},{activity:'airlock'},{activity:'innerHatch'},{climbing:true},{activity:'gym'},
+    {moving:true,needs:{...needs,energy:45}},{moving:true,needs:{...needs,energy:10}}]){
+    const health=new CrewHealth({random:()=>0});let rolls=0;
+    health.random=()=>{rolls++;return .99;};
+    health.update(1800,{needs,...context});assert.equal(health.condition,null);
+    assert.ok(health.nextIncident>=health.clock+1800&&health.nextIncident<=health.clock+3600);
+    const checked=rolls;
+    for(let i=0;i<60*60;i++)health.update(1/60,{needs,...context});
+    assert.equal(health.condition,null);assert.equal(rolls,checked,'a failed roll must not retry each frame');
+    health.random=()=>0;health.update(health.nextIncident-health.clock,{needs,...context});
+    assert.equal(health.condition.kind,'injury');
+    assert.equal(health.condition.source,['eva','airlock','innerHatch'].includes(context.activity)?'fitting':'stumble');
+  }
 });
 test('untreated symptoms worsen, emit each warning once and never kill the crew',()=>{
   const events=[],health=new CrewHealth({onEvent:event=>events.push(event)});health.startCondition('fever');
@@ -52,7 +79,38 @@ test('treatment must finish, cancellation keeps the condition and completion giv
   health.beginTreatment();health.update(health.duration,{needs});assert.equal(health.finishTreatment(),true);
   assert.equal(health.needsCare,false);assert.ok(health.value>=88);assert.equal(health.bandageTime,180);
   assert.equal(health.finishTreatment(),false);assert.equal(health.speedFactor,1);
-  health.update(179,{needs:{...needs,hygiene:0},activity:'eva'});assert.equal(health.condition,null);
+  health.update(1199,{needs:{...needs,hygiene:0,energy:0},activity:'eva'});assert.equal(health.condition,null);
+  assert.equal(health.exposure,0);assert.ok(health.cooldown>0);
+  health.update(1,{needs:{...needs,hygiene:0,energy:0},activity:'gym'});
+  assert.equal(health.condition,null);assert.equal(health.cooldown,0);assert.equal(health.exposure,0);
+  health.update(1,{needs:{...needs,hygiene:0,energy:0},climbing:true});assert.equal(health.condition,null);
+  assert.equal(health.exposure,1,'only time after the recovery grace may accumulate fatigue');
+});
+test('long sessions have occasional incidents with the same outcome at different frame rates',()=>{
+  function simulate(seed,step=1,seconds=8*3600){
+    const onsets=[],recoveries=[];
+    const health=new CrewHealth({
+      random:()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2**32;},
+      onEvent:event=>{
+        if(event.type==='onset')onsets.push({time:health.clock,kind:event.kind,source:event.source});
+        if(event.type==='recovered')recoveries.push(health.clock);
+      }
+    });
+    for(let i=0;i<Math.round(seconds/step);i++){
+      health.update(step,{needs,activity:health.treatment?'medical':'gym'});
+      if(health.condition&&!health.treatment)health.beginTreatment();
+      if(health.treatment)health.finishTreatment();
+    }
+    for(let i=1;i<onsets.length;i++)assert.ok(onsets[i].time-recoveries[i-1]>=20*60);
+    return onsets;
+  }
+  let total=0;
+  for(let seed=1;seed<=32;seed++)total+=simulate(Math.imul(seed,0x9e3779b9)>>>0).length;
+  const perHour=total/(32*8);
+  assert.ok(perHour>.2&&perHour<.8,`normal activity should stay occasional, got ${perHour} incidents/hour`);
+  const slow=simulate(0x714f32a1,1/30,2*3600),fast=simulate(0x714f32a1,1/120,2*3600);
+  assert.ok(slow.length>0);assert.deepEqual(slow.map(({kind,source})=>({kind,source})),fast.map(({kind,source})=>({kind,source})));
+  for(let i=0;i<slow.length;i++)assert.ok(Math.abs(slow[i].time-fast[i].time)<1,'frame rate must not create extra incident rolls');
 });
 test('extended treatment stays reclined after the old 14-second checkup limit; fever readings settle',()=>{
   const health=new CrewHealth();health.startCondition('fever');health.value=29;health.beginTreatment();

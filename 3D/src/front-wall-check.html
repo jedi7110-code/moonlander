@@ -1,0 +1,29 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>手前の壁・窓と配管</title>
+<style>body{margin:0;background:#151d1c;color:#e3e2d5;font:14px system-ui}header{height:64px;box-sizing:border-box;padding:12px 18px;display:flex;align-items:center;gap:10px}button,select{padding:8px 14px;background:#303d38;border:1px solid #84927c;color:inherit;border-radius:4px}button[aria-pressed=true]{border-color:#c1d498;color:#d2e2b5}canvas{display:block;width:100vw;height:calc(100vh - 64px)}output{margin-left:auto;color:#b3bdb6}@media(max-width:1000px){output{display:none}}</style>
+<header><b>手前の壁</b><select id="deck" aria-label="フロア"><option value="0">操縦・医療</option><option value="1" selected>居住区</option><option value="2">生活区画</option></select><button data-view="corridor">廊下から</button><button data-view="front">壁の正面</button><button data-view="window">窓の近く</button><button data-view="detail">追加部分</button><output id="status">読み込み中</output></header><canvas></canvas>
+<script type="module">
+import * as THREE from 'three';
+import {ObservationView} from './obs/view.js';
+import {createViewingWall,cabinWallMaterials} from './obs/viewing-wall.js';
+import {FLOOR_Y} from './obs/ship.js';
+const params=new URLSearchParams(location.search),deck=document.getElementById('deck');
+if(['0','1','2'].includes(params.get('floor')))deck.value=params.get('floor');
+let mode=['front','window','detail'].includes(params.get('view'))?params.get('view'):'corridor';
+const view=await ObservationView.create(document.querySelector('canvas'));view.observer.disconnect();
+view.milo.visible=false;view.cat.visible=false;view.droidService.root.visible=false;view.ship.medical.rig.root.visible=false;
+const wall=createViewingWall(cabinWallMaterials(view.ship.staticMesh));wall.visible=true;view.scene.add(wall);view.deckStyle?.setFootlightsVisible(true);
+function render(){
+  const y=FLOOR_Y[Number(deck.value)],camera=view.camera,width=innerWidth,height=innerHeight-64;
+  camera.near=.025;camera.far=150;camera.aspect=width/height;
+  if(mode==='corridor'){camera.fov=68;camera.position.set(-11.6,y+1.62,.78);camera.lookAt(-2.5,y+1.52,3.0);}
+  if(mode==='front'){camera.fov=76;camera.position.set(-6.5,y+1.53,-.2);camera.lookAt(-6.5,y+1.53,3.15);}
+  if(mode==='window'){camera.fov=72;camera.position.set(-8.76,y+1.57,1.28);camera.lookAt(-8.76,y+1.57,4);}
+  if(mode==='detail'){const x=deck.value==='2'?-7.24:-1.16;camera.fov=59;camera.position.set(x-.34,y+1.60,1.55);camera.lookAt(x,y+1.54,3.15);}
+  camera.updateProjectionMatrix();view.renderer.setSize(width,height,false);view.cabinToon.update(width,height,3,15);view.renderer.render(view.scene,camera);
+  document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===mode)));
+  document.getElementById('status').value='上下の斜面・中央の壁面 ／ 壁2枚ごとに窓';
+  history.replaceState(null,'',`?floor=${deck.value}&view=${mode}`);
+}
+document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{mode=button.dataset.view;render();});deck.onchange=render;
+THREE.DefaultLoadingManager.onLoad=render;addEventListener('resize',render);render();requestAnimationFrame(render);
+</script></html>

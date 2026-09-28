@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BoxGeometry,ExtrudeGeometry,Group,Mesh,MeshStandardMaterial,Path,Shape} from 'three';
+import {Box3,BoxGeometry,ExtrudeGeometry,Group,Mesh,MeshStandardMaterial,Path,Shape,Vector3} from 'three';
 import {coplanarSurfaces,describeFace} from './helpers/coplanar-surfaces.js';
 import {buildSurfaceFixture,disposeSurfaceFixture} from './helpers/cabin-surface-fixture.js';
 import {animateBathroom} from '../src/obs/bathroom.js';
 import {animatePocketShutter} from '../src/obs/shutter.js';
+import {createViewingWall,cabinWallMaterials} from '../src/obs/viewing-wall.js';
+import {CABIN_AISLE} from '../src/obs/layout.js';
+import {FLOOR_Y} from '../src/obs/ship.js';
+import {VIEWING_WALL} from '../src/obs/viewing-wall-profile.js';
 
 test('surface audit distinguishes coincident faces, butt joints and separated surfaces',()=>{
   const root=new Group(),geometry=new BoxGeometry(1,1,1),material=new MeshStandardMaterial();
@@ -29,7 +33,30 @@ test('surface audit respects actual polygons, including holes in extruded walls'
 
 test('unmerged cabin has no coincident planar surfaces, including open pocket doors',t=>{
   const ship=buildSurfaceFixture();t.after(()=>disposeSurfaceFixture(ship));
-  const roots=[ship.staticMesh,ship.animated];
+  const materials=cabinWallMaterials(ship.staticMesh),wall=createViewingWall(materials,{mergeStatic:false});
+  const equipment=wall.getObjectByName('POV / near wall equipment');
+  assert.ok(equipment?.children.length,'the actual ship supplies near-wall fixtures');
+  assert.equal(wall.visible,false,'wall and its fixtures stay hidden in the cutaway');
+  wall.visible=true;
+  const reusedMaterials=new Set();ship.staticMesh.traverse(mesh=>{if(mesh.material)reusedMaterials.add(mesh.material);});
+  for(const item of equipment.children){
+    const bounds=new Box3().setFromObject(item),floor=Math.max(...FLOOR_Y.filter(y=>y<item.position.y));
+    assert.ok(bounds.min.y>floor+.8,'leave low cat passage and footlights clear');
+    assert.ok(bounds.min.z>CABIN_AISLE.crewZ+.55,'keep equipment out of the crew aisle');
+    if(item.userData.wallMountZ!=null){
+      for(const tube of item.children.filter(child=>child.name==='Rear wall thin service pipe')){
+        const end=new Vector3(),vertices=tube.geometry.attributes.position;
+        for(let i=0;i<6;i++)end.add(new Vector3().fromBufferAttribute(vertices,i));
+        tube.localToWorld(end.divideScalar(6));
+        assert.ok(end.z>VIEWING_WALL.faceZ,'pipe cut ends are buried behind the lining');
+      }
+      for(const clamp of item.children.filter(child=>child.name==='Rear pipe clamp')){
+        assert.ok(new Box3().setFromObject(clamp).max.z<VIEWING_WALL.faceZ-.004,'buried tails must not move the clamps off the wall');
+      }
+    }else assert.ok(bounds.max.z<VIEWING_WALL.faceZ-.004,'hardware is separated from the wall face');
+    item.traverse(mesh=>{assert.ok(!mesh.isLight);if(mesh.material)assert.ok(reusedMaterials.has(mesh.material),'reuse existing cabin materials and textures');});
+  }
+  const roots=[ship.staticMesh,ship.animated,wall];
   for(const opening of [0,.16,.32,.6,1]){
     for(const fixture of Object.values(ship.bathrooms))animateBathroom(fixture,{opening,inside:opening===0});
     animatePocketShutter(ship.hatchDoor,opening);

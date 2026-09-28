@@ -6,6 +6,49 @@ import {CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR,CABIN_DECK_LIGHT} from './light
 const WORK_LIGHTS=[[-10.3,29],[-7.35,18],[-4.4,25],[-1.65,16],[1.75,16],[4.3,32],[7.6,18],[10.9,27]];
 const LOUNGE_LIGHTS=[6.25,8.65];
 
+// Clear strips between fitted equipment; the hatch-side bay has recessed lining.
+export const REAR_WALL_PIPE_RUNS=[
+  {label:'操縦席の左脇',deck:DECK.OPERATIONS,x:-11.35,z:-1.58,direction:-1},
+  {label:'ラウンジ入口',deck:DECK.HABITATION,x:4.98,z:-1.58,direction:-1},
+  {label:'ラウンジ右端',deck:DECK.HABITATION,x:9.65,z:-1.58,direction:-1},
+  {label:'運動区画と機関部の間',deck:DECK.LIFE_SUPPORT,x:3.97,z:-1.58,direction:1},
+  {label:'貨物ハッチ左脇',deck:DECK.LIFE_SUPPORT,x:7.86,z:-1.843,direction:-1},
+];
+
+const rearPipeGeometries=new Map();
+const sidePipeGeometries=new Map();
+function bentServicePipeGeometry(elbow,upright){
+  // Reserve four rings for the short elbow, instead of distributing all rings
+  // uniformly over the three-metre run and reducing the bend to a diagonal.
+  const path=new THREE.Curve();
+  path.getPointAt=(t,target)=>t<=.25?elbow.getPoint(t*4,target):upright.getPoint((t-.25)/.75,target);
+  path.getTangentAt=(t,target)=>t<=.25?elbow.getTangent(t*4,target):upright.getTangent((t-.25)/.75,target);
+  return new THREE.TubeGeometry(path,16,.022,6,false);
+}
+function rearWallPipeRun(m,direction){
+  if(!rearPipeGeometries.has(direction)){
+    const elbow=new THREE.CubicBezierCurve3(
+      new THREE.Vector3(0,.18,-.18),new THREE.Vector3(0,.18,-.055),
+      new THREE.Vector3(0,.22,0),new THREE.Vector3(0,.32,0),
+    );
+    const path=new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0,.32,0),new THREE.Vector3(0,1.2,0),
+      new THREE.Vector3(0,2.66,0),new THREE.Vector3(direction*.34,2.97,.08),
+    ]);
+    rearPipeGeometries.set(direction,bentServicePipeGeometry(elbow,path));
+  }
+  const root=new THREE.Group();
+  // Mount by the back of the clamps, not by the buried pipe tails.
+  root.userData.wallMountZ=-.04;
+  for(let i=0;i<4;i++){
+    const tube=new THREE.Mesh(rearPipeGeometries.get(direction),m.cable);
+    tube.name='Rear wall thin service pipe';tube.position.x=(i-1.5)*.062;
+    tube.castShadow=true;root.add(tube);
+  }
+  for(const y of [.49,1.69,2.47])box(root,m.metal,0,y,.02,.276,.08,.12).name='Rear pipe clamp';
+  return root;
+}
+
 // Local, deterministic surface maps: no downloads or per-frame texture work.
 function surfaceMaps(kind,baseImage) {
   const painted=kind==='paint';
@@ -212,12 +255,32 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
     }
   }
   for(const x of [-12.8,12.82]){
-    const direction=x<0?1:-1;
+    const direction=x<0?1:-1,side=-direction;
     for(let i=0;i<4;i++){
-      const xx=x+direction*i*.062;
-      pipe(root,m.cable,[[xx,y+.18,.78],[xx,y+1.2,.78],[xx,y+2.66,.78],[xx+direction*.34,y+2.97,.86]],.022);
+      const xx=x+direction*i*.062,key=`${side}/${i}`;
+      if(!sidePipeGeometries.has(key)){
+        // Nested bends enter the side wall at separate heights, so the four
+        // parallel tubes do not converge into a single overlapping end.
+        const radius=12.95-Math.abs(xx),bottom=.48-radius;
+        const elbow=new THREE.CubicBezierCurve3(
+          new THREE.Vector3(side*(radius+.10),bottom,0),new THREE.Vector3(side*radius*.55,bottom,0),
+          new THREE.Vector3(0,.48-radius*.55,0),new THREE.Vector3(0,.48,0),
+        );
+        const upright=new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0,.48,0),new THREE.Vector3(0,1.2,0),
+          new THREE.Vector3(0,2.66,0),new THREE.Vector3(direction*.34,2.97,.08),
+        ]);
+        sidePipeGeometries.set(key,bentServicePipeGeometry(elbow,upright));
+      }
+      const tube=new THREE.Mesh(sidePipeGeometries.get(key),m.cable);
+      tube.name='Side wall thin service pipe';tube.position.set(xx,y,.78);tube.castShadow=true;root.add(tube);
     }
     for(const h of [.49,1.69,2.47])box(root,m.metal,x+direction*.093,y+h,.8,.276,.08,.12);
+  }
+  for(const spec of REAR_WALL_PIPE_RUNS){
+    if(spec.deck!==level)continue;
+    const run=rearWallPipeRun(m,spec.direction);run.name=`Rear wall pipe bundle / ${spec.label}`;
+    run.position.set(spec.x,y,spec.z);root.add(run);
   }
   // Recessed cable trays and service panels between the ceiling ribs.
   for(const x of [-10.4,-7.25,-3.35,2.13,5.24,8.37,11.47]){
@@ -234,7 +297,10 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
       for(const end of [-1,1])flange(root,m,x+end*(width/2-.12),yy,-1.23,.049);
     }
     box(root,m.enamel,x+width/2-.09,y+1.95,-1.12,.09,.74,.08,.012);
-    pipe(root,m.cable,[[x-width*.3,y+1.61,-1.24],[x-width*.3,y+1.30,-1.24],[x+width*.3,y+1.24,-1.24],[x+width*.3,y+1.61,-1.24]],.025);
+    // Keep the bunk, dumbbells and towel rack clear of dangling cable loops.
+    if(level===DECK.HABITATION&&x===3.0){
+      pipe(root,m.cable,[[x-width*.3,y+1.61,-1.24],[x-width*.3,y+1.30,-1.24],[x+width*.3,y+1.24,-1.24],[x+width*.3,y+1.61,-1.24]],.025);
+    }
   }
   // Grated edge strips: surfaces are flush and the ladder opening stays open.
   if(floorDetails)for(const side of [-1,1])for(let i=0;i<57;i++){

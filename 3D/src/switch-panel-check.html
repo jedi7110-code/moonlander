@@ -1,0 +1,101 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>壁面スイッチの確認</title>
+<style>body{margin:0;background:#17201d;color:#dce1d4;font:14px system-ui}header{box-sizing:border-box;height:72px;padding:16px 18px;display:flex;gap:8px;align-items:center;overflow-x:auto;white-space:nowrap}button{padding:8px 14px;background:#303d38;color:inherit;border:1px solid #82917a;border-radius:4px;flex-shrink:0}canvas{display:block;width:100vw;height:calc(100vh - 72px)}span{margin-left:auto}#labels{position:absolute;inset:72px 0 0;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(2,1fr);pointer-events:none}#labels b{padding:12px;background:linear-gradient(#18201eb0,transparent 40px);font-size:12px;font-weight:400}</style>
+<header><b>船内の確認</b><button id="detail">パネル見本</button><button id="sites">船内の配置</button><button id="bunk">ベッド上</button><button id="lounge">ラウンジ</button><button id="magazines">左ロッカー</button><button id="locker">右ロッカー</button><button id="gym">ダンベル下</button><button id="cargo">貨物ハッチ</button><button id="pipes">奥の配管</button><button id="front">手前の壁</button><span id="status">読み込み中</span></header><canvas id="view"></canvas><div id="labels" hidden></div>
+<script type="module">
+import * as THREE from 'three';
+import {ObservationView} from './obs/view.js';
+import {FLOOR_Y,positionX} from './obs/ship.js';
+import {REAR_WALL_PIPE_RUNS} from './obs/industrial.js';
+import {createWallSwitchMaterials,createWallSwitchPanel,WALL_SWITCH_PANELS} from './obs/wall-switch-panels.js';
+import {createCabinToon} from './obs/cabin-toon.js';
+import {createViewingWall,cabinWallMaterials} from './obs/viewing-wall.js';
+import {animateBathroom} from './obs/bathroom.js';
+const view=await ObservationView.create(document.querySelector('canvas'));
+// Inspect static fixtures without the uninitialised actor and treatment poses.
+view.milo.visible=false;view.cat.visible=false;view.droidService.root.visible=false;
+view.ship.medical.rig.root.visible=false;
+const viewingWall=createViewingWall(cabinWallMaterials(view.ship.staticMesh));view.scene.add(viewingWall);
+const nearWallViews=[
+ {label:'操縦区画の向かい',deck:0,x:-10.45,eyeX:-11.1},{label:'医療区画の向かい',deck:0,x:1.7},
+ {label:'寝台の向かい',deck:1,x:-3.5},{label:'ラウンジの向かい',deck:1,x:6.9},
+ {label:'厨房の向かい',deck:2,x:-11.6},{label:'貨物区画の向かい',deck:2,x:9.4},
+];
+const examples=new THREE.Group();examples.position.y=40;view.scene.add(examples);
+const mat=createWallSwitchMaterials();
+[[.44,.70,0],[.70,.40,1],[.32,.65,2]].forEach(([w,h,style],i)=>{const p=createWallSwitchPanel(mat,{w,h,style});p.position.x=(i-1)*.88;p.rotation.y=-.12;examples.add(p);});
+const wall=new THREE.Mesh(new THREE.BoxGeometry(5,3,.08),new THREE.MeshStandardMaterial({color:0xa1a69a,roughness:.94}));wall.position.z=-.044;examples.add(wall);
+const toon=createCabinToon([examples]);toon.setStyle('cartoon');
+const camera=view.camera;camera.near=.02;const initialArea=new URLSearchParams(location.search).get('area');let mode=['kitchen','shower','toilet'].includes(initialArea)?initialArea:'detail';
+for(const [id,text] of [['shower','シャワー'],['toilet','トイレ']]){const button=document.createElement('button');button.id=id;button.textContent=text;document.getElementById('detail').before(button);}
+const doorControls=document.createElement('div');doorControls.style.cssText='display:flex;align-items:center;gap:6px';
+doorControls.innerHTML='<button id="bathroom-door">ドアを閉める</button><input aria-label="ドアの開き" type="range" min="0" max="1" step=".01" value="1" style="width:90px">';
+document.getElementById('detail').before(doorControls);
+const doorButton=doorControls.querySelector('button'),doorSlider=doorControls.querySelector('input');let opening=1,doorFrame=0,closing=false;
+doorSlider.oninput=()=>{cancelAnimationFrame(doorFrame);closing=false;opening=Number(doorSlider.value);render();};
+doorButton.onclick=()=>{
+ cancelAnimationFrame(doorFrame);const from=opening,to=opening>.5?0:1,start=performance.now();closing=to===0;
+ const step=now=>{const t=Math.min(1,(now-start)/900);opening=from+(to-from)*t;doorSlider.value=opening;render();if(t<1)doorFrame=requestAnimationFrame(step);else closing=false;};
+ doorFrame=requestAnimationFrame(step);
+};
+const labels=document.getElementById('labels');const names=['操縦席の脇','上層の扉脇','医療区画','寝台の入口','ラウンジ','機関区','貨物区画'];
+labels.innerHTML=names.map(n=>`<b>${n}</b>`).join('');
+function render(){
+ const width=innerWidth,height=innerHeight-72,r=view.renderer;
+ viewingWall.visible=mode==='front';
+ const bathroom=['shower','toilet'].includes(mode);doorControls.style.display=bathroom?'flex':'none';doorButton.textContent=opening>.5?'ドアを閉める':'ドアを開ける';
+ for(const [id,room] of Object.entries(view.ship.bathrooms))animateBathroom(room,{opening:mode===id?opening:0,phase:closing?'close':undefined});
+ document.getElementById('status').textContent=bathroom?`${mode==='shower'?'シャワー':'トイレ'} / ${Math.round(opening*100)}% / ${view.ship.bathrooms[mode].ceilingLight.power.value?'点灯':'消灯'}`:mode==='kitchen'?'キッチン':mode==='front'?'主観側 / 3フロア':mode==='pipes'?`${REAR_WALL_PIPE_RUNS.length}か所 / 4本組`:'7か所 / 3種類';
+ labels.style.display=['sites','pipes','front'].includes(mode)?'grid':'none';
+ labels.style.gridTemplateColumns=`repeat(${mode==='pipes'||mode==='front'?3:5},1fr)`;
+ labels.innerHTML=(mode==='front'?nearWallViews.map(p=>p.label):mode==='pipes'?REAR_WALL_PIPE_RUNS.map(p=>p.label):names).map(n=>`<b>${n}</b>`).join('');
+ r.setSize(width,height,false);r.setScissorTest(false);r.clear();
+ if(mode==='detail'){
+  camera.fov=28;camera.aspect=width/height;camera.position.set(.16,40.13,Math.max(3.20,3.0/(2*Math.tan(14*Math.PI/180)*camera.aspect)));camera.lookAt(0,40,0);camera.updateProjectionMatrix();
+  toon.update(width,height,1.7,15);view.cabinToon.update(width,height,1.7,15);r.render(view.scene,camera);
+ }else if(mode==='bunk'){
+  camera.fov=35;camera.aspect=width/height;camera.position.set(-4.30,5.15,4.1);camera.lookAt(-4.25,4.85,-1.2);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,3.0,15);r.render(view.scene,camera);
+ }else if(mode==='lounge'){
+  camera.fov=38;camera.aspect=width/height;camera.position.set(7.70,5.20,5.8);camera.lookAt(7.65,4.92,-1.2);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,4.6,15);r.render(view.scene,camera);
+ }else if(mode==='magazines'){
+  camera.fov=35;camera.aspect=width/height;camera.position.set(2.6,5.0,3.6);camera.lookAt(2.1,4.65,-.75);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,2.8,15);r.render(view.scene,camera);
+ }else if(mode==='locker'){
+  camera.fov=35;camera.aspect=width/height;camera.position.set(11.65,5.0,3.6);camera.lookAt(11.3,4.65,-.75);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,2.8,15);r.render(view.scene,camera);
+ }else if(bathroom){
+  const x=positionX(mode==='shower'?240:380);
+  camera.fov=62;camera.aspect=width/height;camera.position.set(x-.17,4.94,-.95);camera.lookAt(x+.10,5.01,-3.12);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,2.5,15);r.render(view.scene,camera);
+ }else if(mode==='kitchen'){
+  camera.fov=38;camera.aspect=width/height;camera.position.set(-10.0,2.25,4.1);camera.lookAt(-10.0,1.1,-.6);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,3.0,15);r.render(view.scene,camera);
+ }else if(mode==='gym'){
+  camera.fov=38;camera.aspect=width/height;camera.position.set(2.5,1.8,3.2);camera.lookAt(2.0,.88,-.9);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,2.8,15);r.render(view.scene,camera);
+ }else if(mode==='cargo'){
+  const x=positionX(1110);
+  camera.fov=40;camera.aspect=width/height;camera.position.set(x+2.6,2.5,5.0);camera.lookAt(x,1.2,-.35);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,3.5,15);r.render(view.scene,camera);
+ }else if(mode==='front'){
+  const w=width/3,h=height/2;camera.fov=78;camera.aspect=w/h;camera.updateProjectionMatrix();
+  view.cabinToon.update(w,h,3.3,15);r.setScissorTest(true);
+  nearWallViews.forEach((p,i)=>{
+   const x=i%3*w,y=(1-Math.floor(i/3))*h,eye=FLOOR_Y[p.deck]+1.6;
+   r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);
+   camera.position.set(p.eyeX??p.x-.42,eye,.9);camera.lookAt(p.x,eye,2.45);r.render(view.scene,camera);
+  });r.setScissorTest(false);r.setViewport(0,0,width,height);
+ }else{
+  const pipes=mode==='pipes',columns=pipes?3:5,w=width/columns,h=height/2;camera.fov=pipes?42:30;camera.aspect=w/h;camera.updateProjectionMatrix();
+  view.cabinToon.update(w,h,pipes?3.3:1.5,15);r.setScissorTest(true);
+  (pipes?REAR_WALL_PIPE_RUNS:WALL_SWITCH_PANELS).forEach((p,i)=>{
+   const x=i%columns*w,y=(1-Math.floor(i/columns))*h;
+   r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);
+   const yy=FLOOR_Y[p.deck]+(pipes?1.55:p.y),yaw=p.yaw??0,distance=pipes?4.4:2.4;camera.position.set(p.x+Math.sin(yaw)*distance+Math.cos(yaw)*.13,yy+.10,p.z+Math.cos(yaw)*distance);camera.lookAt(p.x,yy,p.z);r.render(view.scene,camera);
+  });r.setScissorTest(false);r.setViewport(0,0,width,height);
+ }
+}
+view.observer.disconnect();for(const name of ['detail','sites','bunk','lounge','magazines','locker','gym','cargo','pipes','front','shower','toilet'])document.getElementById(name).onclick=()=>{mode=name;render();};window.addEventListener('resize',render);
+render();
+</script></html>

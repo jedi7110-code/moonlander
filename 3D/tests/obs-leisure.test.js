@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MeshStandardMaterial} from 'three';
 import {CabinBrain} from '../src/obs/brain.js';
-import {CrewMotion,Supplies,CatRoutine,getStation} from '../src/obs/state.js';
+import {CrewMotion,CatMotion,Supplies,CatRoutine,getStation,advanceCabinTraffic} from '../src/obs/state.js';
+import {CAT_SOFA,CAT_PORT,LOUNGE_SEAT} from '../src/obs/layout.js';
 import {createMilo,animateMilo,createCat,animateCat} from '../src/obs/characters.js';
 import {createLoungeTable} from '../src/obs/ship.js';
 import {updateTableLeisureProps} from '../src/obs/lounge-table-props.js';
@@ -43,6 +44,34 @@ test('cat joins using the existing sofa hop and stops playing when chess starts'
   assert.equal(cat.mode,'play');assert.ok(cat.motion.onSofa);assert.equal(cat.motion.floor,getStation('lounge').floor);
   brain.requestGame();cat.update(1/60,actor);assert.equal(cat.mode,'play');assert.ok(cat.playRelease);assert.equal(cat.playHost,null);
   cat.update(1.2,actor);assert.equal(cat.mode,'look');
+});
+test('Lucy approaches from the floor and hops up beside seated Milo with live cabin traffic',()=>{
+  for(const turns of [false,true])for(const dt of [1/60,.1]){
+    const {brain,care,actor}=setup(()=>.99),cat=new CatRoutine(care,{turns,random:()=>.5});brain.catRoutine=cat;
+    cat.motion=new CatMotion({floor:CAT_SOFA.floor,x:CAT_SOFA.floorX-20,turns});cat.motion.heading=Math.PI/2;
+    cat.hunger=cat.energy=100;cat.rest('look',100);
+    brain._startPerform(getStation('lounge'));brain.update(LOUNGE_ENTRY_SECONDS);
+    let jumped=false;
+    for(let time=0;time<20&&cat.mode!=='play';time+=dt){
+      advanceCabinTraffic(actor,cat,dt);brain.update(dt);jumped||=Boolean(cat.motion.hop);
+      const gap=Math.hypot((actor.x-cat.motion.x)*.022,LOUNGE_SEAT.depth-cat.motion.z);
+      assert.ok(gap>.65,'seated Milo stays clear of the approach and landing');
+    }
+    assert.equal(cat.mode,'play',`joins before the play session ends (turns=${turns}, dt=${dt})`);
+    assert.ok(jumped&&cat.motion.onSofa);assert.equal(cat.motion.elevation,LOUNGE_SEAT.top);
+  }
+});
+test('an unfinished invitation is cancelled when Milo puts the toy away',()=>{
+  const {brain,care,actor}=setup(()=>.99),cat=new CatRoutine(care,{turns:true,random:()=>.5});brain.catRoutine=cat;
+  cat.motion=new CatMotion({floor:CAT_SOFA.floor,x:CAT_SOFA.floorX,turns:true});cat.motion.heading=Math.PI/2;
+  cat.hunger=cat.energy=100;cat.rest('look',100);
+  brain._startPerform(getStation('lounge'));brain.update(LOUNGE_ENTRY_SECONDS);
+  for(let frame=0;frame<180;frame++){advanceCabinTraffic(actor,cat,1/60);brain.update(1/60);}
+  assert.equal(cat.mode,'joinPlay');
+  brain._go(getStation('hydro'));
+  for(let frame=0;frame<10*60;frame++){advanceCabinTraffic(actor,cat,1/60);brain.update(1/60);}
+  assert.equal(cat.playHost,null);assert.notEqual(cat.mode,'joinPlay');
+  assert.equal(cat.motion.onSofa,false);assert.equal(cat.motion.z,CAT_PORT.walkZ);
 });
 test('leisure props only appear in their mode and animations remain finite',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),root=createMilo(m),cat=createCat(m);

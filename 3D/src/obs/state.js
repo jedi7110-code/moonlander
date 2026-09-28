@@ -392,7 +392,19 @@ export class CatRoutine {
     this.groomNeed=bounded(this.groomNeed+dt*(resting&&this.mode==='groom'?-4:.22*CABIN_PACE.catDecay));
     this.curiosity=bounded(this.curiosity+dt*(this.motion.busy?-.8:.3));
     if(chasing)return;
-    this.motion.update(dt,actor,droid);
+    const hostSeated=this.playHost?.isSeatedInLounge()&&this.playHost.leisure==='cat';
+    if(this.playHost&&!hostSeated&&this.mode!=='play'){
+      this.playHost=null;
+      if(this.pendingMove?.kind==='play')this.pendingMove=null;
+      if(this.mode==='joinPlay'){
+        this.mode='walk';this.modeTime=0;
+        this.motion.goTo({floor:this.motion.floor,x:CAT_SOFA.floorX},()=>this.rest('look',6));
+      }
+    }
+    // A seated host is behind the walking lane and beside the sofa landing.
+    // Keep normal crossing reservations for standing crew and the droid.
+    const joiningSeatedHost=this.mode==='joinPlay'&&hostSeated&&this.playHost.actor===actor;
+    this.motion.update(dt,joiningSeatedHost?null:actor,droid);
     if(this.motion.portal)this.motion.heading=this.motion.passagePose.yaw;
     if(this.motion.turn)return;
     if((actor?.waitingForCat||droid?.waitingForCat)&&!this.motion.busy&&!this.motion.onSofa&&this.motion.z!==CAT_PORT.walkZ&&!this.pendingMove){
@@ -428,5 +440,5 @@ export class CatRoutine {
   fetch(){if(this.care.catBowlFilling){this.waitForDroidFood=true;return;}if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=CAT_WALK_SPEED;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX,z:CAT_BOWL.depth},()=>{if(this.care.eatCatFood()){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
 }
 
-export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeStow||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
+export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.smokingVisit?'smoking':brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeStow||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
 export {FLOORS,getStation};

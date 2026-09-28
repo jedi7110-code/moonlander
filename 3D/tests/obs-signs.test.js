@@ -28,16 +28,18 @@ test('sign textures preserve plate proportions and fit text without stretching o
 });
 
 test('front-facing signs stay clear of fixtures, ceiling beams and one another',()=>{
-  const ctx={scale(){},fillRect(){},fillText(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},drawImage(){},createLinearGradient(){return{addColorStop(){}};},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
+  const ctx={scale(){},save(){},restore(){},translate(){},fillRect(){},fillText(){},strokeRect(){},beginPath(){},closePath(){},moveTo(){},lineTo(){},arc(){},fill(){},stroke(){},drawImage(){},createLinearGradient(){return{addColorStop(){}};},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
   const material=new MeshStandardMaterial();let ship;
   globalThis.document={createElement:()=>({getContext:()=>ctx})};
-  try{ship=buildShip(new Proxy({},{get:()=>material}));}finally{delete globalThis.document;}
+  // Separate fixtures retain their small bounds, keeping the full ray grid affordable.
+  try{ship=buildShip(new Proxy({},{get:()=>material}),{mergeStatic:false});}finally{delete globalThis.document;}
   const objects=[];
   for(const root of [ship.staticMesh,ship.animated]){
     root.updateMatrixWorld(true);
     root.traverse(mesh=>{
       if(!mesh.isMesh||mesh.material.visible===false)return;
       for(let node=mesh;node;node=node.parent)if(!node.visible)return;
+      mesh.geometry.computeBoundingBox();
       objects.push(mesh);
     });
   }

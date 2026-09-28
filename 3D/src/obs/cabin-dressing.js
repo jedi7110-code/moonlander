@@ -1,23 +1,20 @@
 import * as THREE from 'three';
 import {DECK} from './layout.js';
 import {box,cylinder,rod,pipe} from './materials.js';
-import {whiteCeramic,finishStaticCups} from './cabin-fixtures.js';
+import {finishStaticCups} from './cabin-fixtures.js';
 import {addFireExtinguishers} from './fire-extinguishers.js';
 import {createPilotSeat} from './pilot-seats.js';
 import {createMachinedMetals,finishMachinedFixtures} from './machined-metals.js';
 import {finishServicePanels} from './service-panel.js';
+import {createWallControlMaterials,createWallControlPanel} from './wall-control-panel.js';
+import {addWallSwitchPanels} from './wall-switch-panels.js';
+import {finishWallPrints} from './wall-prints.js';
+import {addSmokingAshtray} from './smoking-props.js';
 
 function tin(root,m,x,y,z,h=.22,r=.09,paint=m.enamel){
   cylinder(root,paint,x,y+h/2,z,r,h,r,12);
   cylinder(root,m.metal,x,y+h,z,r*1.05,.022,r*1.05,12);
   box(root,m.cloth,x,y+h*.52,z+r,.10,h*.35,.008);
-}
-
-function mug(root,m,x,y,z){
-  cylinder(root,whiteCeramic,x,y+.09,z,.078,.18,.088,12);
-  cylinder(root,m.dark,x,y+.184,z,.067,.007,.067,12);
-  const handle=new THREE.Mesh(new THREE.TorusGeometry(.060,.016,6,12),whiteCeramic);
-  handle.position.set(x+.098,y+.10,z);root.add(handle);
 }
 
 function casePart(root,material,x,y,z,w,h,d,corner=.025){
@@ -87,14 +84,6 @@ function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallMounted=false){
   return group;
 }
 
-function cargoCase(root,m,x,y,z=-.89){
-  const cargo=new THREE.Group();cargo.name='Life support cargo case';cargo.position.set(x,y,z);root.add(cargo);
-  box(cargo,m.olive,0,0,0,.94,.58,.55);
-  for(const dx of [-.29,.29])box(cargo,m.rubber,dx,0,.288,.047,.58,.026);
-  box(cargo,m.metal,0,.30,0,.23,.04,.10);
-  return cargo;
-}
-
 function cloth(root,m,x,y,z,w=.36,h=.55){
   const geo=new THREE.PlaneGeometry(w,h,8,8),p=geo.attributes.position;
   for(let i=0;i<p.count;i++){
@@ -104,31 +93,6 @@ function cloth(root,m,x,y,z,w=.36,h=.55){
   geo.computeVertexNormals();const mat=m.cloth.clone();mat.side=THREE.DoubleSide;
   const mesh=new THREE.Mesh(geo,mat);mesh.position.set(x,y-h/2,z);mesh.castShadow=true;root.add(mesh);
   rod(root,m.metal,[x-w*.55,y,z],[x+w*.55,y,z],.02);
-}
-
-function serviceBoard(root,m,x,y,w=.73){
-  box(root,m.dark,x,y,-1.27,w,1.09,.17);
-  box(root,m.enamel,x,y,-1.17,w-.07,1.02,.04);
-  for(let i=0;i<3;i++){
-    const xx=x-w*.32+i*w*.32;
-    rod(root,m.pipeSteel,[xx,y-.36,-1.10],[xx,y+.15,-1.10],.026);
-    const jaw=new THREE.Mesh(new THREE.TorusGeometry(.053,.020,6,10,Math.PI*1.45),m.metal);
-    jaw.position.set(xx,y+.20,-1.10);jaw.rotation.z=-.7+i*.12;root.add(jaw);
-  }
-  const gauge=cylinder(root,m.metal,x,y+.38,-1.10,.10,.04,.10,16);gauge.rotation.x=Math.PI/2;
-  const face=cylinder(root,m.cloth,x,y+.38,-1.072,.079,.008,.079,16);face.rotation.x=Math.PI/2;
-  rod(root,m.dark,[x,y+.38,-1.06],[x+.035,y+.43,-1.06],.008);
-  pipe(root,m.cable,[[x-w*.45,y+.36,-1.16],[x-w*.61,y+.1,-1.06],[x-w*.56,y-.64,-1.04],[x+w*.22,y-.63,-1.04],[x+w*.45,y-.3,-1.15]],.026);
-}
-
-function wallCards(root,m,x,y){
-  for(let i=0;i<4;i++){
-    const card=new THREE.Group();card.position.set(x+(i%2)*.32,y-Math.floor(i/2)*.29,-1.20);card.rotation.z=(i-1.3)*.035;root.add(card);
-    box(card,m.cloth,0,0,0,.25,.23,.006);
-    box(card,i%2?m.teal:m.olive,0,.033,.007,.19,.10,.004);
-    for(let j=0;j<2;j++)box(card,m.dark,-.015,-.045-j*.026,.008,.15-j*.04,.006,.003);
-    box(card,m.yellow,0,.115,.013,.08,.033,.005);
-  }
 }
 
 function heavyServices(root,m,y){
@@ -192,23 +156,25 @@ export function addCabinDressing(parent,m,floors){
   arrangeConsoleChairs(parent,operations,metals);
   finishMachinedFixtures(parent,m,metals);
   finishServicePanels(parent,m,habitation,bottom);
+  finishWallPrints(parent,m,habitation);
   floors.forEach(y=>heavyServices(root,m,y));underdeck(root,m);
-  addFireExtinguishers(root,m,floors);
+  const extinguishers=addFireExtinguishers(root,m,floors);
+  const switches=addWallSwitchPanels(root,floors);
 
   // Keep the wall above the lounge clear of shelves and stored objects.
-  wallCards(root,m,6.96,habitation+2.34);
   equipmentCase(root,m,casePaint,10.14,habitation+.04,-.18,.83,.43);
   cloth(root,m,10.20,habitation+1.63,-1.02,.47,.81);
   box(root,m.dark,10.19,habitation+1.69,-1.10,.68,.08,.10);
-  for(const [x,y,w]of [[-11.94,habitation+1.73,.62],[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]])serviceBoard(root,m,x,y,w);
-  wallCards(root,m,-5.64,habitation+2.20);
+  const controlMaterials=createWallControlMaterials();
+  for(const [x,y,w]of [[-11.94,habitation+1.73,.62],[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]]){
+    const cabinet=createWallControlPanel(controlMaterials,w);cabinet.position.set(x,y,-1.15);root.add(cabinet);
+  }
   equipmentCase(root,m,casePaint,-8.56,habitation+.12,-.96,.66,.46,true);
   box(root,m.dark,-11.89,habitation+.80,-.99,.63,.065,.53);
-  tin(root,m,-11.89,habitation+.84,-.99,.29,.115,m.red);
+  addSmokingAshtray(root,m,habitation);
 
   // Keep the kitchen worktop props, without an overhead provision shelf.
   const worktop=bottom+1.0+.07/2; // Counter centre and half its thickness.
-  mug(root,m,-10.42,worktop,-.05);
   tin(root,m,-10.03,worktop,-.26,.33,.13,m.metal);
   const handle=new THREE.Mesh(new THREE.TorusGeometry(.15,.024,6,16,Math.PI),m.dark);handle.position.set(-10.03,worktop+.345,-.26);root.add(handle);
   rod(root,m.metal,[-9.94,worktop+.205,-.26],[-9.81,worktop+.285,-.26],.034);
@@ -216,9 +182,18 @@ export function addCabinDressing(parent,m,floors){
 
   // The cargo rack and its tensioned webbing are built together in cargo-bay.js.
   equipmentCase(root,m,casePaint,12.00,bottom+1.47,-.96,.60,.30,true);
-  cargoCase(root,m,1.8,bottom+.45);
+  equipmentCase(root,m,casePaint,1.8,bottom+.04,-.89,.94,.48).name='Life support cargo case';
   // Keep the EVA preparation aisle clear; the former case at x=10.02 sat
   // directly in front of the third hanging suit.
   finishStaticCups(parent);
+  // Detached templates share the actual geometry and atlases, without retaining
+  // the entire unbatched ship through a parent reference.
+  root.userData.viewingWallFixtures=Object.fromEntries(Object.entries({
+    switchWide:switches.getObjectByName('Wall switches / Console auxiliary'),
+    switchTall:switches.getObjectByName('Wall switches / Operations doorway'),
+    switchSquare:switches.getObjectByName('Wall switches / Medical lighting'),
+    cabinet:root.getObjectByName('Wall auxiliary control cabinet'),
+    extinguisher:extinguishers[0],
+  }).map(([name,source])=>{const copy=source.clone();copy.position.set(0,0,0);return[name,copy];}));
   return root;
 }

@@ -1,4 +1,5 @@
 import {animatePocketShutter} from './shutter.js';
+import {updateBathroomCeilingLight} from './bathroom-lighting.js';
 
 const smooth=t=>t*t*(3-2*t);
 const phases=[['reach',1.4],['open',.7],['enter',2.8],['close',.7],['use',Infinity],['reopen',1.8],['leave',2.8],['shut',.7]];
@@ -8,6 +9,7 @@ export const BATHROOM_TURN_DECAY={reach:.4/1.4,reopen:.7/1.8};
 
 export function animateBathroom(fixture,pose=null){
   animatePocketShutter(fixture.door,pose?.opening??0);
+  updateBathroomCeilingLight(fixture.ceilingLight,pose);
   const {lamp}=fixture,material=lamp.material;
   // Pocket-door materials are cloned per fixture, so the other room and all
   // shared cyan indicators stay unchanged. Preserve the original idle glow.

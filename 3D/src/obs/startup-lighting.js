@@ -2,6 +2,7 @@
 // No extra real-time lights or draw calls, including in Quest's culled-light mode.
 import {Color,Vector2,Vector3} from 'three';
 import {LADDER_LIGHT_LAYOUT,EVA_SPOT_LAYOUT} from './lighting.js';
+import {applyBathroomLightingShader} from './bathroom-lighting.js';
 export const STARTUP_LIGHT_DELAY=1;
 export const STARTUP_LIGHT_SECONDS=1.6;
 export const STARTUP_TOTAL_SECONDS=STARTUP_LIGHT_DELAY+STARTUP_LIGHT_SECONDS;
@@ -173,8 +174,11 @@ export class CabinStartupLighting {
     this.reducedMotion=reducedMotion;this.time=0;this.done=false;this.materials=[];
     this.active={value:1};this.levels={value:new Float32Array(STARTUP_CIRCUITS)};
     this.roomLevels={value:new Float32Array(STARTUP_CIRCUITS)};
-    const lights=[];
-    for(const root of roots)root?.traverse(light=>{if(light.isPointLight&&light.userData.cabinShaderLight)lights.push(light);});
+    const lights=[],bathrooms=[];
+    for(const root of roots)root?.traverse(light=>{
+      if(light.isPointLight&&light.userData.cabinShaderLight)lights.push(light);
+      if(light.userData.bathroomLighting)bathrooms.push(light.userData.bathroomLighting);
+    });
     // XR switches these off together with the scene's real point lights.
     this.shaderLights={
       on:{value:1},
@@ -213,8 +217,9 @@ export class CabinStartupLighting {
             gl_FragColor.rgb += diffuseColor.rgb * cabinPracticalSpill(inverseTransformDirection(normal, viewMatrix));
           #endif
           #include <tonemapping_fragment>`);
+        if(spill)applyBathroomLightingShader(shader,bathrooms);
       };
-      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v8-'+Number(fixture)+'-'+Number(spill)+'-'+(lit?lights.length:0);material.needsUpdate=true;
+      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v9-'+Number(fixture)+'-'+Number(spill)+'-'+(lit?lights.length:0)+'-'+bathrooms.length;material.needsUpdate=true;
       this.materials.push({material,compile,key,wrapped});
     }
     if(!start)this.update(STARTUP_TOTAL_SECONDS);

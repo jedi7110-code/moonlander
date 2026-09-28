@@ -1,4 +1,5 @@
 import {BackSide,Color,DoubleSide,Mesh,SkinnedMesh,MeshToonMaterial,ShaderMaterial,Vector2} from 'three';
+import {applyWallPrintSurface} from './wall-prints.js';
 
 const KEEP_GLOSS=new Set(['Industrial / wet chain','Industrial / wet floor']);
 const keepSurface=material=>material.userData.cabinKeepSurface===true;
@@ -42,6 +43,7 @@ function toonMaterial(source){
     `);
   };
   material.customProgramCacheKey=()=> 'cabin-study-bands-v2';
+  applyWallPrintSurface(material,source.userData.wallPrints);
   return material;
 }
 

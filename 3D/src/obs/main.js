@@ -23,7 +23,7 @@ const $=id=>document.getElementById(id);
 const icons={Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
-const stationName=id=>({grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
+const stationName=id=>({smoking:words('シャワー左の灰皿','Shower-side ashtray'),grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
 const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
@@ -96,6 +96,7 @@ function updateHUD(){
   $('milo-activity').textContent=games.open?games.title:paused?words('一時停止','Paused'):actor.waitingForDroid?words('ハシゴの空き待ち','Waiting beside the ladder'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('ゲームをしにラウンジへ','Going to the lounge to play'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
   if(brain.openingWake)$('milo-activity').textContent=brain.bunkVisit?.phase==='sleeping'?words('ルーシーと眠っている','Sleeping with Lucy'):words('ルーシーと目を覚ます','Waking up with Lucy');
   if(!paused&&brain.grooming)$('milo-activity').textContent=words(brain.grooming.pose.label,'Cutting hair and shaving at the washbasin');
+  if(!paused&&brain.smokingVisit)$('milo-activity').textContent=words(brain.smokingVisit.pose.gesture?.label??'灰皿の前へ移動する','Taking a smoke break');
   if(!paused&&brain.groomingQueued)$('milo-activity').textContent=words('ドロイドの洗濯完了を待ってから散髪へ','Waiting for the droid to finish laundry before grooming');
   for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
   if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);

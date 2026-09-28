@@ -3,7 +3,7 @@ import {CABIN_LIGHT_COLOR,LADDER_LIGHT_LAYOUT} from './lighting.js';
 import {createDiningProps} from './dining.js';
 import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
-import {DECK,FLOORS,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,LOUNGE_TABLE,CABIN_AISLE,HYDRO_TRAY} from './layout.js';
+import {DECK,FLOORS,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,LOUNGE_TABLE,CABIN_AISLE,HYDRO_TRAY,ASHTRAY} from './layout.js';
 import {createPlantRack} from './plants.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
@@ -14,6 +14,7 @@ import {BULKHEAD_GATE,gateWall,createBulkheadGate} from './bulkhead-gate.js';
 import {addCabinDressing} from './cabin-dressing.js';
 import {configurePocketShutter} from './shutter.js';
 import {HATCH_TRAVEL} from './delivery.js';
+import {paintSupplyLedge} from './supply-ledge.js';
 import {createWasteIncinerator} from './waste-incinerator.js';
 import {createScreenGlow} from './screen-glow.js';
 import {displayFrame} from './display-frame.js';
@@ -22,6 +23,8 @@ import {createMachinedMetals} from './machined-metals.js';
 import {createCargoStowage,createCargoVentilation} from './cargo-bay.js';
 import {createLoungeCoffee,createTableLeisureProps} from './lounge-table-props.js';
 import {createConsoleMaterials,addConsoleControls} from './console-controls.js';
+import {createShowerFixtures} from './shower-fixtures.js';
+import {createBathroomCeilingLight} from './bathroom-lighting.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -182,7 +185,9 @@ export function createBathroom(parent,animated,m,x,y,type) {
   if(type==='toilet'){
     cylinder(parent,m.white,x,y+.265,-3.37,.24,.43,.29);
     const seat=new THREE.Mesh(new THREE.TorusGeometry(.22,.045,12,36),m.dark);seat.rotation.x=Math.PI/2;seat.position.set(x,y+.49,-3.37);parent.add(seat);
-  }else pipe(parent,m.metal,[[x+.5,y+.4,-3.62],[x+.5,y+2.15,-3.62],[x,y+2.15,-3.38]],.025);
+  }else{
+    const fixtures=createShowerFixtures(m);fixtures.position.set(x,y,0);parent.add(fixtures);
+  }
   const door=new THREE.Group();door.position.set(x-.735,y,-1.72);animated.add(door);
   door.name=`Pocket ${type} shutter`;
   panel(door,m,.735,1.3,0,1.47,2.46,m.white);
@@ -197,7 +202,8 @@ export function createBathroom(parent,animated,m,x,y,type) {
     for(const h of [.32,2.19])box(parent,m.dark,x+side*.787,y+h,-1.52,.10,.13,.12);
   }
   box(parent,m.dark,x,y+2.51,-1.56,1.70,.10,.17,.025).name=`${type} fixed lintel`;
-  return{door,lamp};
+  const ceilingLight=createBathroomCeilingLight(m,x,y,type);parent.add(ceilingLight.housing);animated.add(ceilingLight.root);
+  return{door,lamp,ceilingLight};
 }
 function hatch(parent,animated,m,x,y) {
   box(parent,m.black,x,y+1.15,-3.42,1.80,2.30,.12);
@@ -214,12 +220,16 @@ function hatch(parent,animated,m,x,y) {
   configurePocketShutter(door,{left:x-.89,right:x+.89,travel:HATCH_TRAVEL});
   for(const side of [-1,1])box(parent,m.metal,x+side*.91,y+1.17,-1.53,.065,2.02,.15,.012);
   box(parent,m.dark,x,y+2.17,-1.56,1.96,.10,.17,.025);
-  for(const side of [-1,1]){box(parent,m.dark,x+side*.91,y+.52,-1.50,.12,.15,.13);box(parent,m.dark,x+side*.91,y+1.84,-1.50,.12,.15,.13);}
+  // The lower jamb fittings are enclosed by the full-depth receiving plinth.
+  for(const side of [-1,1])box(parent,m.dark,x+side*.91,y+1.84,-1.50,.12,.15,.13);
   // Keep the fixed header ahead of the service cables; only the leaf is recessed.
   label(parent,'SUPPLY HATCH',x,y+2.47,-.32,1.74,.26,{fg:'#e2c174',size:52});
-  box(parent,m.dark,x,y+.32,.32,2.15,.55,.73,.04);
-  box(parent,m.metal,x,y+.64,.32,2.27,.065,.84,.02);
-  for(let i=0;i<15;i++)box(parent,i%2?m.black:m.yellow,x-1.03+i*.146,y+.285,.705,.146,.14,.015);
+  // Reach the recessed shutter while keeping the cargo pickup edge in place.
+  const ledgeBack=door.position.z+.07,baseFront=.685,topFront=.74;
+  const plinth=box(parent,m.dark,x,y+.32,(ledgeBack+baseFront)/2,2.15,.55,baseFront-ledgeBack,.04);
+  plinth.name='Supply hatch receiving plinth';
+  paintSupplyLedge(plinth,{width:2.15,height:.55,depth:baseFront-ledgeBack,radius:.04});
+  box(parent,m.metal,x,y+.64,(ledgeBack+topFront)/2,2.27,.065,topFront-ledgeBack,.02).name='Supply hatch receiving surface';
   const lamp=new THREE.MeshBasicMaterial({color:0x4b6658,toneMapped:false});
   box(animated,lamp,x,y+2.25,-1.50,.62,.065,.05,.014);
   return{door,lamp};
@@ -398,14 +408,17 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   STATIONS.forEach(({id,x,floor:level})=>{
     const w=id==='galley'?3.06:id==='plant'?2.90:id==='medical'?5.10:id==='eva'?3.65:['airlock','innerHatch'].includes(id)?.62:1.9;
     const fixtureX=id==='galley'?-10.05:id==='airlock'?evaBay.hatch.position.x:id==='innerHatch'?evaBay.innerHatch.position.x:id==='medical'?MED_BED.x-.52:positionX(x);
-    const bounds=id==='grooming'?groomingGateBounds():id==='plant'?new THREE.Box3().setFromObject(plants.root).expandByScalar(.04):id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
+    const bounds=id==='smoking'?new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(ASHTRAY.x,FLOOR_Y[level]+1.0,ASHTRAY.z),new THREE.Vector3(.52,.43,.45)):id==='grooming'?groomingGateBounds():id==='plant'?new THREE.Box3().setFromObject(plants.root).expandByScalar(.04):id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
     const {mesh,group,material}=createStationInteraction(id,bounds,pickMaterial);
-    if(id!=='lounge'&&id!=='grooming')group.position.z=1.75;
+    if(!['lounge','grooming','smoking'].includes(id))group.position.z=1.75;
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
-  addCabinDressing(staticRoot,m,FLOOR_Y);
+  const dressing=addCabinDressing(staticRoot,m,FLOOR_Y);
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
-  return {staticMesh:mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation};
+  const staticMesh=mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot;
+  const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
+  staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
+  return {staticMesh,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation};
 }

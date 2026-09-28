@@ -33,7 +33,8 @@ test('cat appetite slows without stretching movement or sleep recovery',()=>{
 test('low physical needs shorten leisure and postpone exercise',()=>{
   const {brain}=setup();brain.needs.hunger=40;brain._startPerform(getStation('lounge'));assert.equal(brain.curDurSec,8);
   brain.update(LOUNGE_ENTRY_SECONDS);brain._endPerform();brain.update(LOUNGE_STOW_SECONDS);brain.update(LOUNGE_EXIT_SECONDS);
-  assert.equal(brain.state,'idle');Object.keys(brain.needs).forEach(key=>brain.needs[key]=80);brain.needs.hygiene=20;brain.exercise=1;
+  assert.equal(brain.state,'goingTo');assert.equal(brain.actStation,'galley');
+  Object.keys(brain.needs).forEach(key=>brain.needs[key]=80);brain.needs.hygiene=20;brain.exercise=1;
   brain._choose();assert.equal(brain.actStation,'shower');
 });
 test('lounge entry, putting items away and exit preserve the needs budget at their authored speed',()=>{

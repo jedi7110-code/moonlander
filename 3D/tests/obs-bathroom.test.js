@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {BathroomVisit,animateBathroom} from '../src/obs/bathroom.js';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,getStation} from '../src/obs/state.js';
-import {Box3,Group,MeshStandardMaterial} from 'three';
+import {Box3,Group,MeshStandardMaterial,ShaderLib} from 'three';
 import {createBathroom,FLOOR_Y} from '../src/obs/ship.js';
+import {CabinStartupLighting} from '../src/obs/startup-lighting.js';
+import {createCabinToon} from '../src/obs/cabin-toon.js';
 
 const scene={time:{delayedCall(){}},obsUI:{hideWant(){}}};
 const setup=id=>{
@@ -14,7 +16,7 @@ const setup=id=>{
 };
 for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clears passage into a side pocket without rising`,()=>{
  const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),fixed=new Group(),animated=new Group(),floor=FLOOR_Y[0];
- const ctx={fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
+ const ctx={fillRect(){},fillText(){},beginPath(){},arc(){},fill(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};
  globalThis.document={createElement:()=>({getContext:()=>ctx})};
  let fixture;try{fixture=createBathroom(fixed,animated,m,-7,floor,id);}finally{delete globalThis.document;}
  const {door,lamp}=fixture,initial=door.position.clone(),visit=new BathroomVisit(id),bounds=new Box3();let exited=false;
@@ -22,6 +24,7 @@ for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clea
  let occupiedFrames=0,emptyFrames=0;
  for(let frame=0;!visit.done&&frame<1440;frame++){
   const pose=visit.pose;animateBathroom(fixture,pose);animated.updateMatrixWorld(true);
+  assert.equal(fixture.ceilingLight.power.value,['reach','open','shut'].includes(visit.phase)?0:1,'light stays on from full entry opening through use and exit, then switches off after departure');
   if(pose.inside){
     occupiedFrames++;
     assert.equal(lamp.material.color.getHex(),0xe23832);
@@ -53,7 +56,7 @@ for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clea
 test('only the occupied room turns red, including pause and switching to the other room',()=>{
  const material=new MeshStandardMaterial({color:0x4b9982,emissive:0x6fddaa,emissiveIntensity:.6}),m=new Proxy({},{get:()=>material});
  const fixed=new Group(),animated=new Group();
- const ctx={fillRect(){},fillText(){},measureText(){return{width:100};}};
+ const ctx={fillRect(){},fillText(){},beginPath(){},arc(){},fill(){},measureText(){return{width:100};}};
  globalThis.document={createElement:()=>({getContext:()=>ctx})};
  let rooms;
  try{rooms={shower:createBathroom(fixed,animated,m,-7,0,'shower'),toilet:createBathroom(fixed,animated,m,-4,0,'toilet')};}finally{delete globalThis.document;}
@@ -68,9 +71,33 @@ test('only the occupied room turns red, including pause and switching to the oth
        assert.equal(fixture.lamp.material.color.getHex(),id===active?0xe23832:0x4b9982);
        assert.equal(fixture.lamp.material.emissive.getHex(),id===active?0xff1e14:0x6fddaa);
        assert.equal(fixture.lamp.material.emissiveIntensity,.6);
+       assert.equal(fixture.ceilingLight.power.value,id===active?1:0,'the occupied room stays lit with its door closed, including while paused');
      }
    }
  }
+ for(const root of [fixed,animated])root.traverse(part=>part.geometry?.dispose());material.dispose();
+});
+test('ceiling and local bounce switch together, independently of the other bathroom, in toon mode',()=>{
+ const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),fixed=new Group(),animated=new Group();
+ const ctx={fillRect(){},fillText(){},beginPath(){},arc(){},fill(){},measureText(){return{width:100};}};
+ globalThis.document={createElement:()=>({getContext:()=>ctx})};
+ let rooms;try{rooms=[createBathroom(fixed,animated,m,-10,3.392,'shower'),createBathroom(fixed,animated,m,-7,3.392,'toilet')];}finally{delete globalThis.document;}
+ const toon=createCabinToon([fixed,animated]);toon.setStyle('cartoon');
+ const effect=new CabinStartupLighting([fixed,animated],{start:false}),surface=fixed.children.find(mesh=>mesh.isMesh).material;
+ const shader={uniforms:{},vertexShader:ShaderLib.toon.vertexShader,fragmentShader:ShaderLib.toon.fragmentShader};surface.onBeforeCompile(shader);
+ assert.match(shader.fragmentShader,/gl_FragColor.rgb = bathroomIndirectLight/);
+ for(const [i,room] of rooms.entries()){
+   assert.equal(shader.uniforms[`bathroomPower${i}`],room.ceilingLight.power,'shader keeps the live door switch after startup finishes');
+   const inactive=rooms[1-i].ceilingLight;
+   for(const opening of [0,.25,.75,.999,1,.999,0,1]){
+     animateBathroom(room,{opening});assert.equal(room.ceilingLight.power.value,opening===1?1:0);
+     assert.equal(inactive.power.value,0);
+     assert.equal(room.ceilingLight.root.children[0].material,room.ceilingLight.diffuser,'toon must not clone the animated diffuser');
+   }
+   animateBathroom(room,{opening:1,phase:'close'});assert.equal(room.ceilingLight.power.value,0);
+   animateBathroom(room,null);assert.equal(room.ceilingLight.power.value,0);
+ }
+ effect.dispose();toon.dispose();
  for(const root of [fixed,animated])root.traverse(part=>part.geometry?.dispose());material.dispose();
 });
 for(const id of ['shower','toilet'])test(`${id}: opens, enters, shuts, uses, exits and shuts without teleporting`,()=>{
