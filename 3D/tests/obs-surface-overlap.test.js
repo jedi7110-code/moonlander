@@ -44,11 +44,20 @@ test('unmerged cabin has no coincident planar surfaces, including open pocket do
     assert.ok(bounds.min.y>floor+.8,'leave low cat passage and footlights clear');
     assert.ok(bounds.min.z>CABIN_AISLE.crewZ+.55,'keep equipment out of the crew aisle');
     if(item.userData.wallMountZ!=null){
-      for(const tube of item.children.filter(child=>child.name==='Rear wall thin service pipe')){
-        const end=new Vector3(),vertices=tube.geometry.attributes.position;
-        for(let i=0;i<6;i++)end.add(new Vector3().fromBufferAttribute(vertices,i));
-        tube.localToWorld(end.divideScalar(6));
-        assert.ok(end.z>VIEWING_WALL.faceZ,'pipe cut ends are buried behind the lining');
+      const tubes=item.children.filter(child=>child.name==='Rear wall thin service pipe');
+      assert.equal(tubes.length,4,'each wall bundle retains all four pipes');
+      for(const tube of tubes){
+        const vertices=tube.geometry.attributes.position,{tubularSegments,radialSegments}=tube.geometry.parameters;
+        for(const ring of [0,tubularSegments]){
+          const end=new Vector3(),adjacent=new Vector3(),next=ring===0?1:ring-1;
+          for(let i=0;i<radialSegments;i++){
+            const point=tube.localToWorld(new Vector3().fromBufferAttribute(vertices,ring*(radialSegments+1)+i));
+            assert.ok(point.z>VIEWING_WALL.faceZ+.004,'both pipe openings must be entirely buried behind the lining');
+            end.add(point);
+            adjacent.add(tube.localToWorld(new Vector3().fromBufferAttribute(vertices,next*(radialSegments+1)+i)));
+          }
+          assert.ok(end.sub(adjacent).divideScalar(radialSegments).z>.005,'both ends turn toward the wall, not the cabin');
+        }
       }
       for(const clamp of item.children.filter(child=>child.name==='Rear pipe clamp')){
         assert.ok(new Box3().setFromObject(clamp).max.z<VIEWING_WALL.faceZ-.004,'buried tails must not move the clamps off the wall');
