@@ -96,7 +96,7 @@ test('the lounge table clears the seat and its props rest on the top without a g
 test('the rotating habitat belongs to the mothership, while Barramundi remains the lander',async()=>{
   const habitat=await readFile(new URL('../src/obs.html',import.meta.url),'utf8');
   const lander=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
-  assert.match(habitat,/<h1>TARAIRON<\/h1>/);assert.match(habitat,/遠心重力生活区画/);
+  assert.match(habitat,/<h1><img\b[^>]*alt="TARAIRON"[^>]*><\/h1>/);assert.match(habitat,/遠心重力生活区画/);
   assert.doesNotMatch(habitat,/<h1>BARRAMUNDI<\/h1>/);assert.match(lander,/バラマンディ号/);
   assert.match(lander,/LUNAR LANDING MODULE/);
 });
@@ -229,7 +229,14 @@ test('Milo has adult limb proportions and grounded boots when standing or sittin
     for(const {boot}of milo.userData.legs){const bounds=new Box3().setFromObject(boot);assert.ok(bounds.min.y>=-.005&&bounds.min.y<.03,`${action}: feet at ${bounds.min.y}`);}
   }
   animateMilo(milo,{action:null,moving:false,climbing:false,time:0,facing:1});milo.updateMatrixWorld(true);
-  for(const {hand}of milo.userData.arms){const bounds=new Box3().setFromObject(hand);assert.ok(bounds.min.y>.70&&bounds.min.y<.80);}
+  for(const {hand}of milo.userData.arms){
+    // Hidden held props do not change the visible reach of the relaxed hand.
+    const bounds=new Box3();hand.traverseVisible(mesh=>{
+      if(!mesh.geometry)return;
+      mesh.geometry.computeBoundingBox();bounds.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+    });
+    assert.ok(bounds.min.y>.70&&bounds.min.y<.80);
+  }
   const torso=milo.getObjectByName('Continuous shoulders and torso');assert.ok(torso);assert.ok(milo.getObjectByName('Crew neck T-shirt'));
 });
 test('Milo wears structured lace-up combat boots instead of plain pull-on boots',()=>{

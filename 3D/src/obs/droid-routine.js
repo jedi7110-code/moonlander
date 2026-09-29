@@ -26,7 +26,7 @@ const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 export class DroidRoutine {
   constructor({care,brain,actor,cat}={}){
     this.care=care;this.brain=brain;this.actor=actor;this.cat=cat;
-    this.position={...DROID_HOME};this.time=0;this.steps=[];this.age=0;
+    this.position={...DROID_HOME};this.time=0;this.steps=[];this.age=0;this.battery=1;
     this.job=null;this.carrying=null;this.door=null;this.opening=0;
     this.washerOpening=0;this.washerLoaded=false;this.washingUntil=0;this.completed={};this.harvestRow=0;
     this.due={laundry:100,toilet:180,shower:270,cook:70};this.restUntil=12;
@@ -44,11 +44,14 @@ export class DroidRoutine {
       // Keep authored gesture/contact timings together while shortening real time.
       action:s?.action??null,age:this.age*(s?.actionRate??1),duration:(s?.duration??1)*(s?.actionRate??1),time:this.time,
       carrying:this.carrying,walkDistance:this.walkDistance,harvestRow:s?.harvestRow??this.harvestRow,cargoIndex:s?.cargoIndex??this.cargoIndex??0,
-      wasteKind:s?.wasteKind??this.wasteKind,
+      wasteKind:s?.wasteKind??this.wasteKind,battery:this.battery,waiting:Boolean(this.waiting),
+      mouseVisible:Boolean(this.cat?.mouseChase?.mouse?.visible),
       walking:s?.kind==='walk'&&!this.waiting,
       turn:s?.turn??null,
       rest:this.docked?1:s?.kind==='wake'?1-u:s?.kind==='sleep'?u:0,
-      climb:s?.kind==='climb'?{from:s.from.y,to:s.to.y,startDepth:s.from.z,endDepth:s.to.z,progress:u}:null};
+      climb:s?.kind==='climb'?{from:s.from.y,to:s.to.y,startDepth:s.from.z,endDepth:s.to.z,progress:u,
+        landingProgress:s.landingDuration&&this.age>=s.duration-s.landingDuration?
+          (this.age-s.duration+s.landingDuration)/s.landingDuration:null}:null};
   }
   occupied(job){
     const station=STATIONS[job];
@@ -147,10 +150,12 @@ export class DroidRoutine {
       this.add('ladder-wait',.1,null,{ladderEntry:true,ladderPath:{from:this.plan.y,to:DROID_FLOORS[floor]}});
       this.walk(0,LANE);this.walk(0,this.plan.floor===2?.34:1.34);this.turn(Math.PI);
       const descending=DROID_FLOORS[floor]<this.plan.y;
-      const to={...this.plan,floor,y:DROID_FLOORS[floor],z:descending&&floor!==2?1.34:.34};
-      const landingDuration=descending?DROID_LADDER_LANDING.seconds:0;
-      const climbDuration=(Math.abs(to.y-this.plan.y)-LADDER_ENTRY.droidHeight-(landingDuration?DROID_LADDER_LANDING.height:0))/CLIMB_SPEED+LADDER_ENTRY.seconds+landingDuration;
-      this.add('climb',climbDuration,null,{from:{...this.plan},to,landingDuration});this.plan={...to};
+      const to={...this.plan,floor,y:DROID_FLOORS[floor],z:floor!==2?1.34:.34};
+      // At an upper deck the rung plane is over an open well. Keep the climb
+      // active until both feet have transferred backwards onto the bridge.
+      const landingDuration=DROID_LADDER_LANDING.seconds,landingHeight=descending?DROID_LADDER_LANDING.height:0;
+      const climbDuration=(Math.abs(to.y-this.plan.y)-LADDER_ENTRY.droidHeight-landingHeight)/CLIMB_SPEED+LADDER_ENTRY.seconds+landingDuration;
+      this.add('climb',climbDuration,null,{from:{...this.plan},to,landingDuration,landingHeight});this.plan={...to};
       this.walk(0,LANE);
       this.walk((Math.sign(x)||side)*DROID_LADDER_TRAFFIC.droidWaitX,LANE);
       this.add('ladder-release',.01,()=>{this.ladderClaim=false;this.ladderRoute=null;});
@@ -249,9 +254,11 @@ export class DroidRoutine {
   }
   advance(dt){
     this.time+=dt;
+    // Simulated charge: ten minutes of use, 45 seconds for a full dock recharge.
+    this.battery=Math.max(0,Math.min(1,this.battery+dt*(this.docked?1/45:-1/600)));
+    this.waiting=false;this.waitingForCat=false;
     if(this.docked){if(this.time>=this.restUntil){const job=this.choose();if(job)this.request(job);}return;}
     const s=this.step;if(!s)return;
-    this.waiting=false;
     this.waitingForCat=Boolean(this.cat?.motion?.blocksDroid(this,dt));
     if(this.waitingForCat){this.waiting=true;return;}
     if(s.guard&&this.occupied(this.job)){this.waiting=true;return;}
@@ -277,7 +284,7 @@ export class DroidRoutine {
       if(s.kind==='climb'){
         const direction=Math.sign(s.to.y-s.from.y),entry=this.age/LADDER_ENTRY.seconds,transferAt=s.duration-s.landingDuration;
         this.position.y=this.age<LADDER_ENTRY.seconds?s.from.y+direction*LADDER_ENTRY.droidHeight*entry:
-          s.landingDuration&&this.age>=transferAt?s.to.y-direction*DROID_LADDER_LANDING.height*(1-(this.age-transferAt)/s.landingDuration):
+          s.landingDuration&&this.age>=transferAt?s.to.y-direction*s.landingHeight*(1-(this.age-transferAt)/s.landingDuration):
           s.from.y+direction*(LADDER_ENTRY.droidHeight+(this.age-LADDER_ENTRY.seconds)*CLIMB_SPEED);
         this.position.z=s.landingDuration&&this.age>=transferAt?
           mix(.34,s.to.z,smooth((this.age-transferAt)/s.landingDuration)):

@@ -129,14 +129,24 @@ function flange(root,m,x,y,z,r){
   }
 }
 
-function cableRun(root,m,left,right,y,z,count=4,sag=.42){
+function cableRun(root,m,left,right,y,z,count=4,sag=.42,ceilingY=null){
+  const spacing=ceilingY===null?.061:.04;
+  // Pack overhead bundles closer to the ceiling so their low point clears door signs.
+  if(ceilingY!==null){y=Math.min(y,ceilingY-.16);sag=Math.min(sag,.22);}
   for(let i=0;i<count;i++){
-    const offset=i*.061,mid=(left+right)/2,drop=sag+(i%3)*.033;
+    const offset=i*spacing,mid=(left+right)/2,drop=sag+(i%3)*.033;
     pipe(root,m.cable,[[left,y-offset,z],[left+.30,y-.11-offset,z+.07],[mid-.40+(i%2)*.23,y-drop-offset,z+.14+i*.028],[right-.25,y-.12-offset,z+.06],[right,y-offset,z]],.029+i*.009);
   }
   // A single clamp spans the bundle instead of overlapping one per cable.
-  const span=(count-1)*.061;
-  for(const x of [left+.06,right-.06])box(root,m.metal,x,y-.08-span/2,z+.035,.10,.16+span,.12,.012);
+  const span=(count-1)*spacing;
+  for(const x of [left+.06,right-.06]){
+    box(root,m.metal,x,y-.08-span/2,z+.035,.10,.16+span,.12,.012).name='Cable bundle clamp';
+    if(ceilingY===null)continue;
+    // The bundle hangs from the solid deck/roof, with each clamp joined to it.
+    const bottom=y-.018,top=ceilingY+.015;
+    box(root,m.metal,x,(bottom+top)/2,z+.035,.055,top-bottom,.07).name='Ceiling cable hanger';
+    box(root,m.metal,x,ceilingY+.008,z+.035,.24,.035,.21).name='Cable hanger footplate';
+  }
 }
 
 function chain(root,m,x,top,bottom,z){
@@ -238,11 +248,13 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
       for(const dx of [-.10,.10]){const bolt=cylinder(root,m.metal,x+dx,y+h,-.66,.025,.025,.025,6);bolt.rotation.x=Math.PI/2;}
     }
   }
-  // Unequal service loops create a near silhouette without crossing head height.
-  cableRun(root,m,-12.87,-9.45+level*.32,y+3.18,front+.13,5,.40-level*.035);
-  cableRun(root,m,-6.15,-3.37-level*.23,y+3.13,front+.08,3,.24+level*.045);
-  cableRun(root,m,3.39+level*.19,7.07,y+3.18,front+.09,5,.41+level*.045);
-  cableRun(root,m,10.68-level*.13,12.96,y+3.10,front+.10,3,.30+level*.05);
+  // Mount the loops beneath the solid ceiling, clear of both the cutaway edge
+  // and head height. Lower decks use the underside of the floor above them.
+  const serviceZ=CABIN_AISLE.deckFront-.34,ceilingY=level===DECK.OPERATIONS?10.18:y+3.062;
+  cableRun(root,m,-12.87,-9.45+level*.32,y+3.18,serviceZ+.13,5,.40-level*.035,ceilingY);
+  cableRun(root,m,-6.15,-3.37-level*.23,y+3.13,serviceZ+.08,3,.24+level*.045,ceilingY);
+  cableRun(root,m,3.39+level*.19,7.07,y+3.18,serviceZ+.09,5,.41+level*.045,ceilingY);
+  cableRun(root,m,10.68-level*.13,12.96,y+3.10,serviceZ+.10,3,.30+level*.05,ceilingY);
   // Front-facing knee braces give the removed wall a substantial section edge.
   for(const side of [-1,1]){
     const x=side*12.94;

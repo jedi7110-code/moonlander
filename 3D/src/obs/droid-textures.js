@@ -75,6 +75,22 @@ export function createDroidSurfaceAtlas(){
   return b.texture();
 }
 
+// Five fixed tiles (empty plus four charge levels); only UVs change at runtime.
+export function createDroidBatteryAtlas(){
+  const b=bitmap(256,128);
+  for(let level=0;level<=4;level++){
+    const ox=level*32;
+    b.rect(ox,0,32,128,[17,23,20]);
+    for(let i=0;i<4;i++){
+      const y=22+i*28,lit=3-i<level;
+      b.rect(ox+7,y-4,18,8,lit?[126,48,10]:[48,34,21]);
+      b.rect(ox+8,y-3,16,6,lit?[255,134,35]:[73,45,22]);
+      if(lit)b.rect(ox+9,y-2,14,2,[255,191,93]);
+    }
+  }
+  return b.texture();
+}
+
 export function createDroidFaceAtlas(names,paths){
   const b=bitmap(1024,512),size=256;
   names.forEach((name,index)=>{

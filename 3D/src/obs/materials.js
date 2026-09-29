@@ -6,14 +6,16 @@ import {makeXRWideGeometry} from './xr-geometry.js';
 export async function materials() {
   const loader = new THREE.TextureLoader();
   const base=import.meta.env?.BASE_URL??'/3D/';
-  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight]=await Promise.all([
+  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring]=await Promise.all([
     Promise.all(['enamel','steel','twill','fur','industrial-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
     loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-left.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-right.png`),
+    loader.loadAsync(`${base}assets/obs/ai-rack-wiring.png`),
   ]);
   maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
   sweatshirtPrint.colorSpace=THREE.SRGBColorSpace;sweatshirtPrint.anisotropy=4;
+  rackWiring.colorSpace=THREE.SRGBColorSpace;rackWiring.anisotropy=4;
   for(const map of [workShirtPatchLeft,workShirtPatchRight]){
     // Keep the original artwork on disk; the small sewn patches need only 512px.
     const image=map.image,canvas=document.createElement('canvas');
@@ -67,6 +69,7 @@ export async function materials() {
   };
   furTail.customProgramCacheKey=()=> 'obs-calico-tail-v1';
   return {
+    aiWiring:new THREE.MeshBasicMaterial({name:'AI rack / baked wiring',map:rackWiring,color:0xb1bab4,toneMapped:false}),
     shipPaint:standard(0xd3d2c5,.86,.30,{map:maps[4]}),
     enamel: standard(0xd9dedb,.64,.35,{map:maps[0],bumpMap:maps[0],bumpScale:.009}),
     dark:standard(0x343d3e,.66,.6,{map:maps[1]}),
@@ -141,7 +144,8 @@ export function label(parent,text,x,y,z,w,h,{fg='#d4dbcc',bg='#232b2b',size=48}=
   ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=fg;ctx.font=`600 ${fontSize}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
   lines.forEach((line,i)=>ctx.fillText(line,canvas.width/2,canvas.height/2+(i-(lines.length-1)/2)*fontSize*1.2));
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=4;
-  const material=new THREE.MeshBasicMaterial({map:texture,toneMapped:false});material.name=`Sign: ${text}`;
+  // Three.js inserts the material name into a single-line shader directive.
+  const material=new THREE.MeshBasicMaterial({map:texture,toneMapped:false});material.name=`Sign: ${text.replace(/\s+/g,' ')}`;
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),material);mesh.name=material.name;mesh.position.set(x,y,z);parent.add(mesh);return mesh;
 }
 export function screen(parent,x,y,z,w=.85,h=.58,seed=0) {

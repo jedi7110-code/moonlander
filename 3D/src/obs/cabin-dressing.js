@@ -29,7 +29,7 @@ function casePart(root,material,x,y,z,w,h,d,corner=.025){
   part.castShadow=part.receiveShadow=true;root.add(part);return part;
 }
 
-function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallMounted=false){
+function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallZ=null){
   const group=new THREE.Group();group.name='Industrial / protective equipment case';
   group.position.set(x,y,z);root.add(group);
   // The rubber seam sits between separate body and lid shells, not on their faces.
@@ -70,9 +70,9 @@ function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallMounted=false){
   box(group,m.dark,-w*.025,h*.745,.181,w*.17,.008,.004);
   box(group,m.dark,-w*.044,h*.724,.181,w*.13,.004,.004);
 
-  if(wallMounted){
+  if(wallZ!==null){
     // Two short wall stand-offs and a lower retaining cradle visibly support it.
-    const wall=-1.24-z,back=-.151;
+    const wall=wallZ-z,back=-.151;
     for(const dx of [-w*.32,w*.32]){
       box(group,m.dark,dx,h*.48,wall,.050,h+.075,.030);
       for(const yy of [.012,h-.025])box(group,m.dark,dx,yy,(wall+back)/2,.044,.032,back-wall);
@@ -162,14 +162,15 @@ export function addCabinDressing(parent,m,floors){
   const switches=addWallSwitchPanels(root,floors);
 
   // Keep the wall above the lounge clear of shelves and stored objects.
-  equipmentCase(root,m,casePaint,10.14,habitation+.04,-.18,.83,.43);
+  const loungeCase=equipmentCase(root,m,casePaint,10.14,habitation+.04,-.18,.83,.43);
+  loungeCase.rotation.y=.28; // Right end toward the wall, left end toward the aisle.
   cloth(root,m,10.20,habitation+1.63,-1.02,.47,.81);
   box(root,m.dark,10.19,habitation+1.69,-1.10,.68,.08,.10);
   const controlMaterials=createWallControlMaterials();
   for(const [x,y,w]of [[-11.94,habitation+1.73,.62],[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]]){
     const cabinet=createWallControlPanel(controlMaterials,w);cabinet.position.set(x,y,-1.15);root.add(cabinet);
   }
-  equipmentCase(root,m,casePaint,-8.56,habitation+.12,-.96,.66,.46,true);
+  equipmentCase(root,m,casePaint,-8.56,habitation+.42,-1.69,.66,.46,-1.87);
   box(root,m.dark,-11.89,habitation+.80,-.99,.63,.065,.53);
   addSmokingAshtray(root,m,habitation);
 
@@ -181,8 +182,14 @@ export function addCabinDressing(parent,m,floors){
   // The floor space left of the galley is reserved for the waste incinerator.
 
   // The cargo rack and its tensioned webbing are built together in cargo-bay.js.
-  equipmentCase(root,m,casePaint,12.00,bottom+1.47,-.96,.60,.30,true);
-  equipmentCase(root,m,casePaint,1.8,bottom+.04,-.89,.94,.48).name='Life support cargo case';
+  equipmentCase(root,m,casePaint,12.00,bottom+1.47,-.96,.60,.30,-1.24);
+  const gymCase=equipmentCase(root,m,casePaint,1.8,bottom,-.89,.94,.48);
+  gymCase.name='Life support cargo case';
+  // Lay the lid upward and the handle toward the aisle, with a slight floor yaw.
+  gymCase.rotation.set(-Math.PI/2,-.18,Math.PI,'YXZ');
+  const caseBounds=new THREE.Box3().setFromObject(gymCase),caseCenter=caseBounds.getCenter(new THREE.Vector3());
+  gymCase.position.x+=1.8-caseCenter.x;gymCase.position.z+=-.89-caseCenter.z;
+  gymCase.position.y+=bottom-caseBounds.min.y;
   // Keep the EVA preparation aisle clear; the former case at x=10.02 sat
   // directly in front of the third hanging suit.
   finishStaticCups(parent);

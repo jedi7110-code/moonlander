@@ -49,3 +49,51 @@ test('light loads stay neutral and heavy lifting starts when the cargo is raised
   assert.equal(droidServiceExpression({action:'cargo-pick',age:1.5,duration:2.6}),'strained');
   assert.equal(droidServiceExpression({mode:'wake',returning:false}),'neutral');
 });
+
+test('blocked travel is sad and a visible mouse on any deck takes priority until it disappears',()=>{
+  let blocked=false;
+  const cat={mode:'sleep',motion:{blocksDroid:()=>blocked},mouseChase:{mouse:{visible:false,floor:2}}};
+  const routine=new DroidRoutine({care:new Supplies(),brain:{plants:new PlantBed()},actor:{x:1040},cat});
+  const droid=createDroid({detail:'obs'}),rig=createDroidServiceRig({droid},{cargo:[]});
+  try{
+    assert.ok(routine.request('feed'));
+    for(let i=0;i<300&&!routine.pose.walking;i++)routine.update(.05);
+    assert.ok(routine.pose.walking);
+    const position={...routine.position},age=routine.age;
+    blocked=true;routine.update(.1);rig.update(routine);
+    assert.deepEqual(routine.position,position);assert.equal(routine.age,age);
+    assert.equal(routine.pose.waiting,true);assert.equal(droid.face.expression,'sad');
+    cat.mouseChase.mouse.visible=true;rig.update(routine);
+    assert.notEqual(cat.mouseChase.mouse.floor,routine.pose.floor);
+    assert.equal(droid.face.expression,'surprised','react before the cat begins chasing, including another deck');
+    cat.mouseChase.mouse.visible=false;rig.update(routine);assert.equal(droid.face.expression,'sad');
+    blocked=false;routine.update(.1);rig.update(routine);
+    assert.equal(routine.pose.waiting,false);assert.equal(droid.face.expression,'neutral');
+    routine.returning=true;blocked=true;routine.update(.1);rig.update(routine);
+    assert.equal(droid.face.expression,'sad','being blocked also overrides the sleepy return face');
+    assert.equal(droidServiceExpression({mode:'work',action:'food-pour'}),'happy');
+    assert.equal(droidServiceExpression({mode:'work',action:'food-pour',mouseVisible:true}),'surprised');
+    assert.equal(droidServiceExpression({mode:'charging',mouseVisible:true,waiting:true}),'sleepy');
+  }finally{
+    droid.root.removeFromParent();droid.dispose();
+    const geometries=new Set(),materials=new Set();rig.root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+  }
+});
+
+test('charging updates the battery even when the docked service pose is cached',()=>{
+  const routine=new DroidRoutine({care:new Supplies(),brain:{plants:new PlantBed()}});
+  routine.restUntil=Infinity;routine.battery=.25;
+  const droid=createDroid({detail:'obs'}),rig=createDroidServiceRig({droid},{cargo:[]});
+  try{
+    rig.update(routine);assert.equal(droid.battery.level,1);
+    routine.update(24);rig.update(routine);
+    assert.equal(droid.battery.level,4);assert.equal(droid.face.expression,'sleepy');
+    assert.equal(droid.root.getObjectByName('OBS droid / nixie expression image').visible,false);
+    assert.equal(droid.battery.mesh.visible,true);
+  }finally{
+    droid.root.removeFromParent();droid.dispose();
+    const geometries=new Set(),materials=new Set();rig.root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+  }
+});

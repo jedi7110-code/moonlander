@@ -9,6 +9,7 @@ import {DROID_STARTUP_SECONDS} from '../../src/obs/droid-startup.js';
 
 const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
 const VIEWS={three:{eye:[2.35,1.60,3.25],target:[0,.89,0],label:'THREE-QUARTER'},front:{eye:[0,1.19,4],target:[0,.89,0],label:'FRONT'},side:{eye:[4,1.23,0],target:[0,.89,0],label:'SIDE'},back:{eye:[0,1.35,-4],target:[0,.89,0],label:'BACK'},head:{eye:[.30,1.67,1.30],target:[0,1.56,.02],label:'NIXIE / EXPRESSIONS'},hands:{eye:[1.3,1.25,2],target:[0,1.05,.14],label:'HANDS / JOINTS'}};
+VIEWS.chest={eye:[.14,1.35,.88],target:[0,1.23,.11],label:'BATTERY / 4 LEVELS'};
 const choose=(name,values,fallback)=>values.includes(params.get(name))?params.get(name):fallback;
 function init(){
   const canvas=$('droid-canvas'),renderer=new THREE.WebGLRenderer({canvas,antialias:true});
@@ -37,10 +38,11 @@ function init(){
   $('reduction').textContent='三角形数 '+(100-models[1].triangles/models[0].triangles*100).toFixed(1)+'% 削減';
   const camera=new THREE.PerspectiveCamera(32,1,.03,70),controls=new OrbitControls(camera,canvas);controls.minDistance=.55;controls.maxDistance=8;controls.minPolarAngle=.18;controls.maxPolarAngle=Math.PI*.70;
   let mode=choose('mode',['idle','walk','climb','carry','charging','wake'],'idle'),view=choose('view',Object.keys(VIEWS),'three'),style=choose('style',['current','cartoon','flat'],'cartoon'),expression=choose('face',Object.keys(DROID_EXPRESSIONS),'neutral'),layout=choose('layout',['both','study','obs'],'both');
+  let battery=choose('battery',['1','2','3','4'],'4');
   const duration=()=>mode==='wake'?DROID_STARTUP_SECONDS:20;
   let time=Math.max(0,Math.min(duration(),Number(params.get('time'))||0)),speed=1,playing=false,dirty=true,width=1,height=1,last=performance.now(),frame,hud=0;
-  function save(){const url=new URL(location.href);for(const [key,value]of Object.entries({mode,view,style,face:expression,layout,time:time.toFixed(2)}))url.searchParams.set(key,value);history.replaceState(null,'',url);}
-  function setView(){const v=VIEWS[view];camera.position.set(...v.eye);controls.target.set(...v.target);if(!['head','hands'].includes(view))camera.position.sub(controls.target).multiplyScalar(.88).add(controls.target);controls.update();$('view-label').textContent=v.label;dirty=true;}
+  function save(){const url=new URL(location.href);for(const [key,value]of Object.entries({mode,view,style,face:expression,layout,battery,time:time.toFixed(2)}))url.searchParams.set(key,value);history.replaceState(null,'',url);}
+  function setView(){const v=VIEWS[view];camera.position.set(...v.eye);controls.target.set(...v.target);if(!['head','hands','chest'].includes(view))camera.position.sub(controls.target).multiplyScalar(.88).add(controls.target);controls.update();$('view-label').textContent=v.label;dirty=true;}
   function pose(){
     for(const m of models){
       m.ladder.visible=mode==='climb';m.floor.visible=mode!=='climb';
@@ -49,20 +51,22 @@ function init(){
         const y=.75+time*.16;m.droid.update(time,'service',sampleDroidServicePose({y,climb:{from:0,to:6.784},age:10,duration:100,rest:0}));m.ladder.position.y=-y;
       }else m.droid.update(time,mode);
       m.droid.face.setExpression(expression);
+      m.droid.battery.setCharge(Number(battery)/4);
     }
     dirty=true;
   }
   function ui(){
     document.body.dataset.layout=layout;$('play').textContent=playing?'一時停止':'再生';$('play').setAttribute('aria-pressed',String(playing));$('time').max=duration();$('time').value=time;$('time-output').textContent=time.toFixed(1)+' s';
-    for(const [kind,value]of Object.entries({mode,view,style,expression,layout}))document.querySelectorAll('[data-'+kind+']').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset[kind]===value)));
+    for(const [kind,value]of Object.entries({mode,view,style,expression,layout,battery}))document.querySelectorAll('[data-'+kind+']').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset[kind]===value)));
   }
-  for(const kind of ['mode','view','style','expression','layout'])document.querySelectorAll('[data-'+kind+']').forEach(button=>button.onclick=()=>{
+  for(const kind of ['mode','view','style','expression','layout','battery'])document.querySelectorAll('[data-'+kind+']').forEach(button=>button.onclick=()=>{
     const value=button.dataset[kind];
     if(kind==='mode'){mode=value;time=0;if(mode==='wake'){playing=true;last=performance.now();}pose();}
     if(kind==='view'){view=value;setView();}
     if(kind==='style'){style=value;models.forEach(m=>m.toon.setStyle(style));}
     if(kind==='expression'){expression=value;pose();}
     if(kind==='layout')layout=value;
+    if(kind==='battery'){battery=value;pose();}
     dirty=true;ui();save();
   });
   $('play').onclick=()=>{if(!playing&&mode==='wake'&&time>=duration()){time=0;pose();}playing=!playing;last=performance.now();ui();save();};$('reset').onclick=()=>{time=0;pose();ui();save();};

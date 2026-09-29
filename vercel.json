@@ -5,6 +5,8 @@
     { "source": "/3D/index.html", "destination": "/3D/dist/index.html" },
     { "source": "/3D/obs.html", "destination": "/3D/dist/obs.html" },
     { "source": "/3D/obs", "destination": "/3D/dist/obs.html" },
+    { "source": "/3D/sofa-study.html", "destination": "/3D/dist/sofa-study.html" },
+    { "source": "/3D/gate-frame-study.html", "destination": "/3D/dist/gate-frame-study.html" },
     { "source": "/3D/assets/:path*", "destination": "/3D/dist/assets/:path*" }
   ]
 }

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {Group,MeshStandardMaterial,Raycaster,Vector3,Box3} from 'three';
 import {BULKHEAD_GATE,gateWall,createBulkheadGate} from '../src/obs/bulkhead-gate.js';
 import {buildShip,REAR_ROOM_GATES,RECESSED_OPENINGS,FLOOR_Y} from '../src/obs/ship.js';
+import {batchStatic} from '../src/obs/materials.js';
 
 test('the eight-sided opening cuts through the hull and exposes a separate rear room',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),walls=new Group();
@@ -52,16 +53,17 @@ test('the assembled gate reveal has one surface per wall layer, without coplanar
     assert.ok(hit&&hit.point.z< -2.4,`deck at ${door.floor}, doorway ${u}/${height} must expose the rear room without equipment in front`);
   }
   const g=BULKHEAD_GATE;
-  for(const side of [-1,1])for(const z of [-2.23,-2.04,-1.62,-1.57,-1.35]){
+  for(const side of [-1,1])for(const z of [-2.23,-2.04,-1.95,-1.62,-1.57,-1.35]){
     const ray=new Raycaster(new Vector3(g.x,g.floor+1.78,z),new Vector3(side,0,0));
-    const hits=ray.intersectObject(ship.staticMesh,true).filter(hit=>Math.abs(hit.point.x-(g.x+side*g.width/2))<1e-5);
+    const halfWidth=g.width/2*(z< -1.98?1:.97);
+    const hits=ray.intersectObject(ship.staticMesh,true).filter(hit=>Math.abs(hit.point.x-(g.x+side*halfWidth))<1e-5);
     assert.equal(hits.length,1,`one visible reveal at side ${side}, depth ${z}`);
   }
   for(const side of [-1,1]){
     const ray=new Raycaster(new Vector3(g.x+side*1.12,g.floor+.082,0),new Vector3(0,0,-1));
     const hits=ray.intersectObject(ship.staticMesh,true);
     assert.equal(hits.filter(hit=>Math.abs(hit.point.z+1.56)<1e-5).length,1,'only white trim occupies the sill face');
-    assert.equal(hits.filter(hit=>Math.abs(hit.point.z+1.62)<1e-5).length,1,'the dark floor nose is recessed separately');
+    assert.equal(hits.filter(hit=>Math.abs(hit.point.z+1.98)<1e-5).length,1,'the floor nose meets the rear of the fitted reveal');
   }
   const geometries=new Set(),materials=new Set();
   for(const root of [ship.staticMesh,ship.animated])root.traverse(part=>{
@@ -70,4 +72,56 @@ test('the assembled gate reveal has one surface per wall layer, without coplanar
   });
   for(const geometry of geometries)geometry.dispose();
   for(const m of materials){m.map?.dispose();m.bumpMap?.dispose();m.roughnessMap?.dispose();m.dispose();}
+});
+
+test('all three live gates share the fitted study finish and retain both surfaces after batching',()=>{
+  const ctx=new Proxy({measureText:t=>({width:t.length*8}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:()=>{}});
+  const material=new MeshStandardMaterial();let ship;
+  globalThis.document={createElement:()=>({getContext:()=>ctx})};
+  try{ship=buildShip(new Proxy({},{get:()=>material}),{mergeStatic:false});}finally{delete globalThis.document;}
+  const {frames,materials}=ship.gateFinish;
+  assert.equal(frames.length,3);
+  assert.equal(ship.staticMesh.getObjectsByProperty('name','Rear threshold frame').length,0,'no floating frame remains behind the gate');
+  const totals=[0,0];
+  for(const [index,{mesh,reveal,paint}]of frames.entries()){
+    const g=REAR_ROOM_GATES[index],trim=mesh.parent,room=trim.parent;
+    const bounds=new Box3().setFromObject(mesh),size=bounds.getSize(new Vector3());
+    assert.ok(bounds.min.y>g.floor+.015,'the frame clears the deck');
+    assert.ok(Math.abs(size.x-2.0564)<1e-5&&Math.abs(size.y-2.5802)<1e-5,'approved 97% size, applied once');
+    assert.ok(Math.abs(size.z-.64)<1e-6,'two-thirds of the original .96 m wall reveal');
+    assert.ok(Math.abs(bounds.max.z+1.34)<1e-6,'the front face remains in place');
+    for(const name of ['Recessed rear-room floor','Rear-room floor cap']){
+      const floor=new Box3().setFromObject(room.getObjectByName(name));
+      assert.ok(Math.abs(floor.max.z-bounds.min.z)<1e-6,'both floor layers join behind the metal sill');
+    }
+    const seal=new Box3().setFromObject(trim.getObjectByName('Gate seal'));
+    const bolts=trim.getObjectsByProperty('name','Machined gate frame bolt');
+    assert.equal(bolts.length,16);
+    for(const side of [-1,1]){
+      const edge=side>0?'max':'min',centerX=(bounds[edge].x+seal[edge].x)/2;
+      const sideBolts=bolts.filter(b=>Math.abs(b.getWorldPosition(new Vector3()).x-centerX)<1e-5);
+      assert.equal(sideBolts.length,2,'side fasteners stay on the visible paint-band centerline');
+    }
+    assert.equal(paint,materials);assert.equal(mesh.material,materials[0]);assert.equal(reveal.material,materials[1]);
+    assert.equal(materials[1].metalness,.94);assert.equal(materials[1].roughness,.56);
+    for(const [i,surface]of [mesh,reveal].entries()){
+      assert.equal(Array.isArray(surface.material),false,'single-material surfaces survive the cabin batcher');
+      assert.equal(surface.material.transparent,false);assert.equal(surface.material.userData.cabinKeepSurface,true);
+      totals[i]+=surface.geometry.attributes.position.count;
+    }
+  }
+  const batched=batchStatic(ship.staticMesh,{xrLOD:true});
+  for(const [i,material]of materials.entries()){
+    const surface=batched.getObjectByName(material.name);assert.ok(surface,'the approved finish is visible in the merged live cabin');
+    assert.equal(surface.geometry.attributes.position.count,totals[i]);
+    assert.equal(surface.userData.xrWideGeometry.attributes.position.count,totals[i],'both surfaces remain in the wide XR model');
+  }
+  assert.equal(batched.children.filter(mesh=>materials.includes(mesh.material)).length,2,'three gates share two surface draws');
+  const geometries=new Set(),usedMaterials=new Set();
+  for(const root of [ship.staticMesh,ship.animated,batched])root.traverse(part=>{
+    if(part.geometry)geometries.add(part.geometry);
+    if(part.material)for(const m of [].concat(part.material))usedMaterials.add(m);
+  });
+  geometries.forEach(g=>g.dispose());
+  for(const m of usedMaterials){m.map?.dispose();m.bumpMap?.dispose();m.roughnessMap?.dispose();m.dispose();}
 });

@@ -14,7 +14,10 @@ const V=(...v)=>new THREE.Vector3(...v),UP=V(0,1,0);
 const lerpPoint=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t));
 
 export function droidServiceExpression(p){
-  if(p.mode==='charging'||p.returning)return 'sleepy';
+  if(p.mode==='charging')return 'sleepy';
+  if(p.mouseVisible)return 'surprised';
+  if(p.waiting)return 'sad';
+  if(p.returning)return 'sleepy';
   if(p.action==='food-pour')return 'happy';
   if(p.carrying==='cargo'||(p.action==='cargo-pick'&&p.age>=p.duration*.5))return 'strained';
   return 'neutral';
@@ -105,7 +108,9 @@ export function sampleDroidServicePose(p,loads=LOADS){
     out.walkAmount=.25*turn.lift;out.walkPhase=(turn.step+turn.swing)/2;
   }
   if(p.climb){
-    const weight=smooth(Math.min(Math.abs(p.y-p.climb.from),Math.abs(p.y-p.climb.to))/.4);
+    // Arriving at a deck height does not mean there is a floor beneath the
+    // feet. Keep the rung contacts until the explicit landing transfers them.
+    const weight=smooth(Math.abs(p.y-p.climb.from)/LADDER_ENTRY.droidHeight);
     const hands=[-1,1].map(side=>droidLadderContact(p.y,side,true));
     out.hipHeight=mix(out.hipHeight,.82,weight);out.lean=mix(out.lean,.12,weight);out.bodyZ=mix(out.bodyZ,-.045,weight);
     // Roll around the hand's long axis: knuckles face the cabin camera and
@@ -113,12 +118,13 @@ export function sampleDroidServicePose(p,loads=LOADS){
     out.hands=hands.map(hand=>hand.point);out.handWeight=weight;out.gripKind='ladder';out.wristRotation=[-2.55,Math.PI,0];
     out.handGripWeights=hands.map(hand=>1-Math.sin(Math.PI*hand.swing));
     out.feet=[-1,1].map(side=>lerpPoint([side*.137,.099,.045],droidLadderContact(p.y,side,false).point,weight));
-    const landing=p.climb.from>p.climb.to&&Math.abs(p.y-p.climb.to)<=DROID_LADDER_LANDING.height;
+    const descending=p.climb.from>p.climb.to;
+    const landing=p.climb.landingProgress!=null||descending&&Math.abs(p.y-p.climb.to)<=DROID_LADDER_LANDING.height;
     if(Math.abs(p.y-p.climb.from)<LADDER_ENTRY.droidHeight||landing){
       // The same fixed supports work in reverse: hands hold while the feet
       // step behind the ladder, and release only after both soles are down.
-      const start=landing?p.climb.to:p.climb.from,anchor=start+(landing?1:Math.sign(p.climb.to-start))*LADDER_ENTRY.droidHeight;
-      const u=Math.abs(p.y-start)/LADDER_ENTRY.droidHeight,ease=THREE.MathUtils.smootherstep;
+      const start=landing?p.climb.to:p.climb.from,anchor=start+(landing?(descending?1:0):Math.sign(p.climb.to-start))*LADDER_ENTRY.droidHeight;
+      const u=landing&&p.climb.landingProgress!=null?1-p.climb.landingProgress:Math.abs(p.y-start)/LADDER_ENTRY.droidHeight,ease=THREE.MathUtils.smootherstep;
       const reach=ease(u,.16,.38),transfer=ease(u,.4,.96),depth=landing?(p.climb.endDepth??(start>0?1.34:.34)):(p.climb.startDepth??.34),z=p.z??.34,upper=depth>1;
       const rung=CABIN_LADDER.rungBase+Math.round((start+1.24-CABIN_LADDER.rungBase)/LADDER.spacing)*LADDER.spacing;
       out.hipHeight=mix(mix(start+.905,start+(upper?.66:.905),reach),anchor+.82,transfer)-p.y;
@@ -248,9 +254,12 @@ export function createDroidServiceRig(bay,ship){
   }));
   let lastStamp=null;
   function update(routine){
-    const p=routine.pose,expression=droidServiceExpression(p),stamp=p.mode==='charging'?`charging/${routine.care.preparedMeals??0}/${routine.stored.length}/${routine.washerLoaded}`:[p.time,p.mode,p.action,expression].join('/');if(stamp===lastStamp)return;lastStamp=stamp;
+    const p=routine.pose,droid=bay.droid;
+    // Charge changes can update the small display without rebuilding a docked pose.
+    droid.battery.setCharge(p.battery);
+    const expression=droidServiceExpression(p),stamp=p.mode==='charging'?`charging/${routine.care.preparedMeals??0}/${routine.stored.length}/${routine.washerLoaded}`:[p.time,p.mode,p.action,expression].join('/');if(stamp===lastStamp)return;lastStamp=stamp;
     ship.incinerator?.update(routine.incineratorOpen,routine.time<routine.incineratingUntil&&routine.incineratorOpen===0);
-    const model=sampleDroidServicePose(p,loads),droid=bay.droid;
+    const model=sampleDroidServicePose(p,loads);
     actorRoot.position.set(p.x,p.y,p.z);actorRoot.rotation.y=p.yaw;
     droid.face.setExpression(expression);droid.update(p.time,'service',model);
     bay.mode=p.mode;

@@ -13,6 +13,8 @@ import {GymVisit,GYM_TURN_SECONDS,GYM_TURN_DECAY} from './gym-visit.js';
 import {BunkVisit,BUNK_TRANSITION_DECAY} from './bunk-visit.js';
 import {HairGrowthClock,GroomingVisit} from './grooming-visit.js';
 import {SmokingClock,SmokingVisit} from './smoking-visit.js';
+import {CabinEnvironment} from './environment.js';
+import {HatchRepairVisit} from './hatch-repair.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 export const OPENING_SLEEP_SECONDS=3;
@@ -37,6 +39,8 @@ export class CabinBrain extends Brain {
     this.openingWake=null;
     this.hairGrowth=new HairGrowthClock();this.grooming=null;
     this.smokingClock=new SmokingClock(random);this.smokingVisit=null;
+    this.environment=new CabinEnvironment({random,onEvent:event=>this.scene.obsUI?.environmentEvent?.(event)});
+    this.hatchRepair=null;
   }
   beginWakeUp(){
     if(this.bunkVisit)return false;
@@ -69,6 +73,8 @@ export class CabinBrain extends Brain {
     const harvest=this.harvestDelivery;
     const grooming=this.grooming;
     const smoking=this.smokingVisit;
+    const repair=this.hatchRepair;
+    this.environment.update(dt);
     this.smokingClock.update(dt,this.actStation==='smoking');
     this.hairGrowth.update(dt,Boolean(grooming));
     const exit=this.loungeExit,stow=this.loungeStow;
@@ -112,6 +118,13 @@ export class CabinBrain extends Brain {
       smoking.update(dt);
       if(smoking.done){this.smokingVisit=null;this.smokingClock.reset();super._endPerform();this.finishDeparture();}
     }
+    if(repair&&this.hatchRepair===repair){
+      repair.update(dt);
+      if(['inspect','repair','verify'].includes(repair.phase))this.environment.setStage(repair.serial,repair.phase);
+      if(repair.cancelled&&!repair.repaired)this.environment.setStage(repair.serial,'detected');
+      if(repair.repaired&&!repair.reported){repair.reported=true;this.environment.resolve(repair.serial);}
+      if(repair.done){this.hatchRepair=null;super._endPerform();this.finishDeparture();}
+    }
     if(!this.openingWake&&this.bunkVisit?.phase==='sleeping'&&this.needs.energy>=100)this._endPerform();
     if(gym&&this.gymVisit===gym)gym.update(dt);
     if(bunk&&this.bunkVisit===bunk)bunk.update(bunkDt);
@@ -153,6 +166,7 @@ export class CabinBrain extends Brain {
   }
   _maybeWant(){
     if(this.health.urgent){this._go(getStation('medical'));return;}
+    if(this.chooseHatchRepair())return;
     if(this.groomingQueued)return;
     if(this.care.depleted&&!this.care.delivery){this.requestSupplies();return;}
     if(this.care.delivery)return;
@@ -160,6 +174,7 @@ export class CabinBrain extends Brain {
   }
   _choose(){
     if(this.health.urgent){this._go(getStation('medical'));return;}
+    if(this.chooseHatchRepair())return;
     if(this.groomingQueued)return;
     if(['goingToSupplyConsole','orderingSupply'].includes(this.state))return;
     if(this.plants.ready&&this.care.supplies.food<this.care.capacity.food&&Math.min(...Object.values(this.needs))>30&&!this.health.needsCare){this._go(getStation('plant'));return;}
@@ -171,8 +186,15 @@ export class CabinBrain extends Brain {
     super._choose();
   }
   _usable(station){return station.id!=='stereo'&&!(station.id==='gym'&&this.health.needsCare)&&super._usable(station);}
+  chooseHatchRepair(){
+    if(!this.environment.fault||this.hatchRepair)return false;
+    if(this.health.needsCare){this._go(getStation('medical'));return true;}
+    if(Math.min(this.needs.energy,this.needs.hunger,this.needs.thirst,this.needs.bladder)<20)return false;
+    this._go(getStation('airlock'));return true;
+  }
   _go(station){
     station=getStation(station?.id);if(!station)return false;
+    if(station.id==='airlock'&&this.hatchRepair)return true;
     if(station.id==='smoking'&&this.actStation==='smoking')return true;
     if(station.id==='grooming'&&(this.actStation==='grooming'||this.groomingQueued))return true;
     this.cancelQueuedGrooming();
@@ -194,6 +216,10 @@ export class CabinBrain extends Brain {
     return true;
   }
   _startPerform(station,seated=false){
+    if(station.id==='airlock'&&this.environment.fault){
+      this.cur=station;this.state='repairingHatch';this.actKey='perform';this.actStation='airlock';this.recoverNeed=null;
+      this.hatchRepair=new HatchRepairVisit(this.environment.fault.serial);return;
+    }
     if(station.id==='smoking'){
       this.cur=station;this.state='smoking';this.actKey='perform';this.actStation='smoking';this.recoverNeed=null;
       this.smokingVisit=new SmokingVisit();return;
@@ -248,6 +274,7 @@ export class CabinBrain extends Brain {
     if(['eva','airlock','innerHatch'].includes(station.id))this.scene.obsUI?.inspectEVA?.(station.id);
   }
   _endPerform(){
+    if(this.hatchRepair){this.hatchRepair.requestExit();return;}
     if(this.smokingVisit){this.smokingVisit.requestExit();return;}
     if(this.bunkVisit){this.state='leavingBunk';this.recoverNeed=null;this.bunkVisit.requestExit();return;}
     if(this.loungeEntry){this.afterActivity??=()=>{};return;}
@@ -272,6 +299,7 @@ export class CabinBrain extends Brain {
   }
   deferDeparture(callback){
     this.cancelQueuedGrooming();
+    if(this.hatchRepair){this.afterActivity=callback;this.hatchRepair.requestExit();return true;}
     if(this.smokingVisit){this.afterActivity=callback;this.smokingVisit.requestExit();return true;}
     if(this.loungeStow){this.afterActivity=callback;this.loungeStow.next='exit';this.gamePending=false;return true;}
     if(this.harvestDelivery){this.afterActivity=callback;return true;}
@@ -405,6 +433,10 @@ export class CabinBrain extends Brain {
     if(/music|音楽|曲|レコード|stereo|オーディオ|tune/i.test(text)){
       this.nextLeisure='music';this._go(getStation('lounge'));
       return words('ヘッドホンで少し聴いてくる。','I will listen on my headphones for a while.');
+    }
+    if(/修理|故障|環境異常|ロック.*(?:確認|点検)|repair|fix (?:the )?(?:door|hatch)/i.test(text)){
+      this._go(getStation('airlock'));
+      return this.environment.fault?words('船外ハッチのロックを点検して直してくる。','I will inspect and repair the EVA hatch lock.'):words('船外ハッチのロックを点検してくる。','I will inspect the EVA hatch lock.');
     }
     if(/内扉|船内ハッチ|左.*ハッチ|inner (?:hatch|door)|cabin hatch/i.test(text)){
       this._go(getStation('innerHatch'));return words('船内側のハッチを点検してくる。','I will inspect the inner hatch.');

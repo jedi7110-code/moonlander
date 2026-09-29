@@ -180,11 +180,13 @@ export function createDroidLowParts(spec,expressions,expressionPaths){
     bar(chassis,m,[side*.09,.035,-.034],[side*.146,.46,-.039],.016,T.dark);
     box(chassis,m,[side*.076,.225,.052],[.033,.23,.035],T.bright);
     cable(chassis,m,[[side*.148,.46,-.05],[side*.12,.49,.064],[side*.10,.29,.095],[side*.115,.105,.068]],.007,T.copper);
-    cable(chassis,m,[[side*.125,.44,.067],[side*.15,.40,.094],[side*.15,.25,.094],[side*.123,.220,.088]],.0045,T.brass);
+    cable(chassis,m,[[side*.125,.44,.067],[side*.15,.40,.094],[side*.15,.25,.094],[side*.076,.158,.098],[side*.076,.113,.065]],.0045,T.brass);
   }
   bar(chassis,m,[-spec.shoulderHalfWidth,.47,0],[spec.shoulderHalfWidth,.47,0],.025,T.dark);
   chestModule(chassis,m,[-.072,.341,.094],[.103,.246,.126],T.panel);
   chestModule(chassis,m,[.098,.33,.087],[.058,.181,.112],T.circuit);
+  // The recessed indicator joins the chest cover on the left and the spine behind.
+  box(chassis,m,[-.005,.326,.046],[.037,.073,.110],T.dark);
   box(chassis,m,[0,.306,-.156],[.242,.294,.080],T.vent);
   // Two collars and rearward brackets bridge the spine-to-backpack gap.
   // They share the torso joint so neither end separates when the body leans.
@@ -196,7 +198,7 @@ export function createDroidLowParts(spec,expressions,expressionPaths){
   box(chassis,m,[0,.509,-.027],[.064,.08,.062],T.neck);
   for(const side of [-1,1]){
     bar(chassis,m,[side*.062,.469,-.012],[side*.055,.551,-.034],.008,T.bright);
-    cable(chassis,m,[[side*.08,.441,.06],[side*.087,.506,.045],[side*.060,.544,.023],[side*.07,.603,-.07]],.006,T.copper);
+    cable(chassis,m,[[side*.08,side>0?.418:.441,.06],[side*.087,.506,.045],[side*.060,.544,.023],[side*.07,.603,-.07]],.006,T.copper);
   }
   const neckPivot=group(chassis,'Head support pivot',[0,.542,-.015]);
   const {head,face}=headAssembly(neckPivot,m,Object.keys(expressions));head.position.set(0,.125,.040);

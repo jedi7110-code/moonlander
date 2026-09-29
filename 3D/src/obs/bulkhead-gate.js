@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import {box,cylinder,pipe,rod,screen} from './materials.js';
+import {box,cylinder,pipe,rod} from './materials.js';
 import {CABIN_LIGHT_COLOR} from './lighting.js';
 import {createRearRoomFurnishings} from './rear-room-furnishings.js';
+import {addRearSpaceWindow} from './bathroom-window.js';
 
 export const BULKHEAD_GATE={x:-1.88,floor:6.784,width:1.82,height:2.42,bottom:.10,front:-1.36,back:-5.65};
 
@@ -35,15 +36,18 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
   const y=g.floor;
   const outline=(width,height,bottom)=>gateOutline(width,height,bottom,g);
   const opening=outline(g.width,g.height,g.bottom);
-  const frame=path(outline(g.width+.30,g.height+.24,g.bottom-.12));
+  const frameOutline=outline(g.width+.30,g.height+.24,g.bottom-.12);
+  const frame=path(frameOutline);
   frame.holes.push(path([...opening].reverse(),THREE.Path));
   slab(root,m.enamel,frame,g.front-.48,.50,'Eight-sided gate frame');
-  const seal=path(outline(g.width+.09,g.height+.09,g.bottom-.045));
+  const sealOutline=outline(g.width+.09,g.height+.09,g.bottom-.045);
+  const seal=path(sealOutline);
   seal.holes.push(path([...opening].reverse(),THREE.Path));
   slab(root,m.rubber,seal,g.front+.022,.024,'Gate seal');
-  const outer=outline(g.width+.24,g.height+.18,g.bottom-.09);
+  // Center fasteners in the exposed band between the frame edge and the seal.
+  const boltLine=frameOutline.map((point,i)=>point.map((value,j)=>(value+sealOutline[i][j])/2));
   for(let i=0;i<8;i++){
-    const a=outer[i],b=outer[(i+1)%8];
+    const a=boltLine[i],b=boltLine[(i+1)%8];
     for(const t of [.18,.82]){
       const bolt=cylinder(root,m.dark,a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,g.front+.034,.026,.028,.026,6);bolt.rotation.x=Math.PI/2;
     }
@@ -53,7 +57,8 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
   inner.holes.push(path(outline(g.width-.26,g.height-.22,g.bottom+.09).reverse(),THREE.Path));
   slab(root,m.dark,inner,-2.48,.16,'Rear threshold frame');
   // Recess the floor nose behind the trim face at z=-1.56, including its metal cap.
-  box(root,m.dark,g.x,y+.014,-3.68,2.36,.16,4.12).name='Recessed rear-room floor';
+  // Meet the cap underside exactly, including where both front edges join the sill.
+  box(root,m.dark,g.x,y+.013,-3.68,2.36,.158,4.12).name='Recessed rear-room floor';
   box(root,m.metal,g.x,y+.101,-3.68,2.20,.018,4.08).name='Rear-room floor cap';
   for(const z of [-2.1,-2.75,-3.4,-4.05,-4.7,-5.35])box(root,m.rubber,g.x,y+.115,z,2.18,.012,.028);
   for(const side of [-1,1]){
@@ -62,7 +67,11 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
     for(const z of [-2.8,-4.1,-5.3])box(root,m.enamel,g.x+side*1.10,y+1.43,z,.06,2.44,.09);
   }
   box(root,m.dark,g.x,y+2.76,-3.75,2.4,.16,4.1);
-  box(root,m.enamel,g.x,y+1.35,g.back,2.23,2.66,.16);
+  if(g.room==='laundry'||g.room==='stores')box(root,m.enamel,g.x,y+1.35,g.back,2.23,2.66,.16);
+  else addRearSpaceWindow(root,m,g.x,y,'Operations room',{
+    width:1.20,height:.82,y:1.51,wallBack:g.back-.08,wallDepth:.16,
+    wallWidth:2.23,wallHeight:2.66,wallY:1.35,wallCut:0,wallMaterial:m.enamel,
+  });
   for(const side of [-1,1]){
     box(root,m.dark,g.x+side*.93,y+1.26,g.front+.045,.075,.67,.045);
     box(root,m.metal,g.x+side*.93,y+1.26,g.front+.08,.036,.43,.06);
@@ -81,12 +90,10 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
   box(root,m.dark,g.x-.37,y+.47,-5.25,.78,.72,.54,.03);
   box(root,m.enamel,g.x-.37,y+.47,-4.96,.68,.64,.045,.016);
   box(root,m.metal,g.x-.37,y+.87,-5.20,.87,.05,.69,.02);
-  box(root,m.dark,g.x-.38,y+1.46,-5.40,.56,.49,.15,.025);
-  screen(root,g.x-.38,y+1.46,-5.305,.46,.37,23);
   box(root,m.dark,g.x+.74,y+.49,-4.06,.42,.70,1.68,.025);
   box(root,m.enamel,g.x+.74,y+.87,-4.06,.48,.06,1.77,.018);
   for(const z of [-3.48,-4.30])box(root,m.olive,g.x+.74,y+1.06,z,.34,.31,.47,.035);
-  pipe(root,m.pipeSteel,[[g.x+.66,y+.24,-5.40],[g.x+.66,y+1.9,-5.40],[g.x+.34,y+2.22,-5.40],[g.x-.65,y+2.22,-5.40]],.055);
+  pipe(root,m.pipeSteel,[[g.x+.93,y+.24,-5.40],[g.x+.93,y+1.9,-5.40],[g.x+.60,y+2.22,-5.40],[g.x-.65,y+2.22,-5.40]],.055);
   }
   for(const z of [-2.85,-4.7]){
     box(root,m.dark,g.x,y+2.43,z,.83,.09,.33,.02);

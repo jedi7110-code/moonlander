@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Vector3} from 'three';
+import {Group,MeshStandardMaterial,Raycaster,Vector3} from 'three';
 import {createDroid,DROID_SPEC} from '../src/obs/droid-model.js';
 import {sampleDroidServicePose} from '../src/obs/droid-service.js';
 import {DROID_LADDER_LANDING,LADDER_ENTRY} from '../src/obs/pace.js';
+import {DroidRoutine,DROID_FLOORS} from '../src/obs/droid-routine.js';
+import {createDeckFloor} from '../src/obs/ship.js';
+import {Supplies} from '../src/obs/state.js';
 
 test('droid grips from the deck before transferring its feet, including upper-deck openings',()=>{
   const droid=createDroid({detail:'obs'});
@@ -57,4 +60,56 @@ test('droid steps backwards onto either deck while holding the ladder until both
     assert.ok(Math.abs(planted.z-depth+.045)<1e-7,'stand behind the opening');
     }
   }finally{droid.dispose();}
+});
+
+test('upper-deck arrivals keep a real support until both soles reach the bridge before turning',()=>{
+  const droid=createDroid({detail:'obs'}),navigation=new Group(),material=new MeshStandardMaterial();
+  navigation.add(droid.root);
+  const decks=DROID_FLOORS.map((y,level)=>createDeckFloor(new Proxy({},{get:()=>material}),y,level));
+  decks.forEach(deck=>deck.updateMatrixWorld(true));
+  const down=new Vector3(0,-1,0),ray=new Raycaster(),v=()=>new Vector3();
+  const onDeck=point=>{
+    ray.set(point.clone().addScaledVector(down,-.02),down);ray.far=.045;
+    return ray.intersectObjects(decks,true).length>0;
+  };
+  const onRung=(point,sole=false)=>Math.abs(point.x)<.3&&Math.hypot(point.z-.03,
+    point.y-(.12+Math.round((point.y-.12-(sole?.028:0))/.28)*.28)-(sole?.028:0))<.005;
+  try{
+    for(const destination of [0,1]){
+      const routine=new DroidRoutine({care:new Supplies()});
+      routine.position={x:0,y:0,z:.34,floor:2,yaw:Math.PI};routine.plan={...routine.position};
+      routine.travel(destination,2,1.48);
+      while(routine.step.kind!=='climb')routine.update(1/60);
+      let landed=false,landingFrames=0,turnFrames=0;
+      while(routine.steps.length){
+        const p=routine.pose,pose=sampleDroidServicePose(p);
+        droid.update(p.time,'service',pose);
+        navigation.position.set(p.x,p.y,p.z);navigation.rotation.y=p.yaw;navigation.updateMatrixWorld(true);
+        const soles=droid.legs.map(leg=>leg.foot.localToWorld(new Vector3(0,-.099,0)));
+        const hands=droid.arms.map(arm=>arm.palm.ladderGrip.getWorldPosition(v()));
+        assert.ok(hands.some(point=>onRung(point))||soles.some(point=>onRung(point,true)||onDeck(point)),
+          'every frame needs a rung grip, a rung under a sole, or an actual deck surface');
+        if(p.climb?.landingProgress!=null){
+          landingFrames++;
+          if(p.climb.landingProgress>=.61)assert.ok(soles.every(onDeck),'both feet finish on solid floor before releasing the hands');
+        }
+        if(!p.climb){
+          if(!landed){
+            landed=true;
+            assert.ok(soles.every(onDeck),'climbing cannot finish while standing over the shaft');
+            for(const leg of droid.legs)for(const x of [-.073,.073])for(const z of [-.107,.181])
+              assert.ok(leg.foot.localToWorld(new Vector3(x,-.099,z)).z>.94,'the whole foot clears the bridge edge');
+          }
+          if(p.mode==='turn'){
+            turnFrames++;
+            assert.ok(soles.some(onDeck),'turning keeps its supporting foot on the actual deck');
+          }else if(turnFrames)break;
+        }
+        routine.update(1/60);
+      }
+      assert.ok(landingFrames>=179&&turnFrames>0&&landed,'check the full transfer and following turn on each upper deck');
+    }
+  }finally{
+    droid.dispose();material.dispose();decks.forEach(deck=>deck.traverse(o=>o.geometry?.dispose()));
+  }
 });

@@ -3,6 +3,7 @@ import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createDroidLowParts,batchDroidLow} from './droid-low.js';
 import {DROID_STARTUP_SECONDS,droidStartupLight} from './droid-startup.js';
+import {createDroidBatteryAtlas} from './droid-textures.js';
 
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z),DOWN=V(0,-1,0),UP=V(0,1,0);
 const TAU=Math.PI*2,clamp=THREE.MathUtils.clamp;
@@ -180,8 +181,12 @@ function expressionPaths(expression){
     }else if(expression==='strained'){
       paths.push([[x+side*.018,.042],[x-side*.012,.025],[x+side*.018,.009]]);
       paths.push([[x+side*.018,.055],[x-side*.016,.067]]);
-    }else if(expression==='angry')paths.push([[x+side*.019,.050],[x-side*.018,.026],[x+side*.019,.002]]);
-    else if(expression==='sleepy'){
+    }else if(expression==='angry'){
+      // Lower the inner eyelid corners while keeping the eyes open and focused.
+      paths.push([[x+side*.022,.048],[x-side*.021,.021]]);
+      paths.push([[x+side*.022,.048],[x+side*.022,.021],[x+side*.014,.010],[x,.007],[x-side*.014,.011],[x-side*.021,.021]]);
+      paths.push([[x-side*.003,.028],[x-side*.003,.010]]);
+    }else if(expression==='sleepy'){
       paths.push([[x-.020,.036],[x+.020,.036]]);
       paths.push(faceArc(x,.021,.018,.017,Math.PI,TAU));
     }else paths.push(faceArc(x,.026,.017,expression==='surprised'?.037:.033));
@@ -497,13 +502,12 @@ function buildDroidDetailed(){
     cylinder(chassis,m.steel,[side*.076,.16,.051],.019,.103);
     tube(chassis,m.copper,[[side*.148,.46,-.05],[side*.12,.49,.064],[side*.09,.28,.095],[side*.115,.105,.068],[side*.03,-.02,.088]],.008);
     tube(chassis,m.rubber,[[side*.12,.49,-.07],[side*.154,.44,-.01],[side*.150,.18,-.026],[side*.075,.035,-.07]],.010);
-    tube(chassis,m.brass,[[side*.125,.44,.067],[side*.15,.40,.082],[side*.15,.25,.08],[side*.03,.11,.06]],.004);
+    tube(chassis,m.brass,[[side*.125,.44,.067],[side*.15,.40,.082],[side*.15,.25,.094],[side*.076,.158,.098],[side*.076,.113,.065]],.004);
   }
   rod(chassis,m.dark,[-DROID_SPEC.shoulderHalfWidth,.47,0],[DROID_SPEC.shoulderHalfWidth,.47,0],.027);
   panel(chassis,m,[-.072,.341,.071],[.103,.246,.032]);
   panel(chassis,m,[.098,.33,.068],[.058,.181,.038]);
-  box(chassis,m.dark,[0,.326,.092],[.027,.073,.017],.003);
-  for(let i=0;i<4;i++)box(chassis,i===0?m.amber:m.brass,[-.001,.35-i*.015,.103],[.013,.004,.003],.001);
+  box(chassis,m.dark,[-.005,.326,.046],[.037,.073,.110],.003);
   panel(chassis,m,[0,.306,-.156],[.242,.294,.080]);
   for(const side of [-1,1]){
     box(chassis,m.steel,[side*.113,.32,-.204],[.023,.234,.014],.003);
@@ -515,7 +519,7 @@ function buildDroidDetailed(){
   for(let i=0;i<3;i++)cylinder(chassis,m.dark,[0,.487+i*.019,-.027],.037,.009);
   for(const side of [-1,1]){
     rod(chassis,m.bright,[side*.062,.469,-.012],[side*.055,.551,-.034],.009);
-    tube(chassis,m.copper,[[side*.08,.441,.06],[side*.087,.506,.045],[side*.060,.544,.023],[side*.07,.603,-.07]],.007);
+    tube(chassis,m.copper,[[side*.08,side>0?.418:.441,.06],[side*.087,.506,.045],[side*.060,.544,.023],[side*.07,.603,-.07]],.007);
     tube(chassis,m.rubber,[[side*.085,.45,-.09],[side*.085,.515,-.12],[side*.073,.585,-.1]],.010);
   }
   const neckPivot=new THREE.Group();neckPivot.name='Head support pivot';neckPivot.position.set(0,.542,-.015);chassis.add(neckPivot);
@@ -548,6 +552,21 @@ function buildDroidDetailed(){
 export function createDroid({detail='study'}={}){
   const low=detail==='obs';
   const {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators}=low?createDroidLowParts(DROID_SPEC,DROID_EXPRESSIONS,expressionPaths):buildDroidDetailed();
+  m.batteryTexture=createDroidBatteryAtlas();
+  m.battery=new THREE.MeshBasicMaterial({name:'Droid / four amber battery lamps',map:m.batteryTexture,toneMapped:false});
+  const batteryMesh=new THREE.Mesh(new THREE.PlaneGeometry(.025,.073),m.battery);
+  batteryMesh.name='Droid / battery level';batteryMesh.position.set(-.001,.326,.1012);chassis.add(batteryMesh);
+  const batteryUV=batteryMesh.geometry.attributes.uv,originalBatteryUV=batteryUV.array.slice();
+  let batteryCharge=1,batteryLevel=-1;
+  const battery={mesh:batteryMesh,get charge(){return batteryCharge;},get level(){return batteryLevel;},setCharge(value){
+    if(!Number.isFinite(value))return false;
+    batteryCharge=clamp(value,0,1);
+    const level=Math.max(0,Math.ceil(batteryCharge*4-1e-9));if(level===batteryLevel)return false;
+    batteryLevel=level;
+    for(let i=0;i<batteryUV.count;i++)batteryUV.setXY(i,(level+.04+originalBatteryUV[i*2]*.92)/8,.01+(1-originalBatteryUV[i*2+1])*.98);
+    batteryUV.needsUpdate=true;return true;
+  }};
+  battery.setCharge(1);
   root.userData.droidDetail=low?'obs':'study';
   root.userData.toonOutlineWidth=1.2; // Match Milo and Lucy at every camera distance.
   const poweredMeshes=[];
@@ -637,5 +656,5 @@ export function createDroid({detail='study'}={}){
     Object.values(m).forEach(v=>v.dispose?.());
     skin?.skeleton.dispose();
   }
-  return {root,head,face,neckPivot,chassis,arms,legs,tray,actuators,skin,update,dispose};
+  return {root,head,face,battery,neckPivot,chassis,arms,legs,tray,actuators,skin,update,dispose};
 }

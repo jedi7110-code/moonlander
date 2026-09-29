@@ -36,6 +36,7 @@ import {attachMiloBioSensor,updateMiloBioSensor} from './milo-bio-sensor.js';
 import {attachMiloBandage,updateMiloBandage} from './milo-bandage.js';
 import {attachSmokingProps,updateSmokingSmoke} from './smoking-props.js';
 import {applySmokingPose} from './smoking-pose.js';
+import {attachHatchRepairTool,applyHatchRepairPose} from './hatch-repair-pose.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
 function limb(parent,mat,length,profile,depth=1) {
@@ -211,10 +212,10 @@ export function createMilo(m,headModel=new THREE.Group(),{elbowStyle='supported'
   if(elbowStyle==='supported')attachMiloElbow(root);
   attachMiloBandage(root,m);
   for(const {hand} of arms)hand.scale.multiplyScalar(1.08);
-  root.userData.updateWristTwists?.();attachMiloWatch(root);attachMiloBioSensor(root);attachSmokingProps(root);return root;
+  root.userData.updateWristTwists?.();attachMiloWatch(root);attachMiloBioSensor(root);attachSmokingProps(root);attachHatchRepairTool(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,sequentialBedEntry=true}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,hatchRepair=null,sequentialBedEntry=true}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   setMiloNeckProtraction(root,0);
   root.userData.spineCurve=null;
@@ -229,6 +230,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   else delete root.userData.bunkStartYaw;
   resetDiningPose(root);
   root.userData.smokingSignal=null;
+  root.userData.repairTool.visible=false;
   root.userData.smokingProps.cigarette.visible=false;root.userData.smokingProps.lighter.visible=false;root.userData.smokingProps.flame.visible=false;
   for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
   const stride=time*(climbing?5.4:6.5),walking=(moving||Boolean(bathroom?.moving))&&!climbing&&!waiting;
@@ -236,7 +238,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   const dining=['galley','hydro'].includes(action)&&!moving;
   const calling=callingTime!==null&&!moving&&!action;
   const desired=bathroom?root.userData.bathroomStartYaw+angleDelta(root.userData.bathroomStartYaw,bathroom.yaw??0)*(bathroom.turn??1):dining||climbing||calling?Math.PI:walking||waiting?walkYaw??(facing||1)*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
-  const authored=smokingVisit||bathroom||bunkVisit||gymVisit||loungeEntry||loungeExit||(action==='medical'&&!moving)||reclineExit||(action==='bunk'&&!moving);
+  const authored=hatchRepair||smokingVisit||bathroom||bunkVisit||gymVisit||loungeEntry||loungeExit||(action==='medical'&&!moving)||reclineExit||(action==='bunk'&&!moving);
   if(authored){delete root.userData.headingTurn;delete root.userData.standingTurn;}
   else if(walking&&Number.isFinite(walkYaw)){
     // Follow a curved aisle continuously instead of restarting a finite turn
@@ -334,6 +336,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
     applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
   if(smokingVisit)applySmokingPose(root,smokingVisit);
+  if(hatchRepair)applyHatchRepairPose(root,hatchRepair);
   root.userData.updateWristTwists?.();
   updateMiloSpine(root);
   updateMiloNeck(root);

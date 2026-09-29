@@ -1,4 +1,4 @@
-import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
+import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinLoungeGames} from './lounge-games.js';
 import {loungeGamePromptAvailable,updateLoungeGamePrompt} from './lounge-prompt.js';
@@ -18,9 +18,16 @@ import {healthDisplay} from './health-display.js';
 import {DroidRoutine} from './droid-routine.js';
 import {Eye} from 'lucide';
 import {updateCharacterCameraUI,updateFirstPersonOverlay} from './character-camera-ui.js';
+import {environmentDisplay} from './environment.js';
+import {HATCH_REPAIR_LABELS} from './hatch-repair.js';
 
 const $=id=>document.getElementById(id);
-const icons={Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Fish,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
+const CatFoodBowl=[
+  ['path',{d:'m5 12-2 8h18l-2-8'}],
+  ['ellipse',{cx:12,cy:12,rx:7,ry:2}],
+  ['circle',{cx:8,cy:9,r:1}],['circle',{cx:12,cy:8,r:1}],['circle',{cx:16,cy:9,r:1}],
+];
+const icons={CatFoodBowl,Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({smoking:words('シャワー左の灰皿','Shower-side ashtray'),grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
@@ -51,6 +58,12 @@ const scene={
     hideWant(){$('call-alert').hidden=true;},
     openGame(kind){void immersive?.exit();pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');games.show(kind);$('lounge-game-prompt').hidden=true;audio.pause(true);},
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
+    environmentEvent(event){
+      if(event.type==='fault'){
+        showMessage(words('船外ハッチのロック異常。点検・修理が必要。','EVA hatch lock fault. Inspection and repair required.'),'SYSTEM');audio.tone(210,.3,.035);
+      }else if(event.type==='stage'&&event.stage==='repair')showMessage(words('ロックの接点を調整する。','I will adjust the lock contact.'));
+      else if(event.type==='restored')showMessage(words('ロックの修理と確認を終えた。船内環境、正常。','Lock repaired and checked. Cabin systems normal.'));
+    },
     healthEvent(event){
       if(event.type==='onset'){
         showMessage(event.kind==='fever'?words('寒気がする。熱もあるようだ。','I have chills. I think I am running a fever.'):event.source==='fitting'?words('点検中、金具で右腕を切った。手当てが要りそうだ。','I cut my right arm on a fitting. It needs dressing.'):words('足元がふらついて、右腕を壁で擦った。','I lost my footing and scraped my right arm against the wall.'));
@@ -91,12 +104,17 @@ for(const key of Object.keys(brain.statusNeeds)){
   row.append(name,value);item.append(row,meter);$('needs').append(item);needElements[key]={item,name,value,meter};
 }
 function updateHUD(){
+  const environment=environmentDisplay(brain.environment,getLang());
+  $('ship-environment').dataset.state=environment.state;$('ship-environment').title=environment.detail;
+  if($('ship-environment-label').textContent!==environment.label)$('ship-environment-label').textContent=environment.label;
+  $('ship-temperature').textContent=environment.temperature;$('ship-pressure').textContent=environment.pressure;
   const minutes=Math.floor(brain.hour*60);$('ship-clock').textContent=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
   $('milo-mood').textContent=t('mood_'+brain.mood);
   $('milo-activity').textContent=games.open?games.title:paused?words('一時停止','Paused'):actor.waitingForDroid?words('ハシゴの空き待ち','Waiting beside the ladder'):actor.waitingForHatch?words('船内ハッチの開放待ち','Waiting for inner hatch'):brain.gamePending?words('ゲームをしにラウンジへ','Going to the lounge to play'):currentAction(brain)==='gym'?words('ジムで運動中','Exercising in the gym'):currentAction(brain)==='medical'?(brain.health.treatment?words('医療区画で治療中','Treatment in progress'):words('医療区画で健診中','Checkup in progress')):brain.state==='orderingSupply'?words('コンソールで配送を依頼中','Ordering supplies at console'):brain.actStation?stationName(brain.actStation)+(actor.busy?words('へ移動中',' / en route'):['eva','airlock','innerHatch'].includes(brain.actStation)?words('を点検中',' / inspecting'):words('で過ごしている',' / occupied')):t('state_'+brain.actKey);
   if(brain.openingWake)$('milo-activity').textContent=brain.bunkVisit?.phase==='sleeping'?words('ルーシーと眠っている','Sleeping with Lucy'):words('ルーシーと目を覚ます','Waking up with Lucy');
   if(!paused&&brain.grooming)$('milo-activity').textContent=words(brain.grooming.pose.label,'Cutting hair and shaving at the washbasin');
   if(!paused&&brain.smokingVisit)$('milo-activity').textContent=words(brain.smokingVisit.pose.gesture?.label??'灰皿の前へ移動する','Taking a smoke break');
+  if(!paused&&brain.hatchRepair)$('milo-activity').textContent=words(...HATCH_REPAIR_LABELS[brain.hatchRepair.phase]);
   if(!paused&&brain.groomingQueued)$('milo-activity').textContent=words('ドロイドの洗濯完了を待ってから散髪へ','Waiting for the droid to finish laundry before grooming');
   for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
   if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);
@@ -270,7 +288,7 @@ async function start(){
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
     view.onModeChange=mode=>{idleCamera.modeChanged();immersive?.focus(mode);updateHUD();};
     view.onCameraChange=()=>{idleCamera.modeChanged();view.hover(null);updateHUD();};
-    view.onFirstPersonFrame=(rest,active)=>updateFirstPersonOverlay(document,rest,active,words);
+    view.onFirstPersonFrame=(rest,active)=>updateFirstPersonOverlay(document,rest,active);
     view.onStation=id=>{
       if(id==='lounge'){loungeClick();return;}
       if(id==='console'){requestSupply();return;}
@@ -288,7 +306,12 @@ async function start(){
     view.immersive=immersive;
     brain.catRoutine=cat;
     brain.beginWakeUp();
+    if(new URLSearchParams(location.search).get('preview')==='airlock')brain.environment.nextFault=12;
     view.setMode('all');
+    if(new URLSearchParams(location.search).get('preview')==='supervisor'){
+      view.setMode('manual');view.center.set(-4.57,8.22,-1.30);view.targetCenter.copy(view.center);
+      view.viewHeight=view.targetHeight=3.1;view.zoom=view.fitHeight/3.1;
+    }
     view.startLighting();
     await revealStartupScene({
       draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),

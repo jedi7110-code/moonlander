@@ -440,5 +440,5 @@ export class CatRoutine {
   fetch(){if(this.care.catBowlFilling){this.waitForDroidFood=true;return;}if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=CAT_WALK_SPEED;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX,z:CAT_BOWL.depth},()=>{if(this.care.eatCatFood()){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
 }
 
-export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.smokingVisit?'smoking':brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeStow||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
+export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.hatchRepair?'airlock':brain.smokingVisit?'smoking':brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeStow||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}
 export {FLOORS,getStation};

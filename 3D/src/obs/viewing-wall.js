@@ -1,4 +1,5 @@
-import {BoxGeometry,BufferGeometry,Color,ExtrudeGeometry,Float32BufferAttribute,Group,Matrix4,Mesh,MeshBasicMaterial,Path,PlaneGeometry,Points,PointsMaterial,Shape,ShapeGeometry,Vector3} from 'three';
+import {BoxGeometry,ExtrudeGeometry,Group,Matrix4,Mesh,MeshBasicMaterial,Path,PlaneGeometry,Shape,ShapeGeometry,Vector3} from 'three';
+import {createSpaceStars,SPACE_COLOR} from './space-stars.js';
 import {box,cylinder,batchStatic} from './materials.js';
 import {CABIN_AISLE,DECK} from './layout.js';
 import {FLOOR_Y} from './ship.js';
@@ -64,17 +65,10 @@ function viewport(parent,m,x,floor){
 }
 function exteriorSpace(){
   const root=new Group();root.name='POV / space beyond windows';
-  const background=new Mesh(new PlaneGeometry(240,140),new MeshBasicMaterial({name:'POV / deep space',color:0x010307,toneMapped:false}));
+  const background=new Mesh(new PlaneGeometry(240,140),new MeshBasicMaterial({name:'POV / deep space',color:SPACE_COLOR,toneMapped:false,depthWrite:false}));
+  background.renderOrder=-1;
   background.position.set(0,6,90);background.rotation.y=Math.PI;root.add(background);
-  let seed=73191;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-  const positions=[],colors=[],color=new Color();
-  for(let i=0;i<1900;i++){
-    positions.push((random()-.5)*155,(random()-.5)*90+5,40+random()*35);
-    color.setHSL(.56+random()*.09,.08+random()*.23,.46+random()*.42);colors.push(...color.toArray());
-  }
-  const geometry=new BufferGeometry().setAttribute('position',new Float32BufferAttribute(positions,3)).setAttribute('color',new Float32BufferAttribute(colors,3));
-  const stars=new Points(geometry,new PointsMaterial({name:'POV / distant stars',size:.055,vertexColors:true,toneMapped:false}));
-  stars.name='POV / stars';root.add(stars);return root;
+  root.add(createSpaceStars());return root;
 }
 
 function pressureReturns(parent,m,floor){
@@ -159,13 +153,15 @@ export function createViewingWall(m,{mergeStatic=true}={}){
     solid('Front ceiling seam',m.dark,0,floor+3.02,front-.073,26.2,.16,.14);
     solid('Front interdeck closure',m.dark,0,floor+3.21,PROFILE.edgeZ+.105,26.3,.22,.21);
   }
-  // The original cutaway side walls and roof stop at z=1.595/1.68.
+  // Side walls stop at z=1.595; the roof now reaches the forward deck edge.
   for(const side of [-1,1]){
     const spans=side===1?[[-.365,operations],[operations+3.242,10.245]]:[[-.365,10.245]];
     const outside=PROFILE.faceZ+.226;
     for(const [bottom,top]of spans)solid('Side wall return',m.enamel,side*13.07,(bottom+top)/2,(1.57+outside)/2,.40,top-bottom,outside-1.57);
-    solid('Roof return',m.dark,side*7,10.31,(1.65+outside+.014)/2,12.9,.26,outside+.014-1.65);
+    solid('Roof return',m.dark,side*7,10.31,(front-.03+outside+.014)/2,12.9,.26,outside+.014-front+.03);
   }
+  const roofOutside=PROFILE.faceZ+.24;
+  solid('Central roof return',m.dark,0,10.31,(front+roofOutside)/2,1.10,.26,roofOutside-front);
   pressureReturns(root,m,operations);
   addViewingWallDressing(root,m.fixtures,FLOOR_Y);
   addViewingWallDetails(root,m,FLOOR_Y,overhead);

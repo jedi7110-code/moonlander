@@ -11,16 +11,16 @@ function inventory(root){
   return {meshes,triangles};
 }
 
-test('lightweight model uses one opaque body skin and one face image, keeping the detailed default',()=>{
+test('lightweight model uses one body skin, one face image and one battery image, keeping the detailed default',()=>{
   const detailed=createDroid(),low=createDroid({detail:'obs'});
   try{
     assert.equal(detailed.root.userData.droidDetail,'study');assert.equal(detailed.skin,null);
     const old=inventory(detailed.root),small=inventory(low.root);
     assert.ok(small.triangles<3500&&small.triangles<old.triangles*.03);
-    const visible=[];low.root.traverseVisible(o=>{if(o.isMesh)visible.push(o);});assert.equal(visible.length,2);
+    const visible=[];low.root.traverseVisible(o=>{if(o.isMesh)visible.push(o);});assert.equal(visible.length,3);
     assert.equal(visible.filter(o=>o.isSkinnedMesh).length,1);assert.ok(visible.every(o=>!o.material.transparent));
     const atlas=low.skin.mesh.material.map;assert.equal(atlas.image.width,512);assert.equal(atlas.image.height,512);
-    const face=visible.find(o=>o.material.isMeshBasicMaterial);assert.equal(face.geometry.attributes.position.count,4);assert.equal(face.material.map.image.width,1024);
+    const face=visible.find(o=>o.name==='OBS droid / nixie expression image');assert.equal(face.geometry.attributes.position.count,4);assert.equal(face.material.map.image.width,1024);
     assert.ok(small.meshes.every(o=>!['TubeGeometry','TorusGeometry','SphereGeometry'].includes(o.geometry.type)));
     for(const o of small.meshes)for(const name of ['position','normal','uv'])for(const v of o.geometry.attributes[name].array)assert.ok(Number.isFinite(v));
     const box=new THREE.Box3().setFromObject(low.root);assert.ok(box.min.y>=-.001&&box.max.y<1.8);
@@ -28,7 +28,7 @@ test('lightweight model uses one opaque body skin and one face image, keeping th
 });
 
 test('all bitmap expressions swap UVs without reallocating textures or geometry; charging turns them off',()=>{
-  const droid=createDroid({detail:'obs'});let face;droid.root.traverse(o=>{if(o.material?.isMeshBasicMaterial)face=o;});
+  const droid=createDroid({detail:'obs'}),face=droid.root.getObjectByName('OBS droid / nixie expression image');
   try{
     const geometry=face.geometry,map=face.material.map,seen=new Set();
     for(const expression of Object.keys(DROID_EXPRESSIONS)){

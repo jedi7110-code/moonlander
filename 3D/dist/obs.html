@@ -7,16 +7,18 @@
   <title>TARAIRON | 遠心重力生活区画 3D</title>
   <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船内猫ルーシーの暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/3D/assets/favi.ico">
-  <script type="module" crossorigin src="/3D/assets/obs-Bj4SB2L3.js"></script>
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-DVmDbrFF.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-DeIR2Klj.js">
-  <link rel="stylesheet" crossorigin href="/3D/assets/obs-GE3DudF4.css">
+  <script type="module" crossorigin src="/3D/assets/obs-TnRNt2rF.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-CgNGDtxw.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-C9q7H3Sp.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-BqUMn3XX.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/startup-lighting-Ry9bGQid.js">
+  <link rel="stylesheet" crossorigin href="/3D/assets/obs-z_6Lu9JJ.css">
 </head>
 <body>
   <main id="observation">
     <header class="masthead">
-      <a href="./" class="ship-brand"><span class="brand-mark">T</span><div><h1>TARAIRON</h1><span>ROTATING HABITAT / 3D</span></div></a>
-      <div class="ship-system"><span class="status-led"></span><span data-ja="船内環境 正常" data-en="LIFE SUPPORT NOMINAL">船内環境 正常</span><span class="environment">21.4°C <b>/</b> 101.3 kPa</span></div>
+      <a href="./" class="ship-brand"><h1><img class="ship-logo" src="/3D/assets/obs/tarairon-logo.svg" alt="TARAIRON" width="1427" height="744"></h1></a>
+      <div id="ship-environment" class="ship-system" data-state="normal"><span class="status-led" aria-hidden="true"></span><span id="ship-environment-label" role="status" aria-live="polite">船内環境 正常</span><span class="environment"><span id="ship-temperature">21.4°C</span> <b>/</b> <span id="ship-pressure">101.3 kPa</span></span></div>
       <div class="header-actions">
         <time id="ship-clock">08:00</time>
         <button id="obs-pause" class="icon-button" aria-label="一時停止" data-tip="一時停止"><i data-lucide="pause"></i></button>
@@ -41,8 +43,8 @@
         <div class="character-camera" data-camera-character="milo">
           <button id="view-milo" class="icon-button" data-tip="マイロ" aria-label="マイロに寄る" aria-pressed="false" aria-expanded="false" aria-controls="character-view-controls"><i data-lucide="user-round"></i></button>
           <div id="character-view-controls" class="character-view-controls" role="group" aria-label="キャラクターの視点" hidden>
-            <button id="follow-angle" class="icon-button" aria-label="俯瞰角度を切り替える" data-tip="俯瞰角度を切り替える"><i data-lucide="rotate-cw" aria-hidden="true"></i></button>
-            <button id="first-person" class="icon-button" aria-label="本人視点" aria-pressed="false" data-tip="本人視点"><i data-lucide="eye" aria-hidden="true"></i></button>
+            <button id="follow-angle" class="icon-button" aria-label="俯瞰角度を切り替える"><i data-lucide="rotate-cw" aria-hidden="true"></i></button>
+            <button id="first-person" class="icon-button" aria-label="本人視点" aria-pressed="false"><i data-lucide="eye" aria-hidden="true"></i></button>
           </div>
         </div>
         <div class="character-camera" data-camera-character="cat"><button id="view-cat" class="icon-button" data-tip="ルーシー" aria-label="ルーシーに寄る" aria-pressed="false" aria-expanded="false" aria-controls="character-view-controls"><i data-lucide="cat"></i></button></div>
@@ -54,7 +56,6 @@
         <button id="obs-fullscreen" class="icon-button" data-tip="全画面" aria-label="全画面"><i data-lucide="maximize"></i></button>
       </div></div>
       <div id="first-person-eyelids" class="first-person-eyelids" aria-hidden="true" hidden><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path id="first-person-upper-lid"/><path id="first-person-lower-lid"/></svg></div>
-      <div id="first-person-hint" class="first-person-hint" hidden></div>
       <div id="station-status" class="station-status" role="status" aria-live="polite" aria-atomic="true" hidden><span class="signal-lamp" aria-hidden="true"></span><strong id="station-name"></strong><span id="station-phase"></span></div>
       <div id="call-alert" class="call-alert" hidden><button id="acknowledge"><i data-lucide="radio"></i><span id="call-text"></span><i data-lucide="arrow-up-right"></i></button></div>
       <div id="lounge-game-prompt" class="call-alert" hidden><button id="open-lounge-games" type="button" aria-haspopup="dialog" aria-controls="cabin-games"><i data-lucide="swords" aria-hidden="true"></i><span data-ja="ラウンジゲーム" data-en="Lounge games">ラウンジゲーム</span><i data-lucide="arrow-up-right" aria-hidden="true"></i></button></div>
@@ -79,7 +80,7 @@
       <div class="supplies"><div class="supply-heading"><span class="section-label" data-ja="船内備蓄" data-en="SHIP RESERVES">船内備蓄</span><span id="delivery-status" role="status" aria-live="polite">在庫あり</span></div><div class="supply-buttons">
         <button data-use="food" data-tip="食事"><i data-lucide="utensils"></i><span data-ja="食料" data-en="Food">食料</span><b id="stock-food">3/3</b></button>
         <button data-use="water" data-tip="水を飲む"><i data-lucide="droplet"></i><span data-ja="水" data-en="Water">水</span><b id="stock-water">4/4</b></button>
-        <button data-use="catfood" data-tip="ルーシーに餌を出す"><i data-lucide="fish"></i><span data-ja="猫餌" data-en="Cat">猫餌</span><b id="stock-catfood">3/3</b></button>
+        <button data-use="catfood" data-tip="ルーシーに餌を出す"><i data-lucide="cat-food-bowl" aria-hidden="true"></i><span data-ja="猫餌" data-en="Cat">猫餌</span><b id="stock-catfood">3/3</b></button>
         <button id="request-supply" data-tip="コンソールから配送依頼" disabled><i data-lucide="radio-tower"></i><span data-ja="配送" data-en="Order">配送</span></button>
       </div></div>
       <form id="obs-chat" autocomplete="off"><label class="section-label" for="obs-input">COMMS / MILO</label><div class="chat-line"><button type="button" id="play-chess" class="icon-button" aria-label="ラウンジゲーム" data-tip="チェス・ポーカー・リバーシ"><i data-lucide="message-circle"></i></button><input id="obs-input" maxlength="240" placeholder="マイロに話しかける" aria-label="マイロに話しかける"><button type="submit" class="icon-button" aria-label="送信" data-tip="送信"><i data-lucide="send"></i></button></div></form>

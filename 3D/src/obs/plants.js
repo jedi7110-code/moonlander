@@ -43,20 +43,76 @@ function waterRecovery(root,m){
   return{rotor,condensate,water};
 }
 
-// Curved leaf surface, with a raised midrib and a softly corrugated edge.
-function leafGeometry(){
-  const points=[],indices=[],rows=12,cols=6;
-  for(let i=0;i<=rows;i++)for(let j=0;j<=cols;j++){
-    const t=i/rows,s=j/cols*2-1,w=Math.pow(Math.sin(Math.PI*t),.7)*(.085+.004*Math.sin(t*27));
-    points.push(s*w,.26*t-.06*t*t-.024*s*s*Math.sin(Math.PI*t),.14*t*t+.008*Math.sin(t*25)*s*s);
-    if(i<rows&&j<cols){const a=i*(cols+1)+j;indices.push(a,a+1,a+cols+1,a+1,a+cols+2,a+cols+1);}
+function plantRandom(seed){
+  return()=>{
+    seed+=0x6D2B79F5;let n=seed;
+    n=Math.imul(n^n>>>15,n|1);n^=n+Math.imul(n^n>>>7,n|61);
+    return((n^n>>>14)>>>0)/4294967296;
+  };
+}
+
+// Round, lance-shaped and softly lobed young leaves. A narrow petiole is part
+// of each surface, so varied foliage needs no separate stem meshes.
+const LEAF_FORMS=[
+  {width:.078,length:.255,roundness:.57,lobes:.035},
+  {width:.045,length:.295,roundness:.92,lobes:.025},
+  {width:.076,length:.265,roundness:.72,lobes:.25},
+];
+function leafPoint(t,s,form){
+  const u=Math.max(0,(t-form.petiole)/(1-form.petiole)),blade=Math.sin(Math.PI*u);
+  const wave=Math.sin(u*Math.PI*6+form.phase+s*.35);
+  const width=t<form.petiole?.0022:Math.max(.0002,
+    form.width*Math.pow(blade,form.roundness)*(.80+.35*u)*(1-form.lobes*(.5+.5*wave)));
+  return new THREE.Vector3(
+    s*width*(1+form.asymmetry*s)+form.sideBend*t*t,
+    form.length*t-form.curl*t*t*t-.018*s*s*blade,
+    form.bow*t*t+form.twist*s*width*t+.005*wave*s*s*blade
+  );
+}
+function createBabyLeafPlant(material,water,seed){
+  const random=plantRandom(seed),plant=new THREE.Group();plant.name='Baby leaf rosette';
+  const points=[],colors=[],indices=[],rows=14,cross=[-1,-.62,-.10,0,.10,.62,1],cols=cross.length-1;
+  const count=7+Math.floor(random()*5),family=Math.floor(random()*LEAF_FORMS.length);
+  const vigor=.82+random()*.28,start=random()*Math.PI*2;
+  const shade=new THREE.Color(),vein=new THREE.Color(.94,1.12,.69);
+  plant.userData.swayPhase=random()*Math.PI*2;plant.userData.lean=(random()-.5)*.10;
+  for(let l=0;l<count;l++){
+    const age=l/(count-1),form={...LEAF_FORMS[family],
+      petiole:.14+random()*.08,phase:random()*Math.PI*2,
+      asymmetry:(random()-.5)*.24,sideBend:(random()-.5)*.035,
+      curl:.025+random()*.055,bow:.055+random()*.060,twist:(random()-.5)*.9};
+    const size=vigor*(.91+random()*.25)*(1-age*.38),angle=start+l*2.399+(random()-.5)*.58;
+    const transform=new THREE.Matrix4().makeRotationY(angle)
+      .multiply(new THREE.Matrix4().makeRotationX(.12+(1-age)*(.28+random()*.35)))
+      .multiply(new THREE.Matrix4().makeRotationZ((random()-.5)*.27))
+      .scale(new THREE.Vector3(size*(.84+random()*.32),size,size));
+    const color=new THREE.Color(.75+random()*.32,.80+random()*.24,.71+random()*.32),offset=points.length/3;
+    for(let i=0;i<=rows;i++)for(let j=0;j<=cols;j++){
+      const t=i/rows,s=cross[j],point=leafPoint(t,s,form).applyMatrix4(transform);
+      points.push(point.x,point.y,point.z);
+      shade.copy(color).multiplyScalar(.88+t*.12).lerp(vein,t<form.petiole?.5:Math.abs(s)<.05?.22:0);
+      colors.push(shade.r,shade.g,shade.b);
+      if(i<rows&&j<cols){const a=offset+i*(cols+1)+j;indices.push(a,a+1,a+cols+1,a+1,a+cols+2,a+cols+1);}
+    }
+    // Occasional tiny beads sit on the actual bent leaf, not a fixed point in air.
+    if(l===1&&random()>.45){
+      const point=leafPoint(.58,(random()-.5)*.8,form).applyMatrix4(transform),radius=.005+random()*.002;
+      const drop=ball(plant,water,point.x,point.y-.002,point.z,radius,radius*1.3,radius);
+      drop.name='Leaf underside droplet';drop.castShadow=false;
+    }
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(points,3));geometry.setIndex(indices);geometry.computeVertexNormals();return geometry;
+  // One draw per plant. Growth and the existing gentle sway still move the root.
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.setIndex(indices);geometry.computeVertexNormals();
+  const canopy=new THREE.Mesh(geometry,material);canopy.name='Baby leaf canopy';canopy.castShadow=true;canopy.receiveShadow=true;
+  plant.add(canopy);return plant;
 }
 export function createPlantRack(m,x){
   if(!THREE.UniformsLib.LTC_HALF_1)RectAreaLightUniformsLib.init();
   const root=new THREE.Group();root.name='Wall vegetable rack';root.position.x=x;
-  const leaf=leafGeometry(),greens=[0x39651b,0x254f2a,0x315e28].map(color=>new THREE.MeshStandardMaterial({color,roughness:.84,envMapIntensity:.14,side:THREE.DoubleSide}));
+  const greens=[0x39651b,0x254f2a,0x315e28].map(color=>new THREE.MeshStandardMaterial({color,roughness:.84,envMapIntensity:.14,side:THREE.DoubleSide,vertexColors:true}));
   box(root,m.dark,0,1.27,-1.03,2.90,2.48,.15,.03);
   for(const side of [-1,1]){
     box(root,m.metal,side*1.42,1.27,-.76,.045,2.46,.53);
@@ -79,19 +135,10 @@ export function createPlantRack(m,x){
     for(const z of [-.83,-.39])box(root,m.metal,-.16,y+.452,z,2.30,.06,.025);
     for(const side of [-1,1])rod(root,m.black,[side*1.35,y,-.83],[side*1.18,y,-.70],.020);
     for(let p=0;p<6;p++){
-      const plant=new THREE.Group();plant.position.set(-1.08+p*.37,y+.09,-.58);root.add(plant);plants.push(plant);
-      for(let l=0;l<9;l++){
-        const pivot=new THREE.Group();pivot.rotation.y=l*2.399;plant.add(pivot);
-        pivot.rotation.x=.15+(l%3)*.30;
-        const mesh=new THREE.Mesh(leaf,greens[i]);mesh.scale.setScalar(.8+(l%3)*.15);
-        mesh.scale.x*=i===0?1.2:i===1?.8:.75;mesh.scale.y*=i===2?.78:1;
-        mesh.castShadow=true;pivot.add(mesh);
-        if(l===2||l===5){
-          const drop=ball(mesh,recovery.water,.024,.14,.067,.008,.012,.008);
-          drop.name='Leaf underside droplet';drop.castShadow=false;
-        }
-        rod(pivot,greens[i],[0,0,0],[0,.20,.075],.003);
-      }
+      const seed=7141+i*311+p*97,random=plantRandom(seed+83);
+      const plant=createBabyLeafPlant(greens[i],recovery.water,seed);
+      plant.position.set(-1.08+p*.37+(random()-.5)*.055,y+.09,-.59+(random()-.5)*.07);
+      plant.rotation.z=plant.userData.lean;root.add(plant);plants.push(plant);
     }
     box(root,m.black,1.20,y+.20,-.59,.17,.43,.045,.015);
     const segments=[];
@@ -110,7 +157,7 @@ export function animatePlants(rack,bed,time){
   rack.recovery.condensate.update(time);
   rack.rows.forEach((row,i)=>{
     const growth=bed.rows[i].growth,ready=growth>=1;
-    row.plants.forEach((plant,j)=>{plant.scale.setScalar(.25+.75*growth);plant.rotation.z=Math.sin(time*.65+j+i)*.008;});
+    row.plants.forEach(plant=>{plant.scale.setScalar(.25+.75*growth);plant.rotation.z=plant.userData.lean+Math.sin(time*.65+plant.userData.swayPhase)*.008;});
     row.segments.forEach((segment,k)=>segment.material.color.setHex(k<Math.ceil(growth*8)?ready?0xb5e477:0x72b9a2:0x243b31));
     row.lamp.material.color.setHex(ready?0xc7f58c:0x568771);
   });

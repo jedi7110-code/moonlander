@@ -84,6 +84,12 @@ test('the full cabin reduces wide triangles, local lights and shadow passes and 
   const scene=new T.Scene();scene.add(ship.staticMesh,ship.animated,new T.HemisphereLight(),new T.DirectionalLight());
   const shaderLights={on:{value:1}};
   const view={ship,scene,camera:new T.PerspectiveCamera(),renderer:{shadowMap:{enabled:true}},startupLighting:{shaderLights}},quality=new ObservationXRQuality(view);
+  const animatedDraws=()=>{
+    let draws=0;
+    ship.animated.traverseVisible(mesh=>{if(mesh.isMesh&&mesh.material.visible&&mesh.layers.test(view.camera.layers))draws++;});
+    return draws+quality.batches.filter(({mesh})=>mesh.visible&&mesh.count>0).length;
+  };
+  const animatedBefore=animatedDraws();
   let before=0,after=0;
   ship.staticMesh.traverse(o=>{if(o.isMesh)before+=triangles(o.geometry);});
   const visibleBefore=[];scene.traverse(o=>visibleBefore.push([o,o.visible]));
@@ -94,7 +100,9 @@ test('the full cabin reduces wide triangles, local lights and shadow passes and 
   assert.equal(quality.lights.filter(l=>l.visible).length,0);
   assert.equal(shaderLights.on.value,0,'the in-shader ladder and gate fills switch off with the real lights');
   assert.equal(view.renderer.shadowMap.enabled,false);
-  assert.ok(quality.batches.reduce((n,b)=>n+b.mesh.count,0)>250,'batch repeated animated fixture meshes');
+  assert.ok(quality.batches.some(({mesh})=>mesh.visible&&mesh.count>=3),'batch repeated animated fixture meshes');
+  // Foliage is already merged per plant; measure draw savings, not the old leaf count.
+  assert.ok(animatedDraws()<animatedBefore*.7,`${animatedBefore} -> ${animatedDraws()} animated draws`);
   quality.endFrame();
   assert.equal(shaderLights.on.value,1);
   assert.equal(view.renderer.shadowMap.enabled,true);

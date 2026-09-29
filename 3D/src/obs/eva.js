@@ -56,6 +56,10 @@ export function createEVAHatch(m,y,inner=false){
   plate(door,m.enamel,2.78,2.42,.17,.22,.085).name='Sealed pressure door';
   plate(door,m.dark,.84,1.30,.15,.308,.025).position.y=-.18;
   plate(door,m.enamel,.74,1.20,.12,.335,.018).position.y=-.18;
+  if(!inner){
+    const screw=cylinder(door,m.metal,.18,-.12,.360,.019,.028,.019,8);
+    screw.rotation.x=Math.PI/2;screw.name='EVA lock service screw';
+  }
   const porthole=ring(door,m.metal,0,.66,.356,.209,.045);porthole.name='Pressure window rim';
   const pane=cylinder(door,inner?m.black:m.evaWindow,0,.66,.354,.185,.017,.185,40);pane.rotation.x=Math.PI/2;
   if(!inner)for(const [x,yy,r]of [[-.072,.71,.009],[.082,.61,.007],[.035,.78,.006]])ball(door,m.white,x,yy,.371,r,r,.003);
@@ -79,6 +83,7 @@ export function createEVAHatch(m,y,inner=false){
   for(const yy of [-.90,.90])box(edge,m.metal,0,yy,.098,.33,.075,.13,.012);
   box(edge,m.red,0,-.10,.095,.046,.44,.025,.005);
   const signal=new THREE.MeshBasicMaterial({color:0x85e3af,toneMapped:false});
+  signal.userData.cabinAlwaysPowered=true;
   box(edge,signal,0,.61,.094,.10,.055,.025,.006);
   root.userData={door,signal,inner};
   return root;
@@ -127,4 +132,8 @@ export function animateAirlock(door,signal,opening){
   door.position.z=EVA_BAY.depth-opening*3.2;
   door.visible=opening<.999;
   signal.color.setHex(opening>.01?0xf3bd62:0x85e3af);
+}
+
+export function animateHatchFault(signal,environment){
+  signal.color.setHex(environment?.fault?0xff6254:0x85e3af);
 }

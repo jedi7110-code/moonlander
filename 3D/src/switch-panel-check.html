@@ -25,8 +25,8 @@ const mat=createWallSwitchMaterials();
 [[.44,.70,0],[.70,.40,1],[.32,.65,2]].forEach(([w,h,style],i)=>{const p=createWallSwitchPanel(mat,{w,h,style});p.position.x=(i-1)*.88;p.rotation.y=-.12;examples.add(p);});
 const wall=new THREE.Mesh(new THREE.BoxGeometry(5,3,.08),new THREE.MeshStandardMaterial({color:0xa1a69a,roughness:.94}));wall.position.z=-.044;examples.add(wall);
 const toon=createCabinToon([examples]);toon.setStyle('cartoon');
-const camera=view.camera;camera.near=.02;const initialArea=new URLSearchParams(location.search).get('area');let mode=['kitchen','shower','toilet'].includes(initialArea)?initialArea:'detail';
-for(const [id,text] of [['shower','シャワー'],['toilet','トイレ']]){const button=document.createElement('button');button.id=id;button.textContent=text;document.getElementById('detail').before(button);}
+const camera=view.camera;camera.near=.02;const initialArea=new URLSearchParams(location.search).get('area');let mode=['kitchen','shower','toilet','console','lounge','plants'].includes(initialArea)?initialArea:'detail';
+for(const [id,text] of [['console','コンソール'],['shower','シャワー'],['toilet','トイレ'],['plants','栽培棚']]){const button=document.createElement('button');button.id=id;button.textContent=text;document.getElementById('detail').before(button);}
 const doorControls=document.createElement('div');doorControls.style.cssText='display:flex;align-items:center;gap:6px';
 doorControls.innerHTML='<button id="bathroom-door">ドアを閉める</button><input aria-label="ドアの開き" type="range" min="0" max="1" step=".01" value="1" style="width:90px">';
 document.getElementById('detail').before(doorControls);
@@ -44,7 +44,7 @@ function render(){
  viewingWall.visible=mode==='front';
  const bathroom=['shower','toilet'].includes(mode);doorControls.style.display=bathroom?'flex':'none';doorButton.textContent=opening>.5?'ドアを閉める':'ドアを開ける';
  for(const [id,room] of Object.entries(view.ship.bathrooms))animateBathroom(room,{opening:mode===id?opening:0,phase:closing?'close':undefined});
- document.getElementById('status').textContent=bathroom?`${mode==='shower'?'シャワー':'トイレ'} / ${Math.round(opening*100)}% / ${view.ship.bathrooms[mode].ceilingLight.power.value?'点灯':'消灯'}`:mode==='kitchen'?'キッチン':mode==='front'?'主観側 / 3フロア':mode==='pipes'?`${REAR_WALL_PIPE_RUNS.length}か所 / 4本組`:'7か所 / 3種類';
+ document.getElementById('status').textContent=bathroom?`${mode==='shower'?'シャワー':'トイレ'} / ${Math.round(opening*100)}% / ${view.ship.bathrooms[mode].ceilingLight.power.value?'点灯':'消灯'}`:mode==='console'?'FLIGHT / ATMOSPHERE / POWER':mode==='kitchen'?'キッチン':mode==='plants'?'栽培棚':mode==='front'?'主観側 / 3フロア':mode==='pipes'?`${REAR_WALL_PIPE_RUNS.length}か所 / 4本組`:'7か所 / 3種類';
  labels.style.display=['sites','pipes','front'].includes(mode)?'grid':'none';
  labels.style.gridTemplateColumns=`repeat(${mode==='pipes'||mode==='front'?3:5},1fr)`;
  labels.innerHTML=(mode==='front'?nearWallViews.map(p=>p.label):mode==='pipes'?REAR_WALL_PIPE_RUNS.map(p=>p.label):names).map(n=>`<b>${n}</b>`).join('');
@@ -52,11 +52,18 @@ function render(){
  if(mode==='detail'){
   camera.fov=28;camera.aspect=width/height;camera.position.set(.16,40.13,Math.max(3.20,3.0/(2*Math.tan(14*Math.PI/180)*camera.aspect)));camera.lookAt(0,40,0);camera.updateProjectionMatrix();
   toon.update(width,height,1.7,15);view.cabinToon.update(width,height,1.7,15);r.render(view.scene,camera);
+ }else if(mode==='console'){
+  camera.fov=35;camera.aspect=width/height;camera.position.set(-8.58,9.35,Math.max(3.3,5.2/(2*Math.tan(17.5*Math.PI/180)*camera.aspect))-.45);camera.lookAt(-8.58,8.55,-.45);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,3.2,15);r.render(view.scene,camera);
+ }else if(mode==='plants'){
+  const x=view.ship.plants.root.position.x+.43;
+  camera.fov=38;camera.aspect=width/height;camera.position.set(x+.25,1.8,Math.max(4.3,4.3/(2*Math.tan(19*Math.PI/180)*camera.aspect)));camera.lookAt(x,1.37,-.6);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,3.2,15);r.render(view.scene,camera);
  }else if(mode==='bunk'){
   camera.fov=35;camera.aspect=width/height;camera.position.set(-4.30,5.15,4.1);camera.lookAt(-4.25,4.85,-1.2);camera.updateProjectionMatrix();
   view.cabinToon.update(width,height,3.0,15);r.render(view.scene,camera);
  }else if(mode==='lounge'){
-  camera.fov=38;camera.aspect=width/height;camera.position.set(7.70,5.20,5.8);camera.lookAt(7.65,4.92,-1.2);camera.updateProjectionMatrix();
+  camera.fov=38;camera.aspect=width/height;camera.position.set(7.4,5.20,Math.max(5.8,5.0/(2*Math.tan(19*Math.PI/180)*camera.aspect)));camera.lookAt(7.4,4.45,-.3);camera.updateProjectionMatrix();
   view.cabinToon.update(width,height,4.6,15);r.render(view.scene,camera);
  }else if(mode==='magazines'){
   camera.fov=35;camera.aspect=width/height;camera.position.set(2.6,5.0,3.6);camera.lookAt(2.1,4.65,-.75);camera.updateProjectionMatrix();
@@ -96,6 +103,6 @@ function render(){
   });r.setScissorTest(false);r.setViewport(0,0,width,height);
  }
 }
-view.observer.disconnect();for(const name of ['detail','sites','bunk','lounge','magazines','locker','gym','cargo','pipes','front','shower','toilet'])document.getElementById(name).onclick=()=>{mode=name;render();};window.addEventListener('resize',render);
+view.observer.disconnect();for(const name of ['detail','sites','bunk','lounge','magazines','locker','gym','cargo','pipes','front','shower','toilet','console','plants'])document.getElementById(name).onclick=()=>{mode=name;render();};window.addEventListener('resize',render);
 render();
 </script></html>

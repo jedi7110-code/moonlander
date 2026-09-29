@@ -295,11 +295,12 @@ test('ladder travel retains its pace with a slower supported landing on each des
   const climbs=routine.steps.filter(s=>s.kind==='climb');
   assert.ok(climbs.some(s=>s.to.y>s.from.y)&&climbs.some(s=>s.to.y<s.from.y));
   for(const climb of climbs){
-    const extra=LADDER_ENTRY.seconds-LADDER_ENTRY.droidHeight/(.40*DROID_PACE)+(climb.landingDuration?climb.landingDuration-DROID_LADDER_LANDING.height/(.40*DROID_PACE):0);
+    const extra=LADDER_ENTRY.seconds-LADDER_ENTRY.droidHeight/(.40*DROID_PACE)+climb.landingDuration-climb.landingHeight/(.40*DROID_PACE);
     const perDeck=(climb.duration-extra)/Math.abs(climb.to.floor-climb.from.floor);
     assert.ok(perDeck>5&&perDeck<5.5,'a single deck is 1.6 times faster than the former 8.5 seconds');
-    assert.equal(Boolean(climb.landingDuration),climb.to.y<climb.from.y);
-    if(climb.to.y<climb.from.y)assert.equal(climb.to.z,climb.to.floor===2?.34:1.34,'destination is behind the opening');
+    assert.equal(climb.landingDuration,DROID_LADDER_LANDING.seconds,'both directions keep the ladder grip through landing');
+    assert.equal(climb.landingHeight,climb.to.y<climb.from.y?DROID_LADDER_LANDING.height:0);
+    assert.equal(climb.to.z,climb.to.floor===2?.34:1.34,'destination is behind the opening');
   }
   while(routine.step.kind!=='climb')routine.update(.05);
   routine.update(LADDER_ENTRY.seconds-routine.age);

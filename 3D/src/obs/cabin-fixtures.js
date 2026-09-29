@@ -37,7 +37,7 @@ export function finishCabinFixtures(view){
     // Retain actual area-light shading on leaf surfaces; the cabin toon shader
     // does not implement RectAreaLight. No additional lights are introduced.
     const leafMaterial=new MeshPhysicalMaterial({name:`Study / lit greens ${index+1}`,
-      color:greens[index],roughness:.72,metalness:0,envMapIntensity:.14,side:DoubleSide,
+      color:greens[index],roughness:.72,metalness:0,envMapIntensity:.14,side:DoubleSide,vertexColors:true,
       emissive:greens[index],emissiveIntensity:.035});
     const sources=new Set();
     for(const plant of row.plants)plant.traverse(mesh=>{

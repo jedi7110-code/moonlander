@@ -102,9 +102,9 @@ test('only the selected icon owns the controls, with localized state and sleep o
   }
   camera.toggleFirstPerson();tick();updateCharacterCameraUI(document,view,words);
   assert.equal($('first-person').attributes['aria-pressed'],'true');assert.equal($('zoom-in').disabled,true);
-  updateFirstPersonOverlay(document,{closure:1,locked:true},true,words);assert.equal($('first-person-eyelids').hidden,false);
+  updateFirstPersonOverlay(document,{closure:1,locked:true},true);assert.equal($('first-person-eyelids').hidden,false);
   const curve=$('first-person-upper-lid').attributes.d.match(/V([\d.]+)Q50 ([\d.]+)/);
   near(Number(curve[1]),60);near(Number(curve[2]),40);
   camera.select('all');updateCharacterCameraUI(document,view,words);
-  assert.equal($('character-view-controls').hidden,true);assert.equal($('first-person-eyelids').hidden,true);assert.equal($('first-person-hint').hidden,true);
+  assert.equal($('character-view-controls').hidden,true);assert.equal($('first-person-eyelids').hidden,true);
 });

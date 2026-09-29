@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {CABIN_LIGHT_COLOR,LADDER_LIGHT_LAYOUT} from './lighting.js';
 import {createDiningProps} from './dining.js';
-import {box,ball,cylinder,pipe,rod,label,screen,batchStatic} from './materials.js';
+import {box,ball,cylinder,pipe,rod,label,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
 import {DECK,FLOORS,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,LOUNGE_TABLE,CABIN_AISLE,HYDRO_TRAY,ASHTRAY} from './layout.js';
 import {createPlantRack} from './plants.js';
@@ -23,8 +23,14 @@ import {createMachinedMetals} from './machined-metals.js';
 import {createCargoStowage,createCargoVentilation} from './cargo-bay.js';
 import {createLoungeCoffee,createTableLeisureProps} from './lounge-table-props.js';
 import {createConsoleMaterials,addConsoleControls} from './console-controls.js';
+import {ConsoleScreens} from './console-screens.js';
+import {createAIServiceRack} from './ai-service-rack.js';
 import {createShowerFixtures} from './shower-fixtures.js';
 import {createBathroomCeilingLight} from './bathroom-lighting.js';
+import {addBathroomRearWindow} from './bathroom-window.js';
+import {finishLoungeSofa} from './lounge-sofa-finish.js';
+import {createRearWindowStars} from './space-stars.js';
+import {finishGateFrames} from './gate-frame-finish.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -116,7 +122,7 @@ function gauge(parent,m,x,y,z,r=.09) {
   const dial=cylinder(parent,m.white,x,y,z+.035,r*.82,.01);dial.rotation.x=Math.PI/2;
   rod(parent,m.black,[x,y,z+.045],[x+r*.47,y+r*.38,z+.045],.007);
 }
-function consoleUnit(parent,m,controls,x,y,w=1.7,seed=0) {
+function consoleUnit(parent,m,controls,screens,x,y,w=1.7,seed=0) {
   box(parent,m.dark,x,y+.58,-.30,w,1.15,1.15,.08);
   box(parent,m.enamel,x,y+.54,.3,w-.10,.90,.09,.03);
   grille(parent,m,x,y+.46,.36,w*.66,.3);
@@ -125,7 +131,7 @@ function consoleUnit(parent,m,controls,x,y,w=1.7,seed=0) {
   displayFrame(parent,m.enamel,{x,y:y+1.7,z:-.49,width:w-.1,height:.98,depth:.20,holeWidth:w*.70+.012,holeHeight:.742,offsetX:-.1,offsetY:.03});
   box(parent,m.black,x-.1,y+1.73,-.51,w*.70,.73,.09,.04);
   displayFrame(parent,m.black,{x:x-.1,y:y+1.73,z:-.44,width:w*.70,height:.73,depth:.07,holeWidth:w*.64+.012,holeHeight:.622});
-  screen(parent,x-.1,y+1.73,-.45,w*.64,.61,seed);
+  screens.add(parent,x-.1,y+1.73,-.45,w*.64,.61,seed);
   addConsoleControls(parent,controls,{x,y,width:w,seed});
   pipe(parent,m.black,[[x+.5,y+.12,-.6],[x+.7,y+.15,-1],[x+.75,y+1.1,-1]],.035);
 }
@@ -150,13 +156,41 @@ export function createLoungeTable(m){
   root.userData.loungeProps=createTableLeisureProps(root,m,top);
   return root;
 }
+function sofaCushionGeometry(){
+  // A broad upper shoulder and tapered lower corners, rounded into upholstery.
+  const width=.70,height=.58,radius=.07,thickness=.075,bevel=.022,bevelDepth=.011;
+  const corners=[[-.27,.5],[.27,.5],[.5,.10],[.23,-.5],[-.23,-.5],[-.5,.10]]
+    .map(([x,y])=>new THREE.Vector2(x*(width-bevel*2),y*(height-bevel*2)));
+  const outline=new THREE.Shape();
+  for(let i=0;i<corners.length;i++){
+    const corner=corners[i],previous=corners[(i+5)%6],next=corners[(i+1)%6];
+    const entry=corner.clone().add(previous.clone().sub(corner).setLength(radius));
+    const exit=corner.clone().add(next.clone().sub(corner).setLength(radius));
+    if(i===0)outline.moveTo(entry.x,entry.y);else outline.lineTo(entry.x,entry.y);
+    outline.quadraticCurveTo(corner.x,corner.y,exit.x,exit.y);
+  }
+  outline.closePath();
+  const geometry=new THREE.ExtrudeGeometry(outline,{depth:thickness-bevelDepth*2,steps:1,curveSegments:5,bevelEnabled:true,bevelSize:bevel,bevelThickness:bevelDepth,bevelSegments:3});
+  geometry.translate(0,0,-(thickness-bevelDepth*2)/2);
+  return geometry;
+}
+export function createLoungeSofa(m){
+  const root=new THREE.Group(),seat=LOUNGE_SEAT;root.name='Lounge sofa';
+  // Keep the upper contacts fixed and sink the plinth just inside the deck.
+  box(root,m.dark,7.4,.194,-.225,4.12,.412,.95,.045).name='Sofa floor plinth';
+  box(root,m.cushion,7.4,seat.top-.08,seat.centerDepth,3.98,.16,seat.cushionDepth,.07).name='Sofa seat';
+  // Thicken toward the rear wall; keep the cushion's front and seated contacts.
+  box(root,m.cushion,7.4,.82,-.52,4.03,.84,.36,.06).name='Sofa backrest';
+  for(const x of [5.32,9.49])box(root,m.enamel,x,.38,-.20,.16,.79,1.00,.04).name='Sofa floor-reaching arm';
+  const cushionGeometry=sofaCushionGeometry();
+  for(let i=0;i<3;i++){
+    const cushion=new THREE.Mesh(cushionGeometry,m.olive);cushion.name='Sofa hexagonal cushion';
+    cushion.position.set(6.05+i*1.25,.87,-.303);cushion.castShadow=true;cushion.receiveShadow=true;root.add(cushion);
+  }
+  return finishLoungeSofa(root,m);
+}
 export function createLounge(m){
-  const root=new THREE.Group(),seat=LOUNGE_SEAT;root.name='Lounge furniture';
-  box(root,m.dark,7.4,.24,seat.centerDepth,4.12,.32,.70,.045);
-  box(root,m.cushion,7.4,seat.top-.08,seat.centerDepth,3.98,.16,seat.cushionDepth,.07);
-  box(root,m.cushion,7.4,.82,-.44,4.03,.84,.20,.06);
-  for(const x of [5.32,9.49])box(root,m.enamel,x,.43,seat.centerDepth,.16,.69,.80,.04);
-  for(let i=0;i<3;i++)box(root,m.olive,6.05+i*1.25,.75,-.255,.7,.50,.15,.08);
+  const root=createLoungeSofa(m);root.name='Lounge furniture';
   const table=createLoungeTable(m);table.position.set(LOUNGE_TABLE.x,0,LOUNGE_TABLE.z);root.add(table);root.userData.loungeProps=table.userData.loungeProps;
   return root;
 }
@@ -178,7 +212,7 @@ export function createStationInteraction(id,bounds,pickMaterial){
 export function createBathroom(parent,animated,m,x,y,type) {
   // Fit the sill and ceiling BETWEEN the jambs. Their old full-width front
   // faces intersected the jamb faces, producing black flicker at all corners.
-  box(parent,m.dark,x,y+1.29,-3.80,1.56,2.48,.12,.04).name=`${type} rear wall`;
+  addBathroomRearWindow(parent,m,x,y,type);
   for(const side of [-1,1])box(parent,m.white,x+side*.83,y+1.29,-2.66,.10,2.59,2.18,.025).name=`${type} side wall`;
   box(parent,m.white,x,y+2.54,-2.66,1.56,.10,2.18,.025).name=`${type} ceiling`;
   box(parent,m.dark,x,y+.025,-2.66,1.56,.05,2.18,.01).name=`${type} sill`;
@@ -284,10 +318,16 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   gateWall(staticRoot,m.dark,{left:-13.4,right:13.4,bottom:-.405,top:10.285,z:-2.30,depth:.19,gates:REAR_ROOM_GATES,rectangles:wallOpenings});
   // Interior faces sit in front of the hull's back surface; the viewing wall is removed.
   gateWall(staticRoot,m.enamel,{left:-13.15,right:13.15,bottom:-.10,top:10.10,z:-2.09,depth:.22,gates:REAR_ROOM_GATES,rectangles:wallOpenings});
+  // Carry the roof over the full forward aisle, matching the deck below.
+  const roofFront=CABIN_AISLE.deckFront,roofBridgeBack=.94;
   for(const side of [-1,1]){
-    box(staticRoot,m.dark,side*7,10.31,-.12,12.9,.26,3.6,.05);
-    box(staticRoot,m.enamel,side*6.925,10.48,-.14,12.75,.19,3.46,.035);
+    box(staticRoot,m.dark,side*7,10.31,(roofFront-1.92)/2,12.9,.26,roofFront+1.92,.05);
+    box(staticRoot,m.enamel,side*6.925,10.48,(roofFront-1.87)/2,12.75,.19,roofFront+1.87,.035);
   }
+  // Only the ladder shaft stays open; its forward landing has a continuous roof.
+  const roofBridgeZ=(roofFront+roofBridgeBack)/2,roofBridgeDepth=roofFront-roofBridgeBack;
+  box(staticRoot,m.dark,0,10.31,roofBridgeZ,1.10,.26,roofBridgeDepth);
+  box(staticRoot,m.enamel,0,10.5075,roofBridgeZ,1.10,.135,roofBridgeDepth);
   for(const side of [-1,1]){
     // The operations deck ends at a recessed airlock instead of a solid side wall.
     const airlockBottom=FLOOR_Y[DECK.OPERATIONS],airlockTop=airlockBottom+3.242;
@@ -348,21 +388,16 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   panel(staticRoot,m,4.06,habitation+1.5,-1.38,1.37,1.26,m.white);
   label(staticRoot,'TARAIRON\nCREW 01',4.06,habitation+1.57,-1.255,1.13,.37,{bg:'#c8d0c4',fg:'#354236',size:40});
 
-  const consoleMaterials=createConsoleMaterials();
-  for(let i=0;i<3;i++)consoleUnit(staticRoot,m,consoleMaterials,-10.2+i*1.63,operations,1.56,i);
+  const consoleMaterials=createConsoleMaterials(),consoleScreens=new ConsoleScreens();
+  for(let i=0;i<3;i++)consoleUnit(staticRoot,m,consoleMaterials,consoleScreens,-10.2+i*1.63,operations,1.56,i);
   chair(staticRoot,m,-8.8,operations,.82,Math.PI);
-  panel(staticRoot,m,-4.57,operations+1.48,-1.41,1.52,2.43,m.dark);
-  for(let i=0;i<4;i++){
-    const y=operations+.79+i*.42;
-    displayFrame(staticRoot,m.black,{x:-4.57,y,z:-1.275,width:1.32,height:.36,depth:.065,holeWidth:1.17,holeHeight:.282});
-    screen(staticRoot,-4.57,y,-1.30,1.16,.27,i+8);
-  }
+  const aiRack=createAIServiceRack(m);aiRack.root.position.set(-4.57,operations,-1.41);staticRoot.add(aiRack.root);
   animated.add(createScreenGlow());
-  for(let i=0;i<4;i++)gauge(staticRoot,m,-4.99+i*.27,operations+2.39,-1.24,.084);
   const medical=createMedicalBay(m,operations);staticRoot.add(medical.root);
   animated.attach(medical.bed);animated.attach(medical.rig.root);
   const evaBay=createEVABay(m,operations);staticRoot.add(evaBay.root);
   const innerDoor=evaBay.innerHatch.userData.door,innerSignal=evaBay.innerHatch.userData.signal;
+  const outerSignal=evaBay.hatch.userData.signal;
   animated.attach(innerDoor);
 
   const diningStations=Object.fromEntries(['galley','hydro'].map(action=>[action,createDiningStation(m,action)]));
@@ -414,11 +449,13 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
   const dressing=addCabinDressing(staticRoot,m,FLOOR_Y);
+  const gateFinish=finishGateFrames(staticRoot,REAR_ROOM_GATES);
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
+  animated.add(createRearWindowStars(staticRoot));
   const staticMesh=mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
-  return {staticMesh,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,bathrooms,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation};
+  return {staticMesh,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
 }

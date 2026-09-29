@@ -21,7 +21,8 @@ test('sign textures preserve plate proportions and fit text without stretching o
       assert.ok(y-size*.5>0);assert.ok(y+size*.5<canvas.height);
     }
     assert.equal(sign.material.toneMapped,false);assert.equal(sign.material.depthTest,true);
-    const batched=batchStatic(parent),merged=batched.getObjectByName('Sign: '+text);
+    assert.doesNotMatch(sign.material.name,/[\r\n]/,'multiline signs must not break the shader name directive');
+    const batched=batchStatic(parent),merged=batched.getObjectByName('Sign: '+text.replace(/\s+/g,' '));
     assert.ok(merged);assert.equal(merged.castShadow,false);assert.equal(merged.receiveShadow,false);
     merged.geometry.dispose();sign.geometry.dispose();sign.material.map.dispose();sign.material.dispose();
   }
