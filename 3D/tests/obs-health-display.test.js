@@ -28,3 +28,11 @@ test('the detail action distinguishes travelling, examination and treatment',()=
   assert.equal(healthDisplay(health,{medical:true}).treatmentLabel,'治療中');
   assert.equal(healthDisplay(health).detail,'処置完了まで 0秒');
 });
+
+test('smoking shows declining health instead of claiming treatment or recovery',()=>{
+  const health=new CrewHealth(),needs={energy:90,thirst:90,hunger:90,hygiene:90};
+  health.update(5,{needs,smokingTime:5});
+  assert.equal(healthDisplay(health).label,'健康');assert.equal(healthDisplay(health).title,'健康状態 / 喫煙中');
+  assert.equal(healthDisplay(health).detail,'喫煙により健康が低下中');assert.equal(healthDisplay(health,{lang:'en'}).detail,'Smoking is lowering health');
+  health.update(1,{needs});assert.equal(healthDisplay(health).detail,'健康が回復中');
+});

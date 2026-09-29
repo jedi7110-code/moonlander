@@ -15,7 +15,9 @@ test('the lounge target and frame follow the furniture instead of the crew desti
   assert.ok(hitBox.containsBox(furniture));assert.ok(Math.abs(mesh.position.x-7.405)<.001);
   assert.equal(group.position.x,mesh.position.x);assert.equal(group.position.y,bounds.min.y);
   assert.ok(bounds.max.y-FLOOR_Y[0]<1.4);
-  assert.ok(Math.abs(group.children[0].scale.x-(bounds.max.x-bounds.min.x))<1e-7);
+  const frameBounds=new THREE.Box3().setFromObject(group);
+  assert.ok(Math.abs(frameBounds.min.x-bounds.min.x)<1e-7);
+  assert.ok(Math.abs(frameBounds.max.x-bounds.max.x)<1e-7);
   view.camera=new THREE.PerspectiveCamera(24,2,.1,150);view.camera.position.set(9.5,FLOOR_Y[0]+2.6,40);view.camera.lookAt(7.4,FLOOR_Y[0]+1,0);view.camera.updateMatrixWorld(true);
   view.raycaster=new THREE.Raycaster();view.pointer=new THREE.Vector2();view.canvas={getBoundingClientRect:()=>({left:0,top:0,width:1200,height:600})};
   const at=(x,y)=>{const p=new THREE.Vector3(x,FLOOR_Y[0]+y,bounds.max.z).project(view.camera);return view.targetAt({clientX:(p.x+1)*600,clientY:(1-p.y)*300});};
@@ -50,9 +52,10 @@ test('a character tap zooms and follows the pressed subject without issuing a st
   const {view,handlers,orders,modes,event}=controls();
   handlers.pointermove(event());assert.equal(view.canvas.style.cursor,'zoom-in');assert.equal(view.feedback.hovered,null);
   handlers.pointerdown(event());view.targetAt=()=>({type:'station',id:'lounge'});handlers.pointerup(event(102,101));
-  assert.equal(view.mode,'cat');assert.equal(view.targetHeight,3.3);assert.deepEqual(orders,[]);assert.deepEqual(modes,['cat']);
+  assert.equal(view.mode,'cat');assert.equal(view.targetHeight,3.3/1.3);assert.deepEqual(orders,[]);assert.deepEqual(modes,['cat']);
   view.targetAt=()=>({type:'character',id:'milo'});handlers.pointerdown(event());handlers.pointerup(event());
-  assert.equal(view.targetHeight,5.3);assert.equal(view.mode,'milo');
+  assert.equal(view.targetHeight,5.3/1.3);assert.equal(view.mode,'milo');
+  view.setMode('droid');assert.equal(view.targetHeight,3.5/1.3);assert.equal(view.zoom,1.3);
   view.setMode('all');assert.equal(view.targetHeight,12);assert.equal(view.mode,'all');assert.equal(view.targetCenter.y,HABITAT_VIEW.centerY);
 });
 

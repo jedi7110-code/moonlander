@@ -94,11 +94,11 @@ export class MouseChase {
     this.mouse={x:-2.7*direction,floor:0,z:-.67,visible:false,speed:0,age:0,distance:0,phase:'hidden',phaseTime:0,spotted:false};
     this.active=false;this.events=0;this.mouseFloor=mouseFloor;
   }
-  appear(floor=this.mouseFloor??Math.floor(this.random()*2)){
+  appear(floor=this.mouseFloor??Math.floor(this.random()*2),{overtake=false}={}){
     if(this.active)return false;
     // Next crossing starts from the side Lucy is watching; it never teleports
     // her to another deck. It is fine for a mouse to pass on a different deck.
-    this.direction=this.cat.x>0?-1:1;
+    this.overtake=overtake;this.direction=overtake?1:this.cat.x>0?-1:1;
     const d=this.direction;
     Object.assign(this.mouse,{x:-4.42*d,floor,z:-.67,yaw:d*Math.PI/2,visible:true,speed:0,age:0,distance:0,travel:0,phase:'emerge',phaseTime:0,spotted:false});
     if(this.route)Object.assign(this.mouse,this.route.sample(0,d));
@@ -120,12 +120,12 @@ export class MouseChase {
     mouse.age+=dt;cat.age+=dt;
     if(mouse.visible){
       const previous=mouse.travel,length=this.route?.length??8.84;
-      if(mouse.age<MOUSE_TIMING.emerge){
+      if(!this.overtake&&mouse.age<MOUSE_TIMING.emerge){
         const u=mouse.age/MOUSE_TIMING.emerge;
         mouse.phase='emerge';mouse.phaseTime=mouse.age;
         mouse.travel=.58*smooth(0,1,u);
         mouse.speed=.58*6*u*(1-u)/MOUSE_TIMING.emerge;
-      }else if(mouse.age<MOUSE_WALK_AT){
+      }else if(!this.overtake&&mouse.age<MOUSE_WALK_AT){
         mouse.travel=.58;mouse.speed=0;
         mouse.phase=mouse.age<MOUSE_TIMING.emerge+MOUSE_TIMING.survey?'survey':'settle';
         mouse.phaseTime=mouse.age-MOUSE_TIMING.emerge-(mouse.phase==='settle'?MOUSE_TIMING.survey:0);
@@ -134,12 +134,12 @@ export class MouseChase {
         mouse.phaseTime+=dt;
         // The cat noticing the mouse starts the escape, not elapsed time alone.
         // An unseen mouse (including one on another deck) keeps walking.
-        if(!mouse.spotted&&mouse.phaseTime>=MOUSE_TIMING.notice&&mouse.travel>=(this.route?.noticeDistance??0)&&cat.floor===mouse.floor&&cat.phase==='watch'){
+        if(!this.overtake&&!mouse.spotted&&mouse.phaseTime>=MOUSE_TIMING.notice&&mouse.travel>=(this.route?.noticeDistance??0)&&cat.floor===mouse.floor&&cat.phase==='watch'){
           mouse.spotted=true;mouse.phase='run';mouse.phaseTime=0;cat.phase='notice';cat.age=0;
         }
         const beat=mouse.phaseTime%1.37;
-        const desired=mouse.spotted?(beat>1.14&&beat<1.30?.12*MOUSE_PACE:MOUSE_RUN_SPEED+.32*MOUSE_PACE*Math.sin(mouse.phaseTime*17)):MOUSE_WALK_SPEED;
-        mouse.speed=approach(mouse.speed,desired,dt*(mouse.spotted?9*MOUSE_PACE:.35));
+        const desired=mouse.spotted?(beat>1.14&&beat<1.30?.12*MOUSE_PACE:MOUSE_RUN_SPEED+.32*MOUSE_PACE*Math.sin(mouse.phaseTime*17)):this.overtake?1.25:MOUSE_WALK_SPEED;
+        mouse.speed=approach(mouse.speed,desired,dt*(mouse.spotted?9*MOUSE_PACE:this.overtake?2.4:.35));
         mouse.travel=Math.min(length,mouse.travel+mouse.speed*dt);
       }
       mouse.distance+=mouse.travel-previous;

@@ -6,18 +6,20 @@ import {makeXRWideGeometry} from './xr-geometry.js';
 export async function materials() {
   const loader = new THREE.TextureLoader();
   const base=import.meta.env?.BASE_URL??'/3D/';
-  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring]=await Promise.all([
+  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring,taraironLogo]=await Promise.all([
     Promise.all(['enamel','steel','twill','fur','industrial-paint','hoist-safety-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
     loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-left.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-right.png`),
     loader.loadAsync(`${base}assets/obs/ai-rack-wiring.png`),
+    loader.loadAsync(`${base}assets/obs/tarairon-logo.svg`),
   ]);
   maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
   maps[5].name='Hoist / worn yellow and black safety paint';
   maps[5].wrapS=maps[5].wrapT=THREE.ClampToEdgeWrapping;
   sweatshirtPrint.colorSpace=THREE.SRGBColorSpace;sweatshirtPrint.anisotropy=4;
   rackWiring.colorSpace=THREE.SRGBColorSpace;rackWiring.anisotropy=4;
+  taraironLogo.colorSpace=THREE.SRGBColorSpace;taraironLogo.anisotropy=4;
   for(const map of [workShirtPatchLeft,workShirtPatchRight]){
     // Keep the original artwork on disk; the small sewn patches need only 512px.
     const image=map.image,canvas=document.createElement('canvas');
@@ -71,6 +73,7 @@ export async function materials() {
   };
   furTail.customProgramCacheKey=()=> 'obs-calico-tail-v1';
   return {
+    taraironLogo:new THREE.MeshBasicMaterial({name:'TARAIRON / black wall logo',map:taraironLogo,color:0x000000,transparent:true,depthWrite:false,toneMapped:false}),
     aiWiring:new THREE.MeshBasicMaterial({name:'AI rack / baked wiring',map:rackWiring,color:0xb1bab4,toneMapped:false}),
     shipPaint:standard(0xd3d2c5,.86,.30,{map:maps[4]}),
     hoistSafetyPaint:standard(0xffffff,.84,.12,{name:'Industrial / hoist safety paint',map:maps[5],userData:{cabinKeepSurface:true}}),

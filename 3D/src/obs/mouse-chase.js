@@ -1,7 +1,7 @@
 import {MouseChase} from './lucy-run-motion.js';
-import {CAT_PORT,FLOORS} from './layout.js';
+import {CAT_PORT,DECK,FLOORS} from './layout.js';
 import {createCatTurn,angleDelta} from './cat-turn.js';
-import {MOUSE_ROUTES} from './mouse-route.js';
+import {MOUSE_ROUTES,OPENING_MOUSE_ROUTE} from './mouse-route.js';
 
 const toWorld=x=>(x-700)*.022,toCabin=x=>700+x/.022;
 const INTERRUPTIBLE=new Set(['idle','look','sleep','groom','stretch','prone','walk','follow']);
@@ -10,7 +10,7 @@ const INTERRUPTIBLE=new Set(['idle','look','sleep','groom','stretch','prone','wa
 export class CabinMouseChase {
   constructor({random=Math.random}={}){
     this.random=random;this.sim=new MouseChase({random});this.sim.wait=Infinity;
-    this.wait=75+random()*85;this.center=0;this.controlled=false;this.preparing=false;
+    this.wait=75+random()*85;this.center=0;this.controlled=false;this.preparing=false;this.overtaking=false;
   }
   get mouse(){return {...this.sim.mouse,x:this.center+this.sim.mouse.x};}
   get direction(){return this.sim.direction;}
@@ -47,10 +47,17 @@ export class CabinMouseChase {
     delete m.pendingHeading;m.waitingForCrew=false;m.waitingForDroid=false;
     cat.mode='chase';cat.modeTime=0;cat.remaining=0;cat.restYaw=null;
   }
+  appearOpening(cat){
+    if(this.sim.active||cat.motion.floor!==DECK.HABITATION||cat.mode!=='walk'||cat.motion.facing!==1||!this.canReact(cat))return false;
+    this.sim.route=OPENING_MOUSE_ROUTE;this.center=this.sim.route.center;this.sync(cat);
+    this.sim.appear(DECK.HABITATION,{overtake:true});this.sim.cat.floor=-1;
+    this.overtaking=true;
+    return true;
+  }
   cancel(cat){
     if(this.controlled){cat.motion.chase=null;cat.motion.turn=null;cat.mode='idle';cat.modeTime=0;cat.remaining=0;}
     if(cat.pendingMove?.kind==='mouse')cat.pendingMove=null;
-    this.controlled=false;this.preparing=false;this.sim.cat.floor=-1;this.sim.cat.speed=0;this.sim.cat.phase='idle';
+    this.controlled=false;this.preparing=false;this.overtaking=false;this.sim.cat.floor=-1;this.sim.cat.speed=0;this.sim.cat.phase='idle';
   }
   update(dt,cat){
     if(!(dt>0))return false;
@@ -61,6 +68,13 @@ export class CabinMouseChase {
     }
     const wasControlled=this.controlled,previous=this.sim.cat.distance;
     this.sim.update(dt);
+    if(this.overtaking&&this.mouse.x>=toWorld(cat.motion.x)+.65){
+      this.overtaking=false;
+      if(this.sim.mouse.visible&&this.sim.mouse.floor===cat.motion.floor&&this.canReact(cat)){
+        // Lucy keeps walking until the mouse clears her nose, then reacts.
+        Object.assign(this.sim.mouse,{spotted:true,phase:'run',phaseTime:0});this.begin(cat);
+      }
+    }
     if(this.controlled){
       const c=this.sim.cat,m=cat.motion;
       m.x=toCabin(this.center+c.x);m.heading=c.yaw;m.facing=this.direction;

@@ -7,12 +7,12 @@
   <title>TARAIRON | 遠心重力生活区画 3D</title>
   <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船内猫ルーシーの暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/3D/assets/favi.ico">
-  <script type="module" crossorigin src="/3D/assets/obs-n5ohFvuO.js"></script>
+  <script type="module" crossorigin src="/3D/assets/obs-CS0mssNW.js"></script>
   <link rel="modulepreload" crossorigin href="/3D/assets/three-BtW1zwyB.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-qFU0klON.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-D3GQL4sQ.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/startup-lighting-BHw35SzM.js">
-  <link rel="stylesheet" crossorigin href="/3D/assets/obs-Df8_W_S4.css">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-DMVRYnuB.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/startup-lighting-CAh2TqMb.js">
+  <link rel="stylesheet" crossorigin href="/3D/assets/obs-DlvgUG1B.css">
 </head>
 <body>
   <main id="observation">
@@ -30,10 +30,10 @@
       <div class="crew-state"><span class="crew-tag">01</span><div><strong data-ja="マイロ・ジャービス" data-en="MILO JARVIS">マイロ・ジャービス</strong><span id="milo-activity">船内待機</span></div><span id="milo-mood" class="mood-indicator">良好</span></div>
       <div id="needs" class="needs"></div>
       <div class="cat-state"><i data-lucide="cat"></i><div><strong data-ja="ルーシー" data-en="Lucy">ルーシー</strong><span id="cat-activity">くつろいでいる</span></div></div>
-      <section id="health-alert" class="health-alert" role="dialog" aria-labelledby="health-title" hidden>
-        <div class="health-heading"><i data-lucide="heart-pulse" aria-hidden="true"></i><strong id="health-title" aria-live="polite"></strong><button id="dismiss-health" class="icon-button" aria-label="閉じる"><i data-lucide="x" aria-hidden="true"></i></button></div>
-        <p id="health-detail"></p>
-        <button id="seek-treatment"><i data-lucide="cross" aria-hidden="true"></i><span id="treatment-label">医療区画へ</span></button>
+      <section id="need-details" class="need-details" role="dialog" aria-labelledby="need-title" hidden>
+        <div class="need-heading"><span id="need-detail-icon" aria-hidden="true"><i data-lucide="heart-pulse"></i></span><strong id="need-title" aria-live="polite"></strong><button id="dismiss-need" class="icon-button" aria-label="閉じる"><i data-lucide="x" aria-hidden="true"></i></button></div>
+        <p id="need-detail"></p>
+        <button id="need-action" type="button"><span id="need-action-icon" aria-hidden="true"><i data-lucide="cross"></i></span><span id="need-action-label">医療区画へ</span></button>
       </section>
     </section>
     <section id="viewport" aria-label="母艦タライロンの遠心重力生活区画の断面">

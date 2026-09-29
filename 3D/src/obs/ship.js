@@ -199,11 +199,14 @@ export function createStationInteraction(id,bounds,pickMaterial){
   mesh.position.copy(center);mesh.userData.station=id;
   const group=new THREE.Group(),material=new THREE.MeshBasicMaterial({color:0xf3bd62,transparent:true,depthWrite:false,depthTest:false,toneMapped:false});
   group.position.set(center.x,bounds.min.y,bounds.max.z+.025);group.visible=false;
-  box(group,material,0,.055,0,size.x,.07,.018);
-  box(group,material,0,size.y-.02,0,.66,.10,.025,.012);
-  for(const side of [-1,1])for(const y of [.19,size.y-.16]){
-    box(group,material,side*size.x/2,y,0,.045,.30,.018);
-    if(y>.19)box(group,material,side*(size.x/2-.14),size.y-.02,0,.28,.045,.018);
+  // One filled outline per bracket keeps the corners seamless at every opacity.
+  const stroke=.045,arm=Math.min(.28,size.x*.3),shape=new THREE.Shape();
+  shape.moveTo(arm,size.y);shape.lineTo(0,size.y);shape.lineTo(0,0);shape.lineTo(arm,0);
+  shape.lineTo(arm,stroke);shape.lineTo(stroke,stroke);shape.lineTo(stroke,size.y-stroke);shape.lineTo(arm,size.y-stroke);shape.closePath();
+  const geometry=new THREE.ShapeGeometry(shape);
+  for(const side of [-1,1]){
+    const bracket=new THREE.Mesh(geometry,material);bracket.name=side<0?'Selection bracket left':'Selection bracket right';
+    bracket.position.set(side*size.x/2,side<0?0:size.y,0);bracket.rotation.z=side<0?0:Math.PI;group.add(bracket);
   }
   group.children.forEach(part=>{part.castShadow=false;part.receiveShadow=false;part.renderOrder=8;});
   return{mesh,group,material};
@@ -385,7 +388,8 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   staticRoot.updateMatrixWorld(true);for(const prop of Object.values(loungeProps))animated.attach(prop);
   cupboard(staticRoot,m,11.55,habitation,-1.11,1.35,2.35);
   panel(staticRoot,m,4.06,habitation+1.5,-1.38,1.37,1.26,m.white);
-  label(staticRoot,'TARAIRON\nCREW 01',4.06,habitation+1.57,-1.255,1.13,.37,{bg:'#c8d0c4',fg:'#354236',size:40});
+  const wallLogo=new THREE.Mesh(new THREE.PlaneGeometry(1.13,1.13*754/1427),m.taraironLogo);
+  wallLogo.name='TARAIRON panel logo';wallLogo.position.set(4.06,habitation+1.5,-1.255);staticRoot.add(wallLogo);
 
   const consoleMaterials=createConsoleMaterials(),consoleScreens=new ConsoleScreens();
   for(let i=0;i<3;i++)consoleUnit(staticRoot,m,consoleMaterials,consoleScreens,-10.2+i*1.63,operations,1.56,i);

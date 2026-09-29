@@ -92,7 +92,8 @@ export class CabinBrain extends Brain {
     const medicalActive=this.state==='performing'&&this.cur?.id==='medical';
     const medicalTime=medicalActive?this.curDurSec-this.performT:0;
     const treatmentTime=medicalActive?Math.max(0,Math.min(medicalTime+dt,this.curDurSec-MED_BED.transition)-Math.max(medicalTime,MED_BED.transition)):0;
-    this.health.update(dt,{needs:this.needs,activity:this.state==='performing'?this.cur?.id:null,moving:this.actor.busy,climbing:this.actor.climbing,treatmentTime});
+    const smokingTime=smoking?.update(dt)??0;
+    this.health.update(dt,{needs:this.needs,activity:this.state==='performing'?this.cur?.id:null,moving:this.actor.busy,climbing:this.actor.climbing,treatmentTime,smokingTime});
     this.actor.walkSpeed=this.baseWalkSpeed*this.health.speedFactor;this.actor.climbSpeed=this.baseClimbSpeed*this.health.speedFactor;
     const exercising=this.state==='performing'&&this.cur?.id==='gym';
     this.exercise=Math.max(0,Math.min(100,this.exercise+dt*(exercising?100/16:-.20*CABIN_PACE.needDecay)));
@@ -100,6 +101,8 @@ export class CabinBrain extends Brain {
       for(const [need,rate]of [['energy',.6],['thirst',.35],['hygiene',.55]])this.needs[need]=Math.max(0,this.needs[need]-dt*rate);
     }
     super.update(dt);
+    // One point of enjoyment per second actually spent smoking, capped at 100.
+    if(smokingTime>0)this.needs.fun=Math.min(100,this.needs.fun+smokingTime);
     if(harvest&&this.harvestDelivery===harvest){
       if(harvest.phase==='pickup'){
         harvest.age+=dt;
@@ -115,7 +118,6 @@ export class CabinBrain extends Brain {
       if(grooming.done){this.hairGrowth.reset();this.grooming=null;super._endPerform();this.finishDeparture();}
     }
     if(smoking&&this.smokingVisit===smoking){
-      smoking.update(dt);
       if(smoking.done){this.smokingVisit=null;this.smokingClock.reset();super._endPerform();this.finishDeparture();}
     }
     if(repair&&this.hatchRepair===repair){

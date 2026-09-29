@@ -44,8 +44,10 @@ test('front-facing signs stay clear of fixtures, ceiling beams and one another',
       objects.push(mesh);
     });
   }
-  const signs=objects.filter(mesh=>mesh.material.name.startsWith('Sign:')),ray=new Raycaster();let checked=0;
+  const signs=objects.filter(mesh=>mesh.material.name.startsWith('Sign:')||mesh.name==='TARAIRON panel logo'),ray=new Raycaster();let checked=0;
   const names=signs.map(sign=>sign.name);
+  assert.ok(names.includes('TARAIRON panel logo'));
+  assert.ok(!names.includes('Sign: TARAIRON CREW 01'));
   for(const text of ['01 / OPERATIONS','02 / HABITATION','03 / LIFE SUPPORT','HYDROPONICS','SUPPLY HATCH'])assert.ok(names.includes('Sign: '+text),text);
   for(const text of ['GALLEY','DRINKING WATER','SHIP SYSTEMS','LOUNGE','COOLANT SYSTEM','MEDICAL','EVA / SUIT SERVICE','GYM / ERGOMETER','BUNK / M. JARVIS'])assert.ok(!names.includes('Sign: '+text),text);
   assert.ok(names.every(name=>!name.includes('ENGINEERING')));

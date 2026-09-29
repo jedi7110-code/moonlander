@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CatRoutine,Supplies,FLOORS,CrewMotion,advanceCabinTraffic} from '../src/obs/state.js';
-import {CAT_PORT} from '../src/obs/layout.js';
+import {CAT_PORT,DECK,getStation} from '../src/obs/layout.js';
+import {CabinBrain} from '../src/obs/brain.js';
 import {RUN_SPEED,MOUSE_WALK_SPEED} from '../src/obs/lucy-run-motion.js';
 import {Box3,MeshStandardMaterial,Raycaster,Vector3} from 'three';
 import {buildShip,FLOOR_Y,HABITAT_VIEW} from '../src/obs/ship.js';
-import {MOUSE_ROUTES} from '../src/obs/mouse-route.js';
+import {MOUSE_ROUTES,OPENING_MOUSE_ROUTE} from '../src/obs/mouse-route.js';
 import {createCabinMouse} from '../src/obs/mouse.js';
 
 function fixture({floor=2,x=510,facing=1}={}){
@@ -87,6 +88,50 @@ test('occasional mice select all three floors and do not spawn again immediately
   }
 });
 
+test('the opening mouse overtakes walking Lucy after landing, then escapes behind the sofa',()=>{
+  const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true,random:()=>.5});
+  const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.5});brain.catRoutine=cat;brain.beginWakeUp();
+  const chase=cat.mouseChase;let started=false,overtaken=false,walked=false,spawnX,previous=cat.motion.x,fastest=0;
+  for(let i=0;i<40*60;i++){
+    if(!started&&chase.appearOpening(cat)){
+      started=true;spawnX=cat.motion.x;
+      assert.equal(cat.bunkWake,null);assert.equal(cat.mode,'walk');assert.equal(chase.controlled,false);
+      assert.ok(chase.mouse.x<(getStation('bunk').x-700)*.022);
+      assert.ok(chase.mouse.x<(cat.motion.x-700)*.022);
+      const snapshot=JSON.stringify([chase.sim,cat.motion.x,cat.motion.walkDistance]);cat.update(0);
+      assert.equal(JSON.stringify([chase.sim,cat.motion.x,cat.motion.walkDistance]),snapshot);
+    }
+    advanceCabinTraffic(actor,cat,1/60);brain.update(1/60);
+    assert.ok(Math.abs(cat.motion.x-previous)*.022<=RUN_SPEED/60+1e-8,'no teleport when walking becomes pursuit');previous=cat.motion.x;
+    if(started&&!overtaken){
+      if(chase.controlled){
+        overtaken=true;assert.ok(walked,'Lucy must keep walking before she notices');
+        assert.ok(chase.mouse.x>(cat.motion.x-700)*.022+.64,'the mouse has passed her nose');
+      }else{
+        walked||=cat.motion.x>spawnX+10;assert.equal(cat.mode,'walk');assert.equal(chase.mouse.spotted,false);
+      }
+    }
+    fastest=Math.max(fastest,chase.pose?.speed??0);
+    if(started&&!chase.sim.active)break;
+  }
+  assert.ok(started&&overtaken&&fastest>1.5);
+  assert.equal(chase.mouse.visible,false);assert.equal(chase.controlled,false);assert.equal(chase.overtaking,false);
+  assert.ok(chase.mouse.x>5.3&&chase.mouse.x<9.49);assert.ok(chase.mouse.z<-.7);
+  assert.ok(chase.wait>60);
+  chase.appear(cat,0);assert.equal(chase.sim.route,MOUSE_ROUTES[0]);assert.equal(chase.sim.overtake,false);
+});
+
+test('feeding before the opening mouse overtakes Lucy cancels her reaction',()=>{
+  const cat=fixture({floor:DECK.HABITATION,x:534}),chase=cat.mouseChase;
+  cat.mode='walk';cat.motion.goTo({floor:DECK.HABITATION,x:1005});
+  assert.equal(chase.appearOpening(cat),true);advance(cat,.5);cat.fetch();
+  assert.equal(chase.overtaking,false);
+  for(let i=0;i<25*60;i++){
+    chase.update(1/60,cat);assert.equal(chase.controlled,false);assert.equal(chase.mouse.spotted,false);
+  }
+  assert.equal(chase.mouse.visible,false);
+});
+
 test('rear furniture hides both ends, while the mouse follows a visible, supported route through its gaps',()=>{
   const ctx=new Proxy({measureText:t=>({width:t.length*8}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:()=>{}});
   const material=new MeshStandardMaterial();let ship;
@@ -101,7 +146,7 @@ test('rear furniture hides both ends, while the mouse follows a visible, support
   const eye=new Vector3(0,HABITAT_VIEW.centerY+1.6,Math.sqrt(40**2-1.6**2)),ray=new Raycaster();
   const boxes=meshes.map(mesh=>new Box3().setFromObject(mesh));
   try{
-    for(const [floor,route]of MOUSE_ROUTES.entries()){
+    for(const [floor,route]of [...MOUSE_ROUTES.entries(),[DECK.HABITATION,OPENING_MOUSE_ROUTE]]){
       const y=FLOOR_Y[floor];let visible=0;
       for(let i=0;i<=240;i++){
         const p=route.sample(route.length*i/240),x=route.center+p.x,z=p.z,head=new Vector3(x,y+.07,z);

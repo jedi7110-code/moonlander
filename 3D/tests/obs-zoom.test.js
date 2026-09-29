@@ -62,7 +62,7 @@ test('zoom buttons retain tracking, limits are stable, and horizontal-only wheel
   view.changeZoom(.001,p);assert.equal(view.targetHeight,view.fitHeight*1.25);
   for(const ratio of [0,-1,NaN,Infinity,1])view.changeZoom(ratio,p);
   assert.equal(view.targetHeight,view.fitHeight*1.25);
-  view.setMode('cat');assert.equal(view.targetHeight,3.3);view.setMode('all');assert.equal(view.targetHeight,view.fitHeight);
+  view.setMode('cat');assert.equal(view.targetHeight,3.3/1.3);view.setMode('all');assert.equal(view.targetHeight,view.fitHeight);
 });
 
 test('panning produces depth parallax with a bounded orbit and no camera roll',()=>{

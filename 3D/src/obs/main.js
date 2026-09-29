@@ -1,4 +1,4 @@
-import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross} from 'lucide';
+import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinLoungeGames} from './lounge-games.js';
 import {loungeGamePromptAvailable,updateLoungeGamePrompt} from './lounge-prompt.js';
@@ -27,16 +27,26 @@ const CatFoodBowl=[
   ['ellipse',{cx:12,cy:12,rx:7,ry:2}],
   ['circle',{cx:8,cy:9,r:1}],['circle',{cx:12,cy:8,r:1}],['circle',{cx:16,cy:9,r:1}],
 ];
-const icons={CatFoodBowl,Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross};
+const icons={CatFoodBowl,Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({smoking:words('シャワー左の灰皿','Shower-side ashtray'),grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
 const needName=key=>key==='health'?words('健康','Health'):key==='exercise'?words('運動','Exercise'):t('need_'+key);
+const needOrders={
+  hunger:{station:'galley',icon:'utensils',label:['食事をする','Eat a meal'],detail:['調理室で食事をして回復します。','Restore this level with a meal in the galley.']},
+  thirst:{station:'hydro',icon:'droplet',label:['水を飲む','Drink water'],detail:['給水設備で水を飲んで回復します。','Restore this level by drinking water at the dispenser.']},
+  energy:{station:'bunk',icon:'bed',label:['寝台で眠る','Sleep in the bunk'],detail:['寝台で睡眠を取って回復します。','Restore energy by sleeping in the bunk.']},
+  hygiene:{station:'shower',icon:'shower-head',label:['シャワーを浴びる','Take a shower'],detail:['シャワーを浴びて回復します。','Restore hygiene by taking a shower.']},
+  fun:{station:'lounge',icon:'message-circle',label:['ラウンジで過ごす','Relax in the lounge'],detail:['ラウンジでくつろいで回復します。','Restore this level by relaxing in the lounge.']},
+  bladder:{station:'toilet',icon:'toilet',label:['トイレへ行く','Use the toilet'],detail:['トイレを使用して回復します。','Restore this level by using the toilet.']},
+  exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
+};
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
 let paused=false,elapsed=0,view=null,immersive=null,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
 let idleCamera=null,unbindIdleCamera=null;
-let mousePreviewPending=new URLSearchParams(location.search).get('preview')==='mouse';
+// Occasionally let a mouse overtake Lucy after she leaves the bed.
+let openingMousePending=new URLSearchParams(location.search).get('preview')==='mouse'||Math.random()<.25;
 const timers=[];
 let messageTimer=null;
 function dismissMessage(){
@@ -56,7 +66,7 @@ const scene={
     flashMonitor(){$('call-alert').animate([{opacity:.6},{opacity:1}],{duration:350});},
     showWant(text){$('call-text').textContent=text.replace(t('want_hint'),'');$('call-alert').hidden=false;},
     hideWant(){$('call-alert').hidden=true;},
-    openGame(kind){void immersive?.exit();pendingHQ=false;dismissMessage();setHealthDetails(false);view?.setMode('milo');games.show(kind);$('lounge-game-prompt').hidden=true;audio.pause(true);},
+    openGame(kind){void immersive?.exit();pendingHQ=false;dismissMessage();setNeedDetails(null);view?.setMode('milo');games.show(kind);$('lounge-game-prompt').hidden=true;audio.pause(true);},
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     environmentEvent(event){
       if(event.type==='fault'){
@@ -97,10 +107,13 @@ care.onPhase=phase=>{
 care.onDeliver=()=>{feedback.notify('hatch','delivered');showMessage(words('食料、水、猫餌を受領。備蓄を補充した。','Food, water and cat food received. Reserves replenished.'),'LOGISTICS');};
 
 const needElements={};
+let selectedNeed=null;
 for(const key of Object.keys(brain.statusNeeds)){
-  const item=document.createElement(key==='health'?'button':'div');item.className='need';item.dataset.need=key;
-  if(key==='health'){item.id='health-toggle';item.type='button';item.setAttribute('aria-controls','health-alert');item.setAttribute('aria-expanded','false');item.setAttribute('aria-haspopup','dialog');}
-  const row=document.createElement(key==='health'?'span':'div'),name=document.createElement('span'),value=document.createElement('b'),meter=document.createElement('progress');row.className='need-row';meter.max=100;
+  const item=document.createElement('button');item.type='button';item.className='need';item.dataset.need=key;
+  item.id=key==='health'?'health-toggle':'need-'+key;
+  item.setAttribute('aria-controls','need-details');item.setAttribute('aria-expanded','false');item.setAttribute('aria-haspopup','dialog');
+  item.addEventListener('click',()=>setNeedDetails(selectedNeed===key?null:key));
+  const row=document.createElement('span'),name=document.createElement('span'),value=document.createElement('b'),meter=document.createElement('progress');row.className='need-row';meter.max=100;
   row.append(name,value);item.append(row,meter);$('needs').append(item);needElements[key]={item,name,value,meter};
 }
 function updateHUD(reopenCameraControls=false){
@@ -116,10 +129,14 @@ function updateHUD(reopenCameraControls=false){
   if(!paused&&brain.smokingVisit)$('milo-activity').textContent=words(brain.smokingVisit.pose.gesture?.label??'灰皿の前へ移動する','Taking a smoke break');
   if(!paused&&brain.hatchRepair)$('milo-activity').textContent=words(...HATCH_REPAIR_LABELS[brain.hatchRepair.phase]);
   if(!paused&&brain.groomingQueued)$('milo-activity').textContent=words('ドロイドの洗濯完了を待ってから散髪へ','Waiting for the droid to finish laundry before grooming');
-  for(const [key,nodes]of Object.entries(needElements)){const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);}
+  for(const [key,nodes]of Object.entries(needElements)){
+    const value=Math.round(brain.statusNeeds[key]);nodes.name.textContent=needName(key);nodes.value.textContent=value;nodes.meter.value=value;nodes.meter.setAttribute('aria-label',needName(key));
+    if(needOrders[key])nodes.item.setAttribute('aria-label',`${needName(key)} ${value}/100: ${words('詳細を表示','Show details')}`);
+    nodes.item.classList.toggle('low',key==='health'?brain.health.needsCare:value<30);nodes.item.classList.toggle('critical',key==='health'&&brain.health.critical);
+  }
   if(!paused&&brain.isSeatedInLounge()&&LEISURE_LABELS[brain.leisure])$('milo-activity').textContent=words(...LEISURE_LABELS[brain.leisure]);
   if(!paused&&brain.loungeExit)$('milo-activity').textContent=words('ラウンジから立ち上がる','Getting up from the lounge');
-  updateHealthHUD();
+  updateHealthHUD();updateNeedDetails();
   const catStates={play:['マイロと遊んでいる','Playing with Milo'],joinPlay:['マイロのそばへ','Joining Milo'],sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],look:['周りを見ている','Looking around'],stretch:['伸びをしている','Stretching'],prone:['伏せて休んでいる','Resting on belly'],follow:['マイロについて歩く','Following Milo'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
   const passage=cat.motion.portal;
   $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...(catStates[cat.mode]??['立っている','Standing']));
@@ -152,21 +169,42 @@ function updateHealthHUD(){
   const medical=brain.actStation==='medical',display=healthDisplay(brain.health,{lang:getLang(),medical,exam:currentAction(brain)==='medical'}),nodes=needElements.health;
   nodes.name.textContent=display.label;nodes.item.dataset.stage=display.stage;
   nodes.item.setAttribute('aria-label',`${display.title}, ${Math.round(brain.health.value)}/100`);
-  $('health-alert').dataset.stage=display.stage;
-  if($('health-title').textContent!==display.title)$('health-title').textContent=display.title;
-  $('health-detail').textContent=display.detail;
-  $('seek-treatment').disabled=medical;$('treatment-label').textContent=display.treatmentLabel;
-  if(!$('health-alert').hidden)positionHealthDetails();
 }
-function positionHealthDetails(){
-  const panel=$('health-alert'),parent=panel.parentElement.getBoundingClientRect(),anchor=$('health-toggle').getBoundingClientRect();
+function updateNeedDetails(){
+  if(!selectedNeed)return;
+  const panel=$('need-details');
+  if(selectedNeed==='health'){
+    const medical=brain.actStation==='medical',display=healthDisplay(brain.health,{lang:getLang(),medical,exam:currentAction(brain)==='medical'});
+    panel.dataset.stage=display.stage;
+    if($('need-title').textContent!==display.title)$('need-title').textContent=display.title;
+    $('need-detail').textContent=display.detail;
+    $('need-action').disabled=medical;$('need-action-label').textContent=display.treatmentLabel;
+  }else{
+    const order=needOrders[selectedNeed],value=Math.round(brain.statusNeeds[selectedNeed]),station=getStation(order.station);
+    const active=brain.actStation===order.station,using=currentAction(brain)===order.station;
+    const outOfStock=Boolean(station.supply&&!care.has(station.supply));
+    panel.dataset.stage=value<30?'warning':'healthy';
+    $('need-title').textContent=needName(selectedNeed);
+    $('need-detail').textContent=`${words('現在の値','Current level')}: ${value} / 100。 ${outOfStock?words('在庫がありません。コンソールから配送を依頼してください。','Out of stock. Order supplies at the console.'):words(...order.detail)}`;
+    $('need-action').disabled=active||outOfStock;
+    $('need-action-label').textContent=active?(using?words('使用中','In use'):words('移動中','En route')):words(...order.label);
+  }
+  positionNeedDetails();
+}
+function positionNeedDetails(){
+  if(!selectedNeed)return;
+  const panel=$('need-details'),parent=panel.parentElement.getBoundingClientRect(),anchor=needElements[selectedNeed].item.getBoundingClientRect();
   panel.style.left=`${Math.max(12,Math.min(anchor.right-parent.left-panel.offsetWidth,parent.width-panel.offsetWidth-12))}px`;
   panel.style.maxHeight=`${Math.max(80,innerHeight-parent.bottom-18)}px`;
 }
-function setHealthDetails(open,restoreFocus=false){
-  $('health-alert').hidden=!open;$('health-toggle').setAttribute('aria-expanded',String(open));
-  if(open){positionHealthDetails();$('dismiss-health').focus({preventScroll:true});}
-  else if(restoreFocus)$('health-toggle').focus({preventScroll:true});
+function setNeedDetails(key,restoreFocus=false){
+  const previous=selectedNeed;selectedNeed=key;$('need-details').hidden=!key;
+  for(const [id,nodes]of Object.entries(needElements))nodes.item.setAttribute('aria-expanded',String(id===key));
+  if(key){
+    $('need-detail-icon').innerHTML=`<i data-lucide="${key==='health'?'heart-pulse':needOrders[key].icon}" aria-hidden="true"></i>`;
+    $('need-action-icon').innerHTML=`<i data-lucide="${key==='health'?'cross':'arrow-up-right'}" aria-hidden="true"></i>`;
+    refreshIcons();updateNeedDetails();$('dismiss-need').focus({preventScroll:true});
+  }else if(restoreFocus&&previous)needElements[previous].item.focus({preventScroll:true});
 }
 function localize(){
   document.documentElement.lang=getLang();document.querySelectorAll('[data-ja]').forEach(el=>el.textContent=el.dataset[getLang()]);
@@ -175,7 +213,7 @@ function localize(){
   for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['obs-fullscreen','全画面','Fullscreen'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   const pauseLabel=paused?words('再開','Resume'):words('一時停止','Pause');$('obs-pause').setAttribute('aria-label',pauseLabel);$('obs-pause').dataset.tip=pauseLabel;
   $('play-chess').setAttribute('aria-label',words('ラウンジゲーム','Lounge games'));$('play-chess').dataset.tip=words('チェス・ポーカー・リバーシ','Chess · Poker · Reversi');
-  $('dismiss-health').setAttribute('aria-label',words('閉じる','Close'));
+  $('dismiss-need').setAttribute('aria-label',words('閉じる','Close'));
   if(games.open)games.render();
   immersive?.localize();
   if(brain.isCalling())scene.obsUI.showWant(brain._wantText());updateHUD();
@@ -250,12 +288,15 @@ $('open-lounge-games').addEventListener('click',()=>{
   pendingHQ=false;if(paused)setPause(false);
   brain.requestGame();updateHUD();
 });
-$('health-toggle').addEventListener('click',()=>setHealthDetails($('health-alert').hidden));
-$('dismiss-health').addEventListener('click',()=>setHealthDetails(false,true));
-$('seek-treatment').addEventListener('click',()=>{useStation('medical');setHealthDetails(false,true);});
-document.addEventListener('pointerdown',event=>{if(!$('health-alert').hidden&&!$('health-alert').contains(event.target)&&!$('health-toggle').contains(event.target))setHealthDetails(false);});
-document.addEventListener('focusin',event=>{if(!$('health-alert').hidden&&!$('health-alert').contains(event.target)&&!$('health-toggle').contains(event.target))setHealthDetails(false);});
-window.addEventListener('resize',()=>{if(!$('health-alert').hidden)positionHealthDetails();});
+$('dismiss-need').addEventListener('click',()=>setNeedDetails(null,true));
+$('need-action').addEventListener('click',()=>{
+  if(!selectedNeed)return;
+  useStation(selectedNeed==='health'?'medical':needOrders[selectedNeed].station);setNeedDetails(null,true);
+});
+for(const eventName of ['pointerdown','focusin'])document.addEventListener(eventName,event=>{
+  if(selectedNeed&&!$('need-details').contains(event.target)&&!$('needs').contains(event.target))setNeedDetails(null);
+});
+window.addEventListener('resize',positionNeedDetails);
 $('dismiss-dialogue').addEventListener('click',dismissMessage);
 $('acknowledge').addEventListener('click',acknowledge);
 $('hq-message').addEventListener('click',headquarters);
@@ -271,7 +312,7 @@ $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').a
 if(!document.fullscreenEnabled)$('obs-fullscreen').hidden=true;
 $('obs-fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('observation').requestFullscreen();}catch{showMessage(words('全画面に切り替えられませんでした。','Fullscreen is unavailable.'),'SYSTEM');}});
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&!$('health-alert').hidden){event.preventDefault();setHealthDetails(false,true);return;}
+  if(event.key==='Escape'&&selectedNeed){event.preventDefault();setNeedDetails(null,true);return;}
   if(games.open)return;
   if(event.key==='Escape'){dismissMessage();view?.setMode('all');return;}
   if(event.target.closest('input,textarea,button')||event.metaKey||event.ctrlKey||event.altKey)return;
@@ -328,7 +369,7 @@ async function start(){
       idleCamera.update(now,{blocked:immersive.active||paused||!visible||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
       if(!paused&&visible&&!games.open){
         accumulator+=dt;
-        if(mousePreviewPending&&cat.mouseChase.canReact(cat)){cat.mouseChase.appear(cat,cat.motion.floor);mousePreviewPending=false;}
+        if(openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
         while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0,elapsed);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}

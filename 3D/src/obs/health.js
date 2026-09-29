@@ -8,6 +8,7 @@ export class CrewHealth {
   constructor({random=Math.random,onEvent=()=>{}}={}){
     this.random=random;this.onEvent=onEvent;this.value=100;this.condition=null;this.treatment=null;
     this.clock=0;this.exposure=0;this.serial=0;this.bandageTime=0;this.cooldown=0;
+    this.smoking=false;
     this.scheduleIncident();this.lastStage='healthy';
   }
   get stage(){return this.treatment?'treating':!this.condition?this.value<99?'recovering':'healthy':this.value<=30?'critical':this.value<=55?'urgent':'warning';}
@@ -41,8 +42,11 @@ export class CrewHealth {
     this.condition=null;this.treatment=null;this.cooldown=RECOVERY_GRACE_SECONDS;this.exposure=0;
     this.scheduleIncident();this.lastStage=this.stage;this.emit('recovered');return true;
   }
-  update(dt,{needs,activity=null,moving=false,climbing=false,treatmentTime=dt}={}){
+  update(dt,{needs,activity=null,moving=false,climbing=false,treatmentTime=dt,smokingTime=0}={}){
     if(!(dt>0))return;
+    const smoked=Number.isFinite(smokingTime)?Math.max(0,Math.min(dt,smokingTime)):0;
+    this.smoking=smoked>0;
+    if(this.smoking)this.value=clamp(this.value-smoked*.4);
     const exposedTime=Math.max(0,dt-this.cooldown);
     this.clock+=dt;this.cooldown=Math.max(0,this.cooldown-dt);this.bandageTime=Math.max(0,this.bandageTime-dt);
     if(this.condition){
@@ -57,7 +61,7 @@ export class CrewHealth {
       if(this.stage!==this.lastStage){this.lastStage=this.stage;if(this.urgent)this.emit('worsened');}
       return;
     }
-    if(needs.energy>40&&needs.thirst>35&&needs.hunger>30)this.value=clamp(this.value+dt*.16);
+    if(needs.energy>40&&needs.thirst>35&&needs.hunger>30)this.value=clamp(this.value+(dt-smoked)*.16);
     if(!exposedTime||PROTECTED_ACTIVITIES.has(activity)){
       // Rest and recovery must not bank fatigue or defer an overdue roll until departure.
       this.exposure=0;

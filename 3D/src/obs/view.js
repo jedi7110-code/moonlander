@@ -140,7 +140,7 @@ export class ObservationView {
     this.bind('pointerleave',()=>this.hover(null));
     this.bind('wheel',e=>{if(e.deltaY===0)return;e.preventDefault();this.changeZoom(e.deltaY<0?1.15:1/1.15,e);},{passive:false});
   }
-  setMode(mode){this.hover(null);this.zoomAnchor=null;this.mode=mode;this.characterCamera?.select(mode);this.zoom=1;this.targetHeight=mode==='all'?this.fitHeight:mode==='cat'?3.3:mode==='droid'?3.5:5.3;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
+  setMode(mode){this.hover(null);this.zoomAnchor=null;this.mode=mode;this.characterCamera?.select(mode);this.zoom=['milo','cat','droid'].includes(mode)?1.3:1;this.targetHeight=(mode==='all'?this.fitHeight:mode==='cat'?3.3:mode==='droid'?3.5:5.3)/this.zoom;if(mode==='all')this.targetCenter.set(0,HABITAT_VIEW.centerY,0);this.onModeChange?.(mode);}
   miloHeadScreenPosition(){
     if(!this.milo.visible)return null;
     // The head origin is at the neck; add the crown height in world units so

@@ -11,7 +11,7 @@ const POINTS=[
   [[-8.95,-1.4],[-8.49,-1.4],[-8.49,-.22],[-5.425,-.22],[-5.425,-1.42],[-6,-1.42]],
 ];
 
-export const MOUSE_ROUTES=POINTS.map(points=>{
+function createMouseRoute(points){
   const vertices=points.map(([x,z])=>new Vector3(x,0,z)),curve=new CurvePath();
   let previous=vertices[0];
   for(let i=1;i<vertices.length-1;i++){
@@ -31,4 +31,10 @@ export const MOUSE_ROUTES=POINTS.map(points=>{
   };
   return {length,center,sample,noticeDistance:1.65,
     stopX:direction=>sample(length,direction).x*direction-.65};
-});
+}
+export const MOUSE_ROUTES=POINTS.map(createMouseRoute);
+// Emerge around the head of the bed, pass Lucy along the front aisle, then
+// turn through the sofa's left gap and disappear behind its solid plinth.
+export const OPENING_MOUSE_ROUTE=createMouseRoute([
+  [-4.8,-1.1],[-5.65,-1.1],[-5.65,1.7],[4.95,1.7],[4.95,-.78],[5.8,-.78],
+]);

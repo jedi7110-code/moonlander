@@ -7,6 +7,7 @@ const mix=(a,b,t)=>a+(b-a)*t;
 const durations={turnIn:1.6,approach:2.8,settle:1.4,smoke:22,extinguish:3.8,turnOut:2.2,return:2.8,align:1.6};
 export const SMOKING_SECONDS=Object.values(durations).reduce((a,b)=>a+b,0);
 export const SMOKING_INTERVAL={min:8*60,max:15*60};
+const CIGARETTE_LIT_AT=3.45;
 
 // Running time, not calendar time or a per-frame lottery. Reset after returning
 // to the aisle, including interrupted visits, so one break cannot chain to another.
@@ -28,8 +29,8 @@ export function smokingGesture(time){
   }
   const lighter=smooth((time-1.2)/1.6)*(1-smooth((time-4.1)/1.3));
   const exhale=[[5.8,7.4],[12,13.1],[19.6,21.2]].some(([a,b])=>time>=a&&time<b);
-  return{hand,reach:smooth(time/.55),cigarette:time>=.45,lighter,flame:time>=3.1&&time<3.8,lit:time>=3.45,
-    inhale:time>=3.45&&hand[2]>.99,exhale,tap:time>=13.3&&time<=14?Math.sin((time-13.3)*Math.PI*6)*.012:0,
+  return{hand,reach:smooth(time/.55),cigarette:time>=.45,lighter,flame:time>=3.1&&time<3.8,lit:time>=CIGARETTE_LIT_AT,
+    inhale:time>=CIGARETTE_LIT_AT&&hand[2]>.99,exhale,tap:time>=13.3&&time<=14?Math.sin((time-13.3)*Math.PI*6)*.012:0,
     label:time<4.1?'煙草に火をつける':hand[3]>.5?'灰を落とす':'灰皿の前で一服している'};
 }
 
@@ -41,14 +42,18 @@ export class SmokingVisit {
   }
   finish(){this.finishFrom=smokingGesture(this.age);this.phase='extinguish';this.age=0;}
   update(dt){
-    if(!Number.isFinite(dt)||dt<=0)return;
+    if(!Number.isFinite(dt)||dt<=0)return 0;
+    let smokingTime=0;
     while(dt>0&&!this.done){
-      const step=Math.min(dt,durations[this.phase]-this.age);this.age+=step;dt-=step;
+      const step=Math.min(dt,durations[this.phase]-this.age);
+      if(this.phase==='smoke')smokingTime+=Math.max(0,this.age+step-Math.max(this.age,CIGARETTE_LIT_AT));
+      this.age+=step;dt-=step;
       if(this.age<durations[this.phase]-1e-8)break;
       if(this.phase==='smoke'){this.finish();continue;}
       const order=Object.keys(durations),index=order.indexOf(this.phase);
       this.phase=this.phase==='settle'&&this.exitRequested?'turnOut':order[index+1]??'done';this.age=0;
     }
+    return smokingTime;
   }
   get done(){return this.phase==='done';}
   get pose(){

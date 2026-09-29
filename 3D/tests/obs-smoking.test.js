@@ -11,6 +11,7 @@ import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {CIGARETTE,LIGHTER_TIP} from '../src/obs/smoking-props.js';
 import {mouthPosition} from '../src/obs/dining.js';
 import {createMiloToon} from '../src/obs/milo-toon.js';
+import {CrewHealth} from '../src/obs/health.js';
 
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -64,6 +65,48 @@ test('another order waits for extinguishing and a complete walk back into the ai
   assert.equal(visit.phase,'extinguish');assert.equal(actor.busy,false);assert.equal(visit.pose.gesture.cigarette,true);
   advance(state,2.4);assert.equal(actor.busy,false);assert.equal(visit.pose.gesture.cigarette,false);
   advance(state,8.1);assert.equal(brain.smokingVisit,null);assert.equal(visit.pose.depth,CABIN_AISLE.crewZ);assert.equal(brain.actStation,'hydro');assert.equal(actor.busy,true);
+});
+
+test('smoking time counts only after lighting, across frame boundaries and interrupted visits',()=>{
+  for(const dt of [1/60,.37,SMOKING_SECONDS+10]){
+    const visit=new SmokingVisit();let smoked=0;
+    while(!visit.done)smoked+=visit.update(dt);
+    assert.ok(Math.abs(smoked-18.55)<1e-8);
+    assert.equal(visit.update(10),0);
+  }
+  const early=new SmokingVisit();early.requestExit();assert.equal(early.update(SMOKING_SECONDS),0);
+  const visit=new SmokingVisit();assert.equal(visit.update(9),0);
+  assert.ok(Math.abs(visit.update(1)-.75)<1e-8);
+  for(const dt of [0,-1,NaN,Infinity])assert.equal(visit.update(dt),0);
+  visit.requestExit();assert.equal(visit.update(SMOKING_SECONDS),0);
+});
+
+test('a live smoke break raises enjoyment and lowers health only while smoking, and pauses freeze both',()=>{
+  const state=setup(),{brain,actor}=state;brain.needs.fun=50;
+  brain._go(getStation('smoking'));actor.update(.1);advance(state,9);
+  assert.equal(brain.health.value,100);assert.ok(brain.needs.fun<50);
+  const beforeSmoking=brain.needs.fun;advance(state,2);const fun=brain.needs.fun,health=brain.health.value;
+  assert.ok(fun>beforeSmoking);assert.ok(health<100);assert.equal(brain.health.smoking,true);
+  brain.update(0);assert.equal(brain.needs.fun,fun);assert.equal(brain.health.value,health);
+  brain.state='playingGame';brain.update(30);assert.equal(brain.needs.fun,fun);assert.equal(brain.health.value,health);
+  brain.state='smoking';brain._go(getStation('hydro'));advance(state,2);
+  assert.ok(brain.needs.fun<fun);assert.ok(brain.health.value>health);assert.equal(brain.health.smoking,false);
+});
+
+test('smoking health cost is not cancelled by passive recovery, and status values stay bounded',()=>{
+  const needs={energy:90,thirst:90,hunger:90,hygiene:90},health=new CrewHealth();health.nextIncident=1e6;
+  health.update(5,{needs,smokingTime:5});assert.equal(health.value,98);
+  health.update(1,{needs});assert.ok(Math.abs(health.value-98.16)<1e-8);
+  health.value=5;health.update(10,{needs,smokingTime:10});assert.equal(health.value,5);
+  const state=setup(),{brain,actor}=state;brain.needs.fun=100;
+  brain._go(getStation('smoking'));actor.update(.1);advance(state,20);
+  assert.ok(brain.needs.fun<=100);assert.ok(brain.needs.fun>99);assert.ok(brain.health.value>=5&&brain.health.value<100);
+});
+
+test('a completed cigarette leaves higher enjoyment and lower health than before the break',()=>{
+  const state=setup(),{brain,actor}=state;brain.needs.fun=50;
+  brain._go(getStation('smoking'));actor.update(.1);advance(state,SMOKING_SECONDS+.05);
+  assert.equal(brain.smokingVisit,null);assert.ok(brain.needs.fun>50);assert.ok(brain.health.value<100);
 });
 
 test('entry, exit and cancellation never jump through the shelf or teleport into the aisle',()=>{
