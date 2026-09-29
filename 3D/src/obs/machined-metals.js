@@ -27,6 +27,16 @@ export function createMachinedMetals(){
   };
 }
 
+export function createLoungeTitanium(){
+  const {shell:titanium,alloy}=createMachinedMetals();
+  alloy.dispose();
+  titanium.name='Study sofa / satin titanium legs';
+  titanium.color.setHex(0x969c9d);
+  titanium.roughness=.56;titanium.roughnessMap=null;
+  titanium.bumpScale=.00015;titanium.envMapIntensity=.85;
+  return titanium;
+}
+
 export function finishMachinedFixtures(root,m,metals){
   // The three wall-racked dumbbells are separate meshes in the source ship.
   const rackX=(GYM.x-700)*.022-.70;

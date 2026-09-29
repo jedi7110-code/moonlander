@@ -7,13 +7,15 @@ export async function materials() {
   const loader = new THREE.TextureLoader();
   const base=import.meta.env?.BASE_URL??'/3D/';
   const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring]=await Promise.all([
-    Promise.all(['enamel','steel','twill','fur','industrial-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
+    Promise.all(['enamel','steel','twill','fur','industrial-paint','hoist-safety-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
     loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-left.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-right.png`),
     loader.loadAsync(`${base}assets/obs/ai-rack-wiring.png`),
   ]);
   maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
+  maps[5].name='Hoist / worn yellow and black safety paint';
+  maps[5].wrapS=maps[5].wrapT=THREE.ClampToEdgeWrapping;
   sweatshirtPrint.colorSpace=THREE.SRGBColorSpace;sweatshirtPrint.anisotropy=4;
   rackWiring.colorSpace=THREE.SRGBColorSpace;rackWiring.anisotropy=4;
   for(const map of [workShirtPatchLeft,workShirtPatchRight]){
@@ -71,6 +73,7 @@ export async function materials() {
   return {
     aiWiring:new THREE.MeshBasicMaterial({name:'AI rack / baked wiring',map:rackWiring,color:0xb1bab4,toneMapped:false}),
     shipPaint:standard(0xd3d2c5,.86,.30,{map:maps[4]}),
+    hoistSafetyPaint:standard(0xffffff,.84,.12,{name:'Industrial / hoist safety paint',map:maps[5],userData:{cabinKeepSurface:true}}),
     enamel: standard(0xd9dedb,.64,.35,{map:maps[0],bumpMap:maps[0],bumpScale:.009}),
     dark:standard(0x343d3e,.66,.6,{map:maps[1]}),
     metal:standard(0xaab8ba,.38,.83,{map:maps[1]}),

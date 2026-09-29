@@ -1,6 +1,6 @@
 import {BoxGeometry,BufferGeometry,CylinderGeometry,ExtrudeGeometry,Float32BufferAttribute,Group,Mesh,Path,Shape,Vector2,Vector3} from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {createMachinedMetals} from './machined-metals.js';
+import {createLoungeTitanium} from './machined-metals.js';
 
 // The approved profile is shared by the live cabin and the orbit study.
 // Coordinates below are [depth, height]; +depth faces the aisle.
@@ -182,12 +182,7 @@ export function finishLoungeSofa(sofa,m){
   const arms=[];sofa.traverse(part=>{if(part.name==='Sofa floor-reaching arm')arms.push(part);});
   const sideProfile=[[-.70,.30],[-.70,.66],[-.50,.79],[.27,.79],[.30,.75],[.30,.45],[.10,.24],[.10,.12],[.22,.04],[.22,-.015],[-.53,-.015],[-.53,.18]];
   const sideGeometry=recessedSideGeometry(sideProfile);
-  const {shell:titanium,alloy}=createMachinedMetals();
-  alloy.dispose();
-  titanium.name='Study sofa / satin titanium legs';
-  titanium.color.setHex(0x969c9d);
-  titanium.roughness=.56;titanium.roughnessMap=null;
-  titanium.bumpScale=.00015;titanium.envMapIntensity=.85;
+  const titanium=createLoungeTitanium();
   const webMetal=titanium.clone();webMetal.name='Study sofa / recessed titanium web';
   webMetal.defines={...titanium.defines};
   webMetal.color.setHex(0x818987);webMetal.roughness=.63;

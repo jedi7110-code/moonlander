@@ -206,8 +206,13 @@ function hoist(root,m,x,y){
   const z=2.86;
   box(root,m.dark,x,y+2.91,z,.74,.13,.43,.03);
   for(const dx of [-.25,.25]){const wheel=cylinder(root,m.metal,x+dx,y+2.96,z,.11,.20,.11,12);wheel.rotation.x=Math.PI/2;}
-  box(root,m.yellow,x,y+2.62,z,.43,.43,.28,.06);
-  for(const dx of [-.12,.12]){const stripe=box(root,m.dark,x+dx,y+2.62,z+.15,.07,.37,.012);stripe.rotation.z=-.45;}
+  const housing=box(root,m.hoistSafetyPaint,x,y+2.62,z,.43,.43,.28,.06);
+  housing.name='Hoist / image-painted housing';
+  // Project the image onto the actual housing, including its rounded edges.
+  // Shared coordinates keep the paint continuous across the box's face seams.
+  const {position,uv}=housing.geometry.attributes;
+  for(let i=0;i<position.count;i++)uv.setXY(i,position.getX(i)/.43+.5,position.getY(i)/.43+.5);
+  uv.needsUpdate=true;
   const loadEnd=chain(root,m,x-.12,y+2.43,y+.63,z);
   chain(root,m,x+.12,y+2.43,y+1.03,z+.05);
   liftingHook(root,m,loadEnd);

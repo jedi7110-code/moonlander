@@ -170,7 +170,9 @@ export function addCabinDressing(parent,m,floors){
   for(const [x,y,w]of [[-11.94,habitation+1.73,.62],[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]]){
     const cabinet=createWallControlPanel(controlMaterials,w);cabinet.position.set(x,y,-1.15);root.add(cabinet);
   }
-  equipmentCase(root,m,casePaint,-8.56,habitation+.42,-1.69,.66,.46,-1.87);
+  const toiletCasePaint=casePaint.clone();
+  toiletCasePaint.name='Industrial / warm yellow toilet case';toiletCasePaint.color.setHex(0xe2ae35);
+  equipmentCase(root,m,toiletCasePaint,-8.56,habitation+.42,-1.69,.66,.46,-1.87);
   box(root,m.dark,-11.89,habitation+.80,-.99,.63,.065,.53);
   addSmokingAshtray(root,m,habitation);
 

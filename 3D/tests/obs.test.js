@@ -73,10 +73,11 @@ test('the lounge table clears the seat and its props rest on the top without a g
   const material=new MeshStandardMaterial(),table=createLoungeTable(new Proxy({},{get:()=>material}));
   table.updateMatrixWorld(true);
   const bounds=name=>new Box3().setFromObject(table.getObjectByName(name));
-  const top=bounds('Tabletop'),pedestal=bounds('Table pedestal');
+  const top=bounds('Tabletop'),pedestal=bounds('Table pedestal'),base=bounds('Table floor mounting plate');
   assert.ok(top.max.y-LOUNGE_SEAT.top>.30&&top.max.y-LOUNGE_SEAT.top<.34);
   assert.ok(top.min.y>LOUNGE_SEAT.top+.20);
-  assert.ok(Math.abs(pedestal.min.y)<1e-7);
+  assert.ok(Math.abs(base.min.y)<1e-7,'the mounting plate rests on the floor');
+  assert.ok(Math.abs(pedestal.min.y-base.max.y)<1e-7,'the pedestal rests on the mounting plate');
   assert.ok(Math.abs(pedestal.max.y-top.min.y)<1e-7);
   const book=bounds('Table book'),cup=bounds('Table cup');
   assert.ok(Math.abs(book.min.y-top.max.y)<1e-7);

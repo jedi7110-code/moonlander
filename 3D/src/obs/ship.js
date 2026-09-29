@@ -19,7 +19,7 @@ import {createWasteIncinerator} from './waste-incinerator.js';
 import {createScreenGlow} from './screen-glow.js';
 import {displayFrame} from './display-frame.js';
 import {createVanity} from './grooming.js';
-import {createMachinedMetals} from './machined-metals.js';
+import {createLoungeTitanium,createMachinedMetals} from './machined-metals.js';
 import {createCargoStowage,createCargoVentilation} from './cargo-bay.js';
 import {createLoungeCoffee,createTableLeisureProps} from './lounge-table-props.js';
 import {createConsoleMaterials,addConsoleControls} from './console-controls.js';
@@ -29,6 +29,7 @@ import {createShowerFixtures} from './shower-fixtures.js';
 import {createBathroomCeilingLight} from './bathroom-lighting.js';
 import {addBathroomRearWindow} from './bathroom-window.js';
 import {finishLoungeSofa} from './lounge-sofa-finish.js';
+import {createLoungeTableFrame} from './lounge-table-frame.js';
 import {createRearWindowStars} from './space-stars.js';
 import {finishGateFrames} from './gate-frame-finish.js';
 
@@ -146,11 +147,8 @@ function cupboard(parent,m,x,y,z,w=1.25,h=1.85) {
   box(parent,m.dark,x,y+h/2,z,w,h,.62,.04);
   for(const side of [-1,1]){panel(parent,m,x+side*w*.245,y+h/2,z+.35,w*.475,h-.07);box(parent,m.black,x+side*.075,y+h*.52,z+.42,.03,.2,.04,.01);grille(parent,m,x+side*w*.245,y+.25,z+.414,w*.33,.2);}
 }
-export function createLoungeTable(m){
-  const root=new THREE.Group(),top=LOUNGE_SEAT.top+.32,thickness=.08,underside=top-thickness;
-  root.name='Lounge table';
-  cylinder(root,m.metal,0,underside/2,0,.056,underside).name='Table pedestal';
-  box(root,m.enamel,0,top-thickness/2,0,LOUNGE_TABLE.width,thickness,LOUNGE_TABLE.depth,.08).name='Tabletop';
+export function createLoungeTable(m,titanium=createLoungeTitanium()){
+  const root=createLoungeTableFrame(titanium,m.enamel),top=LOUNGE_SEAT.top+.32;
   box(root,m.red,-.45,top+.035/2,-.15,.38,.035,.24,.007).name='Table book';
   const cup=createLoungeCoffee();cup.position.set(-.58,top+.035,-.20);cup.rotation.y=Math.PI;root.add(cup);
   root.userData.loungeProps=createTableLeisureProps(root,m,top);
@@ -191,7 +189,8 @@ export function createLoungeSofa(m){
 }
 export function createLounge(m){
   const root=createLoungeSofa(m);root.name='Lounge furniture';
-  const table=createLoungeTable(m);table.position.set(LOUNGE_TABLE.x,0,LOUNGE_TABLE.z);root.add(table);root.userData.loungeProps=table.userData.loungeProps;
+  const titanium=root.getObjectByName('Sofa floor-reaching arm').material;
+  const table=createLoungeTable(m,titanium);table.position.set(LOUNGE_TABLE.x,0,LOUNGE_TABLE.z);root.add(table);root.userData.loungeProps=table.userData.loungeProps;
   return root;
 }
 export function createStationInteraction(id,bounds,pickMaterial){

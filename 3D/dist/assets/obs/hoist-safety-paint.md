@@ -1,0 +1,7 @@
+# Hoist safety paint
+
+Asset: `hoist-safety-paint.webp`, generated with the built-in image generation tool on 2026-09-29, resized to 1024 × 1024 and encoded as WebP at quality 90. Painted directly onto the rounded chain-hoist housing; replaces two protruding black stripe meshes.
+
+Prompt:
+
+Use case: stylized-concept. Asset type: square base-color image texture for the painted front of a 43 cm industrial chain-hoist housing in a realistic weathered spacecraft interior. Create ONLY a flat orthographic 1024x1024 full-frame material swatch, NOT a 3D object or a scene. Uniform alternating safety-yellow and charcoal-black diagonal stripes, exactly 45 degrees, rising from lower left to upper right; three black stripe bands cross the square, alternating equal-width yellow bands. The bands run uninterrupted out of the image edges, with no border. Muted warm ochre yellow around #d6ad35, black around #20241f. Physically believable satin enamel paint, fine orange-peel grain, subtle brush marks, tiny irregular paint chips exposing gray metal, a few fine hairline scuffs and faint gray-brown grime. Most paint intact; restrained wear matching an industrial film set, not heavily rusted or a distressed grunge poster. Fine sharp material detail visible close up. All stripes are perfectly flush painted color on the same flat surface, no raised bars. Even neutral diffuse illumination, no shadows, reflections, highlights, gradients, vignette, perspective, text, labels, bolts, chains, panel borders, logos or extra objects. Opaque background.
