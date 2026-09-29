@@ -11,6 +11,7 @@ import {createHarvestDelivery} from './harvest-delivery.js';
 import {loadMiloHead} from './head.js';
 import {animateDelivery} from './delivery.js';
 import {animateBathroom} from './bathroom.js';
+import {animateCatPorts} from './cat-ports.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE,FLOORS,getStation} from './layout.js';
 import {animateAirlock,animateHatchFault} from './eva.js';
@@ -233,6 +234,7 @@ export class ObservationView {
       const cleaning=this.droidRoutine?.door===id?{opening:this.droidRoutine.opening,inside:false}:null;
       animateBathroom(fixture,brain.bathroom?.id===id?bathroom:cleaning);
     }
+    animateCatPorts(this.ship.catPorts,catMotion.portal);
     for(const [id,docks]of Object.entries(this.ship.diningDocks)){
       docks.mug.visible=id==='hydro'&&action!==id;
       docks.bowl.visible=id==='galley'&&action!==id;docks.spoon.visible=docks.bowl.visible;

@@ -84,7 +84,7 @@ export class CatMotion extends CrewMotion {
   }
   get climbing(){return false;}
   get passageWalkSeconds(){return Math.abs(CAT_PORT.walkZ-CAT_PORT.turnInset-CAT_PORT.insideZ)/(this.walkSpeed*.022);}
-  get hidden(){return this.portal?.phase==='transit';}
+  get hidden(){return ['close','transit','reopen'].includes(this.portal?.phase);}
   goTo(target,onArrive){
     if(!target||!FLOORS[target.floor])return;
     this.commandVersion++;this.destination={floor:target.floor,x:target.x,z:target.z??CAT_PORT.walkZ};this.onDestination=onArrive||null;
@@ -117,7 +117,7 @@ export class CatMotion extends CrewMotion {
     const segment=this.queue[0];
     let min=this.x,max=this.x,seconds=0,active=false;
     if(this.hop){min=CAT_SOFA.floorX;max=CAT_SOFA.seatX;seconds=1;active=this.hop.up||this.hop.started||this.hop.phase!=='prepare';}
-    else if(this.portal&&this.portal.phase!=='transit'){seconds=this.portal.duration-this.portal.age;active=this.portal.age>0;}
+    else if(this.portal&&!this.hidden){seconds=this.portal.duration-this.portal.age;active=this.portal.age>0;}
     else if(segment?.type==='depth'&&Math.abs(segment.z-this.z)>.001){
       if(Math.min(this.z,segment.z)>CABIN_AISLE.catZ-.08&&!segment.started)return null;
       seconds=Math.abs(segment.z-this.z)/(this.walkSpeed*.022)+.4;active=Boolean(segment.started)||this.z<CABIN_AISLE.catZ-.08;
@@ -218,17 +218,21 @@ export class CatMotion extends CrewMotion {
       this.heading=this.passagePose.yaw;
       if(p.age<p.duration)break;
       p.age=0;
-      if(p.phase==='turnIn'){p.phase='enter';p.duration=this.passageWalkSeconds;return;}
-      else if(p.phase==='enter'){p.phase='transit';p.duration=1.6+Math.abs(p.to-p.from)*1.5;}
-      else if(p.phase==='transit'){this.floor=p.to;this.y=FLOORS[p.to].y;p.phase='exit';p.duration=this.passageWalkSeconds;return;}
-      else if(p.phase==='exit'){p.phase='turnOut';p.duration=4;this.facing=Math.sign(this.destination.x-CAT_PORT.x)||1;}
+      if(p.phase==='turnIn'){p.phase='open';p.duration=CAT_PORT.doorSeconds;return;}
+      else if(p.phase==='open'){p.phase='enter';p.duration=this.passageWalkSeconds;return;}
+      else if(p.phase==='enter'){p.phase='close';p.duration=CAT_PORT.doorSeconds;}
+      else if(p.phase==='close'){p.phase='transit';p.duration=1.6+Math.abs(p.to-p.from)*1.5;}
+      else if(p.phase==='transit'){this.floor=p.to;this.y=FLOORS[p.to].y;p.phase='reopen';p.duration=CAT_PORT.doorSeconds;}
+      else if(p.phase==='reopen'){p.phase='exit';p.duration=this.passageWalkSeconds;return;}
+      else if(p.phase==='exit'){p.phase='shut';p.duration=CAT_PORT.doorSeconds;}
+      else if(p.phase==='shut'){p.phase='turnOut';p.duration=4;this.facing=Math.sign(this.destination.x-CAT_PORT.x)||1;}
       else{this.portal=null;this.z=CAT_PORT.walkZ;this.plan();}
     }
   }
   get passagePose(){
     const p=this.portal;if(!p)return null;
     const t=p.age/p.duration,s=t*t*(3-2*t);
-    const yaw=this.turnPose?.yaw??(p.phase==='turnIn'?p.yaw+Math.atan2(Math.sin(Math.PI-p.yaw),Math.cos(Math.PI-p.yaw))*s:p.phase==='enter'?Math.PI:p.phase==='turnOut'?this.facing*Math.PI/2*s:0);
+    const yaw=this.turnPose?.yaw??(p.phase==='turnIn'?p.yaw+Math.atan2(Math.sin(Math.PI-p.yaw),Math.cos(Math.PI-p.yaw))*s:['open','enter','close'].includes(p.phase)?Math.PI:p.phase==='turnOut'?this.facing*Math.PI/2*s:0);
     // Walk upright across the cabin and only duck at the low duct opening.
     const nearMouth=Math.max(0,Math.min(1,(CAT_PORT.wallZ+.9-this.z)/.9));
     const crouch=nearMouth*nearMouth*(3-2*nearMouth);

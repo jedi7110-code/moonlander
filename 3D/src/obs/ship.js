@@ -12,7 +12,7 @@ import {createBunk} from './bunk.js';
 import {industrialMaterials,addIndustrialDeck,addWorkLights} from './industrial.js';
 import {BULKHEAD_GATE,gateWall,createBulkheadGate} from './bulkhead-gate.js';
 import {addCabinDressing} from './cabin-dressing.js';
-import {configurePocketShutter} from './shutter.js';
+import {configurePocketShutter,addPocketShutterFrame} from './shutter.js';
 import {HATCH_TRAVEL} from './delivery.js';
 import {paintSupplyLedge} from './supply-ledge.js';
 import {createWasteIncinerator} from './waste-incinerator.js';
@@ -227,17 +227,12 @@ export function createBathroom(parent,animated,m,x,y,type) {
   const door=new THREE.Group();door.position.set(x-.735,y,-1.72);animated.add(door);
   door.name=`Pocket ${type} shutter`;
   panel(door,m,.735,1.3,0,1.47,2.46,m.white);
-  panel(door,m,.735,1.55,.09,.85,.90,m.dark);
   box(door,m.black,1.295,1.17,.14,.06,.30,.05,.012);
   label(door,type==='shower'?'SHOWER':'WC',.735,2.12,.20,.94,.18,{size:65});
   const lamp=ball(door,m.green,1.285,1.62,.16,.026,.026,.016);lamp.name=type+'Lamp';
   grille(door,m,.735,.36,.15,1.08,.27);
   configurePocketShutter(door,{left:x-.77,right:x+.77,travel:1.63});
-  for(const side of [-1,1]){
-    box(parent,m.metal,x+side*.787,y+1.27,-1.53,.055,2.43,.15,.012);
-    for(const h of [.32,2.19])box(parent,m.dark,x+side*.787,y+h,-1.52,.10,.13,.12);
-  }
-  box(parent,m.dark,x,y+2.51,-1.56,1.70,.10,.17,.025).name=`${type} fixed lintel`;
+  addPocketShutterFrame(parent,m,x,y,-1.53,{name:type});
   const ceilingLight=createBathroomCeilingLight(m,x,y,type);parent.add(ceilingLight.housing);animated.add(ceilingLight.root);
   return{door,lamp,ceilingLight};
 }
@@ -373,7 +368,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   // Keep the fixture batched with the cabin; only the mirror and tool mounts need transforms.
   staticRoot.updateMatrixWorld(true);
   for(const mount of [groomingStation.mirror,...Object.values(groomingStation.docks)])animated.attach(mount);
-  for(const [level,y]of FLOOR_Y.entries())catPort(staticRoot,m,positionX(CAT_PORT.x),y,level);
+  const catPorts=FLOOR_Y.map((y,level)=>catPort(staticRoot,m,positionX(CAT_PORT.x),y,level,animated));
   // The upper shaft is a visible continuation, not an additional playable deck.
   const ladder=createAccessLadder(m);staticRoot.add(ladder);
   animated.attach(ladder.getObjectByName('Ladder work lights'));
@@ -460,5 +455,5 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   const staticMesh=mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
-  return {staticMesh,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
+  return {staticMesh,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
 }

@@ -1,4 +1,4 @@
-import{g as H,p as W,a as K,ai as V,G as Z,z as j,C as q,V as J}from"./three-BtW1zwyB.js";import{t as k,ae as Q,Z as ee,aT as y,aU as d,aV as te}from"./cabin-toon-DMVRYnuB.js";const P={firstX:-11.8,spacing:1.52,count:16,width:1.34,height:.018,y:.105,inset:.045,wallFaceZ:k.deckFront-.098};function oe(i,t){i.onBeforeCompile=o=>{o.uniforms.povFootlights=t,o.vertexShader=o.vertexShader.replace("#include <common>",`#include <common>
+import{g as H,p as W,a as K,ai as V,G as Z,z as j,C as q,V as J}from"./three-BtW1zwyB.js";import{t as k,ae as Q,Z as ee,aU as y,aV as d,aW as te}from"./cabin-toon-BCDUSW7p.js";const P={firstX:-11.8,spacing:1.52,count:16,width:1.34,height:.018,y:.105,inset:.045,wallFaceZ:k.deckFront-.098};function oe(i,t){i.onBeforeCompile=o=>{o.uniforms.povFootlights=t,o.vertexShader=o.vertexShader.replace("#include <common>",`#include <common>
 varying vec3 vPovDeckPosition;`).replace("#include <begin_vertex>",`#include <begin_vertex>
 vPovDeckPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;`),o.fragmentShader=o.fragmentShader.replace("#include <common>",`#include <common>
 varying vec3 vPovDeckPosition;

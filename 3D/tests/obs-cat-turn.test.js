@@ -69,5 +69,5 @@ test('turn-enabled routes still arrive once through sofa hops and wall passages'
     lastYaw=cat.poseYaw;
   }
   assert.equal(arrived,1);assert.equal(cat.motion.floor,2);assert.equal(cat.motion.x,1000);
-  assert.deepEqual([...phases],['turnIn','enter','transit','exit','turnOut']);
+  assert.deepEqual([...phases],['turnIn','open','enter','close','transit','reopen','exit','shut','turnOut']);
 });

@@ -18,7 +18,7 @@ test('floor changes enter a wall, hide for transit, and emerge before walking aw
     if(cat.portal){if(phases.at(-1)!==cat.portal.phase)phases.push(cat.portal.phase);assert.equal(cat.x,CAT_PORT.x);}
     if(cat.hidden){transitFrames++;assert.equal(cat.z,CAT_PORT.insideZ);assert.ok(cat.y>=FLOORS[0].y&&cat.y<=FLOORS[2].y);assert.equal(arrived,0);}
   }
-  assert.deepEqual(phases,['turnIn','enter','transit','exit','turnOut']);assert.ok(transitFrames>240);
+  assert.deepEqual(phases,['turnIn','open','enter','close','transit','reopen','exit','shut','turnOut']);assert.ok(transitFrames>240);
   assert.equal(arrived,1);assert.equal(cat.floor,2);assert.equal(cat.x,1000);assert.equal(cat.y,FLOORS[2].y);assert.equal(cat.z,CAT_PORT.walkZ);assert.equal(cat.busy,false);
 });
 test('retargeting before a hole replaces the old route without entering it',()=>{

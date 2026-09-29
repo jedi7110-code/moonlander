@@ -12,7 +12,7 @@ export const SMOKING={id:'smoking',floor:DECK.HABITATION,x:700+(ASHTRAY.x+ASHTRA
 export const MEDICAL={id:'medical',floor:DECK.OPERATIONS,x:912,need:null,dur:14000};
 export const CABIN_AISLE={crewZ:.78,catZ:2.20,deckBack:-1.81,deckFront:2.55,crossingClearance:48};
 export const HYDRO_TRAY={depth:.40,z:-.40,cupZ:-.28,standZ:.10};
-export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,turnInset:.65,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66};
+export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,turnInset:.65,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66,doorSeconds:.7};
 export const CAT_SCALE=.8;
 export const CAT_BOWL={floor:2,x:490,depth:.89,approachX:490+18*CAT_SCALE,foodHeight:.14,foodColor:0x7e5532};
 // Stand beyond the lower-hinged loading flap's forward sweep.

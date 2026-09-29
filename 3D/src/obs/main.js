@@ -139,7 +139,7 @@ function updateHUD(reopenCameraControls=false){
   updateHealthHUD();updateNeedDetails();
   const catStates={play:['マイロと遊んでいる','Playing with Milo'],joinPlay:['マイロのそばへ','Joining Milo'],sleep:['眠っている','Sleeping'],groom:['毛づくろい','Grooming'],look:['周りを見ている','Looking around'],stretch:['伸びをしている','Stretching'],prone:['伏せて休んでいる','Resting on belly'],follow:['マイロについて歩く','Following Milo'],eat:['食事中','Eating'],fetch:['餌のところへ','Going to the bowl'],walk:['船内を散歩中','Exploring']};
   const passage=cat.motion.portal;
-  $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','enter'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...(catStates[cat.mode]??['立っている','Standing']));
+  $('cat-activity').textContent=cat.motion.turnPose?words('向きを変えている','Turning around'):passage?words(...(passage.phase==='transit'?['壁裏を移動中','In wall passage']:['turnIn','open','enter','close'].includes(passage.phase)?['猫穴に入る','Entering passage']:['猫穴から出る','Leaving passage'])):words(...(catStates[cat.mode]??['立っている','Standing']));
   if(cat.bunkWake)$('cat-activity').textContent=cat.bunkWake.visit.phase==='sleeping'?words('マイロと眠っている','Sleeping with Milo'):words('マイロと目を覚ます','Waking up with Milo');
   const pursuit=cat.mouseChase?.pose;
   if(pursuit)$('cat-activity').textContent=pursuit.phase==='chase'?words('ネズミを追いかける','Chasing a mouse'):pursuit.phase==='braking'?words('逃げたネズミを見送る','Watching the mouse escape'):pursuit.phase==='turn'?words('ネズミへ向きを変える','Turning toward the mouse'):words('ネズミの様子をうかがう','Watching a mouse');
