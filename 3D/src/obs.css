@@ -55,6 +55,9 @@
 .vr-button{font:700 12px/1 Arial,sans-serif;letter-spacing:.02em}.vr-button:disabled{opacity:.4;cursor:wait}
 @media(max-width:400px){.view-top>span{display:none}}
 .character-camera{position:relative;display:flex}
+.camera-tools [data-tip]:hover::after{content:none}
+/* Suppress browser double-tap zoom on controls; the canvas keeps touch-action:none. */
+#observation{touch-action:manipulation}
 .ship-system[data-state=abnormal] #ship-environment-label{color:#ff8175}
 .ship-system[data-state=abnormal]>.status-led{background:#ff8175}
 .ship-system .environment{font-variant-numeric:tabular-nums;white-space:nowrap}

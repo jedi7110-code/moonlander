@@ -83,12 +83,12 @@ test('touch looking remains bounded, sleep and treatment lock it, and WebXR owns
   assert.equal(camera.available,false);assert.equal(camera.wall.visible,false);assert.ok(view.camera.position.equals(position));
 });
 
-function ui(){
+function ui(touch=false){
   const nodes=new Map();const node=id=>{
-    if(!nodes.has(id))nodes.set(id,{hidden:false,dataset:{},attributes:{},setAttribute(k,v){this.attributes[k]=v;},append(child){child.parentElement=this;}});
+    if(!nodes.has(id))nodes.set(id,{hidden:false,dataset:{},attributes:{},setAttribute(k,v){this.attributes[k]=v;},append(child){child.parentElement=this;},contains(){return false;}});
     return nodes.get(id);
   };
-  return{getElementById:node,querySelector:node};
+  return{getElementById:node,querySelector:node,defaultView:{matchMedia:()=>({matches:touch})}};
 }
 
 test('only the selected icon owns the controls, with localized state and sleep overlay cleared on exit',()=>{
@@ -107,4 +107,43 @@ test('only the selected icon owns the controls, with localized state and sleep o
   near(Number(curve[1]),60);near(Number(curve[2]),40);
   camera.select('all');updateCharacterCameraUI(document,view,words);
   assert.equal($('character-view-controls').hidden,true);assert.equal($('first-person-eyelids').hidden,true);
+});
+
+test('touch camera controls close after five seconds despite HUD refreshes and reopen without changing the view',t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const {view,camera}=setup(),document=ui(true),$=document.getElementById,words=ja=>ja;
+  const refresh=options=>updateCharacterCameraUI(document,view,words,options);
+  camera.select('milo');camera.cycleAngle();camera.toggleFirstPerson();refresh();
+  for(let i=0;i<49;i++){t.mock.timers.tick(100);refresh();}
+  assert.equal($('character-view-controls').hidden,false);
+  t.mock.timers.tick(100);
+  assert.equal($('character-view-controls').hidden,true);assert.equal($('view-milo').attributes['aria-expanded'],'false');
+  refresh();assert.equal($('character-view-controls').hidden,true);
+  refresh({reopen:true});assert.equal($('character-view-controls').hidden,false);
+  assert.equal($('view-milo').attributes['aria-expanded'],'true');assert.equal(camera.angle,'left');assert.equal(camera.firstPerson,true);
+  t.mock.timers.tick(5000);assert.equal($('character-view-controls').hidden,true);
+});
+
+test('camera actions and character changes renew the touch timer, while wide view cancels it',t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const {view,camera}=setup(),document=ui(true),$=document.getElementById,words=ja=>ja;
+  const refresh=options=>updateCharacterCameraUI(document,view,words,options);
+  camera.select('milo');refresh();t.mock.timers.tick(4000);
+  camera.cycleAngle();refresh({reopen:true});t.mock.timers.tick(4000);refresh();
+  assert.equal($('character-view-controls').hidden,false);
+  camera.select('cat');refresh();t.mock.timers.tick(1000);
+  assert.equal($('character-view-controls').hidden,false);assert.equal($('view-cat').attributes['aria-expanded'],'true');
+  camera.select('all');refresh();assert.equal($('character-view-controls').hidden,true);
+  t.mock.timers.tick(3000);camera.select('droid');refresh();t.mock.timers.tick(1000);
+  assert.equal($('character-view-controls').hidden,false);assert.equal($('view-droid').attributes['aria-expanded'],'true');
+  t.mock.timers.tick(4000);assert.equal($('character-view-controls').hidden,true);
+});
+
+test('desktop camera controls stay open beyond five seconds',t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const {view,camera}=setup(),document=ui();camera.select('cat');
+  updateCharacterCameraUI(document,view,ja=>ja);t.mock.timers.tick(10000);
+  updateCharacterCameraUI(document,view,ja=>ja);
+  assert.equal(document.getElementById('character-view-controls').hidden,false);
+  assert.equal(document.getElementById('view-cat').attributes['aria-expanded'],'true');
 });

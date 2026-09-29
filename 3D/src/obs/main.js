@@ -103,7 +103,7 @@ for(const key of Object.keys(brain.statusNeeds)){
   const row=document.createElement(key==='health'?'span':'div'),name=document.createElement('span'),value=document.createElement('b'),meter=document.createElement('progress');row.className='need-row';meter.max=100;
   row.append(name,value);item.append(row,meter);$('needs').append(item);needElements[key]={item,name,value,meter};
 }
-function updateHUD(){
+function updateHUD(reopenCameraControls=false){
   const environment=environmentDisplay(brain.environment,getLang());
   $('ship-environment').dataset.state=environment.state;$('ship-environment').title=environment.detail;
   if($('ship-environment-label').textContent!==environment.label)$('ship-environment-label').textContent=environment.label;
@@ -138,7 +138,7 @@ function updateHUD(){
   $('request-supply').setAttribute('aria-label',words('コンソールから物資配送を依頼','Order supplies at console'));
   document.querySelectorAll('[id^="view-"]').forEach(button=>{if(!['view-all','view-milo','view-cat','view-droid'].includes(button.id))return;const selected=button.id==='view-'+view?.mode;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
   $('camera-label').textContent=view?.mode==='droid'?`3817 / ${view.droidRoutine.label}`:{all:'CAM 01 / WIDE',milo:'CAM 02 / MILO',cat:'CAM 03 / LUCY',manual:'CAM / MANUAL'}[view?.mode]||'CAM 01 / WIDE';
-  updateCharacterCameraUI(document,view,words);
+  updateCharacterCameraUI(document,view,words,{reopen:reopenCameraControls});
   const signal=feedback.summary,status=$('station-status');status.hidden=!signal;
   if(signal){
     const phases={hover:['',''],inspect:['在庫確認','Inventory'],moving:['移動中','En route'],waiting:['指示待機','Queued'],active:['使用中','In use'],done:['完了','Completed'],blocked:['補給待ち','Supply required'],stocked:['在庫あり','Already stocked'],unloading:['荷受け中','Unloading'],delivered:['補給済み','Delivered'],acknowledged:['応答済み','Acknowledged']};
@@ -261,7 +261,10 @@ $('acknowledge').addEventListener('click',acknowledge);
 $('hq-message').addEventListener('click',headquarters);
 document.querySelectorAll('[data-use]').forEach(button=>button.addEventListener('click',()=>useSupply(button.dataset.use)));
 $('request-supply').addEventListener('click',requestSupply);
-for(const mode of ['all','milo','cat','droid'])$('view-'+mode).addEventListener('click',()=>view?.setMode(mode));
+for(const mode of ['all','milo','cat','droid'])$('view-'+mode).addEventListener('click',()=>{
+  if(view?.mode===mode&&view.characterCamera?.available&&$('character-view-controls').hidden)updateHUD(true);
+  else view?.setMode(mode);
+});
 $('follow-angle').addEventListener('click',()=>view?.characterCamera?.cycleAngle());
 $('first-person').addEventListener('click',()=>view?.characterCamera?.toggleFirstPerson());
 $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').addEventListener('click',()=>view?.changeZoom(1/1.3));
@@ -286,8 +289,8 @@ async function start(){
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
-    view.onModeChange=mode=>{idleCamera.modeChanged();immersive?.focus(mode);updateHUD();};
-    view.onCameraChange=()=>{idleCamera.modeChanged();view.hover(null);updateHUD();};
+    view.onModeChange=mode=>{idleCamera.modeChanged();immersive?.focus(mode);updateHUD(true);};
+    view.onCameraChange=()=>{idleCamera.modeChanged();view.hover(null);updateHUD(true);};
     view.onFirstPersonFrame=(rest,active)=>updateFirstPersonOverlay(document,rest,active);
     view.onStation=id=>{
       if(id==='lounge'){loungeClick();return;}

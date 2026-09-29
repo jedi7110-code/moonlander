@@ -1,11 +1,30 @@
 const labels={front:['正面','Front'],left:['左斜め上','Upper left'],right:['右斜め上','Upper right']};
 const names={milo:['マイロ','Milo'],cat:['ルーシー','Lucy'],droid:['ドロイド','Droid']};
+const menus=new WeakMap();
 
-export function updateCharacterCameraUI(document,view,words){
+function updateCharacterMenu(document,panel,selected,reopen){
+  const touch=Boolean(document.defaultView?.matchMedia('(pointer: coarse)').matches);
+  const setVisible=visible=>{
+    panel.hidden=!visible;
+    for(const id of Object.keys(names))document.getElementById('view-'+id).setAttribute('aria-expanded',String(visible&&selected===id));
+  };
+  let menu=menus.get(panel);
+  // HUD refreshes must not reopen a dismissed menu or restart its timer.
+  if(!menu||menu.selected!==selected||menu.touch!==touch||reopen){
+    clearTimeout(menu?.timer);
+    menu={selected,touch,closed:false};menus.set(panel,menu);
+    if(selected&&touch)menu.timer=setTimeout(()=>{
+      menu.closed=true;setVisible(false);
+      if(panel.contains(document.activeElement))document.getElementById('view-'+selected).focus({preventScroll:true});
+    },5000);
+  }
+  setVisible(Boolean(selected)&&!menu.closed);
+}
+
+export function updateCharacterCameraUI(document,view,words,{reopen=false}={}){
   const $=id=>document.getElementById(id),camera=view?.characterCamera,panel=$('character-view-controls');
   const available=Boolean(camera?.available),selected=camera?.selected;
-  panel.hidden=!available;
-  for(const id of Object.keys(names))$('view-'+id).setAttribute('aria-expanded',String(available&&selected===id));
+  updateCharacterMenu(document,panel,available?selected:null,reopen);
   if(available){
     const owner=document.querySelector(`[data-camera-character="${selected}"]`);
     if(panel.parentElement!==owner)owner.append(panel);
