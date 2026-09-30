@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PAD / 端末スタディー — TARAIRON</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script></head>
+<body><main>
+  <section class="viewer" aria-label="パッド端末の3Dプレビュー">
+    <header><p class="eyebrow">TARAIRON / OBJECT STUDIES</p><h1>船内のパッド端末</h1><p class="subtitle">手に取る道具として、形と素材を詰める。</p></header>
+    <canvas id="pad-view" tabindex="0" aria-label="パッド端末。ドラッグで回転、ホイールで拡大、右ドラッグで移動。"></canvas>
+    <div class="object-tag"><span id="edition">01 / 業務端末案</span><span id="dimensions">230 × 300 mm</span></div>
+    <p id="status" role="status">端末を準備しています…</p>
+    <p class="help">ドラッグで回転 · ホイールで拡大 · ダブルクリックで初期位置</p>
+  </section>
+  <aside><div class="panel-heading"><span>PAD</span><span>DESIGN STUDY / 01</span></div>
+    <section><h2>モデル</h2><div class="segmented"><button data-model="study" aria-pressed="true">業務端末案</button><button data-model="current" aria-pressed="false">現行</button></div><p id="model-note">保護バンパーと物理キーを備えた船内備品。画面は筐体の縁より一段奥へ。</p></section>
+    <section><h2>見る角度</h2><div class="views"><button data-view="oblique" aria-pressed="true">斜め</button><button data-view="front" aria-pressed="false">画面</button><button data-view="back" aria-pressed="false">背面</button><button data-view="edge" aria-pressed="false">側面</button><button data-view="dock" aria-pressed="false">接点</button><button id="reset">初期位置</button></div></section>
+    <fieldset id="design"><legend>仕上げ</legend><div class="swatches"><button data-color="#666e60" aria-label="グレーオリーブ" aria-pressed="true" style="--swatch:#666e60"></button><button data-color="#a9a99a" aria-label="ウォームグレー" aria-pressed="false" style="--swatch:#a9a99a"></button><button data-color="#3d4849" aria-label="チャコール" aria-pressed="false" style="--swatch:#3d4849"></button><span id="color-name">グレーオリーブ</span></div><label for="wear">縁の使用感 <output id="wear-value">55%</output></label><input id="wear" type="range" min="0" max="100" value="55"><label for="brightness">画面の明るさ <output id="brightness-value">80%</output></label><input id="brightness" type="range" min="25" max="100" value="80"><label class="check"><input type="checkbox" id="screen" checked>画面を点灯</label></fieldset>
+    <section><h2>確認する光</h2><div class="segmented"><button data-light="studio" aria-pressed="true">スタジオ</button><button data-light="cabin" aria-pressed="false">船内の暗さ</button></div><label class="check"><input id="grid" type="checkbox">寸法グリッド / 50 mm</label></section>
+    <section><h2>画面の内容</h2><div class="views"><button data-page="lounge" aria-pressed="true">ラウンジ</button><button data-page="log" aria-pressed="false">船内記録</button><button data-page="novel" aria-pressed="false">読書</button><button data-page="random">ランダム</button></div></section>
+    <footer><span class="number">01</span><p>筐体・保護材・操作部<br>背面の蓋と充電接点まで確認できます。</p><small>チャコール・擦れ 0%・明るさ 85% を本編へ反映</small></footer>
+  </aside>
+</main><script type="module" src="./study.js"></script></body></html>

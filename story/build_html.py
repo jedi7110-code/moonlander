@@ -439,7 +439,6 @@ def progress_script(bm_key, scroll_nav=False):
   window.addEventListener('resize', function(){{ rebuildTicks(); updateProgress(); }});
   window.addEventListener('load', function(){{ rebuildTicks(); updateProgress(); }});
   rebuildTicks(); updateProgress();
-  window.scrollTo(0, 0);
 </script>"""
 
 def gloss_modal(prefix=""):
@@ -594,7 +593,7 @@ def page_doc(page_title, nav_html, body_html, root_prefix="", bm_key="mira-bm-sa
     </div>
   </div>
   {progress_aside}
-<script src="{root_prefix}reader.js"></script>
+<script src="{root_prefix}reader.js?v=3"></script>
 {page_script}
 {gloss_modal(root_prefix)}
 </body>

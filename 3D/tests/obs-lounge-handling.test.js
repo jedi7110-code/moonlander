@@ -9,6 +9,8 @@ import {updateTableLeisureProps} from '../src/obs/lounge-table-props.js';
 import {LOUNGE_SEAT,LOUNGE_TABLE} from '../src/obs/layout.js';
 import {LOUNGE_PROP_KEYS,LOUNGE_STOW_SECONDS,loungeHandlingPhase} from '../src/obs/lounge-handling.js';
 import {teaserHandCenter} from '../src/obs/cat-teaser-pose.js';
+import {tabletGripContact} from '../src/obs/tablet-pose.js';
+import {padSurfaceDistance} from './helpers/pad-surface.js';
 
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
 function setup(){
@@ -38,7 +40,7 @@ test('the same visible objects move continuously from the table to the hands and
       const phase=loungeHandlingPhase(Math.min(time,4),mode,stow);
       if(phase.reach>.999&&phase.grip>.99)for(const rig of mode==='cat'?[root.userData.arms[0]]:root.userData.arms){
         const actual=mode==='tablet'?rig.hand.getWorldPosition(new Vector3()):rig.hand.localToWorld(mode==='cat'?teaserHandCenter(rig,phase.lift):new Vector3(0,-.078,-.015));
-        const contact=mode==='tablet'?new Vector3(rig.side*.17,.014,-.115):mode==='cat'?new Vector3(.0425,.012,0):new Vector3(rig.side*.159,-.012,0);
+        const contact=mode==='tablet'?tabletGripContact(rig.side):mode==='cat'?new Vector3(.0425,.012,0):new Vector3(rig.side*.159,-.012,0);
         assert.ok(actual.distanceTo(prop.localToWorld(contact))<.002,`${mode}: hands stay attached at ${time}`);
       }
     }
@@ -75,15 +77,14 @@ test('the tablet stays between the actual finger pads and opposing thumbs while 
     for(let i=0;i<position.count;i++){
       if(position.getY(i)>=.91||armRegion.getX(i)<.95)continue;
       const p=tablet.worldToLocal(skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(position,i)).applyMatrix4(skin.matrixWorld));
-      const q=[Math.abs(p.x)-.107,Math.abs(p.y),Math.abs(p.z)-.142];
-      const distance=Math.hypot(...q.map(v=>Math.max(v,0)))+Math.min(0,Math.max(...q))-.008;
+      const distance=padSurfaceDistance(p);
       assert.ok(distance>-.0015,'skin must not pass through the tablet');
       let weight=-1,name='';
       for(let j=0;j<4;j++)if(skinWeight.array[i*4+j]>weight){weight=skinWeight.array[i*4+j];name=skin.skeleton.bones[skinIndex.array[i*4+j]].name;}
       const part=name.includes('thumb')?'thumb':name.includes('finger')?'finger':null;
       if(part){const contact=contacts[position.getX(i)<0?0:1];contact[part]=Math.min(contact[part],distance);}
     }
-    for(const contact of contacts){assert.ok(contact.finger<.003,'finger pads support the back');assert.ok(contact.thumb<.003,'thumb contacts the edge');}
+    for(const contact of contacts){assert.ok(contact.finger<.003,'finger pads support the protective side grips');assert.ok(contact.thumb<.003,'thumb contacts the edge');}
   }
 });
 

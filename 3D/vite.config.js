@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import {storyPreview} from './story-preview.js';
 
 export default defineConfig({
+  plugins:[storyPreview()],
   root: 'src',
   base: '/3D/',
   publicDir: '../public',

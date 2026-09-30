@@ -8,6 +8,7 @@ import {cloneMiloSkinGeometry} from '../src/obs/milo-elbow.js';
 import {LOUNGE_SEAT} from '../src/obs/layout.js';
 import {setLadderHandFit} from '../studies/milo/ladder-hand-fit.js';
 import {applyLadderStudy} from '../studies/milo/ladder-study.js';
+import {padSurfaceDistance as tabletDistance} from './helpers/pad-surface.js';
 
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
 const create=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
@@ -28,10 +29,6 @@ function hands(root,space=null){
     result[position.getX(i)<0?0:1][part].push(p);
   }
   return result;
-}
-function tabletDistance(p){
-  const q=[Math.abs(p.x)-.107,Math.abs(p.y),Math.abs(p.z)-.142];
-  return Math.hypot(...q.map(v=>Math.max(v,0)))+Math.min(0,Math.max(...q))-.008;
 }
 
 test('seated palms and fingers rest on the real lounge tabletop without clipping or reaching past its edge',()=>{
@@ -56,9 +53,9 @@ test('both hands support the lower tablet back with opposing thumbs throughout r
       const points=Object.values(hand).flat();
       assert.ok(points.every(p=>p.toArray().every(Number.isFinite)));
       assert.ok(points.every(p=>tabletDistance(p)>-.0015),'skin must not pass through the tablet');
-      assert.ok(Math.min(...hand.fingers.map(tabletDistance))<.003,'finger pads support the back');
+      assert.ok(Math.min(...hand.fingers.map(tabletDistance))<.003,'finger pads support the protective side grips');
       assert.ok(Math.min(...hand.thumb.map(tabletDistance))<.003,'thumb contacts the rounded edge');
-      assert.ok(hand.thumb.some(p=>p.y>.008),'thumb opposes the fingers across the edge');
+      assert.ok(hand.thumb.some(p=>p.y>.017),'thumb opposes the fingers across the thicker edge');
       assert.ok(hand.fingers.every(p=>side?p.x>.005:p.x<-.005),'left and right fingers do not overlap');
     }
   }

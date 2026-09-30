@@ -3,12 +3,19 @@ import {ReversiMatch,chooseReversiMove} from './reversi-match.js';
 import {PokerMatch,cardLabel,evaluateHand,POKER_HAND_NAMES} from './poker-match.js';
 import {getLang} from '../../../js/obs/i18n.js?v=15';
 import './lounge-games.css';
+import {FALL_LINE_URL} from './pad-screen.js';
+import {createElement,ChessKnight,Spade,BookOpen} from 'lucide';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const labels={chess:['チェス','Chess'],poker:['ポーカー','Poker'],reversi:['リバーシ','Reversi']};
 const keys={poker:'tarairon-poker-v1',reversi:'tarairon-reversi-v1'};
 const read=key=>{try{return JSON.parse(localStorage.getItem(key));}catch{return null;}};
 const button=(action,text,disabled=false)=>`<button type="button" data-action="${action}"${disabled?' disabled':''}>${text}</button>`;
+const choiceIcons={chess:ChessKnight,poker:Spade,novel:BookOpen,reversi:[
+  ['circle',{cx:8,cy:8,r:6,fill:'currentColor'}],
+  ['circle',{cx:16,cy:16,r:6,fill:'#293c35'}],
+]};
+const choiceIcon=kind=>`<span class="lounge-choice-icon" aria-hidden="true">${createElement(choiceIcons[kind],{'stroke-width':1.6,focusable:'false'}).outerHTML}</span>`;
 
 export class CabinLoungeGames{
   constructor({parent,onClose,onMove,onResult,refreshIcons}){
@@ -38,17 +45,23 @@ export class CabinLoungeGames{
     this.visibility=()=>{this.cancelAI();if(!document.hidden)this.think();};document.addEventListener('visibilitychange',this.visibility);
   }
   get open(){return this.active;}
-  get title(){return this.kind?words(...labels[this.kind]):words('ラウンジゲーム','Lounge games');}
+  get title(){return this.kind==='novel'?'FALL-LINE ── '+words('フォールライン','THE FALL'):this.kind?words(...labels[this.kind]):words('ラウンジゲーム','Lounge games');}
   show(kind=null){if(this.active)return;this.returnFocus=document.activeElement;this.active=true;this.showMenu();if(labels[kind])this.select(kind);}
   showMenu(){this.cancelAI();this.kind=null;this.confirmation=false;this.render();if(!this.dialog.open)this.dialog.showModal();this.dialog.querySelector('[data-game]').focus();}
   select(kind){
-    if(!labels[kind])return;this.cancelAI();this.save();this.kind=kind;this.confirmation=false;this.selected.clear();
+    if(!labels[kind]&&kind!=='novel')return;this.cancelAI();this.save();this.kind=kind;this.confirmation=false;this.selected.clear();
     if(kind==='chess'){this.switchingToChess=true;this.dialog.close();this.chess.show();this.backButton.textContent=words('ゲームを選ぶ','Choose game');}
     else{this.render();this.dialog.querySelector('[data-action="menu"]').focus();this.think();}
   }
   close(){this.cancelAI();this.save();if(this.chess.open)this.chess.close();else this.dialog.close();}
   finish(){if(!this.active)return;this.active=false;this.cancelAI();this.save();this.onClose?.();if(this.returnFocus?.isConnected)this.returnFocus.focus();}
-  save(){if(!keys[this.kind])return;try{localStorage.setItem(keys[this.kind],JSON.stringify(this.matches[this.kind].serialize()));this.saveFailed=false;}catch{this.saveFailed=true;}}
+  save(){
+    if(this.kind==='novel'&&this.dialog.open){
+      // Flush the reader before the iframe is hidden or removed.
+      try{this.dialog.querySelector('.lounge-novel')?.contentWindow?.Reader?.saveBookmark();}catch{}
+    }
+    if(!keys[this.kind])return;try{localStorage.setItem(keys[this.kind],JSON.stringify(this.matches[this.kind].serialize()));this.saveFailed=false;}catch{this.saveFailed=true;}
+  }
   cancelAI(){this.epoch++;clearTimeout(this.timer);this.thinking=false;}
   think(){
     const match=this.matches.reversi;
@@ -69,6 +82,7 @@ export class CabinLoungeGames{
   action(action){
     if(action==='close'){this.close();return;}
     if(action==='menu'){this.save();this.showMenu();return;}
+    if(action==='read-novel'){this.select('novel');return;}
     if(action==='new'){this.cancelAI();this.confirmation=true;this.render();this.dialog.querySelector('[data-action="cancel"]').focus();return;}
     if(action==='cancel'){this.confirmation=false;this.render();this.think();return;}
     if(action==='confirm'){this.matches[this.kind].reset();this.selected.clear();this.confirmation=false;this.save();this.render();this.think();return;}
@@ -81,12 +95,16 @@ export class CabinLoungeGames{
   render(){
     if(this.chess.open){this.chess.render();this.backButton.textContent=words('ゲームを選ぶ','Choose game');return;}
     const focus=document.activeElement?.dataset,oldSquare=focus?.square;
+    const reading=this.kind==='novel';
+    this.dialog.classList.toggle('lounge-reader',reading);
+    // Keep the embedded reader's scroll position when language/HUD refreshes.
+    if(reading&&this.dialog.querySelector('.lounge-novel'))return;
     let content='';
     if(!this.kind){
       const descriptions={chess:words('白を持って先手。3段階のマイロと対局。','Take white. Three opponent levels.'),poker:words('5枚ドロー・1回交換。ゲーム内チップで一対一。','Five-card draw. Heads-up with play chips.'),reversi:words('あなたは黒。置ける場所を見ながら一局。','You play black. Legal moves are highlighted.')};
-      content=`<p class="lounge-intro">${words('何で遊ぼうか。続きの対局も、ここから。','What shall we play? Your saved games are here, too.')}</p><div class="lounge-choices">${Object.keys(labels).map((kind,i)=>`<button data-game="${kind}"><span class="lounge-game-symbol" aria-hidden="true">${['♞','♠','●○'][i]}</span><strong>${words(...labels[kind])}</strong><span>${descriptions[kind]}</span><small>${words('選ぶ →','Play →')}</small></button>`).join('')}</div>`;
-    }else content=this.kind==='reversi'?this.renderReversi():this.renderPoker();
-    this.dialog.innerHTML=`<header class="lounge-header"><div><span>RECREATION / TARAIRON</span><h2 id="lounge-title">${this.title}</h2></div>${button('close',words('船内へ戻る','Back to cabin'))}</header><div class="lounge-content">${content}</div>${this.confirmation?`<div class="lounge-confirm" role="alert">${words('現在の対局を終えて最初から始めますか？','End this game and start over?')}${this.kind==='poker'?words('チップは双方500に戻ります。','Both stacks return to 500.'):''}${button('cancel',words('続ける','Continue'))}${button('confirm',words('最初から','Start over'))}</div>`:''}<footer class="lounge-footer">${this.kind?button('menu',words('← ゲームを選ぶ','← Choose game')):''}<span>${this.saveFailed?words('保存できません。このページ内で継続できます。','Save unavailable. Keep this page open.'):words('船内時間は停止中・対局は自動保存','Ship time paused · Games saved automatically')}</span>${this.kind?button('new',words('新しい対局','New game')):''}</footer>`;
+      content=`<p class="lounge-intro">${words('ゲームや読書をどうぞ。続きの対局も、ここから。','Choose a game or a book. Your saved games are here, too.')}</p><div class="lounge-choices">${Object.keys(labels).map(kind=>`<button data-game="${kind}">${choiceIcon(kind)}<strong>${words(...labels[kind])}</strong><span class="lounge-choice-description">${descriptions[kind]}</span><small>${words('選ぶ →','Play →')}</small></button>`).join('')}<button type="button" class="lounge-reading" data-action="read-novel">${choiceIcon('novel')}<strong>${words('小説を読む','Read a novel')}</strong><span class="lounge-choice-description">FALL-LINE ── ${words('フォールライン','THE FALL')}</span><small>${words('読む →','Read →')}</small></button></div>`;
+    }else content=reading?`<iframe class="lounge-novel" title="FALL-LINE ── フォールライン" src="${FALL_LINE_URL}"></iframe>`:this.kind==='reversi'?this.renderReversi():this.renderPoker();
+    this.dialog.innerHTML=`<header class="lounge-header"><div><span>RECREATION / TARAIRON</span><h2 id="lounge-title">${this.title}</h2></div>${button('close',words('船内へ戻る','Back to cabin'))}</header><div class="lounge-content">${content}</div>${this.confirmation?`<div class="lounge-confirm" role="alert">${words('現在の対局を終えて最初から始めますか？','End this game and start over?')}${this.kind==='poker'?words('チップは双方500に戻ります。','Both stacks return to 500.'):''}${button('cancel',words('続ける','Continue'))}${button('confirm',words('最初から','Start over'))}</div>`:''}<footer class="lounge-footer">${this.kind?button('menu',words('← 選択肢へ戻る','← Back to choices')):''}<span>${reading?words('読書中・船内時間は停止中','Reading · Ship time paused'):this.saveFailed?words('保存できません。このページ内で継続できます。','Save unavailable. Keep this page open.'):words('船内時間は停止中・対局は自動保存','Ship time paused · Games saved automatically')}</span>${this.kind&&!reading?button('new',words('新しい対局','New game')):''}</footer>`;
     if(oldSquare!==undefined)this.dialog.querySelector(`[data-square="${oldSquare}"]`)?.focus();
   }
   renderReversi(){

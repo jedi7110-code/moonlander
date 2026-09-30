@@ -5,13 +5,15 @@
    使い方：
      Reader.init({
        getScroll: () => window,      // window/body スクロール。旧式の独自スクロール要素も可
-       bmKey: 'mira-bm-saga',        // しおりの localStorage キー
+       bmKey: 'mira-bm-saga',        // 作品・章ごとのしおりCookie名
      });
    ページ固有（章ナビのスクロール、進捗ゲージ、分岐選択など）は
    各ビルドの inline <script> に残す。
    ============================================================ */
 (function(){
   'use strict';
+  var cookiePath = document.currentScript ? new URL('.', document.currentScript.src).pathname : '/';
+  var saveBookmark = function(){};
 
   // ────────── ハンバーガー（モバイル時のドロワー開閉） ──────────
   function setupHamburger(){
@@ -97,77 +99,170 @@
   }
 
   // ────────── しおり ──────────
-  //  クリック：いま見ている位置を保存（フィードバック「📑 保存」）。
-  //   ただし保存位置から離れている時は、保存位置へジャンプ（「📑 戻る」）。
-  //  スクロール中もデバウンスで自動保存（起動 1.5 秒後から）。
+  // Cookieは1年間保持。画面幅や文字サイズが変わっても同じ段落へ戻す。
+  // スクロール時に位置を取得し、モーダルの破棄前にも同期保存できる。
   function setupBookmark(getScroll, key){
     var btn = document.getElementById('bmBtn');
     key = key || 'mira-bm';
+    function normalize(value){
+      if (typeof value === 'number') value = {top:value};
+      if (!value || !Number.isFinite(value.top) || value.top < 0) return null;
+      var result = {top:value.top};
+      if (Number.isInteger(value.block) && value.block >= 0 &&
+          Number.isFinite(value.fraction) && value.fraction >= 0 && value.fraction <= 1 &&
+          typeof value.sample === 'string' && value.sample.length <= 48) {
+        result.block = value.block; result.fraction = value.fraction; result.sample = value.sample;
+        result.gap = Number.isFinite(value.gap) && value.gap >= 0 ? Math.min(10000,value.gap) : 0;
+      }
+      return result;
+    }
     function get(){
-      try { return parseInt(localStorage.getItem(key) || '0', 10); }
-      catch(e){ return 0; }
+      try {
+        var prefix = encodeURIComponent(key) + '=';
+        var entry = document.cookie.split(';').map(function(v){ return v.trim(); }).find(function(v){ return v.indexOf(prefix) === 0; });
+        if (entry) {
+          var value = normalize(JSON.parse(decodeURIComponent(entry.slice(prefix.length))));
+          if (value) return value;
+        }
+      } catch(e){}
+      // 以前の読書位置を最初の一度だけ引き継ぐ。
+      try {
+        var legacy = localStorage.getItem(key);
+        var old = legacy === null ? null : normalize(Number(legacy));
+        if (old) { setVal(old); return old; }
+      } catch(e){}
+      return null;
     }
     function setVal(v){
-      try { localStorage.setItem(key, String(v)); } catch(e){}
+      if (!v) return;
+      try {
+        document.cookie = encodeURIComponent(key) + '=' + encodeURIComponent(JSON.stringify(v)) +
+          '; Max-Age=31536000; Path=' + cookiePath + '; SameSite=Lax' +
+          (location.protocol === 'https:' ? '; Secure' : '');
+      } catch(e){}
     }
-    // 自動保存（スクロールデバウンス）
-    var ready = false;
-    setTimeout(function(){ ready = true; }, 1500);
-    var t = 0;
+    function blocks(){ return Array.from(document.querySelectorAll('.book > *')); }
+    function sample(el){
+      var text = (el.textContent.trim() || el.querySelector('img')?.getAttribute('src') || el.tagName).slice(0,96), hash = 2166136261;
+      for (var i=0;i<text.length;i++) hash = Math.imul(hash ^ text.charCodeAt(i),16777619);
+      return (hash >>> 0).toString(16);
+    }
+    function readingLine(sc){
+      var bar = document.getElementById('bar');
+      return Math.max(isWindowScroller(sc) ? 0 : sc.getBoundingClientRect().top, bar ? bar.getBoundingClientRect().bottom : 0) + 8;
+    }
+    function capture(sc){
+      var top = Math.max(0,Math.min(scrollTopOf(sc),scrollMaxOf(sc))), value = {top:top};
+      if (top === 0) return value;
+      var line = readingLine(sc), items = blocks();
+      for (var i=0;i<items.length;i++) {
+        var rect = items[i].getBoundingClientRect();
+        if (rect.top > line) break;
+        if (rect.height > 0) {
+          value.block = i; value.fraction = Math.min(1,Math.max(0,(line-rect.top)/rect.height)); value.sample = sample(items[i]);
+          value.gap = Math.max(0,line-rect.bottom);
+        }
+      }
+      return value;
+    }
+    function position(sc, value){
+      var items = blocks(), block = items[value.block];
+      if (value.sample && (!block || sample(block) !== value.sample)) block = items.find(function(el){ return sample(el) === value.sample; });
+      if (!block || value.fraction === undefined) return Math.min(value.top,scrollMaxOf(sc));
+      var rect = block.getBoundingClientRect();
+      return Math.max(0,Math.min(scrollMaxOf(sc),scrollTopOf(sc)+rect.top+rect.height*value.fraction+(value.gap||0)-readingLine(sc)));
+    }
+    var saved = get(), lastPosition = saved, ready = false, restoring = false, interacted = false, dirty = false, t = 0;
+    function persist(){
+      if (!dirty) return;
+      setVal(lastPosition); dirty = false;
+    }
+    function flush(){
+      clearTimeout(t);
+      var sc = getScroll();
+      if (ready && sc) {
+        var current = capture(sc);
+        if (!lastPosition || current.top !== lastPosition.top) dirty = true;
+        lastPosition = current; persist();
+      }
+    }
+    saveBookmark = flush;
     function attach(sc){
       if (!sc || sc.__bmAttached) return;
       sc.__bmAttached = true;
       addScrollHandler(sc, function(){
-        if (!ready) return;
+        if (!ready || restoring) return;
+        lastPosition = capture(sc);
+        dirty = true;
         clearTimeout(t);
-        t = setTimeout(function(){ setVal(scrollTopOf(sc)); }, 500);
+        t = setTimeout(persist, 400);
       });
     }
-    // 初回 + 100ms 後（遅延生成ペイン対策）
     attach(getScroll());
     setTimeout(function(){ attach(getScroll()); }, 100);
-    // クリック挙動（ボタンがあるページだけ）
+    // 読者の操作を優先し、読み始めた後に遅れて位置を戻さない。
+    function userStarted(){ interacted = true; restoring = false; ready = true; }
+    ['wheel','touchstart','pointerdown','keydown'].forEach(function(event){
+      window.addEventListener(event,userStarted,{passive:true,capture:true});
+    });
+    // iframeを外した後は寸法を再計算せず、最後に取得した位置を保存。
+    window.addEventListener('pagehide',function(){ clearTimeout(t); persist(); });
+    document.addEventListener('visibilitychange',function(){
+      if (document.hidden) { clearTimeout(t); persist(); }
+    });
     if (btn) {
       btn.addEventListener('click', function(){
         var sc = getScroll(); if (!sc) return;
-        attach(sc);  // 別ペインになっていたら今のペインで自動保存も繋ぎ直す
-        var cur = scrollTopOf(sc);
-        var saved = get();
+        attach(sc);
+        var bookmark = get(), target = bookmark ? position(sc,bookmark) : 0;
         var orig = btn.textContent;
-        if (saved > 0 && Math.abs(cur - saved) > 40) {
-          // 別の場所にいる → 保存位置へ戻る
-          scrollToTop(sc, saved, 'smooth');
+        if (target > 0 && Math.abs(scrollTopOf(sc) - target) > 40) {
+          scrollToTop(sc, target, 'smooth');
           btn.textContent = '📑 戻る';
         } else {
-          // いまの位置を保存
-          setVal(cur);
+          flush();
           btn.textContent = '📑 保存';
         }
         setTimeout(function(){ btn.textContent = orig; }, 900);
       });
     }
-    // 前回の続き案内トースト（ロード時に1回だけ）
-    window.addEventListener('load', function(){
-      var sc = getScroll(); if (!sc) return;
-      var saved = get();
-      var max = scrollMaxOf(sc);
-      if (max <= 0 || saved < Math.max(80, max * 0.05)) return;
-      var toast = document.getElementById('resume');
-      if (!toast) return;
-      var pct = toast.querySelector('.pct');
-      if (pct) pct.textContent = Math.min(100, Math.round(saved / max * 100)) + '%';
-      toast.classList.add('show');
-      toast.onclick = function(e){
-        e.preventDefault();
-        scrollToTop(sc, saved, 'smooth');
-        toast.classList.remove('show');
-      };
-      setTimeout(function(){ toast.classList.remove('show'); }, 8000);
-    });
+    var resume = saved && saved.top > 0 && !location.hash;
+    if (resume && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+    function restore(){
+      var sc = getScroll(); if (!sc || !restoring) return;
+      scrollToTop(sc,position(sc,saved),'instant');
+      lastPosition = capture(sc);
+      var pct = document.getElementById('resume')?.querySelector('.pct');
+      if (pct) pct.textContent = Math.round(scrollTopOf(sc)/Math.max(1,scrollMaxOf(sc))*100) + '%';
+    }
+    function loaded(){
+      Promise.resolve(document.fonts?.ready).then(function(){
+        if (!resume || interacted) { ready = true; return; }
+        restoring = true; restore();
+        requestAnimationFrame(function(){
+          restore(); ready = true;
+          var toast = document.getElementById('resume'), sc = getScroll();
+          if (toast && sc && !interacted) {
+            toast.firstChild.nodeValue = '栞の位置から再開 ';
+            var pct = toast.querySelector('.pct');
+            if (pct) pct.textContent = Math.round(scrollTopOf(sc)/Math.max(1,scrollMaxOf(sc))*100) + '%';
+            toast.classList.add('show');
+            toast.onclick = function(e){ e.preventDefault(); scrollToTop(sc,position(sc,saved),'smooth'); toast.classList.remove('show'); };
+            setTimeout(function(){ toast.classList.remove('show'); },4000);
+          }
+        });
+        // 遅延画像が読み込まれて段落が動いた場合も、操作開始までは追従。
+        document.addEventListener('load',function(e){ if (e.target.tagName === 'IMG') restore(); },true);
+        window.addEventListener('resize',restore);
+        setTimeout(function(){ restoring = false; },3000);
+      });
+    }
+    if (document.readyState === 'complete') loaded(); else window.addEventListener('load',loaded,{once:true});
   }
 
   // ────────── public ──────────
   window.Reader = {
+    saveBookmark: function(){ saveBookmark(); },
     init: function(opts){
       opts = opts || {};
       setupHamburger();

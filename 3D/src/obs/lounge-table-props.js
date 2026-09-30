@@ -45,6 +45,10 @@ export function createTableLeisureProps(table,m,top){
 export function updateTableLeisureProps(tableProps,heldProps){
   for(const key of ['tablet','phones','toy']){
     const prop=tableProps[key],held=heldProps[key],home=loungePropHome(prop);
+    if(key==='tablet'){
+      if(held.visible&&!prop.userData.padWasHeld)prop.userData.nextPadPage?.();
+      prop.userData.padWasHeld=held.visible;
+    }
     prop.parent.updateWorldMatrix(true,false);held.updateWorldMatrix(true,false);
     prop.position.copy(prop.parent.worldToLocal(held.visible?held.getWorldPosition(home.position.clone()):home.position.clone()));
     prop.quaternion.copy(prop.parent.getWorldQuaternion(home.quaternion.clone()).invert()).multiply(held.visible?held.getWorldQuaternion(home.quaternion.clone()):home.quaternion);

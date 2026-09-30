@@ -218,7 +218,7 @@ function localize(){
   for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   updateFullscreenUI(document,words,refreshIcons);
   const pauseLabel=paused?words('再開','Resume'):words('一時停止','Pause');$('obs-pause').setAttribute('aria-label',pauseLabel);$('obs-pause').dataset.tip=pauseLabel;
-  $('play-chess').setAttribute('aria-label',words('ラウンジゲーム','Lounge games'));$('play-chess').dataset.tip=words('チェス・ポーカー・リバーシ','Chess · Poker · Reversi');
+  $('play-chess').setAttribute('aria-label',words('ラウンジゲーム','Lounge games'));$('play-chess').dataset.tip=words('チェス・ポーカー・リバーシ・小説を読む','Chess · Poker · Reversi · Read a novel');
   $('dismiss-need').setAttribute('aria-label',words('閉じる','Close'));
   if(games.open)games.render();
   immersive?.localize();

@@ -4,6 +4,7 @@ import {applyDeskHands,applyMusicRhythm,applyMusicGuard,closeMusicFist} from './
 import {applyLoungeSpine} from './milo-spine.js';
 import {setMealHandFit,setTeaserHandFit} from './cup-hand-fit.js';
 import {teaserHandCenter,applyTeaserGrip,applyTeaserGaze} from './cat-teaser-pose.js';
+import {TABLET_GRIP,tabletGripContact} from './tablet-pose.js';
 
 export const LOUNGE_STOW_SECONDS=4;
 export const LOUNGE_PROP_KEYS={tablet:'tablet',music:'phones',cat:'toy'};
@@ -67,7 +68,7 @@ export function applyLoungeHandling(root,mode,time,{docks,stow=null,entering=fal
     const gripRotation=mode==='tablet'?tabletGrips[i]:mode==='cat'?new Quaternion().setFromEuler(new Euler(-Math.PI/2-.8*phase.lift,0,0)):
       new Quaternion().setFromAxisAngle(new Vector3(1,0,0),-phase.lift).multiply(new Quaternion().setFromEuler(new Euler(0,rig.side*Math.PI/2,Math.PI)));
     const rotation=prop.quaternion.clone().multiply(gripRotation);
-    const contact=mode==='tablet'?new Vector3(rig.side*.17,.014,-.115):mode==='cat'?new Vector3(.0425,.012,0):new Vector3(rig.side*.159,-.012,0);
+    const contact=mode==='tablet'?tabletGripContact(rig.side):mode==='cat'?new Vector3(.0425,.012,0):new Vector3(rig.side*.159,-.012,0);
     const target=contact.applyQuaternion(prop.quaternion).add(prop.position);
     if(mode!=='tablet')target.sub((mode==='cat'?teaserHandCenter(rig,phase.lift):new Vector3(0,-.078,-.015)).multiply(rig.hand.scale).applyQuaternion(rotation));
     const wrist=restWrist.clone().lerp(target,reach);wrist.y+=Math.sin(Math.PI*reach)*.08;
@@ -94,7 +95,7 @@ export function applyLoungeHandling(root,mode,time,{docks,stow=null,entering=fal
       finger.userData.links[0].rotation.set((mode==='tablet'?.15:mode==='music'?.20:.65)*grip,0,0);
       finger.userData.links[1].rotation.set((mode==='tablet'?.08:mode==='music'?.10:.3)*grip,0,0);
     }
-    rig.thumb.position.set(-rig.side*MathUtils.lerp(.029,mode==='music'?.050+.008*phase.lift:.033,mode==='tablet'||mode==='music'?grip:0),-.051,MathUtils.lerp(.025,.013,mode==='tablet'?grip:0));
+    rig.thumb.position.set(-rig.side*MathUtils.lerp(.029,mode==='music'?.050+.008*phase.lift:.033,mode==='tablet'||mode==='music'?grip:0),-.051,MathUtils.lerp(.025,TABLET_GRIP.thumbZ,mode==='tablet'?grip:0));
     rig.thumb.rotation.set((mode==='tablet'?.35:.25)*grip,mode==='tablet'?rig.side*.15*grip:0,rig.side*(mode==='tablet'?-.15:.3)*grip);
     rig.thumb.userData.ip.rotation.set(mode==='tablet'?.1*grip:0,0,0);
     if(mode==='music')closeMusicFist(rig,listening);

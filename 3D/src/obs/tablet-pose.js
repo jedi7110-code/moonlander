@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import {solveHingeArm} from './arm-ik.js';
 import {cloneMiloSkinGeometry} from './milo-elbow.js';
+// Open around the 39 mm guarded terminal; keep the approved wrist rotation.
+export const TABLET_GRIP={x:.178,y:.006,z:-.115,thumbZ:-.007};
+export const tabletGripContact=side=>new THREE.Vector3(side*TABLET_GRIP.x,TABLET_GRIP.y,TABLET_GRIP.z);
 
 export function createGripHandGeometry(skin,side=0){
     const geometry=cloneMiloSkinGeometry(skin);
@@ -62,7 +65,7 @@ export function applyTabletHands(root){
   const {tablet}=root.userData.leisure;
   for(const rig of root.userData.arms){
     const {arm,elbow,hand,side}=rig;
-    const target=new THREE.Vector3(side*.17,.014,-.115).applyQuaternion(tablet.quaternion).add(tablet.position);
+    const target=tabletGripContact(side).applyQuaternion(tablet.quaternion).add(tablet.position);
     const rotation=tablet.quaternion.clone().multiply(tabletGripRotation(rig));
     const alignedElbow=target.clone().add(new THREE.Vector3(0,hand.position.length(),0).applyQuaternion(rotation));
     const pose=solveHingeArm(rig,target,alignedElbow.sub(arm.position));
@@ -70,7 +73,7 @@ export function applyTabletHands(root){
     // Keep the wrist straight and distribute the turn through the forearm.
     hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(rotation);
     for(const finger of rig.fingers){finger.rotation.set(.15,0,0);finger.userData.links[0].rotation.x=.15;finger.userData.links[1].rotation.x=.08;}
-    rig.thumb.position.set(-side*.033,-.051,.013);
+    rig.thumb.position.set(-side*.033,-.051,TABLET_GRIP.thumbZ);
     rig.thumb.rotation.set(.35,side*.15,-side*.15);rig.thumb.userData.ip.rotation.x=.1;
   }
 }
