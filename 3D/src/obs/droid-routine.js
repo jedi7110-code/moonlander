@@ -29,7 +29,8 @@ export class DroidRoutine {
     this.position={...DROID_HOME};this.time=0;this.steps=[];this.age=0;this.battery=1;
     this.job=null;this.carrying=null;this.door=null;this.opening=0;
     this.washerOpening=0;this.washerLoaded=false;this.washingUntil=0;this.completed={};this.harvestRow=0;
-    this.due={laundry:100,toilet:180,shower:270,cook:70};this.restUntil=12;
+    // Begin the first wake-up three simulation seconds after the cabin appears.
+    this.due={laundry:100,toilet:180,shower:270,cook:70};this.restUntil=3;
     this.stored=[];this.lastDelivery=null;this.walkDistance=0;this.returning=false;this.ladderClaim=false;
     this.wasteKind=null;this.binWaste=null;this.disposedWaste=0;this.incineratorOpen=0;this.incineratingUntil=0;
   }

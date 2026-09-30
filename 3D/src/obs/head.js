@@ -249,7 +249,8 @@ export const NAPE_TATTOO_GLSL=`
 
 export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/head/`){
   const loader=new THREE.TextureLoader();
-  const [gltf,map,normalMap,napeTattoo]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg'),loader.loadAsync(base+'tattoo-naval-barcode.png')]);
+  // Request the supplied hair alongside the scan; it must not wait for the scan to finish.
+  const [gltf,map,normalMap,napeTattoo,suppliedHair]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg'),loader.loadAsync(base+'tattoo-naval-barcode.png'),loadSuppliedHair(base+'supplied-hair/')]);
   napeTattoo.colorSpace=THREE.NoColorSpace;napeTattoo.anisotropy=4;
   map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;normalMap.anisotropy=4;
   const material=new THREE.MeshStandardMaterial({color:0xd2c8bd,map,normalMap,normalScale:new THREE.Vector2(.45,.45),roughness:.74,metalness:0,envMapIntensity:.3});
@@ -290,7 +291,6 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
   material.customProgramCacheKey=()=> 'obs-milo-scan-v10-anchored-neck';
   const source=gltf.scene.getObjectByName('LeePerrySmith');
   if(!source?.isMesh)throw new Error('Milo head mesh is missing');
-  const suppliedHair=await loadSuppliedHair(base+'supplied-hair/');
   const forward=MILO_HEAD_FORWARD/.055,hairSource=headGeometry(source.geometry);
   const group=new THREE.Group(),mesh=new THREE.Mesh(headGeometry(source.geometry,forward),material);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);
   group.userData.faceForward=MILO_HEAD_FORWARD;

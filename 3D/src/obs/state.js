@@ -278,6 +278,8 @@ export class Supplies {
 export class CatRoutine {
   constructor(care,{random=Math.random,turns=false,mouseChase=false}={}){
     this.care=care;this.random=random;this.motion=new CatMotion({turns});
+    // The cabin clears this until Lucy's grooming surface correction has loaded.
+    this.groomAvailable=true;
     this.hunger=this.between(48,90);this.energy=this.between(35,80);this.groomNeed=this.between(20,80);this.curiosity=this.between(30,90);
     this.rest('sleep',this.between(8,16));this.companion=null;this.followLeft=0;this.retargetIn=0;
     this.bunkWake=null;
@@ -356,7 +358,7 @@ export class CatRoutine {
   endFollow(){this.motion.goTo({floor:this.motion.floor,x:this.motion.x});this.rest('look',this.between(5,9));}
   choose(){
     // Fulfil actual needs, but sample their weights instead of repeating a fixed tour.
-    const choices=[['fetch',(this.care.catBowl>0||this.care.has('catfood'))&&this.hunger<70?(100-this.hunger)**2/100:0],['sleep',1+(100-this.energy)**2/100],['groom',1+this.groomNeed**2/100],['look',12+this.curiosity*.15],['stretch',8],['prone',10],['follow',this.canFollow()?18:0],['walk',5+this.curiosity**2/100]];
+    const choices=[['fetch',(this.care.catBowl>0||this.care.has('catfood'))&&this.hunger<70?(100-this.hunger)**2/100:0],['sleep',1+(100-this.energy)**2/100],['groom',this.groomAvailable?1+this.groomNeed**2/100:0],['look',12+this.curiosity*.15],['stretch',8],['prone',10],['follow',this.canFollow()?18:0],['walk',5+this.curiosity**2/100]];
     let draw=this.random()*choices.reduce((sum,[,weight])=>sum+weight,0),mode='walk';
     for(const [candidate,weight]of choices){draw-=weight;if(draw<0){mode=candidate;break;}}
     if(mode==='fetch'){this.fetch();return;}
@@ -365,7 +367,7 @@ export class CatRoutine {
     const places=[{floor:CAT_SOFA.floor,x:840},{floor:getStation('medical').floor,x:940},{floor:2,x:1155},{floor:getStation('console').floor,x:510},{floor:CAT_SOFA.floor,x:1060}].filter(place=>place.floor!==this.motion.floor||Math.abs(place.x-this.motion.x)>40);
     const target=places[Math.floor(this.random()*places.length)];
     this.depart(()=>{this.mode='walk';this.modeTime=0;
-      this.motion.goTo(target,()=>{const rest=this.random()<.35?'look':this.random()<(100-this.energy)/(100-this.energy+this.groomNeed+1)?'sleep':'groom';this.rest(rest,this.between(7,18));});
+      this.motion.goTo(target,()=>{const rest=this.random()<.35?'look':this.random()<(100-this.energy)/(100-this.energy+this.groomNeed+1)?'sleep':this.groomAvailable?'groom':'look';this.rest(rest,this.between(7,18));});
     },'walk');
   }
   update(dt,actor=null,droid=null){
@@ -441,7 +443,7 @@ export class CatRoutine {
     if(this.mode==='eat')this.groomNeed=Math.min(100,this.groomNeed+25);
     this.choose();
   }
-  fetch(){if(this.care.catBowlFilling){this.waitForDroidFood=true;return;}if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=CAT_WALK_SPEED;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX,z:CAT_BOWL.depth},()=>{if(this.care.eatCatFood()){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest('groom',4);});},'fetch');}
+  fetch(){if(this.care.catBowlFilling){this.waitForDroidFood=true;return;}if(this.mode==='fetch'||this.pendingMove?.kind==='fetch')return;this.depart(()=>{this.mode='fetch';this.modeTime=0;this.motion.walkSpeed=CAT_WALK_SPEED;this.motion.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX,z:CAT_BOWL.depth},()=>{if(this.care.eatCatFood()){this.motion.facing=-1;this.hunger=100;this.rest('eat',8);}else this.rest(this.groomAvailable?'groom':'look',4);});},'fetch');}
 }
 
 export function currentAction(brain){return brain.bathroom?.id??brain.reclineExit?.id??(brain.hatchRepair?'airlock':brain.smokingVisit?'smoking':brain.bunkVisit?'bunk':brain.gymVisit?'gym':brain.loungeEntry||brain.loungeStow||brain.loungeExit||brain.state==='playingGame'?'lounge':['reading','orderingSupply'].includes(brain.state)?'console':brain.state==='performing'?brain.cur?.id:null);}

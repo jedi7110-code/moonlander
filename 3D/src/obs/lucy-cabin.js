@@ -19,14 +19,24 @@ export function decodeGroomCache(buffer,metadata){
   return {duration:metadata.duration,steps,indices:new Int32Array(buffer,16,count),
     frames:Array.from({length:steps+1},(_,i)=>new Float32Array(buffer,16+count*4+i*count*24,count*6))};
 }
-export async function loadCabinLucy(){
+const LUCY_ASSET_VERSION='20260915-approved-2';
+async function readLucyAsset(name,method){
   const base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/lucy/`;
-  const version='20260915-approved-2';
-  const read=async(name,method)=>{const response=await fetch(`${base}${name}?v=${version}`);if(!response.ok)throw new Error(`Lucy ${name}: ${response.status}`);return response[method]();};
-  const [gltf,poses,binary]=await Promise.all([loadLucy(version),read('lucy-approved.json','json'),read('lucy-groom.bin','arrayBuffer')]);
-  return {gltf,poses,cache:decodeGroomCache(binary,poses.groom)};
+  const response=await fetch(`${base}${name}?v=${LUCY_ASSET_VERSION}`);if(!response.ok)throw new Error(`Lucy ${name}: ${response.status}`);return response[method]();
 }
-export function createCabinLucy({gltf,poses,cache},options){
+// The 21 MB grooming correction is needed only once Lucy grooms. The cabin
+// defers it until after its first frame; studies keep loading it up front.
+export async function loadCabinLucy({deferGroomCache=false}={}){
+  const [gltf,poses,binary]=await Promise.all([loadLucy(LUCY_ASSET_VERSION),readLucyAsset('lucy-approved.json','json'),deferGroomCache?null:readLucyAsset('lucy-groom.bin','arrayBuffer')]);
+  return {gltf,poses,cache:binary?decodeGroomCache(binary,poses.groom):null};
+}
+export async function loadCabinLucyGroomCache(root){
+  const c=root.userData.cabin;
+  if(c.groom.cache)return c.groom.cache;
+  const cache=decodeGroomCache(await readLucyAsset('lucy-groom.bin','arrayBuffer'),c.poses.groom);
+  c.groom.setCache(cache);return cache;
+}
+export function createCabinLucy({gltf,poses,cache=null},options){
   const root=createLucy(gltf,options),s=root.userData;
   addLucyWhiskerPads(root);addLucyPupilShape(root);addLucyPawPads(root);addSleepingEyelids(root);
   const breathe=addSideSleepBreathing(root);

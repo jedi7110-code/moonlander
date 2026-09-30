@@ -42,14 +42,22 @@ export async function prepareGroomPlayback(root,surface,{fps=30,yieldFrame=async
   return createGroomPlayback(surface,{duration,steps,indices:new Int32Array(indices),frames});
 }
 
-export function createGroomPlayback(surface,cache){
+// The cabin fetches the correction cache after its first frame; until it is
+// attached, playback leaves the live coat visible and applies no correction.
+export function createGroomPlayback(surface,cache=null){
   const {source,display}=surface,a=source.geometry.attributes,count=a.position.count;
   const positions=display.geometry.attributes.position,normals=display.geometry.attributes.normal;
-  const lookup=new Int32Array(count).fill(-1);cache.indices.forEach((vertex,k)=>lookup[vertex]=k*6);
+  const lookup=new Int32Array(count);
   const matrices=source.skeleton.bones.map(()=>new Matrix4()),bone=new Matrix4();
   const morphPositions=source.geometry.morphAttributes.position??[],morphNormals=source.geometry.morphAttributes.normal??[];
+  const playback={update,cache:null,setCache};
+  function setCache(next){
+    if(!next?.frames?.length)throw new Error('Invalid Lucy grooming cache');
+    lookup.fill(-1);next.indices.forEach((vertex,k)=>lookup[vertex]=k*6);playback.cache=next;
+  }
   function update(enabled,time=0,{weight=enabled?1:0}={}){
-    weight=enabled?Math.max(0,Math.min(1,weight)):0;
+    const cache=playback.cache;
+    weight=enabled&&cache?Math.max(0,Math.min(1,weight)):0;
     source.visible=weight<1e-5;display.visible=!source.visible;
     if(!display.visible)return;
     display.position.copy(source.position);display.quaternion.copy(source.quaternion);display.scale.copy(source.scale);
@@ -87,5 +95,6 @@ export function createGroomPlayback(surface,cache){
     }
     positions.needsUpdate=true;normals.needsUpdate=true;
   }
-  return {update,cache};
+  if(cache)setCache(cache);
+  return playback;
 }

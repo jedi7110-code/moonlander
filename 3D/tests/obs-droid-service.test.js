@@ -173,12 +173,28 @@ test('occupied equipment, occupied ladder and pause stop task progress',()=>{
 test('autonomy leaves the dock for an empty bowl, reserves its food, then rests again',()=>{
   const care=new Supplies(),brain={plants:new PlantBed(),actStation:null};
   const routine=new DroidRoutine({care,brain,actor:{x:1040},cat:{mode:'sleep'}});
-  routine.update(11);assert.ok(routine.docked);routine.update(2);assert.equal(routine.job,'feed');
+  routine.update(2.99);assert.ok(routine.docked);routine.update(.02);assert.equal(routine.job,'feed');
   while(!routine.carriedFood)routine.update(.1);
   assert.equal(care.catBowl,0);assert.equal(care.supplies.catfood,2);
   care.take('catfood');care.take('catfood');
   finish(routine);assert.equal(care.catBowl,1);assert.equal(care.supplies.catfood,0);
   routine.update(20);assert.ok(routine.docked,'rest between jobs');
+});
+test('the initial dark standby lasts three seconds of active time, independently of cabin lighting',()=>{
+  const care=new Supplies(),brain={plants:new PlantBed(),actStation:'bunk',openingWake:{waiting:true}};
+  const cat={mode:'sleep'},routine=new DroidRoutine({care,brain,actor:{x:1040},cat});
+  assert.equal(routine.restUntil,3);
+  for(let i=0;i<179;i++)routine.update(1/60);
+  assert.equal(routine.pose.mode,'charging');
+  const before=routine.pose;
+  for(let i=0;i<600;i++)routine.update(0);
+  assert.deepEqual(routine.pose,before,'pause and hidden tabs do not consume the three-second wait');
+  routine.update(2/60);
+  assert.equal(routine.pose.mode,'wake');assert.equal(routine.job,'feed');
+  assert.ok(routine.time-routine.age>=3&&routine.time-routine.age<3+1/30);
+  assert.equal(routine.pose.duration,DROID_STARTUP_SECONDS,'preserve the nixie ignition animation');
+  assert.deepEqual(routine.position,DROID_HOME,'warm up at the dock');
+  assert.equal(brain.openingWake.waiting,true);assert.equal(cat.mode,'sleep','do not wake Milo or Lucy');
 });
 test('the droid does not claim an occupied ladder or release it before stepping away',()=>{
   const {routine,actor}=setup('feed');

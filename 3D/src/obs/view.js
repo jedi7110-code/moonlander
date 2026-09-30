@@ -46,8 +46,8 @@ import {createMetalDeckStyle} from './metal-deck.js';
 import {createCutawayStars} from './space-stars.js';
 
 export class ObservationView {
-  static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false}={}){
-    const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy(),loadEVAGarment(),loadMiloBody()]);
+  static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false}={}){
+    const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy({deferGroomCache}),loadEVAGarment(),loadMiloBody()]);
     head.userData.setAppearance({hair:'crop',beard:'none'});
     const deckStyle=floorBuilder?null:createMetalDeckStyle();
     const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor});

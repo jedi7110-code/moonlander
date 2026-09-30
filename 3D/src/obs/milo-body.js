@@ -57,11 +57,14 @@ export function sampleMiloNeckline(geometry){
 
 export async function loadMiloBody(url=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/milo/body.json`){
   if(bodyData)return bodyData;
+  // Request the prints together with the body, not after it has arrived.
+  const base=import.meta.env?.BASE_URL??'/3D/',loader=typeof document!=='undefined'?new THREE.TextureLoader():null;
+  const prints=loader?Promise.all(['tattoo-cosmo-atomic-bold.png','tattoo-cat-red.png','tshirt-back-print.png','tattoo-right-upper.png'].map(name=>loader.loadAsync(`${base}assets/obs/milo/${name}`))):null;
+  prints?.catch(()=>{});
   const response=await fetch(url);if(!response.ok)throw new Error('Milo body could not be loaded');
   const data=await response.json();
-  if(typeof document!=='undefined'){
-    const loader=new THREE.TextureLoader(),base=import.meta.env?.BASE_URL??'/3D/';
-    const maps=await Promise.all(['tattoo-cosmo-atomic-bold.png','tattoo-cat-red.png','tshirt-back-print.png','tattoo-right-upper.png'].map(name=>loader.loadAsync(`${base}assets/obs/milo/${name}`)));
+  if(prints){
+    const maps=await prints;
     tattooMaps=maps.slice(0,2);shirtBackPrint=maps[2];tattooRightUpper=maps[3];
     for(const map of [...tattooMaps,tattooRightUpper]){map.colorSpace=THREE.NoColorSpace;map.anisotropy=4;}
     // Keep the original PNG on disk; a 1K upload is enough for the garment print.

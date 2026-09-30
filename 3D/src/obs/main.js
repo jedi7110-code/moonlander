@@ -6,6 +6,7 @@ import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
 import {ObservationView} from './view.js';
+import {loadCabinLucyGroomCache} from './lucy-cabin.js';
 import {ObservationXR} from './xr.js';
 import {revealStartupScene} from './startup-lighting.js';
 import {bindStartupLightingInput} from './startup-input.js';
@@ -44,6 +45,8 @@ const needOrders={
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio();
+// Lucy's grooming correction cache arrives after the cabin is on screen.
+cat.groomAvailable=false;
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
 let paused=false,elapsed=0,view=null,immersive=null,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
 let idleCamera=null,unbindIdleCamera=null,unbindStartupLighting=null;
@@ -329,7 +332,7 @@ refreshIcons();localize();
 
 async function start(){
   try{
-    view=await ObservationView.create($('ship-view'),{characterViews:true});
+    view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true});
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
@@ -365,6 +368,7 @@ async function start(){
       reveal:()=>{$('loading').hidden=true;},
     });
     $('lighting-hint').hidden=false;
+    loadCabinLucyGroomCache(view.cat).then(()=>{cat.groomAvailable=true;},error=>console.warn('Lucy grooming correction unavailable; grooming stays off.',error));
     view.onSceneActivate=()=>{if(view.startupLighting.activate()){brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}};
     unbindStartupLighting=bindStartupLightingInput($('ship-view'),()=>view.onSceneActivate());
     previous=performance.now();
