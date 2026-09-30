@@ -202,6 +202,10 @@ export class CabinStartupLighting {
       const effect=this;
       const wrapped=function(shader,renderer){
         compile.call(this,shader,renderer);
+        // Milo's toon copies forward to their original material at compile
+        // time. A shared mug source may already have applied this same effect.
+        // Keep its uniforms and shader code instead of declaring them twice.
+        if(shader.uniforms.cabinBootActive===effect.active)return;
         // Custom ink shaders can intentionally omit the standard output chunks.
         if(!shader.vertexShader.includes('#include <project_vertex>')||!shader.fragmentShader.includes('#include <tonemapping_fragment>'))return;
         shader.uniforms.cabinBootActive=effect.active;shader.uniforms.cabinBootLevels=effect.levels;shader.uniforms.cabinBootRoomLevels=effect.roomLevels;
@@ -219,7 +223,7 @@ export class CabinStartupLighting {
           #include <tonemapping_fragment>`);
         if(spill)applyBathroomLightingShader(shader,bathrooms);
       };
-      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v9-'+Number(fixture)+'-'+Number(spill)+'-'+(lit?lights.length:0)+'-'+bathrooms.length;material.needsUpdate=true;
+      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v10-'+Number(fixture)+'-'+Number(spill)+'-'+(lit?lights.length:0)+'-'+bathrooms.length;material.needsUpdate=true;
       this.materials.push({material,compile,key,wrapped});
     }
     if(!start)this.update(STARTUP_TOTAL_SECONDS);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {Group,Mesh,InstancedMesh,BoxGeometry,MeshStandardMaterial,MeshBasicMaterial,MeshPhysicalMaterial,ShaderLib,PointLight,AdditiveBlending,Raycaster,Vector3,Box3} from 'three';
 import {CabinStartupLighting,STARTUP_LIGHT_DELAY,STARTUP_LIGHT_SECONDS,STARTUP_TOTAL_SECONDS,STARTUP_CIRCUITS,circuitDelay,circuitPower,revealStartupScene} from '../src/obs/startup-lighting.js';
 import {createCabinToon} from '../src/obs/cabin-toon.js';
+import {createMiloToon} from '../src/obs/milo-toon.js';
 import {createAccessLadder,FLOOR_Y} from '../src/obs/ship.js';
 import {screen,batchStatic} from '../src/obs/materials.js';
 import {createPlantRack} from '../src/obs/plants.js';
@@ -269,6 +270,27 @@ test('restarting and disposing lighting restores shaders without accumulating ho
     assert.equal(material.onBeforeCompile,original);assert.equal(material.customProgramCacheKey,key);assert.equal(root.children.length,1);assert.equal(disposed,false);
   }
   geometry.dispose();material.dispose();
+});
+
+test('shared printed mug and Milo toon copy apply the same startup lighting only once',()=>{
+  const furniture=new Group(),milo=new Group(),geometry=new BoxGeometry(),source=new MeshPhysicalMaterial();
+  const cup=new Mesh(geometry,source);furniture.add(cup);milo.add(new Mesh(geometry,source));
+  const printUniform={value:.75};
+  source.onBeforeCompile=shader=>{shader.uniforms.printDetail=printUniform;};
+  source.customProgramCacheKey=()=> 'test-shared-porcelain-print';
+  const toon=createMiloToon(milo),lighting=new CabinStartupLighting([furniture,milo],{waitForActivation:true});
+  try{
+    for(const mesh of [cup,milo.children[0]]){
+      const shader={uniforms:{},vertexShader:ShaderLib.physical.vertexShader,fragmentShader:ShaderLib.physical.fragmentShader};
+      mesh.material.onBeforeCompile(shader);
+      assert.equal(shader.uniforms.printDetail,printUniform,'original printed material hook remains active');
+      assert.equal(shader.uniforms.cabinBootActive,lighting.active);
+      assert.equal(shader.vertexShader.split('uniform float cabinBootActive;').length-1,1);
+      assert.equal(shader.vertexShader.split('vec4 bootPosition').length-1,1);
+      assert.equal(shader.fragmentShader.split('uniform float cabinBootActive;').length-1,1);
+      assert.equal(shader.fragmentShader.split('float cabinBootPower()').length-1,1);
+    }
+  }finally{lighting.dispose();toon.dispose();geometry.dispose();source.dispose();}
 });
 
 test('short-range fills marked for shaders light lit materials in range with the PointLight falloff',()=>{
