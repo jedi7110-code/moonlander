@@ -79,7 +79,6 @@ export function createMedicalBay(m,y){
   box(root,m.teal,2.14,y+1.77,-.285,.57,.53,.025,.018);
   box(root,m.white,2.14,y+1.77,-.266,.105,.35,.013);
   box(root,m.white,2.14,y+1.77,-.258,.35,.105,.013);
-  label(root,'SEALED',2.14,y+.30,-.25,.92,.17,{size:47});
   const bed=new THREE.Group();bed.name='Examination couch';bed.position.set(x,y,depth);root.add(bed);
   const pistons=[];
   for(const xx of [-.82,.82]){

@@ -46,7 +46,7 @@ test('couch stays clear of the passage, patient faces upward, and pose resets af
   globalThis.document={createElement(){return{getContext(){return ctx;}};}};
   try{bay=createMedicalBay(m,3.392);}finally{delete globalThis.document;}
   assert.equal(bay.root.getObjectByName('Sign: MED SUPPLIES'),undefined,'no heading plaque above the cabinet');
-  assert.ok(bay.root.getObjectByName('Sign: SEALED'),'keep the lower seal notice');
+  assert.equal(bay.root.getObjectByName('Sign: SEALED'),undefined,'no lower seal notice on the cabinet');
   for(const z of [-.266,-.258])assert.ok(bay.root.children.some(o=>o.isMesh&&o.position.x===2.14&&o.position.y===3.392+1.77&&o.position.z===z),'keep both first-aid cross strokes');
   const bounds=new Box3().setFromObject(bay.root);
   assert.ok(bounds.max.x<6.7);assert.ok(bounds.min.x>1.2);assert.ok(bounds.max.y<3.392+3.0);

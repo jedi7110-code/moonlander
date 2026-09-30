@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>マイロ視点 / 鏡の画質</title>
+<style>body{margin:0;background:#121a1c;color:#e3e8e2;font:14px system-ui}main{max-width:1200px;margin:auto;padding:20px}h1{font-size:20px;font-weight:500}canvas{display:block;width:100%;height:65vh;min-height:380px}nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}button{background:#293737;color:inherit;border:1px solid #56625c;padding:9px 14px;border-radius:5px;cursor:pointer}button[aria-pressed=true]{background:#426058}pre{white-space:pre-wrap;font-size:12px;color:#b4c6bc}a{color:#b4c6bc}</style></head>
+<body><main><h1>マイロ視点 / 鏡の画質</h1><p>OBS本編と同じ船内・人物・視点。鏡の範囲だけを描画し、マイロ視点以外では停止します。</p>
+<canvas id="mirror-view" aria-label="マイロ視点の鏡"></canvas>
+<nav><button id="pov">マイロ視点</button><button id="follow">マイロを外から</button><button id="wide">全景</button><button id="cat">猫視点</button><button id="current" aria-pressed="true">改善後</button><button id="legacy" aria-pressed="false">以前の画質</button><button id="measure">負荷を比較</button></nav>
+<p id="status" role="status">読み込み中…</p><pre id="metrics"></pre><a href="http://127.0.0.1:5173/3D/obs.html">OBSへ戻る</a>
+</main><script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script>
+<script type="module" src="./mirror-study.js"></script></body></html>

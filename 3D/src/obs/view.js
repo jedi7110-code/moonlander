@@ -37,7 +37,7 @@ import {updateMiloBandage} from './milo-bandage.js';
 import {createDroidChargingBay,DROID_DOCK} from './droid-charging.js';
 import {createDroidServiceRig} from './droid-service.js';
 import {CabinStartupLighting} from './startup-lighting.js';
-import {Reflector} from 'three/addons/objects/Reflector.js';
+import {createCabinMirror,isMiloMirrorView} from './cabin-mirror.js';
 import {attachHairGrowth} from './hair-growth.js';
 import {createGroomingTools,prepareGroomingMotion} from './grooming.js';
 import {createMachinedMetals} from './machined-metals.js';
@@ -93,8 +93,7 @@ export class ObservationView {
       tool.visible=false;
       tool.traverse(part=>{if(part.material?.anisotropy>0)part.material.defines.USE_UV='';});
     }
-    this.groomingMirror=new Reflector(new THREE.PlaneGeometry(.72,.89),{color:0xa8b5b5,textureWidth:256,textureHeight:384,clipBias:.002,multisample:0});
-    this.groomingMirror.getRenderTarget().stencilBuffer=true;this.groomingMirror.visible=false;
+    this.groomingMirror=createCabinMirror();
     this.restingMirror=new THREE.Mesh(new THREE.PlaneGeometry(.72,.89),new THREE.MeshStandardMaterial({color:0xa8b5b5,metalness:1,roughness:.08}));
     this.restingMirror.material.userData.cabinKeepSurface=true;
     this.ship.groomingStation.mirror.add(this.groomingMirror,this.restingMirror);
@@ -276,8 +275,9 @@ export class ObservationView {
       this.groomingMotion.update(grooming.time,{...pose,health:brain.health});this.hairGrowth.setGrowth(pose.hair,pose.beard);
     }else this.hairGrowth.setGrowth(brain.hairGrowth?.progress??0);
     for(const tool of Object.values(this.groomingTools))tool.visible=Boolean(grooming);
-    // A close grooming view is the only desktop view needing a second scene render.
-    this.groomingMirror.visible=Boolean(grooming)&&this.viewHeight<8&&!this.renderer.xr.isPresenting;
+    // The mirror is useful only through Milo's eyes; other cameras and XR
+    // keep the inexpensive metal surface. Offscreen reflections are culled.
+    this.groomingMirror.visible=isMiloMirrorView(this.characterCamera,this.renderer.xr.isPresenting);
     this.restingMirror.visible=!this.groomingMirror.visible;
     if(!paused)this.ship.fan.rotation.z+=dt*3.0;
     animateDelivery(this.ship,care,this.reducedMotion);
