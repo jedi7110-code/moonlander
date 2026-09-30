@@ -6,6 +6,7 @@ import {setCupHandFit,setMealHandFit} from './cup-hand-fit.js';
 import {reachMeal} from './meal-pose.js';
 import {CABIN_AISLE,HYDRO_TRAY} from './layout.js';
 import {createCupWater,updateCupWater} from './cup-water.js';
+import {printMugLogo} from './cup-print.js';
 
 const clamp=THREE.MathUtils.clamp,lerp=THREE.MathUtils.lerp;
 const smooth=value=>{const t=clamp(value,0,1);return t*t*(3-2*t);};
@@ -44,7 +45,8 @@ export function createDiningProps(body,m){
   const steel=new THREE.MeshStandardMaterial({color:0xc0c8c7,roughness:.32,metalness:.48});
   mug.name='Drinking cup';bowl.name='Meal bowl';spoon.name='Meal spoon';
   for(const prop of [mug,bowl,spoon]){body.add(prop);prop.visible=false;}
-  lathe(mug,m.white,[[0,-.064],[.032,-.064],[.039,-.056],[.046,.059],[.045,.067],[.041,.068],[.039,.057],[.033,-.052],[0,-.052]],'Hollow enamel cup');
+  const cup=lathe(mug,m.white,[[0,-.064],[.032,-.064],[.039,-.056],[.046,.059],[.045,.067],[.041,.068],[.039,.057],[.033,-.052],[0,-.052]],'Hollow enamel cup');
+  printMugLogo(cup,m.taraironLogo?.map,{centerY:.003});
   const handle=new THREE.Mesh(new THREE.TorusGeometry(.032,.006,12,32),m.white);
   handle.position.set(.066,.003,0);handle.scale.y=1.18;mug.add(handle);
   const water=createCupWater();mug.add(water);

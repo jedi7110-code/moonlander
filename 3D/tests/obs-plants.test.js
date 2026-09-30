@@ -66,7 +66,8 @@ test('empty or full-store harvests do not create a delivery',()=>{
 });
 test('recovery fixtures stay inside the service bay and the sight tube carries moving condensate',()=>{
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});let rack;
-  globalThis.document={createElement(){return{getContext(){return{fillRect(){},fillText(){},measureText(text){return{width:text.length*20};}};}};}};
+  const ctx=new Proxy({measureText:text=>({width:text.length*20})},{get:(o,k)=>o[k]??(()=>{})});
+  globalThis.document={createElement:()=>({getContext:()=>ctx})};
   try{rack=createPlantRack(m,0);}finally{delete globalThis.document;}
   for(const name of ['Humidity recovery hood','Condensate tray','Condensate sight tube','Replaceable filter cartridge','Enclosed UV treatment','Nutrient conductivity sensor','Nutrient reservoir'])assert.ok(rack.root.getObjectByName(name),name);
   const bounds=new Box3().setFromObject(rack.root);assert.ok(bounds.max.x<2.6);assert.ok(bounds.max.y<2.7);

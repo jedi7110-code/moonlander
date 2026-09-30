@@ -4,12 +4,14 @@ import {createLeisureProps} from './leisure.js';
 import {loungePropHome} from './lounge-handling.js';
 import {updateCatTeaser} from './cat-teaser.js';
 import {LOUNGE_TABLE} from './layout.js';
+import {printMugLogo} from './cup-print.js';
 
-export function createLoungeCoffee(){
+export function createLoungeCoffee(m={}){
   const root=new Group();root.name='Lounge coffee mug';
   const profile=[[0,0],[.033,0],[.041,.010],[.047,.120],[.045,.132],[.039,.132],[.038,.120],[.032,.012],[0,.012]];
   const cup=new Mesh(new LatheGeometry(profile.map(p=>new Vector2(...p)),48),whiteCeramic);
   cup.name='Table cup';cup.castShadow=cup.receiveShadow=true;root.add(cup);
+  printMugLogo(cup,m.taraironLogo?.map);
   const handle=new Mesh(new TorusGeometry(.033,.007,12,40),whiteCeramic);
   handle.name='Table cup handle';handle.position.set(.065,.067,0);handle.scale.y=1.18;
   handle.castShadow=handle.receiveShadow=true;root.add(handle);

@@ -1,11 +1,18 @@
 import * as THREE from 'three';
 import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
-import {box,ball,cylinder,rod,pipe,label} from './materials.js';
+import {box,ball,cylinder,rod,pipe} from './materials.js';
 import {CABIN_LIGHT_COLOR} from './lighting.js';
 import {createCondensateSight} from './condensate.js';
+import {addPlantLabel} from './plant-labels.js';
 
 function waterRecovery(root,m){
   const water=new THREE.MeshStandardMaterial({color:0x9bd7c8,roughness:.10,metalness:.15});
+  // Clean stainless service vessels and fittings; reuse the existing fine bump
+  // but not the dark structural-steel color/roughness maps.
+  const serviceMetal=m.metal.clone();serviceMetal.name='Hydroponics / stainless service metal';
+  serviceMetal.color.setHex(0xbdc7c9);serviceMetal.map=null;serviceMetal.roughnessMap=null;
+  serviceMetal.metalness=.78;serviceMetal.roughness=.36;serviceMetal.bumpScale=.001;serviceMetal.envMapIntensity=.65;
+  serviceMetal.userData.cabinKeepSurface=true;
   const hood=box(root,m.metal,0,2.56,-.68,2.90,.16,.70,.025);hood.name='Humidity recovery hood';
   for(let i=0;i<24;i++)box(root,m.black,-1.31+i*.114,2.56,-.318,.06,.06,.012);
   pipe(root,m.metal,[[1.34,2.56,-.73],[1.93,2.56,-.73],[1.93,2.16,-.73]],.09).name='Air return duct';
@@ -21,23 +28,23 @@ function waterRecovery(root,m){
   box(root,m.metal,2.03,1.86,-.60,.65,.055,.37,.015).name='Condensate tray';
   box(root,water,2.03,1.893,-.60,.52,.007,.23).name='Recovered condensate';
   // Only the condensate inspection segment is transparent; nutrient lines are opaque.
-  const condensate=createCondensateSight(root,m.metal);
+  const condensate=createCondensateSight(root,serviceMetal);
   pipe(root,m.black,[[1.73,.50,-.53],[1.73,.42,-.76],[.53,.32,-.76]],.034).name='Filtered condensate return';
-  cylinder(root,m.enamel,2.18,1.53,-.54,.12,.40).name='Replaceable filter cartridge';
-  for(const y of [1.32,1.74])cylinder(root,m.metal,2.18,y,-.54,.14,.04);
-  label(root,'FILTER',2.18,1.53,-.407,.19,.10,{size:40});
+  cylinder(root,serviceMetal,2.18,1.53,-.54,.12,.40).name='Replaceable filter cartridge';
+  for(const y of [1.32,1.74])cylinder(root,serviceMetal,2.18,y,-.54,.14,.04).name='Filter cartridge metal collar';
+  addPlantLabel(root,m,'filter',{x:2.18,y:1.53,z:-.54,width:.19,height:.316,radius:.122});
   pipe(root,m.black,[[2.03,1.87,-.70],[2.18,1.76,-.70],[2.18,1.75,-.54]],.025);
-  box(root,m.metal,2.16,1.05,-.59,.40,.29,.29,.02).name='Enclosed UV treatment';
-  label(root,'UV / SEALED',2.16,1.065,-.435,.34,.08,{size:48});
+  box(root,m.black,2.16,1.05,-.59,.40,.29,.29,.02).name='Enclosed UV treatment';
+  addPlantLabel(root,m,'uv',{x:2.16,y:1.095,z:-.442,width:.35,height:.168});
   ball(root,m.green,2.16,.99,-.428,.017,.017,.01);
   pipe(root,m.black,[[2.18,1.30,-.54],[2.18,1.22,-.54],[2.16,1.19,-.54]],.025);
   pipe(root,m.black,[[2.16,.90,-.54],[1.73,.88,-.53]],.025);
   box(root,m.black,2.10,.66,-.60,.65,.28,.16,.02).name='Nutrient conductivity sensor';
-  label(root,'EC / pH\nLOOP OK',2.10,.66,-.511,.59,.21,{fg:'#a2d9c7',size:48});
+  addPlantLabel(root,m,'sensor',{x:2.10,y:.66,z:-.517,width:.59,height:.253});
   for(const [i,text]of ['A','B'].entries()){
-    cylinder(root,m.enamel,1.87+i*.30,.29,-.57,.09,.26);
-    cylinder(root,m.black,1.87+i*.30,.45,-.57,.07,.045);
-    label(root,text,1.87+i*.30,.30,-.472,.10,.10,{size:48});
+    cylinder(root,serviceMetal,1.87+i*.30,.29,-.57,.09,.26).name=`Nutrient ${text} metal vessel`;
+    cylinder(root,serviceMetal,1.87+i*.30,.45,-.57,.07,.045).name=`Nutrient ${text} metal cap`;
+    addPlantLabel(root,m,`nutrient${text}`,{x:1.87+i*.30,y:.29,z:-.57,width:.14,height:.217,radius:.092});
     pipe(root,m.black,[[1.87+i*.30,.45,-.57],[1.87+i*.30,.48,-.83],[1.25,.24,-.83],[.6,.24,-.83]],.012);
   }
   return{rotor,condensate,water};
@@ -119,7 +126,7 @@ export function createPlantRack(m,x){
     rod(root,m.black,[side*1.35,.18,-.83],[side*1.35,2.43,-.83],.028);
   }
   box(root,m.dark,0,2.38,-.35,2.60,.19,.09,.01);
-  label(root,'HYDROPONICS',0,2.38,-.29,2.60,.19,{size:40});
+  addPlantLabel(root,m,'rack',{x:0,y:2.38,z:-.302,width:2.50,height:.176});
   const recovery=waterRecovery(root,m),rows=[];
   const growDiffuser=new THREE.MeshBasicMaterial({name:'Full-spectrum grow diffuser',color:CABIN_LIGHT_COLOR,toneMapped:false});
   growDiffuser.userData.cabinAlwaysPowered=true;
@@ -148,7 +155,7 @@ export function createPlantRack(m,x){
     rows.push({plants,segments,lamp,growLight});
   }
   box(root,m.teal,0,.23,-.80,1.24,.33,.42,.025).name='Nutrient reservoir';
-  label(root,'NUTRIENT / RETURN',0,.23,-.585,1.08,.13,{size:40});
+  addPlantLabel(root,m,'reservoir',{x:0,y:.23,z:-.587,width:1.10,height:.275});
   for(const side of [-1,1])pipe(root,m.black,[[side*1.35,.18,-.83],[side*.80,.15,-.83],[side*.62,.23,-.83]],.028);
   return{root,rows,recovery};
 }

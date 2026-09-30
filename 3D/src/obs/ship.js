@@ -32,6 +32,7 @@ import {finishLoungeSofa} from './lounge-sofa-finish.js';
 import {createLoungeTableFrame} from './lounge-table-frame.js';
 import {createRearWindowStars} from './space-stars.js';
 import {finishGateFrames} from './gate-frame-finish.js';
+import {createCatFoodCarton,createCatFoodMaterial} from './cat-food-package.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -150,7 +151,7 @@ function cupboard(parent,m,x,y,z,w=1.25,h=1.85) {
 export function createLoungeTable(m,titanium=createLoungeTitanium()){
   const root=createLoungeTableFrame(titanium,m.enamel),top=LOUNGE_SEAT.top+.32;
   box(root,m.red,-.45,top+.035/2,-.15,.38,.035,.24,.007).name='Table book';
-  const cup=createLoungeCoffee();cup.position.set(-.58,top+.035,-.20);cup.rotation.y=Math.PI;root.add(cup);
+  const cup=createLoungeCoffee(m);cup.position.set(-.58,top+.035,-.20);cup.rotation.y=Math.PI;root.add(cup);
   root.userData.loungeProps=createTableLeisureProps(root,m,top);
   return root;
 }
@@ -297,7 +298,6 @@ export function createDiningStation(m,action){
     cylinder(root,m.metal,-11.11,1.19,-.58,.146,.23,.17);
     box(root,m.dark,-9.3,1.075,-.29,.85,.03,.52,.08);
     pipe(root,m.metal,[[-9.3,1.01,-.73],[-9.3,1.41,-.73],[-9.3,1.45,-.44],[-9.3,1.30,-.38]],.028);
-    box(root,m.enamel,-11.90,1.42,-.33,.65,.74,.8,.045);grille(root,m,-11.9,1.4,.09,.37,.27);
     cylinder(root,m.white,-11.50,1.13,-.02,.055,.18,.065);
     docks.bowl.position.set(stationX+.095,1.077,.10);docks.bowl.rotation.y=Math.PI;docks.bowl.visible=true;
     docks.spoon.position.set(stationX-.17,1.039,.10);docks.spoon.visible=true;docks.bite.visible=false;
@@ -422,7 +422,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,catFood,Math.cos(a)*r,CAT_BOWL.foodHeight,Math.sin(a)*r,.025,.018,.022);}
   const ventilation=createCargoVentilation(m),fan=ventilation.rotor;
   staticRoot.add(ventilation.root);animated.add(fan);
-  const cargo=[];
+  const cargo=[],catFoodPackage=m.catFoodPackage??createCatFoodMaterial();
   ['food','water','catfood'].forEach((key,i)=>{
     const group=new THREE.Group();group.name='Delivery '+key;group.position.set(positionX(1110)+(i-1)*.70,.675,.32);group.visible=false;animated.add(group);
     if(key==='water'){
@@ -430,10 +430,14 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
       for(const side of [-1,1])box(group,m.metal,side*.22,.31,.211,.025,.5,.02);
       box(group,m.black,0,.63,0,.24,.085,.12,.022);label(group,'H2O',0,.30,.211,.38,.18,{size:60});
     }else for(let j=0;j<2;j++){
-      const y=.137+j*.283,material=key==='food'?m.olive:m.yellow;
-      box(group,material,0,y,0,.61,.272,.43,.025);
-      for(const side of [-1,1])box(group,m.dark,side*.20,y,.223,.04,.274,.012);
-      label(group,key==='food'?'RATIONS':'CAT FOOD',0,y,.227,.33,.11,{size:42});
+      const y=.137+j*.283;
+      if(key==='catfood'){
+        const carton=createCatFoodCarton(catFoodPackage);carton.position.y=y;group.add(carton);
+      }else{
+        box(group,m.olive,0,y,0,.61,.272,.43,.025);
+        for(const side of [-1,1])box(group,m.dark,side*.20,y,.223,.04,.274,.012);
+        label(group,'RATIONS',0,y,.227,.33,.11,{size:42});
+      }
     }
     cargo.push(group);
   });
@@ -455,5 +459,5 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   const staticMesh=mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
-  return {staticMesh,animated,targets,indicators,cargo,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
+  return {staticMesh,animated,targets,indicators,cargo,catFoodPackage,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
 }

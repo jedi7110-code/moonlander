@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {box,cylinder,rod,pipe} from './materials.js';
 import {createMiloBoot} from './characters.js';
+import {addEquipmentLabel} from './equipment-labels.js';
 
 function ring(root,material,x,y,z,r,tube){
   const mesh=new THREE.Mesh(new THREE.TorusGeometry(r,tube,8,32),material);
@@ -171,21 +172,21 @@ function stores(root,m){
   for(let row=0;row<3;row++){
     const y=.38+row*.51;
     box(rack,m.olive,-.46,y,.04,.78,.34,.56,.025).name='Food ration case';
-    box(rack,m.cloth,-.46,y,.327,.31,.13,.009);
+    addEquipmentLabel(rack,m,'rations',{x:-.46,y,z:.323,width:.32,height:.16});
     for(const dx of [-.27,.27])box(rack,m.yellow,-.46+dx,y,.333,.04,.34,.016);
   }
   for(let i=0;i<4;i++){
     const x=-.78+i*.21;
     cylinder(rack,m.enamel,x,1.89,.12,.077,.28,.077,16).name='Preserved food tin';
     cylinder(rack,m.metal,x,2.035,.12,.080,.015,.080,16);
-    box(rack,m.olive,x,1.90,.198,.11,.12,.01);
+    addEquipmentLabel(rack,m,'tin',{x,y:1.90,z:.12,width:.145,height:.145,radius:.079});
   }
   // Household supplies: detergent, folded linen and paper rolls.
   for(let i=0;i<3;i++){
     const x=.25+i*.24;
     box(rack,m.teal,x,.41,.04,.19,.40,.29,.025).name='Household detergent';
     box(rack,m.dark,x,.63,.04,.085,.055,.10,.01);
-    box(rack,m.cloth,x,.42,.192,.11,.16,.01);
+    addEquipmentLabel(rack,m,'detergent',{x,y:.42,z:.188,width:.14,height:.14});
   }
   for(let i=0;i<4;i++)box(rack,i%2?m.cloth:m.enamel,.49,.77+i*.09,.04,.69,.075,.55,.02).name='Stored linen';
   for(let row=0;row<2;row++)for(let col=0;col<3;col++){
@@ -193,7 +194,11 @@ function stores(root,m){
     const roll=cylinder(rack,m.cloth,x,y,.07,.105,.30,.105,20);roll.rotation.x=Math.PI/2;roll.name='Paper roll';
     const core=cylinder(rack,m.dark,x,y,.225,.030,.012,.030,12);core.rotation.x=Math.PI/2;
   }
-  for(let i=0;i<2;i++)box(rack,m.enamel,.29+i*.38,1.93,.03,.33,.36,.54,.02).name='Household supply box';
+  for(let i=0;i<2;i++){
+    const x=.29+i*.38;
+    box(rack,m.enamel,x,1.93,.03,.33,.36,.54,.02).name='Household supply box';
+    addEquipmentLabel(rack,m,'hygiene',{x,y:1.94,z:.303,width:.285,height:.1425});
+  }
 }
 
 export function createRearRoomFurnishings(m,g,wearMaterials=m){

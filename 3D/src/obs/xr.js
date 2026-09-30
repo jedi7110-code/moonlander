@@ -93,6 +93,7 @@ export class ObservationXR {
   }
   localize(){
     this.button.disabled=this.pending||this.support==='checking';
+    this.button.dataset.xrReady=String(this.support==='ready'||this.active);
     this.button.setAttribute('aria-pressed',String(this.active));
     this.button.classList.toggle('active',this.active);
     const label=this.active?this.words('立体表示を終了','Exit immersive 3D'):this.words('立体表示 / Meta Quest','Immersive 3D / Meta Quest');

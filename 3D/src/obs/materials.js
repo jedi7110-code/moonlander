@@ -2,17 +2,19 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {makeXRWideGeometry} from './xr-geometry.js';
+import {CAT_FOOD_PRINT,createCatFoodMaterial} from './cat-food-package.js';
 
 export async function materials() {
   const loader = new THREE.TextureLoader();
   const base=import.meta.env?.BASE_URL??'/3D/';
-  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring,taraironLogo]=await Promise.all([
+  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring,taraironLogo,catFoodPrint]=await Promise.all([
     Promise.all(['enamel','steel','twill','fur','industrial-paint','hoist-safety-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
     loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-left.png`),
     loader.loadAsync(`${base}assets/obs/workshirt-patch-right.png`),
     loader.loadAsync(`${base}assets/obs/ai-rack-wiring.png`),
     loader.loadAsync(`${base}assets/obs/tarairon-logo.svg`),
+    loader.loadAsync(`${base}${CAT_FOOD_PRINT}`),
   ]);
   maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
   maps[5].name='Hoist / worn yellow and black safety paint';
@@ -73,6 +75,7 @@ export async function materials() {
   };
   furTail.customProgramCacheKey=()=> 'obs-calico-tail-v1';
   return {
+    catFoodPackage:createCatFoodMaterial(catFoodPrint),
     taraironLogo:new THREE.MeshBasicMaterial({name:'TARAIRON / black wall logo',map:taraironLogo,color:0x000000,transparent:true,depthWrite:false,toneMapped:false}),
     aiWiring:new THREE.MeshBasicMaterial({name:'AI rack / baked wiring',map:rackWiring,color:0xb1bab4,toneMapped:false}),
     shipPaint:standard(0xd3d2c5,.86,.30,{map:maps[4]}),

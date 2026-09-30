@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createCatFoodMaterial,createCatFoodPouch} from './cat-food-package.js';
 import {box,cylinder,rod,ball,batchStatic} from './materials.js';
 import {DROID_SPEC,DROID_POSTURE} from './droid-model.js';
 import {LADDER} from './ladder-pose.js';
@@ -215,14 +216,13 @@ export function createDroidServiceRig(bay,ship){
   const cloth=prop('cloth');for(let i=0;i<3;i++)box(cloth,m.cloth,0,i*.045,0,.32,.048,.24,.013);
   const greens=prop('greens');box(greens,m.dark,0,-.03,0,.38,.055,.28,.015);
   for(let i=0;i<7;i++)ball(greens,m.green,(i%3-1)*.09,.05,Math.floor(i/3)*.07-.08,.068,.12,.05);
-  const food=prop('food');box(food,m.bag,0,0,0,.23,.25,.14,.018);box(food,m.dark,0,.04,.075,.13,.065,.007);
+  const catFoodPackage=ship.catFoodPackage??createCatFoodMaterial();
+  const food=prop('food');food.add(createCatFoodPouch(catFoodPackage));
   const waste=prop('waste'),wasteVariants={};
   for(const kind of ['wrapper','scraps']){
     const g=new THREE.Group();g.name='Discarded '+kind;
     if(kind==='wrapper'){
-      box(g,m.bag,0,0,0,.23,.25,.05,.01);
-      box(g,m.dark,0,.035,.029,.13,.065,.006);
-      const fold=box(g,m.bag,0,.132,-.008,.22,.025,.012);fold.rotation.x=.5;
+      g.add(createCatFoodPouch(catFoodPackage,{empty:true}));
     }else{
       box(g,m.dark,0,-.02,0,.30,.17,.18,.02);
       for(let i=0;i<3;i++){const scrap=box(g,i===1?m.green:m.bag,(i-1)*.074,.075,0,.10,.052,.13,.008);scrap.rotation.z=(i-1)*.24;}

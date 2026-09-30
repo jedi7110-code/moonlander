@@ -71,6 +71,19 @@ test('the click requests XR before yielding; double clicks cannot create two ses
   await s.immersive.exit();s.immersive.dispose();
 });
 
+test('mobile visibility exposes the 3D control only when immersive VR is available',async()=>{
+  const s=setup();assert.equal(s.button.dataset.xrReady,'false','hidden during initial support detection on mobile');
+  await s.immersive.ready;assert.equal(s.button.dataset.xrReady,'true','Quest keeps its entry point');
+  await s.immersive.toggle();assert.equal(s.button.dataset.xrReady,'true');
+  await s.immersive.exit();assert.equal(s.button.dataset.xrReady,'true');
+  s.xr.isSessionSupported=async()=>false;await s.immersive.checkSupport();assert.equal(s.button.dataset.xrReady,'false');
+  s.immersive.dispose();
+  for(const options of [{secure:false},{supported:false},{missing:true}]){
+    const phone=setup(options);await phone.immersive.ready;phone.immersive.localize();
+    assert.equal(phone.button.dataset.xrReady,'false');phone.immersive.dispose();
+  }
+});
+
 test('head tracking owns the camera, focus follows translation, and ending restores the desktop view',async()=>{
   const s=setup();await s.immersive.ready;const original=s.view.camera.clone();
   await s.immersive.toggle();s.immersive.update(1/72,xrFrame(transform(.2,1.6,.3,.3)));

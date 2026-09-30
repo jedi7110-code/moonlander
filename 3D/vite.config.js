@@ -14,6 +14,7 @@ export default defineConfig({
         obs: fileURLToPath(new URL('./src/obs.html', import.meta.url)),
         sofaStudy: fileURLToPath(new URL('./src/sofa-study.html', import.meta.url)),
         gateFrameStudy: fileURLToPath(new URL('./src/gate-frame-study.html', import.meta.url)),
+        equipmentLabelStudy: fileURLToPath(new URL('./src/equipment-label-study.html', import.meta.url)),
       },
       output: { manualChunks: { three: ['three'] } },
     },

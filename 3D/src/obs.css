@@ -53,6 +53,9 @@
 @media(max-width:480px){html[lang=en] .need>.need-row{font-size:9px;gap:2px}}
 @media(max-height:560px) and (min-width:600px) and (max-width:1200px){#observation{grid-template-rows:32px 112px minmax(0,1fr) 67px}}
 .vr-button{font:700 12px/1 Arial,sans-serif;letter-spacing:.02em}.vr-button:disabled{opacity:.4;cursor:wait}
+/* Hide the headset-only control on mobile, including landscape touch screens.
+   An available immersive headset keeps its entry point at any viewport size. */
+@media(max-width:760px),(hover:none) and (pointer:coarse){#obs-vr:not([data-xr-ready="true"]){display:none}}
 @media(max-width:400px){.view-top>span{display:none}}
 .character-camera{position:relative;display:flex}
 .camera-tools [data-tip]:hover::after{content:none}

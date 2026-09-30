@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {box as plainBox,cylinder,rod,pipe,label,batchStatic} from './materials.js';
+import {addEquipmentLabelPlate} from './equipment-labels.js';
 
 function box(parent,material,x,y,z,w,h,d,r=0){
   if(!r)return plainBox(parent,material,x,y,z,w,h,d);
@@ -146,9 +147,7 @@ export function createCargoStowage(m){
     box(root,m.rubber,0,y+.090,-.135,.265,.064,.050,.011);
     box(root,m.metal,0,y+.072,-.101,.191,.020,.035,.006);
     for(const x of [-w*.23,w*.23])box(root,paint,x,y-.044,-.133,.031,.205,.038,.006);
-    box(root,m.metal,-w*.15,y-.083,-.133,.27,.084,.020);
-    box(root,m.dark,-w*.17,y-.067,-.120,.196,.012,.008);
-    box(root,m.dark,-w*.185,y-.094,-.120,.160,.008,.008);
+    addEquipmentLabelPlate(root,m,['rations','water','parts'][i],{y:y-.071,z:-.121,width:.33,height:.165,border:.008,depth:.020});
   }
 
   const weave=webbingMaterial(),belt=weave.clone();belt.name='Cargo / dark rope tension straps';belt.color.setHex(0x787361);

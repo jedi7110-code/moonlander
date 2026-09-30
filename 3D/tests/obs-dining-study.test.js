@@ -18,6 +18,10 @@ test('water and kitchen studies use production durations, dock positions and con
   assert.ok(cup.min.z>tray.min.z+.02&&cup.max.z<tray.max.z-.02,'the entire cup fits with a small margin');
   assert.ok(Math.abs(cup.min.y-tray.max.y)<1e-6,'the cup sits on the tray surface');
   assert.equal(hydro.docks.mug.position.z,HYDRO_TRAY.cupZ);
+  const galley=study.stations.galley.root;
+  assert.ok(!galley.children.some(o=>o.isMesh&&o.position.x<-11.6),'the unused vent box and grille to the left of the kitchen stay removed');
+  assert.ok(galley.children.some(o=>o.isMesh&&o.position.x===-11.50&&o.position.y===1.13),'keep the adjacent countertop cup');
+  assert.equal(galley.children.filter(o=>o.geometry?.type==='TorusGeometry').length,4,'keep all four stove rings');
   const milo=createMilo(m);
   for(const id of ['hydro','galley','hydro']){
     const duration=diningStudyDuration(id);assert.equal(duration,getStation(id).dur/1000);

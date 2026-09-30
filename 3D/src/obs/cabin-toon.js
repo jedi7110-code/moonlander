@@ -100,7 +100,7 @@ export function createCabinToon(roots){
     if(!eligible(source)&&!keep)continue;
     if(!keep&&!materials.has(source))materials.set(source,toonMaterial(source));
     // Do not ink transparent panes, luminous lenses, thin cables or leaf cards.
-    if(source.side===DoubleSide||source.emissiveIntensity>1||/cable|rubber|rope/i.test(source.name)||(mesh.isSkinnedMesh&&!mesh.userData.cabinRigidSkin)||source.alphaTest>0)continue;
+    if(source.userData.cabinNoOutline||source.side===DoubleSide||source.emissiveIntensity>1||/cable|rubber|rope/i.test(source.name)||(mesh.isSkinnedMesh&&!mesh.userData.cabinRigidSkin)||source.alphaTest>0)continue;
     if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
     // The static cabin is already batched by material. Moving small details stay clean.
     const box=mesh.geometry.boundingBox,scale=mesh.matrixWorld.elements;

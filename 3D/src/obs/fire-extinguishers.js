@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {box,cylinder,rod,pipe} from './materials.js';
+import {addEquipmentLabel} from './equipment-labels.js';
 
 // Shared geometry and materials are merged with the static cabin.
 export function addFireExtinguishers(parent,m,floors){
@@ -22,15 +23,15 @@ export function addFireExtinguishers(parent,m,floors){
   rod(unit,red,[-.025,.648,0],[.128,.652,0],.017);
   const pin=new THREE.Mesh(new THREE.TorusGeometry(.027,.006,5,12),m.brass);
   pin.position.set(-.048,.615,.042);unit.add(pin);
-  pipe(unit,black,[[.028,.586,-.005],[.12,.579,-.02],[.178,.472,-.012],[.178,.225,.015],[.161,.175,.033]],.019);
-  rod(unit,black,[.161,.175,.033],[.145,.26,.045],.026);
+  // Let the hose end downward; no separate reversed tip at the bottom.
+  pipe(unit,black,[[.028,.586,-.005],[.12,.579,-.02],[.178,.472,-.012],[.178,.225,.015],[.161,.175,.033]],.019).name='Fire extinguisher / continuous hose';
 
   cylinder(unit,m.metal,0,.542,.056,.042,.048,.042,16).rotation.x=Math.PI/2;
   cylinder(unit,white,0,.542,.083,.032,.008,.032,16).rotation.x=Math.PI/2;
-  rod(unit,black,[0,.542,.089],[.013,.558,.089],.0035);
-  box(unit,white,0,.315,.113,.136,.19,.008,.008);
-  box(unit,red,0,.365,.119,.104,.025,.006);
-  for(let i=0;i<3;i++)box(unit,black,-.006,.325-i*.027,.119,.086-i*.009,.009,.006);
+  addEquipmentLabel(unit,m,'gauge',{y:.542,z:.089,width:.063,round:true});
+  addEquipmentLabel(unit,m,'extinguisher',{y:.292,width:.146,height:.292,radius:.118});
+  const inspection=addEquipmentLabel(unit,m,'inspection',{y:.315,width:.078,height:.078,radius:.1185});
+  inspection.rotation.y=-1.43;
 
   // Same position on every deck, above the cat duct and right of the ladder.
   return floors.map((floor,index)=>{

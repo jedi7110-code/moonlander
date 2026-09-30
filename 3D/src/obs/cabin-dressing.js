@@ -10,6 +10,8 @@ import {createWallControlMaterials,createWallControlPanel} from './wall-control-
 import {addWallSwitchPanels} from './wall-switch-panels.js';
 import {finishWallPrints} from './wall-prints.js';
 import {addSmokingAshtray} from './smoking-props.js';
+import {addEquipmentLabelPlate} from './equipment-labels.js';
+import {createUnderdeckServiceTank} from './underdeck-tank.js';
 
 function tin(root,m,x,y,z,h=.22,r=.09,paint=m.enamel){
   cylinder(root,paint,x,y+h/2,z,r,h,r,12);
@@ -29,7 +31,7 @@ function casePart(root,material,x,y,z,w,h,d,corner=.025){
   part.castShadow=part.receiveShadow=true;root.add(part);return part;
 }
 
-function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallZ=null){
+export function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallZ=null){
   const group=new THREE.Group();group.name='Industrial / protective equipment case';
   group.position.set(x,y,z);root.add(group);
   // The rubber seam sits between separate body and lid shells, not on their faces.
@@ -66,9 +68,7 @@ function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallZ=null){
   const valve=cylinder(group,m.rubber,w*.38,h*.30,.179,.023,.022,.023,10);valve.rotation.x=Math.PI/2;
   box(group,m.dark,w*.38,h*.30,.192,.025,.005,.004);
   // Small, unlit inventory plate, so the hardware carries the silhouette.
-  box(group,m.metal,0,h*.74,.174,w*.25,.052,.010);
-  box(group,m.dark,-w*.025,h*.745,.181,w*.17,.008,.004);
-  box(group,m.dark,-w*.044,h*.724,.181,w*.13,.004,.004);
+  addEquipmentLabelPlate(group,m,'parts',{y:h*.78,z:.187,width:w*.22,height:w*.11,border:.006});
 
   if(wallZ!==null){
     // Two short wall stand-offs and a lower retaining cradle visibly support it.
@@ -115,16 +115,7 @@ function heavyServices(root,m,y){
 function underdeck(root,m){
   const tanks=new THREE.Group();tanks.name='Underdeck service tanks';root.add(tanks);
   for(const [x,length]of [[-10.6,2.6],[-6.7,2.8],[3.3,2.4],[7.45,2.5]]){
-    const tank=cylinder(tanks,m.pipeSteel,x,-.91,.74,.28,length,.28,16);tank.rotation.z=Math.PI/2;
-    for(const dx of [-length*.34,length*.34]){
-      const strap=cylinder(tanks,m.dark,x+dx,-.91,.74,.296,.10,.296,16);strap.rotation.z=Math.PI/2;
-      box(tanks,m.dark,x+dx,-.53,.74,.09,.25,.67);
-    }
-    for(const side of [-1,1]){
-      const cap=cylinder(tanks,m.enamel,x+side*length/2,-.91,.74,.24,.09,.24,16);cap.rotation.z=Math.PI/2;
-      pipe(tanks,m.brass,[[x+side*length/2,-.91,.74],[x+side*(length/2+.19),-.91,.74],[x+side*(length/2+.19),-.54,.74]],.048);
-    }
-    box(tanks,m.yellow,x,-.86,1.027,.40,.12,.01);
+    const tank=createUnderdeckServiceTank(m,length);tank.position.set(x,-.91,.74);tanks.add(tank);
   }
   for(const x of [-3.9,10.4]){
     box(tanks,m.dark,x,-.84,.8,1.02,.62,.60);

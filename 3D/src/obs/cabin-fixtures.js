@@ -8,7 +8,7 @@ export const whiteCeramic=new MeshPhysicalMaterial({
 
 export function finishStaticCups(root){
   const loungeCup=root.getObjectByName('Table cup');
-  if(loungeCup)loungeCup.material=whiteCeramic;
+  if(loungeCup&&!loungeCup.userData.cupPrint)loungeCup.material=whiteCeramic;
   const kitchen=root.getObjectByName('Kitchen station');
   // Omit the original station's small plain cup at the far left.
   const cup=kitchen?.children.find(mesh=>mesh.isMesh&&mesh.geometry.type==='CylinderGeometry'&&
@@ -20,7 +20,7 @@ export function finishCabinFixtures(view){
   // Both the resting cup and Milo's held copy use the same clean ceramic.
   const mugs=[...Object.values(view.ship.diningDocks).map(dock=>dock.mug),view.milo.userData.dining?.mug];
   for(const mug of mugs)if(mug)mug.traverse(mesh=>{
-    if(mesh.isMesh&&!mesh.userData.cupWater)mesh.material=whiteCeramic;
+    if(mesh.isMesh&&!mesh.userData.cupWater&&!mesh.userData.cupPrint)mesh.material=whiteCeramic;
   });
 
   const rack=view.ship.plants;

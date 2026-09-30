@@ -21,14 +21,14 @@ function dispose(root){
   geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
 }
 
-test('sealed waste unit fits left of the galley below its existing wall equipment',()=>{
+test('sealed waste unit fits beside the galley cabinets without blocking the aisle',()=>{
   const metal=new MeshStandardMaterial(),unit=createWasteIncinerator({metal,dark:metal});
   try{
     for(const opening of [0,.25,.6,1]){
       unit.update(opening,false);unit.root.updateMatrixWorld(true);
       const bounds=new Box3().setFromObject(unit.root);
       assert.ok(bounds.min.x>-12.87&&bounds.max.x<-11.555,'clear of the hull and galley cabinets');
-      assert.ok(bounds.min.y>=-.001&&bounds.max.y<1.05,'floor mounted below the wall equipment');
+      assert.ok(bounds.min.y>=-.001&&bounds.max.y<1.05,'floor mounted below counter height');
       assert.ok(bounds.max.z<CABIN_AISLE.crewZ,'door clears the main traffic lane');
     }
     let lights=0;unit.root.traverse(o=>{if(o.isLight)lights++;});assert.equal(lights,0);
