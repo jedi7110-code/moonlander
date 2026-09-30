@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import {createCatFoodMaterial,createCatFoodPouch} from './cat-food-package.js';
+import {createKibbleStream} from './kibble-stream.js';
 import {box,cylinder,rod,ball,batchStatic} from './materials.js';
 import {DROID_SPEC,DROID_POSTURE} from './droid-model.js';
 import {LADDER} from './ladder-pose.js';
 import {CABIN_LADDER} from './cabin-ladder.js';
-import {CAT_BOWL,WASTE_INCINERATOR as WASTE} from './layout.js';
+import {CAT_BOWL,LADDER_X,WASTE_INCINERATOR as WASTE} from './layout.js';
 import {sampleDroidTurn} from './droid-turn.js';
 import {DROID_LADDER_LANDING,LADDER_ENTRY} from './pace.js';
 import {fitLadderEntryBody} from './ladder-entry.js';
@@ -12,6 +13,7 @@ import {fitLadderEntryBody} from './ladder-entry.js';
 const mix=THREE.MathUtils.lerp,clamp=THREE.MathUtils.clamp;
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const V=(...v)=>new THREE.Vector3(...v),UP=V(0,1,0);
+const FOOD_POUR_TILT=Math.PI-.9;
 const lerpPoint=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t));
 
 export function droidServiceExpression(p){
@@ -42,7 +44,7 @@ function fitCarriedObject(out,p,loads){
   if(!kind||!out.hands||p.climb)return;
   const shape=kind==='cargo'?loads.cargo[p.cargoIndex??0]:kind==='waste'?loads.waste[p.wasteKind??'scraps']:loads[kind];
   const indices=['harvest','washer-open','washer-close'].includes(a)?[0]:[0,1];
-  const q=new THREE.Quaternion().setFromAxisAngle(V(1,0,0),a==='food-pour'?-.9*smooth(p.age/1.4):0);
+  const q=new THREE.Quaternion().setFromAxisAngle(V(1,0,0),a==='food-pour'?FOOD_POUR_TILT*smooth(p.age/1.4):0);
   const position=V(...out.hands[indices[0]]);
   if(indices.length===2)position.add(V(...out.hands[1])).multiplyScalar(.5);
   position.y+=shape.offsetY;
@@ -238,7 +240,8 @@ export function createDroidServiceRig(bay,ship){
   pot.position.set(-10.56,1.075,-.17);
   const board=prop('board');box(board,m.bag,0,0,0,.40,.025,.22,.012);board.position.set(-10.00,1.065,-.015);
   for(let i=0;i<7;i++)box(board,m.green,(i-3)*.04,.025,0,.025,.028,.095,.009);
-  const stream=prop('kibble');for(let i=0;i<10;i++)ball(stream,m.food,(i%3-1)*.013,-i*.028,0,.012,.012,.012);
+  const stream=prop('kibble'),kibble=createKibbleStream(m.food);stream.add(kibble.mesh);
+  const pourSource=V(),pourBowl=V((CAT_BOWL.x-LADDER_X)*.022,CAT_BOWL.foodHeight-.005,CAT_BOWL.depth);
   const cargo=ship.cargo.map((source,i)=>{const g=source.clone(true);g.name='Handled supply '+i;root.add(g);return g;});
   const stored=ship.cargo.map((source,i)=>{const g=source.clone(true);g.name='Stored supply '+i;g.position.set(-1.20,.122+i*.65,-3.70);root.add(g);return g;});
   const measure=(g,offsetY)=>{
@@ -293,8 +296,11 @@ export function createDroidServiceRig(bay,ship){
     if(p.carrying==='greens'||a==='harvest')held(greens,[0,-.10,0],a!=='harvest',0);
     if(p.carrying==='food')held(food,[0,.08,0],true);
     if(a==='food-pour'&&routine.carriedFood){
-      if(!model.load)food.rotation.x=-.9*smooth(t/1.4);
-      if(t>1.5&&t<p.duration-1){held(stream,[0,-.03,.09],true);stream.position.y-=((t*1.7)%1)*.06;}
+      if(!model.load)food.rotation.x=FOOD_POUR_TILT*smooth(t/1.4);
+      // The tilted pouch lip, not a rigid cluster attached to the wrists.
+      pourSource.set(0,.125,.006).applyQuaternion(food.quaternion).add(food.position);
+      pourBowl.y=p.y+CAT_BOWL.foodHeight-.005;
+      stream.visible=kibble.update(t,p.duration,routine.completed?.feed??0,pourSource,pourBowl)>0;
     }
     if(a==='scrub-toilet')held(brush);
     if(a==='scrub-shower')held(sponge);
