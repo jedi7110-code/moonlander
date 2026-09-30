@@ -10,7 +10,6 @@ const LOUNGE_LIGHTS=[6.25,8.65];
 export const REAR_WALL_PIPE_RUNS=[
   {label:'操縦席の左脇',deck:DECK.OPERATIONS,x:-11.35,z:-1.58,direction:-1},
   {label:'ラウンジ入口',deck:DECK.HABITATION,x:4.98,z:-1.58,direction:-1},
-  {label:'ラウンジ右端',deck:DECK.HABITATION,x:9.65,z:-1.58,direction:-1},
   {label:'運動区画と機関部の間',deck:DECK.LIFE_SUPPORT,x:3.97,z:-1.58,direction:1},
   {label:'貨物ハッチ左脇',deck:DECK.LIFE_SUPPORT,x:7.86,z:-1.843,direction:-1},
 ];
@@ -306,7 +305,7 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
     cableRun(root,m,x-.60,x+.62,y+2.52,-1.19,2,.12);
   }
   // Exposed services in the formerly bare wall bays; never in the ladder well.
-  for(const [x,width] of (level===DECK.HABITATION?[[-4.2,1.5],[3.0,.7],[10.55,.8]]:level===DECK.OPERATIONS?[]:[[1.65,1.2]])){
+  for(const [x,width] of (level===DECK.HABITATION?[[-4.2,1.5],[3.0,.7]]:level===DECK.OPERATIONS?[]:[[1.65,1.2]])){
     box(root,m.dark,x,y+1.95,-1.40,width,.64,.18,.035);
     for(let i=0;i<3;i++){
       const yy=y+1.72+i*.21;
@@ -314,7 +313,7 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
       for(const end of [-1,1])flange(root,m,x+end*(width/2-.12),yy,-1.23,.049);
     }
     box(root,m.enamel,x+width/2-.09,y+1.95,-1.12,.09,.74,.08,.012);
-    // Keep the bunk, dumbbells and towel rack clear of dangling cable loops.
+    // Keep the bunk and dumbbells clear of dangling cable loops.
     if(level===DECK.HABITATION&&x===3.0){
       pipe(root,m.cable,[[x-width*.3,y+1.61,-1.24],[x-width*.3,y+1.30,-1.24],[x+width*.3,y+1.24,-1.24],[x+width*.3,y+1.61,-1.24]],.025);
     }

@@ -10,6 +10,35 @@ import {createScreenGlow} from '../src/obs/screen-glow.js';
 import {displayFrame} from '../src/obs/display-frame.js';
 import {LADDER_LIGHT_LAYOUT,EVA_SPOT_LAYOUT} from '../src/obs/lighting.js';
 import {createEVASpotlights} from '../src/obs/eva.js';
+import {ObservationView} from '../src/obs/view.js';
+
+test('manual startup holds only ceiling power indefinitely, then ignites once and settles in 1.6 seconds',()=>{
+  for(const reducedMotion of [false,true]){
+    const effect=new CabinStartupLighting([],{reducedMotion,waitForActivation:true});
+    const uniforms=[effect.active,effect.levels,effect.roomLevels];
+    for(const dt of [1/60,1,60,3600])effect.update(dt);
+    assert.equal(effect.waiting,true);assert.equal(effect.time,0);assert.equal(effect.done,false);
+    assert.equal(effect.active.value,1);assert.ok(effect.levels.value.every(p=>p===0));assert.ok(effect.roomLevels.value.every(p=>p===0));
+    assert.equal(effect.shaderLights.on.value,1,'practical lights are independent of ceiling power');
+    assert.equal(effect.activate(),true);assert.equal(effect.waiting,false);assert.equal(effect.time,STARTUP_LIGHT_DELAY);
+    effect.update(.1);assert.ok(effect.levels.value.some(p=>p>0),'no extra one-second delay after clicking');
+    assert.equal(effect.activate(),false);assert.equal(effect.time,STARTUP_LIGHT_DELAY+.1,'repeated clicks never reset the sequence');
+    effect.update(STARTUP_LIGHT_SECONDS-.1);assert.equal(effect.done,true);assert.equal(effect.active.value,0);
+    assert.ok(effect.levels.value.every(p=>p===1));assert.equal(effect.activate(),false);
+    assert.deepEqual([effect.active,effect.levels,effect.roomLevels],uniforms);
+    effect.dispose();
+  }
+});
+
+test('OBS reuses compiled lighting for click standby while study restarts stay automatic',()=>{
+  const effect=new CabinStartupLighting([],{start:false}),view={startupLighting:effect,reducedMotion:false};
+  assert.equal(effect.done,true);assert.equal(effect.waiting,false);
+  ObservationView.prototype.startLighting.call(view,{waitForActivation:true});
+  effect.update(100);assert.equal(effect.time,0);assert.equal(effect.waiting,true);assert.equal(effect.active.value,1);
+  ObservationView.prototype.startLighting.call(view);
+  effect.update(STARTUP_TOTAL_SECONDS);assert.equal(effect.waiting,false);assert.equal(effect.done,true);
+  effect.dispose();assert.equal(effect.activate(),false);
+});
 
 test('cold rendering stays behind the loader and a zero-power frame is presented before the startup clock can run',async()=>{
   const effect=new CabinStartupLighting([]),events=[],frames=[];

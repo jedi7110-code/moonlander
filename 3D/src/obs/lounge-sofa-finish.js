@@ -204,6 +204,10 @@ export function finishLoungeSofa(sofa,m){
   const seat=sofa.getObjectByName('Sofa seat');
   seat.geometry.dispose();seat.geometry=returnedSeatGeometry();
   seat.name='Study seat with returned front edge';seat.position.set(7.4,0,0);
+  // A slightly lighter, warmer sage separates the horizontal seat from the
+  // original deep-green back. Share the upholstery maps, not its colour state.
+  seat.material=m.cushion.clone();seat.material.name='Lounge sofa / sage seat upholstery';
+  seat.material.color.setHex(0x58675f);
 
   const back=sofa.getObjectByName('Sofa backrest');
   back.geometry.dispose();back.geometry=chamferedBackGeometry();

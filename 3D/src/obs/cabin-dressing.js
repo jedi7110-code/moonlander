@@ -12,6 +12,8 @@ import {finishWallPrints} from './wall-prints.js';
 import {addSmokingAshtray} from './smoking-props.js';
 import {addEquipmentLabelPlate} from './equipment-labels.js';
 import {createUnderdeckServiceTank} from './underdeck-tank.js';
+import {createCoffeeMachine} from './coffee-machine.js';
+import {createMaintenanceSprayCan} from './maintenance-spray.js';
 
 function tin(root,m,x,y,z,h=.22,r=.09,paint=m.enamel){
   cylinder(root,paint,x,y+h/2,z,r,h,r,12);
@@ -84,15 +86,18 @@ export function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallZ=null){
   return group;
 }
 
-function cloth(root,m,x,y,z,w=.36,h=.55){
-  const geo=new THREE.PlaneGeometry(w,h,8,8),p=geo.attributes.position;
-  for(let i=0;i<p.count;i++){
-    const xx=p.getX(i),yy=p.getY(i),s=(h/2-yy)/h;
-    p.setXYZ(i,xx+s*.025*Math.sin(yy*13),yy,Math.sin(xx*48)*.027+s*s*.06);
-  }
-  geo.computeVertexNormals();const mat=m.cloth.clone();mat.side=THREE.DoubleSide;
-  const mesh=new THREE.Mesh(geo,mat);mesh.position.set(x,y-h/2,z);mesh.castShadow=true;root.add(mesh);
-  rod(root,m.metal,[x-w*.55,y,z],[x+w*.55,y,z],.02);
+export function createLoungeCoffeeStation(m,casePaint,titanium){
+  const root=new THREE.Group();root.name='Lounge coffee station';
+  const machine=createCoffeeMachine(m,titanium);machine.position.set(0,.82,-1.12);root.add(machine);
+  // Retain the original case and its label. Stow it below the wall-mounted
+  // machine, outside both the mug bay and the crew's walking lane.
+  const hardCase=equipmentCase(root,m,casePaint,.06,.04,-.72,.83,.43);
+  hardCase.rotation.y=.12;hardCase.name='Lounge protective equipment case';
+  const spray=createMaintenanceSprayCan(m,machine.getObjectByName('Coffee / machined side cheek').material);
+  // Rest on the flat top of the case body, outside the handle and its mounts.
+  spray.position.set(-.285,.436,-.035);spray.rotation.y=-.26;hardCase.add(spray);
+  root.userData.coffeeMachine=machine;root.userData.hardCase=hardCase;root.userData.maintenanceSpray=spray;
+  return root;
 }
 
 function heavyServices(root,m,y){
@@ -152,11 +157,8 @@ export function addCabinDressing(parent,m,floors){
   const extinguishers=addFireExtinguishers(root,m,floors);
   const switches=addWallSwitchPanels(root,floors);
 
-  // Keep the wall above the lounge clear of shelves and stored objects.
-  const loungeCase=equipmentCase(root,m,casePaint,10.14,habitation+.04,-.18,.83,.43);
-  loungeCase.rotation.y=.28; // Right end toward the wall, left end toward the aisle.
-  cloth(root,m,10.20,habitation+1.63,-1.02,.47,.81);
-  box(root,m.dark,10.19,habitation+1.69,-1.10,.68,.08,.10);
+  const coffeeStation=createLoungeCoffeeStation(m,casePaint,parent.getObjectByName('Sofa floor-reaching arm')?.material);
+  coffeeStation.position.set(10.20,habitation,0);root.add(coffeeStation);
   const controlMaterials=createWallControlMaterials();
   for(const [x,y,w]of [[-11.94,habitation+1.73,.62],[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]]){
     const cabinet=createWallControlPanel(controlMaterials,w);cabinet.position.set(x,y,-1.15);root.add(cabinet);

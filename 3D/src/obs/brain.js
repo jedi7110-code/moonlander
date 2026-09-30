@@ -42,13 +42,13 @@ export class CabinBrain extends Brain {
     this.environment=new CabinEnvironment({random,onEvent:event=>this.scene.obsUI?.environmentEvent?.(event)});
     this.hatchRepair=null;
   }
-  beginWakeUp(){
+  beginWakeUp({waitForActivation=false}={}){
     if(this.bunkVisit)return false;
     const station=getStation('bunk');
     this.actor.floor=station.floor;this.actor.x=station.x;this.actor.y=FLOORS[station.floor].y;
     this.actor.queue=[];this.actor.onArrive=null;this.actor.facing=1;this.actor.setSymbol('');
     this.cur=station;this.state='wakingBunk';this.actKey='perform';this.actStation='bunk';this.recoverNeed=null;
-    this.openingWake={age:0};
+    this.openingWake={age:0,waiting:waitForActivation};
     this.bunkVisit=new BunkVisit({startAsleep:true,
       exited:()=>{
         this.catRoutine?.finishBunkWake();this.openingWake=null;this.bunkVisit=null;
@@ -57,6 +57,12 @@ export class CabinBrain extends Brain {
     });
     this.bunkVisit.startYaw=0;
     this.catRoutine?.beginBunkWake(this.bunkVisit);
+    return true;
+  }
+  releaseOpeningSleep(){
+    if(!this.openingWake?.waiting)return false;
+    this.openingWake.waiting=false;this.openingWake.age=OPENING_SLEEP_SECONDS;
+    this.bunkVisit.requestExit();
     return true;
   }
   get statusNeeds(){return{...this.needs,exercise:this.exercise,health:this.health.value};}
@@ -70,6 +76,13 @@ export class CabinBrain extends Brain {
   }
   update(dt){
     if(this.state==='playingGame')return;
+    if(this.openingWake?.waiting){
+      // Keep ship time and life support live without consuming the opening
+      // sleep, needs or health. Lucy follows this same sleeping bunk visit.
+      this.clock=(this.clock+dt*1000)%this.dayMs;
+      this.environment.update(dt);this.plants.update(dt);
+      return;
+    }
     const harvest=this.harvestDelivery;
     const grooming=this.grooming;
     const smoking=this.smokingVisit;
@@ -276,6 +289,7 @@ export class CabinBrain extends Brain {
     if(['eva','airlock','innerHatch'].includes(station.id))this.scene.obsUI?.inspectEVA?.(station.id);
   }
   _endPerform(){
+    if(this.openingWake?.waiting)return;
     if(this.hatchRepair){this.hatchRepair.requestExit();return;}
     if(this.smokingVisit){this.smokingVisit.requestExit();return;}
     if(this.bunkVisit){this.state='leavingBunk';this.recoverNeed=null;this.bunkVisit.requestExit();return;}
@@ -300,6 +314,7 @@ export class CabinBrain extends Brain {
     this.finishDeparture();
   }
   deferDeparture(callback){
+    if(this.openingWake?.waiting){this.afterActivity=callback;return true;}
     this.cancelQueuedGrooming();
     if(this.hatchRepair){this.afterActivity=callback;this.hatchRepair.requestExit();return true;}
     if(this.smokingVisit){this.afterActivity=callback;this.smokingVisit.requestExit();return true;}

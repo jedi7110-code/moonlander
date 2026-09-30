@@ -6,7 +6,8 @@ import {BUNK_BED,reclineProgress} from '../src/obs/recline.js';
 import {MED_BED,medicalDuration} from '../src/obs/medical.js';
 import {BunkVisit} from '../src/obs/bunk-visit.js';
 import {CabinBrain,OPENING_SLEEP_SECONDS} from '../src/obs/brain.js';
-import {CrewMotion,Supplies,CatRoutine,getStation} from '../src/obs/state.js';
+import {CrewMotion,Supplies,CatRoutine,getStation,advanceCabinTraffic} from '../src/obs/state.js';
+import {CabinStartupLighting} from '../src/obs/startup-lighting.js';
 
 const character=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 const pose=(root,action,time,duration=9)=>{
@@ -75,6 +76,45 @@ test('the cabin opens with Milo and Lucy asleep together, then wakes and release
   brain.update(.2);assert.equal(brain.bunkVisit.phase,'waking');
   for(let i=0;i<1800&&brain.bunkVisit;i++){cat.update(1/60,actor);brain.update(1/60);}
   assert.equal(brain.bunkVisit,null);assert.equal(brain.openingWake,null);assert.equal(cat.bunkWake,null);assert.equal(brain.state,'idle');assert.equal(cat.mode,'walk');
+});
+
+test('click standby keeps both asleep while ship time advances, and lighting activation releases one normal wake-up',()=>{
+  const actor=new CrewMotion(),care=new Supplies(),cat=new CatRoutine(care,{random:()=>.5,turns:true,mouseChase:true});
+  const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.5});brain.catRoutine=cat;
+  brain.beginWakeUp({waitForActivation:true});
+  const lights=new CabinStartupLighting([],{waitForActivation:true});
+  const clock=brain.clock,needs={...brain.statusNeeds},x=actor.x,catX=cat.motion.x,pose=brain.bunkVisit.pose;
+  const step=dt=>{care.update(dt);advanceCabinTraffic(actor,cat,dt);brain.update(dt);lights.update(dt);};
+  for(let i=0;i<60*60;i++)step(1/60);
+  assert.ok(Math.abs(brain.clock-(clock+60000)%brain.dayMs)<.001,'ship clock keeps running');
+  assert.ok(brain.environment.clock>59);assert.ok(brain.plants.rows[0].growth>.9);
+  assert.equal(brain.openingWake.age,0);assert.equal(brain.openingWake.waiting,true);
+  assert.equal(brain.bunkVisit.phase,'sleeping');assert.deepEqual(brain.bunkVisit.pose,pose);
+  assert.equal(cat.mode,'sleep');assert.equal(cat.motion.x,catX);assert.equal(actor.x,x);
+  assert.equal(cat.motion.busy,false);assert.equal(actor.busy,false);assert.equal(cat.mouseChase.controlled,false);
+  assert.deepEqual(brain.statusNeeds,needs);assert.equal(lights.time,0);
+  // Even a very long dark wait must not force either sleeper into an activity.
+  step(3600);assert.equal(brain.bunkVisit.phase,'sleeping');assert.equal(cat.mode,'sleep');assert.deepEqual(brain.statusNeeds,needs);
+  assert.equal(lights.activate(),true);assert.equal(brain.releaseOpeningSleep(),true);
+  assert.equal(brain.bunkVisit.phase,'waking');assert.equal(brain.bunkVisit.age,0);
+  step(1);const age=brain.bunkVisit.age;
+  assert.equal(lights.activate(),false);assert.equal(brain.releaseOpeningSleep(),false);assert.equal(brain.bunkVisit.age,age);
+  // Avoid an unrelated maintenance fault, accumulated during the long wait.
+  brain.environment.fault=null;brain.environment.nextFault=Infinity;
+  for(let i=0;i<1800&&brain.bunkVisit;i++)step(1/60);
+  assert.equal(brain.openingWake,null);assert.equal(brain.bunkVisit,null);assert.equal(cat.bunkWake,null);
+  assert.equal(cat.mode,'walk');assert.equal(lights.done,true);lights.dispose();
+});
+
+test('orders received during opening standby wait until the sleepers are released',()=>{
+  const actor=new CrewMotion(),care=new Supplies(),cat=new CatRoutine(care,{random:()=>.5});
+  const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.5});brain.catRoutine=cat;
+  brain.beginWakeUp({waitForActivation:true});brain._go(getStation('hydro'));brain._endPerform();
+  brain.update(60);cat.update(60,actor);
+  assert.equal(brain.bunkVisit.phase,'sleeping');assert.equal(brain.bunkVisit.exitRequested,false);assert.equal(cat.mode,'sleep');assert.equal(actor.busy,false);
+  brain.releaseOpeningSleep();
+  for(let i=0;i<1800&&brain.bunkVisit;i++){cat.update(1/60,actor);brain.update(1/60);}
+  assert.equal(brain.actStation,'hydro');assert.equal(actor.busy,true);
 });
 
 test('Lucy leaves after landing, before Milo finishes rising, without a heading snap or a second release',()=>{

@@ -554,6 +554,9 @@ export function createDroid({detail='study'}={}){
   const {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators}=low?createDroidLowParts(DROID_SPEC,DROID_EXPRESSIONS,expressionPaths):buildDroidDetailed();
   m.batteryTexture=createDroidBatteryAtlas();
   m.battery=new THREE.MeshBasicMaterial({name:'Droid / four amber battery lamps',map:m.batteryTexture,toneMapped:false});
+  // Self-lit tubes and charge indicators run from the droid, not the ceiling
+  // circuit. Preserve their baked orange halos while the cabin is dark.
+  for(const material of [m.amber,m.halo,m.glow,m.battery])if(material)material.userData.cabinAlwaysPowered=true;
   const batteryMesh=new THREE.Mesh(new THREE.PlaneGeometry(.025,.073),m.battery);
   batteryMesh.name='Droid / battery level';batteryMesh.position.set(-.001,.326,.1012);chassis.add(batteryMesh);
   const batteryUV=batteryMesh.geometry.attributes.uv,originalBatteryUV=batteryUV.array.slice();

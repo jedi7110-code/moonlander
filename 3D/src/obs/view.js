@@ -107,9 +107,9 @@ export class ObservationView {
     limitShadowCasters(this.scene);
   }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
-  startLighting(){
-    if(this.startupLighting){this.startupLighting.restart(this.reducedMotion);return;}
-    this.startupLighting=new CabinStartupLighting([this.ship.staticMesh,this.ship.animated,this.droidBay.root,this.droidService.root,this.harvestDelivery.root,this.milo,this.cat,this.mouse.root],{reducedMotion:this.reducedMotion});
+  startLighting({waitForActivation=false}={}){
+    if(this.startupLighting){this.startupLighting.restart(this.reducedMotion,{waitForActivation});return;}
+    this.startupLighting=new CabinStartupLighting([this.ship.staticMesh,this.ship.animated,this.droidBay.root,this.droidService.root,this.harvestDelivery.root,this.milo,this.cat,this.mouse.root],{reducedMotion:this.reducedMotion,waitForActivation});
   }
   targetAt(event){
     const rect=this.canvas.getBoundingClientRect();this.pointer.set((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);this.raycaster.setFromCamera(this.pointer,this.camera);

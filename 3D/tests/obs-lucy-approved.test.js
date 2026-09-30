@@ -25,6 +25,26 @@ function bounds(root){
     m.skeleton?.update();for(let i=0;i<m.geometry.attributes.position.count;i++)points.push(m.getVertexPosition(i,p).applyMatrix4(m.matrixWorld).clone());
   });return points;
 }
+test('sleep state shares the rendered transition, fixed neck and closed eyes with POV',async()=>{
+  const cat=await create(),c=cat.userData.cabin,head=cat.getObjectByName('Bone004');
+  const frame=(age,remaining=100,extra={})=>animateCabinLucy(cat,{dt:1/60,time:age,mode:'sleep',actionTime:age,remaining,yaw:0,...extra});
+  frame(0);assert.equal(c.sleepWeight,0);
+  frame(1.1);assert.equal(c.sleepWeight,.5);
+  frame(4);const rotation=head.quaternion.clone(),position=head.position.clone();
+  for(const age of [5,8,14,28]){
+    frame(age);assert.equal(c.sleepWeight,1);
+    assert.ok(head.quaternion.angleTo(rotation)<1e-7);assert.ok(head.position.distanceTo(position)<1e-9);
+    assert.ok(c.lids.every(m=>m.visible));assert.ok(c.eyes.every(m=>!m.visible));
+  }
+  frame(28,.6);assert.equal(c.sleepWeight,.5);
+  frame(29,0,{dt:0});assert.equal(c.sleepWeight,.5,'pause preserves the rendered eyelid/neck state');
+  frame(29,0);assert.equal(c.sleepWeight,0);assert.ok(c.eyes.every(m=>m.visible));
+  frame(30);assert.equal(c.sleepWeight,1);
+  frame(31,100,{moving:true});assert.equal(c.sleepWeight,0);
+  frame(32,100,{turn:sampleCatTurn(createCatTurn(0,Math.PI/2))});assert.equal(c.sleepWeight,0);
+  frame(33,100,{mode:'groom'});assert.equal(c.sleepWeight,0);
+  disposeCabinLucy(cat);
+});
 test('the rendered wake-up retains the navigation heading through rise, turn, jump and rest',async()=>{
   const root=await create(),cat=new CatRoutine(new Supplies(),{turns:true,random:()=>.5}),visit=new BunkVisit({startAsleep:true});
   cat.beginBunkWake(visit);

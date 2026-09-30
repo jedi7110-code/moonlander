@@ -29,6 +29,7 @@ import {createShowerFixtures} from './shower-fixtures.js';
 import {createBathroomCeilingLight} from './bathroom-lighting.js';
 import {addBathroomRearWindow} from './bathroom-window.js';
 import {finishLoungeSofa} from './lounge-sofa-finish.js';
+import {createLoungeCap} from './lounge-cap.js';
 import {createLoungeTableFrame} from './lounge-table-frame.js';
 import {createRearWindowStars} from './space-stars.js';
 import {finishGateFrames} from './gate-frame-finish.js';
@@ -151,7 +152,7 @@ function cupboard(parent,m,x,y,z,w=1.25,h=1.85) {
 export function createLoungeTable(m,titanium=createLoungeTitanium()){
   const root=createLoungeTableFrame(titanium,m.enamel),top=LOUNGE_SEAT.top+.32;
   box(root,m.red,-.45,top+.035/2,-.15,.38,.035,.24,.007).name='Table book';
-  const cup=createLoungeCoffee(m);cup.position.set(-.58,top+.035,-.20);cup.rotation.y=Math.PI;root.add(cup);
+  const cup=createLoungeCoffee(m);cup.position.set(-.58,top+.035,-.20);cup.rotation.y=Math.PI+.58;root.add(cup);
   root.userData.loungeProps=createTableLeisureProps(root,m,top);
   return root;
 }
@@ -186,7 +187,12 @@ export function createLoungeSofa(m){
     const cushion=new THREE.Mesh(cushionGeometry,m.olive);cushion.name='Sofa hexagonal cushion';
     cushion.position.set(6.05+i*1.25,.87,-.303);cushion.castShadow=true;cushion.receiveShadow=true;root.add(cushion);
   }
-  return finishLoungeSofa(root,m);
+  finishLoungeSofa(root,m);
+  const cap=createLoungeCap(m);cap.rotation.set(.75,-.24,-.12,'YXZ');
+  // Hook the open rear hem over the left arm's rounded front corner. The
+  // hollow crown cups the end and the curved bill hangs down, clear of the seat.
+  cap.position.set(5.32,.805,.260);root.add(cap);
+  return root;
 }
 export function createLounge(m){
   const root=createLoungeSofa(m);root.name='Lounge furniture';

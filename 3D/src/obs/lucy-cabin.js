@@ -47,7 +47,7 @@ export function createCabinLucy({gltf,poses,cache},options){
     if(data){stretch.attributes.position.array.set(data.positions);stretch.attributes.normal.array.set(data.normals);}
     return {mesh,base,stretch};
   });
-  s.cabin={poses,poseRoot,bones,eyes,lids,lidGeometry,coat,baseGeometry,proneGeometry,breathe,groom,surface,turnRig:createLucyTurnRig(root),point:new Vector3(),q:new Quaternion(),p:new Vector3()};
+  s.cabin={poses,poseRoot,bones,eyes,lids,lidGeometry,coat,baseGeometry,proneGeometry,breathe,groom,surface,sleepWeight:0,turnRig:createLucyTurnRig(root),point:new Vector3(),q:new Quaternion(),p:new Vector3()};
   return root;
 }
 
@@ -59,6 +59,9 @@ export function animateCabinLucy(root,options={}){
   c.breathe(0);
   const quiet=!options.moving&&!options.passage&&!hop&&!turn;
   const sleep=quiet&&options.mode==='sleep'?restWeight(actionTime,remaining,2.2):0;
+  // Share the rendered pose with POV: paused frames and wake/turn transitions
+  // must not close the eyes or unlock the neck on a different clock.
+  c.sleepWeight=sleep;
   const rest=quiet?c.poses.rests?.[options.mode]:null;
   c.coat.geometry=rest&&options.mode==='prone'?c.proneGeometry:c.baseGeometry;
   c.lidGeometry.forEach(({mesh,base,stretch})=>mesh.geometry=rest&&options.mode==='stretch'?stretch:base);

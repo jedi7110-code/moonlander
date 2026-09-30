@@ -11,6 +11,9 @@ try{
   const m=industrialMaterials(await materials()),sofa=createSofaStudyModel(m);
   const bounds=new THREE.Box3().setFromObject(sofa),center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   sofa.position.sub(center);
+  sofa.updateMatrixWorld(true);
+  const capBounds=new THREE.Box3().setFromObject(sofa.getObjectByName('Lounge / baseball cap'));
+  const capCenter=capBounds.getCenter(new THREE.Vector3()),capSize=capBounds.getSize(new THREE.Vector3());
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x171d1e);
   const model=batchStatic(sofa);scene.add(model);
   const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'low-power'});
@@ -30,8 +33,8 @@ try{
   const camera=new THREE.PerspectiveCamera(36,1,.02,80),controls=new OrbitControls(camera,canvas);
   controls.enableDamping=false;controls.screenSpacePanning=true;controls.minDistance=.6;controls.maxDistance=28;
   controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI;controls.rotateSpeed=.75;controls.zoomSpeed=.8;
-  const directions={front:[0,0,1],back:[0,0,-1],left:[-1,0,0],right:[1,0,0],top:[0,1,.0001],bottom:[0,-1,.0001],reset:[5.4,3.1,7]};
-  const buttons=[...document.querySelectorAll('[data-view]')];let pending=0,width=1,height=1,preset='reset';
+  const directions={front:[0,0,1],back:[0,0,-1],left:[-1,0,0],right:[1,0,0],top:[0,1,.0001],bottom:[0,-1,.0001],reset:[5.4,3.1,7],cap:[-.9,.20,1.7]};
+  const buttons=[...document.querySelectorAll('[data-view]')];let pending=0,width=1,height=1,preset=new URLSearchParams(location.search).get('view')==='cap'?'cap':'reset';
   function render(){
     pending=0;const visibleHeight=2*camera.position.distanceTo(controls.target)*Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
     toon.update(width,height,visibleHeight,15);renderer.render(scene,camera);
@@ -41,14 +44,15 @@ try{
   function setView(name){
     preset=name;
     const direction=new THREE.Vector3(...directions[name]).normalize(),right=new THREE.Vector3().crossVectors(camera.up,direction).normalize(),up=new THREE.Vector3().crossVectors(direction,right);
+    const extent=name==='cap'?capSize:size,focus=name==='cap'?capCenter:new THREE.Vector3();
     const slope=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));let distance=0;
     // Fit the projected corners: side views should fill the viewport too,
     // instead of inheriting the distance needed for the sofa's entire width.
     for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1]){
-      const corner=new THREE.Vector3(x*size.x/2,y*size.y/2,z*size.z/2);
+      const corner=new THREE.Vector3(x*extent.x/2,y*extent.y/2,z*extent.z/2);
       distance=Math.max(distance,corner.dot(direction)+1.16*Math.max(Math.abs(corner.dot(up))/slope,Math.abs(corner.dot(right))/(slope*camera.aspect)));
     }
-    controls.target.set(0,0,0);camera.position.copy(direction).multiplyScalar(distance);controls.update();selectPreset(name);requestRender();
+    controls.target.copy(focus);camera.position.copy(direction).multiplyScalar(Math.max(controls.minDistance,distance)).add(focus);controls.update();selectPreset(name);requestRender();
   }
   controls.addEventListener('change',requestRender);
   controls.addEventListener('start',()=>{preset=null;selectPreset(null);});

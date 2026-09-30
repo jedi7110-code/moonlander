@@ -138,6 +138,18 @@ test('controller rays select the VR panel or route characters and stations to ex
   await s.immersive.exit();s.immersive.dispose();
 });
 
+test('VR movement and grips leave ceilings waiting; a visible controller trigger can power them up without a hit',async()=>{
+  const s=await start();let activations=0;s.view.onSceneActivate=()=>activations++;
+  const controller=s.immersive.controllers[0].controller;
+  s.immersive.pick=()=>null;
+  s.right.gamepad.axes[3]=-1;s.immersive.update(.1,xrFrame(transform()));
+  controller.dispatchEvent({type:'squeeze'});assert.equal(activations,0);
+  s.session.visibilityState='hidden';controller.dispatchEvent({type:'select'});assert.equal(activations,0);
+  s.session.visibilityState='visible';controller.dispatchEvent({type:'select'});assert.equal(activations,1);
+  await s.immersive.exit();controller.dispatchEvent({type:'select'});assert.equal(activations,1);
+  s.immersive.dispose();
+});
+
 test('repeated sessions release controllers and panel assets exactly once',async()=>{
   const s=setup();await s.immersive.ready;
   for(let i=0;i<3;i++){

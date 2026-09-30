@@ -170,8 +170,8 @@ const shaderLightLoop=`
 `;
 
 export class CabinStartupLighting {
-  constructor(roots,{reducedMotion=false,start=true}={}){
-    this.reducedMotion=reducedMotion;this.time=0;this.done=false;this.materials=[];
+  constructor(roots,{reducedMotion=false,start=true,waitForActivation=false}={}){
+    this.reducedMotion=reducedMotion;this.time=0;this.done=false;this.waiting=start&&waitForActivation;this.materials=[];
     this.active={value:1};this.levels={value:new Float32Array(STARTUP_CIRCUITS)};
     this.roomLevels={value:new Float32Array(STARTUP_CIRCUITS)};
     const lights=[],bathrooms=[];
@@ -224,13 +224,19 @@ export class CabinStartupLighting {
     }
     if(!start)this.update(STARTUP_TOTAL_SECONDS);
   }
-  restart(reducedMotion=this.reducedMotion){
-    this.reducedMotion=reducedMotion;this.time=0;this.done=false;
+  restart(reducedMotion=this.reducedMotion,{waitForActivation=false}={}){
+    this.reducedMotion=reducedMotion;this.time=0;this.done=false;this.waiting=waitForActivation;
     this.active.value=1;this.levels.value.fill(0);this.roomLevels.value.fill(0);
     // Reuse the uniform objects already bound to cached WebGL programs.
   }
+  activate(){
+    if(!this.waiting||this.done)return false;
+    // The user has already waited in the dark. Ignite immediately on input;
+    // retain the study's one-second automatic lead-in for normal restarts.
+    this.waiting=false;this.time=STARTUP_LIGHT_DELAY;this.update(0);return true;
+  }
   update(dt){
-    if(this.done)return;
+    if(this.done||this.waiting)return;
     // Use visible wall time, not the physics step: slow frames must not turn a
     // one-second starter response into a long sequence on Quest.
     if(Number.isFinite(dt))this.time=Math.min(STARTUP_TOTAL_SECONDS,this.time+Math.max(0,dt));
@@ -244,7 +250,7 @@ export class CabinStartupLighting {
     // Only the ceiling mask is bypassed; safety and screen spill stay on.
   }
   dispose(){
-    this.active.value=0;this.done=true;
+    this.active.value=0;this.done=true;this.waiting=false;
     for(const {material,compile,key,wrapped} of this.materials){
       if(material.onBeforeCompile!==wrapped)continue;
       material.onBeforeCompile=compile;material.customProgramCacheKey=key;material.needsUpdate=true;

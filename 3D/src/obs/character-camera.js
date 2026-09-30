@@ -1,7 +1,7 @@
 import {Vector3,Quaternion,MathUtils} from 'three';
 import {HeadLookRig,LookInput,LOOK_PROFILES} from './first-person-look.js';
 import {StableFirstPersonCamera,maskSelfView} from './first-person-camera.js';
-import {sleepView} from './first-person-sleep.js';
+import {sleepView,catSleepView} from './first-person-sleep.js';
 import {medicalView} from './first-person-medical.js';
 import {createViewingWall,cabinWallMaterials} from './viewing-wall.js';
 import {pupilShells} from '../../studies/lucy/pupil-study.js';
@@ -100,7 +100,8 @@ export class CharacterCamera {
     if(this.transition)this.transition.age+=this.view.reducedMotion?1:dt;
     if(!this.active){this.rest=inactiveRest();this.view.onFirstPersonFrame?.(this.rest,false);return;}
     const medical=medicalView(brain,this.selected);
-    this.rest=medical.active?{...medical,closure:0,medical:true}:sleepView(brain.bunkVisit?.pose,this.selected);
+    this.rest=medical.active?{...medical,closure:0,medical:true}:this.selected==='cat'?
+      catSleepView(this.view.cat.userData.cabin?.sleepWeight):sleepView(brain.bunkVisit?.pose,this.selected);
     if(this.rest.locked)this.look.reset();
     const freedom=this.selected==='milo'?(brain.grooming?.18:brain.bunkVisit?.25:brain.state==='performing'?.55:1):
       this.selected==='cat'?(['sleep','groom','eat'].includes(catRoutine.mode)?.3:1):

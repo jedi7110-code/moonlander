@@ -83,6 +83,40 @@ test('touch looking remains bounded, sleep and treatment lock it, and WebXR owns
   assert.equal(camera.available,false);assert.equal(camera.wall.visible,false);assert.ok(view.camera.position.equals(position));
 });
 
+test('Lucy sleep locks the animated neck and closes POV eyes, including pause, wake and camera switches',()=>{
+  const {view,camera,rigs,frame,tick}=setup(),document=ui();
+  view.onFirstPersonFrame=(rest,active)=>updateFirstPersonOverlay(document,rest,active);
+  view.cat.userData.cabin={sleepWeight:0};
+  camera.select('cat');camera.toggleFirstPerson();tick();
+  const head=rigs.cat.head,neutral=head.quaternion.clone();
+  camera.pointerMove({pointerType:'mouse',clientX:1280,clientY:0});tick();
+  assert.ok(head.quaternion.angleTo(neutral)>.1);
+  frame.catRoutine.mode='sleep';
+  for(const weight of [.2,.6,1]){
+    view.cat.userData.cabin.sleepWeight=weight;tick();
+    assert.deepEqual(camera.rest,{locked:true,recline:weight,closure:weight});
+    assert.ok(head.quaternion.angleTo(neutral)<1e-7,'keep the sleeping pose without additive neck motion');
+  }
+  for(const dt of [0,.4]){
+    camera.pointerMove({pointerType:'mouse',clientX:0,clientY:720});
+    camera.pointerDown({pointerType:'touch',pointerId:2,clientX:100,clientY:100});
+    camera.pointerMove({pointerType:'touch',pointerId:2,clientX:500,clientY:500});tick(dt);
+    assert.equal(camera.touch,null);assert.equal(camera.look.yaw,0);assert.equal(camera.look.pitch,0);
+    assert.equal(camera.rest.closure,1);assert.equal(document.getElementById('first-person-eyelids').hidden,false);
+  }
+  camera.toggleFirstPerson();tick();assert.equal(document.getElementById('first-person-eyelids').hidden,true);
+  camera.toggleFirstPerson();tick();assert.equal(camera.rest.closure,1);
+  camera.select('droid');camera.toggleFirstPerson();tick();assert.equal(camera.rest.closure,0);
+  camera.select('cat');camera.toggleFirstPerson();tick();assert.equal(camera.rest.closure,1);
+  for(const weight of [.8,.4,0]){
+    view.cat.userData.cabin.sleepWeight=weight;tick();assert.equal(camera.rest.closure,weight);
+  }
+  assert.equal(camera.rest.locked,false);assert.equal(document.getElementById('first-person-eyelids').hidden,true);
+  frame.catRoutine.mode='walk';camera.pointerMove({pointerType:'mouse',clientX:0,clientY:720});tick();
+  assert.ok(head.quaternion.angleTo(neutral)>.1,'awake mouse looking returns');
+  camera.dispose();
+});
+
 function ui(touch=false){
   const nodes=new Map();const node=id=>{
     if(!nodes.has(id))nodes.set(id,{hidden:false,dataset:{},attributes:{},setAttribute(k,v){this.attributes[k]=v;},append(child){child.parentElement=this;},contains(){return false;}});

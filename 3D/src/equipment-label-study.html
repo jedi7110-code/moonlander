@@ -3,7 +3,7 @@
 <style>
 *{box-sizing:border-box}body{margin:0;height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr);background:#141a1b;color:#e6e5d9;font:14px system-ui}header{min-height:70px;padding:14px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}header b{margin-right:16px}button,a{padding:8px 12px;border:1px solid #61726a;border-radius:4px;background:#28332f;color:inherit;text-decoration:none;cursor:pointer}button[aria-pressed=true]{background:#526349;border-color:#c5d5a8}output{margin-left:auto;color:#b3bdb4}canvas{display:block;width:100%;height:100%;min-height:0}.note{position:fixed;bottom:12px;left:20px;pointer-events:none;color:#cbd0c1;font-size:12px}@media(max-width:650px){header{padding:10px}output{display:none}}
 </style>
-<header><b>船内機器・倉庫資材</b><button data-view="fire">消火器</button><button data-view="cargo">荷受けケース</button><button data-view="cases">ハードケース4個</button><button data-view="mug">マグカップ</button><button data-view="stores">倉庫の食品・日用品</button><button data-view="tank">床下タンク</button><button data-view="plants">栽培装置</button><button data-view="cat-food">猫えさ</button><button data-view="atlas">印刷原稿</button><button data-view="plant-atlas">栽培の印刷原稿</button><button data-view="cat-food-atlas">猫えさの印刷原稿</button><a href="./obs.html">OBSへ</a><output id="status">読み込み中</output></header>
+<header><b>船内機器・倉庫資材</b><button data-view="fire">消火器</button><button data-view="cargo">荷受けケース</button><button data-view="cases">ハードケース4個</button><button data-view="mug">マグカップ</button><button data-view="coffee">コーヒーマシン</button><button data-view="stores">倉庫の食品・日用品</button><button data-view="tank">床下タンク</button><button data-view="plants">栽培装置</button><button data-view="cat-food">猫えさ</button><button data-view="atlas">印刷原稿</button><button data-view="plant-atlas">栽培の印刷原稿</button><button data-view="cat-food-atlas">猫えさの印刷原稿</button><a href="./obs.html">OBSへ</a><output id="status">読み込み中</output></header>
 <canvas aria-label="船内機器と物資ラベルの3D確認"></canvas><div class="note">ドラッグで回転・スクロールで拡大 ／ OBSと同じモデル・非発光の印刷面</div>
 <script type="module">
 import * as THREE from 'three';
@@ -20,7 +20,7 @@ import {createPlantRack,animatePlants} from './obs/plants.js';
 import {PlantBed} from './obs/plant-state.js';
 import {plantLabelMaterial} from './obs/plant-labels.js';
 import {createCatFoodPouch,createCatFoodCarton} from './obs/cat-food-package.js';
-import {equipmentCase} from './obs/cabin-dressing.js';
+import {equipmentCase,createLoungeCoffeeStation} from './obs/cabin-dressing.js';
 import {createLoungeCoffee} from './obs/lounge-table-props.js';
 import {createCabinToon} from './obs/cabin-toon.js';
 const canvas=document.querySelector('canvas'),renderer=new THREE.WebGLRenderer({canvas,antialias:true});
@@ -40,6 +40,7 @@ equipmentCase(cases,m,casePaint,-.62,0,0,.60,.30);
 const laidCase=equipmentCase(cases,m,casePaint,.54,.04,0,.94,.48);laidCase.rotation.set(-Math.PI/2,-.18,Math.PI,'YXZ');
 const casesToon=createCabinToon([cases]);casesToon.setStyle('cartoon');
 const mug=createLoungeCoffee(m);
+const coffee=createLoungeCoffeeStation(m,casePaint);coffee.position.z=1.12;
 const stores=createRearRoomFurnishings(m,{room:'stores',x:0,floor:0});stores.position.z=4.7;
 const tank=createUnderdeckServiceTank(m);
 const plants=createPlantRack(m,0);animatePlants(plants,new PlantBed(),0);
@@ -48,16 +49,17 @@ const plantAtlas=new THREE.Mesh(new THREE.PlaneGeometry(2,1),new THREE.MeshBasic
 const catFood=new THREE.Group(),pouch=createCatFoodPouch(m.catFoodPackage),back=createCatFoodPouch(m.catFoodPackage,{empty:true}),carton=createCatFoodCarton(m.catFoodPackage);
 pouch.position.set(-.17,.408,0);back.position.set(.17,.408,0);back.rotation.y=Math.PI;carton.position.y=.136;catFood.add(pouch,back,carton);
 const catFoodAtlas=new THREE.Mesh(new THREE.PlaneGeometry(2,1),new THREE.MeshBasicMaterial({map:m.catFoodPackage.map,toneMapped:false}));catFoodAtlas.position.y=.5;
-const views={fire,cargo,cases,mug,stores,tank,plants:plants.root,'cat-food':catFood,atlas,'plant-atlas':plantAtlas,'cat-food-atlas':catFoodAtlas};scene.add(...Object.values(views));
+const views={fire,cargo,cases,mug,coffee,stores,tank,plants:plants.root,'cat-food':catFood,atlas,'plant-atlas':plantAtlas,'cat-food-atlas':catFoodAtlas};scene.add(...Object.values(views));
 const render=()=>renderer.render(scene,camera);controls.addEventListener('change',render);
 let mode=new URLSearchParams(location.search).get('view');if(!views[mode])mode='fire';
 function fitProjection(){camera.zoom=Math.min(1,camera.aspect/(mode==='plants'?1.4:mode.endsWith('-atlas')?1.5:1));camera.updateProjectionMatrix();}
 function select(next){
   mode=next;for(const [name,object]of Object.entries(views))object.visible=name===mode;
-  const poses={fire:[[.32,.38,1.12],[0,.33,0]],cargo:[[1.4,1.22,2.8],[0,.75,-.2]],cases:[[.20,1.16,3.8],[0,.48,0]],mug:[[.11,.15,.33],[0,.067,0]],stores:[[.12,1.36,3.5],[0,1.17,0]],tank:[[.30,.18,3.1],[0,.02,0]],plants:[[.55,1.5,4.7],[.55,1.3,-.5]],'cat-food':[[.36,.44,1.55],[0,.28,0]],atlas:[[0,.5,1.8],[0,.5,0]],'plant-atlas':[[0,.5,2.35],[0,.5,0]],'cat-food-atlas':[[0,.5,2.35],[0,.5,0]]};
+  const poses={fire:[[.32,.38,1.12],[0,.33,0]],cargo:[[1.4,1.22,2.8],[0,.75,-.2]],cases:[[.20,1.16,3.8],[0,.48,0]],mug:[[.11,.15,.33],[0,.067,0]],coffee:[[1.15,1.80,4.4],[0,1.23,.05]],stores:[[.12,1.36,3.5],[0,1.17,0]],tank:[[.30,.18,3.1],[0,.02,0]],plants:[[.55,1.5,4.7],[.55,1.3,-.5]],'cat-food':[[.36,.44,1.55],[0,.28,0]],atlas:[[0,.5,1.8],[0,.5,0]],'plant-atlas':[[0,.5,2.35],[0,.5,0]],'cat-food-atlas':[[0,.5,2.35],[0,.5,0]]};
   const [eye,target]=poses[mode];camera.position.set(...eye);controls.target.set(...target);fitProjection();controls.update();
   document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===mode)));
-  document.getElementById('status').value=mode==='mug'?'既存ロゴ共有 ／ 陶器への直接プリント':mode==='cases'?'ラウンジ・黄色・荷室上部・床置き ／ OBS共通形状':`共有アトラス 1024 × ${['plants','plant-atlas','cat-food','cat-food-atlas'].includes(mode)?'512':'1024'} ／ 非発光・静的印刷`;history.replaceState(null,'',`?view=${mode}`);
+  document.getElementById('status').value=mode==='coffee'?'ATELIER / 02 ／ ESPRESSO・AMERICANO ／ OBS共通配置':mode==='mug'?'既存ロゴ共有 ／ 陶器への直接プリント':mode==='cases'?'ラウンジ・黄色・荷室上部・床置き ／ OBS共通形状':`共有アトラス 1024 × ${['plants','plant-atlas','cat-food','cat-food-atlas'].includes(mode)?'512':'1024'} ／ 非発光・静的印刷`;history.replaceState(null,'',`?view=${mode}`);
+  document.querySelector('.note').textContent=mode==='coffee'?'ドラッグで回転・スクロールで拡大 ／ OBS共通モデル・マグ置き式 ／ 飲料キーは外観確認用': 'ドラッグで回転・スクロールで拡大 ／ OBSと同じモデル・非発光の印刷面';
   render();
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>select(b.dataset.view));

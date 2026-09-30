@@ -8,6 +8,7 @@ import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraf
 import {ObservationView} from './view.js';
 import {ObservationXR} from './xr.js';
 import {revealStartupScene} from './startup-lighting.js';
+import {bindStartupLightingInput} from './startup-input.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
@@ -44,7 +45,7 @@ const needOrders={
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio();
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
 let paused=false,elapsed=0,view=null,immersive=null,previous=performance.now(),accumulator=0,hudTime=0,pendingHQ=false;
-let idleCamera=null,unbindIdleCamera=null;
+let idleCamera=null,unbindIdleCamera=null,unbindStartupLighting=null;
 // Occasionally let a mouse overtake Lucy after she leaves the bed.
 let openingMousePending=new URLSearchParams(location.search).get('preview')==='mouse'||Math.random()<.25;
 const timers=[];
@@ -349,18 +350,21 @@ async function start(){
     });
     view.immersive=immersive;
     brain.catRoutine=cat;
-    brain.beginWakeUp();
+    brain.beginWakeUp({waitForActivation:true});
     if(new URLSearchParams(location.search).get('preview')==='airlock')brain.environment.nextFault=12;
     view.setMode('all');
     if(new URLSearchParams(location.search).get('preview')==='supervisor'){
       view.setMode('manual');view.center.set(-4.57,8.22,-1.30);view.targetCenter.copy(view.center);
       view.viewHeight=view.targetHeight=3.1;view.zoom=view.fitHeight/3.1;
     }
-    view.startLighting();
+    view.startLighting({waitForActivation:true});
     await revealStartupScene({
       draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),
       reveal:()=>{$('loading').hidden=true;},
     });
+    $('lighting-hint').hidden=false;
+    view.onSceneActivate=()=>{if(view.startupLighting.activate()){brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}};
+    unbindStartupLighting=bindStartupLightingInput($('ship-view'),()=>view.onSceneActivate());
     previous=performance.now();
     let firstVisibleFrame=true;
     function tick(now,xrFrame){
@@ -381,5 +385,5 @@ async function start(){
   }catch(error){console.error(error);$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
 }
 $('ship-view').addEventListener('webglcontextlost',event=>{event.preventDefault();setPause(true);$('obs-error').hidden=false;$('obs-error').textContent=words('映像接続が中断されました。ページを再読み込みしてください。','Graphics connection interrupted. Please reload the page.');});
-window.addEventListener('pagehide',event=>{if(!event.persisted){unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
+window.addEventListener('pagehide',event=>{if(!event.persisted){unbindStartupLighting?.();unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
 start();

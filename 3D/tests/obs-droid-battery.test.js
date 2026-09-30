@@ -5,6 +5,38 @@ import {createDroid} from '../src/obs/droid-model.js';
 import {DroidRoutine} from '../src/obs/droid-routine.js';
 import {Supplies} from '../src/obs/state.js';
 import {PlantBed} from '../src/obs/plant-state.js';
+import {CabinStartupLighting,STARTUP_TOTAL_SECONDS} from '../src/obs/startup-lighting.js';
+import {createCabinToon} from '../src/obs/cabin-toon.js';
+
+test('nixie faces, their soft halos and battery lamps stay self-lit independently of cabin startup in both models',()=>{
+  for(const detail of ['study','obs']){
+    const droid=createDroid({detail}),toon=createCabinToon([droid.root]),emission=new Map();
+    toon.setStyle('cartoon');
+    droid.root.traverse(o=>{
+      if(o.isMesh&&/nixie cathode|nixie halo|tube illumination|four amber battery lamps/.test(o.material.name))emission.set(o.material,o.material.onBeforeCompile);
+    });
+    const inventory=()=>{const out=[];droid.root.traverse(o=>out.push([o.uuid,o.geometry?.uuid,o.material?.uuid,o.material?.map?.uuid]));return out;};
+    const before=inventory(),effect=new CabinStartupLighting([droid.root],{waitForActivation:true});
+    try{
+      assert.equal(emission.size,detail==='obs'?2:4);
+      assert.ok(effect.materials.length>0,'the opaque frame still receives cabin darkness');
+      for(const [material,compile]of emission){
+        assert.equal(material.userData.cabinAlwaysPowered,true);assert.equal(material.toneMapped,false);
+        assert.equal(material.onBeforeCompile,compile,'no ceiling blackout shader on a self-lit face or gauge');
+        assert.ok(!effect.materials.some(entry=>entry.material===material));
+      }
+      droid.face.setExpression('happy');droid.battery.setCharge(.5);
+      effect.update(600);assert.equal(effect.time,0);
+      assert.equal(droid.update(30,'idle').facePower,1);assert.equal(droid.battery.mesh.visible,true);
+      const levels=()=>[...droid.battery.mesh.geometry.attributes.uv.array];const half=levels();
+      effect.activate();effect.update(.1);effect.update(STARTUP_TOTAL_SECONDS);
+      assert.equal(droid.update(30,'idle').facePower,1);assert.deepEqual(levels(),half);
+      assert.equal(droid.update(0,'charging').facePower,0,'the droid still controls its own face power');
+      assert.equal(droid.battery.mesh.visible,true,'charging gauge stays on even with the face off');
+      assert.deepEqual(inventory(),before,'no extra lights, geometry, textures or draw objects');
+    }finally{effect.dispose();toon.dispose();droid.dispose();}
+  }
+});
 
 test('both chest indicators light four amber levels from the bottom with one reusable opaque quad',()=>{
   for(const detail of ['study','obs']){
