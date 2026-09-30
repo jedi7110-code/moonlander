@@ -1,4 +1,4 @@
-import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike} from 'lucide';
+import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize2,Minimize2,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinLoungeGames} from './lounge-games.js';
 import {loungeGamePromptAvailable,updateLoungeGamePrompt} from './lounge-prompt.js';
@@ -19,6 +19,7 @@ import {healthDisplay} from './health-display.js';
 import {DroidRoutine} from './droid-routine.js';
 import {Eye} from 'lucide';
 import {updateCharacterCameraUI,updateFirstPersonOverlay} from './character-camera-ui.js';
+import {updateFullscreenUI} from './fullscreen-ui.js';
 import {environmentDisplay} from './environment.js';
 import {HATCH_REPAIR_LABELS} from './hatch-repair.js';
 
@@ -28,7 +29,7 @@ const CatFoodBowl=[
   ['ellipse',{cx:12,cy:12,rx:7,ry:2}],
   ['circle',{cx:8,cy:9,r:1}],['circle',{cx:12,cy:8,r:1}],['circle',{cx:16,cy:9,r:1}],
 ];
-const icons={CatFoodBowl,Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike};
+const icons={CatFoodBowl,Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize2,Minimize2,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({smoking:words('シャワー左の灰皿','Shower-side ashtray'),grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));
@@ -211,7 +212,8 @@ function localize(){
   document.documentElement.lang=getLang();document.querySelectorAll('[data-ja]').forEach(el=>el.textContent=el.dataset[getLang()]);
   $('obs-lang').textContent=words('EN','JA');$('obs-lang').setAttribute('aria-label',words('Switch to English','日本語に切り替え'));
   $('obs-input').placeholder=words('マイロに話しかける','Talk to Milo');$('obs-input').setAttribute('aria-label',$('obs-input').placeholder);
-  for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['obs-fullscreen','全画面','Fullscreen'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
+  for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
+  updateFullscreenUI(document,words,refreshIcons);
   const pauseLabel=paused?words('再開','Resume'):words('一時停止','Pause');$('obs-pause').setAttribute('aria-label',pauseLabel);$('obs-pause').dataset.tip=pauseLabel;
   $('play-chess').setAttribute('aria-label',words('ラウンジゲーム','Lounge games'));$('play-chess').dataset.tip=words('チェス・ポーカー・リバーシ','Chess · Poker · Reversi');
   $('dismiss-need').setAttribute('aria-label',words('閉じる','Close'));
@@ -310,7 +312,7 @@ for(const mode of ['all','milo','cat','droid'])$('view-'+mode).addEventListener(
 $('follow-angle').addEventListener('click',()=>view?.characterCamera?.cycleAngle());
 $('first-person').addEventListener('click',()=>view?.characterCamera?.toggleFirstPerson());
 $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').addEventListener('click',()=>view?.changeZoom(1/1.3));
-if(!document.fullscreenEnabled)$('obs-fullscreen').hidden=true;
+document.addEventListener('fullscreenchange',()=>updateFullscreenUI(document,words,refreshIcons));
 $('obs-fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('observation').requestFullscreen();}catch{showMessage(words('全画面に切り替えられませんでした。','Fullscreen is unavailable.'),'SYSTEM');}});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'&&selectedNeed){event.preventDefault();setNeedDetails(null,true);return;}
