@@ -23,10 +23,26 @@ for(const up of [true,false])test(`cat hops ${up?'onto':'off'} the sofa and land
 test('retargeting a jump finishes the landing before reversing, including pause',()=>{
   const cat=new CatMotion({floor:CAT_SOFA.floor,x:CAT_SOFA.floorX});let old=0,latest=0;
   cat.goTo({floor:CAT_SOFA.floor,x:1060},()=>old++);advance(cat,(CAT_PORT.walkZ-CAT_SOFA.approachZ)/(cat.walkSpeed*.022)+.4);
+  assert.equal(cat.hop.phase,'flight');assert.equal(cat.hop.up,true);
   const position=[cat.x,cat.elevation,cat.z],age=cat.hop.age;
-  cat.update(0);cat.goTo({floor:2,x:800},()=>latest++);
+  cat.update(0);cat.goTo({floor:2,x:800},()=>latest++);cat.update(0);
   assert.deepEqual([cat.x,cat.elevation,cat.z],position);assert.equal(cat.hop.age,age);
-  advance(cat,35+2*cat.passageWalkSeconds);assert.equal(old,0);assert.equal(latest,1);assert.equal(cat.floor,2);assert.equal(cat.elevation,0);assert.equal(cat.onSofa,false);
+  // Include both hops, the aisle walk and the full passage. Wait for completion
+  // within a bounded budget rather than assuming a fixed route duration.
+  const phases=[],maxSeconds=90;
+  for(let frame=0;frame<maxSeconds*120&&cat.busy;frame++){
+    if(cat.hop){
+      const phase=`${cat.hop.up?'up':'down'}:${cat.hop.phase}`;
+      if(phases.at(-1)!==phase)phases.push(phase);
+      assert.equal(latest,0,'arrival must not fire during either jump');
+    }
+    cat.update(1/120);
+  }
+  assert.deepEqual(phases,['up:flight','up:land','down:prepare','down:flight','down:land']);
+  assert.equal(cat.busy,false,`retargeted route did not finish within ${maxSeconds} simulated seconds`);
+  assert.equal(old,0);assert.equal(latest,1);assert.equal(cat.floor,2);assert.equal(cat.x,800);
+  assert.equal(cat.elevation,0);assert.equal(cat.onSofa,false);assert.equal(cat.z,CAT_PORT.walkZ);
+  advance(cat,1);assert.equal(old,0);assert.equal(latest,1,'arrival must fire exactly once');
 });
 test('jump poses fold the legs in flight and recover without changing size',()=>{
   const material=new MeshStandardMaterial(),root=createCat(new Proxy({},{get:()=>material}));
