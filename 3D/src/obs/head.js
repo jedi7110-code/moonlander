@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createHair,HAIRLINE_GLSL,MILO_HAIR_STYLES} from './hair.js';
 import {loadSuppliedHair} from './supplied-hair.js';
+import {triangleSubset} from './triangle-subset.js';
 
 export const MILO_BEARD_STYLES={
   none:{label:'なし',strength:0},
@@ -139,7 +140,10 @@ function eyeEnvironment(){
 }
 
 export function createMiloEye(source,{x,y,halfWidth,halfHeight}){
-  const scanMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),scan=new THREE.Mesh(source,scanMaterial);
+  // Depth rays travel along z inside the opening (outer ring at 1.025), so
+  // only the scan triangles under that footprint can be the nearest hit.
+  const reach=1.03,footprint=new THREE.Box3(new THREE.Vector3(x-halfWidth*reach,y-halfHeight*reach,-Infinity),new THREE.Vector3(x+halfWidth*reach,y+halfHeight*reach,Infinity));
+  const scanMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),scan=new THREE.Mesh(triangleSubset(source,footprint),scanMaterial);
   const ray=new THREE.Raycaster(new THREE.Vector3(),new THREE.Vector3(0,0,-1));
   const depthAt=(px,py)=>{
     ray.ray.origin.set(px,py,4);
@@ -174,7 +178,7 @@ export function createMiloEye(source,{x,y,halfWidth,halfHeight}){
       else{const c=a-segments,d=b-segments;indices.push(c,a,b,c,b,d);}
     }
   }
-  scanMaterial.dispose();
+  scanMaterial.dispose();scan.geometry.dispose();
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setIndex(indices);
   geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
   const material=new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:.24,metalness:0,clearcoat:1,clearcoatRoughness:.055,envMap:eyeEnvironment(),envMapIntensity:.65});

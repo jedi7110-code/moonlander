@@ -34,6 +34,8 @@ export function paintSupplyLedge(mesh,{width,height,depth,radius}){
   material.color.setHex(0xffffff);material.map=safetyPaint(height);
   material.roughness=.85;material.metalness=.25;material.roughnessMap=null;material.bumpMap=null;
   mesh.material=material;
+  // The box helper shares rounded boxes of equal size; repaint a private copy.
+  mesh.geometry=mesh.geometry.clone();
   const {position,uv}=mesh.geometry.attributes,a=width/2-radius,b=depth/2-radius;
   for(const group of mesh.geometry.groups){
     const painted=[0,1,4].includes(group.materialIndex);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {armBruiseMask,handBruiseMask,armBruiseShader} from './injury-appearance.js';
+import {triangleSubset} from './triangle-subset.js';
 
 // Share tapered garment folds between surface shading and displacement.
 const kneeFoldShader=`
@@ -43,7 +44,11 @@ export function invalidateMiloSkinBounds(skin){if(skin)skin.userData.poseBoundsS
 export function sampleMiloNeckline(geometry){
   if(!geometry)return null;
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
-  const scan=new THREE.Mesh(geometry,material),ray=new THREE.Raycaster(),radii=[];
+  // The horizontal rays sit between the collar's lowest and highest edge, so
+  // only the scan triangles spanning that band can be hit.
+  const collar=[-1,1].map(s=>(1.563-.020*s-1.637)/.055);
+  const band=new THREE.Box3(new THREE.Vector3(-Infinity,Math.min(...collar)-1e-4,-Infinity),new THREE.Vector3(Infinity,Math.max(...collar)+1e-4,Infinity));
+  const scan=new THREE.Mesh(triangleSubset(geometry,band),material),ray=new THREE.Raycaster(),radii=[];
   // Measure the actual scan at the sloping collar edge, in head-local space.
   for(let i=0;i<128;i++){
     const angle=i*Math.PI*2/128,c=Math.cos(angle),s=Math.sin(angle);
@@ -51,7 +56,7 @@ export function sampleMiloNeckline(geometry){
     const hit=ray.intersectObject(scan,false)[0];
     radii.push(hit?(4-hit.distance)*.055:null);
   }
-  material.dispose();
+  material.dispose();scan.geometry.dispose();
   return radii.every(r=>Number.isFinite(r)&&r>.03)?radii:null;
 }
 

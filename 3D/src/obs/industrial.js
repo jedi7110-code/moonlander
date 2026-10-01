@@ -209,6 +209,8 @@ function hoist(root,m,x,y){
   housing.name='Hoist / image-painted housing';
   // Project the image onto the actual housing, including its rounded edges.
   // Shared coordinates keep the paint continuous across the box's face seams.
+  // The helper shares rounded boxes of equal size, so edit a private copy.
+  housing.geometry=housing.geometry.clone();
   const {position,uv}=housing.geometry.attributes;
   for(let i=0;i<position.count;i++)uv.setXY(i,position.getX(i)/.43+.5,position.getY(i)/.43+.5);
   uv.needsUpdate=true;

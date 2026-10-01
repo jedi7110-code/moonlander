@@ -1,6 +1,7 @@
 import { BufferGeometry, Float32BufferAttribute, Uint16BufferAttribute,
   Mesh, MeshBasicMaterial, MeshStandardMaterial, DoubleSide, Raycaster,
-  Vector3, Triangle, SkinnedMesh } from 'three';
+  Vector3, Triangle, SkinnedMesh, Box3 } from 'three';
+import { triangleSubset } from '../../src/obs/triangle-subset.js';
 
 // Small fitted skin patches, not spheres stuck through the feet. Sample both
 // the sole and its rig weights so the pads follow the same wrist/toe surface.
@@ -10,17 +11,16 @@ export function addLucyPawPads(root) {
   root.traverse(m => {if(m.material?.name === 'Lucy calico coat') source = m;});
   if(!source) throw new Error('Paw pads require the Lucy coat');
   const a = source.geometry.attributes;
-  // Raycast only foot triangles. Scanning the whole cat for each pad sample
-  // otherwise adds seconds to the study's initial load.
-  const inspectionGeometry=new BufferGeometry(), soleIndices=[];
+  // Raycast only foot triangles, and for each pad only those under its own
+  // footprint. Scanning the whole sole for every sample otherwise costs over a
+  // second at load; the nearest hit is identical with the subset.
+  const soleIndices=[];
   const sourceIndex=source.geometry.index;
   for(let i=0;i<(sourceIndex?.count??a.position.count);i+=3) {
     const tri=[0,1,2].map(k=>sourceIndex?sourceIndex.getX(i+k):i+k);
     if(tri.every(j=>a.position.getY(j)<.035)) soleIndices.push(...tri);
   }
-  inspectionGeometry.setAttribute('position',a.position);inspectionGeometry.setIndex(soleIndices);
-  const inspection = new Mesh(inspectionGeometry,new MeshBasicMaterial({side:DoubleSide}));
-  inspection.updateMatrixWorld();
+  const inspectionMaterial=new MeshBasicMaterial({side:DoubleSide});
   const ray = new Raycaster(), bary = new Vector3();
   const material = new MeshStandardMaterial({name:'Soft pink paw pads',color:0xc98c91,roughness:.76});
   const segments = 48, rings = 8;
@@ -35,6 +35,10 @@ export function addLucyPawPads(root) {
       ['toe 4',.030,.1527,.0020,.0025],
     ];
     for(const [label,cx,cz,rx,rz] of layout) {
+      // Samples reach radius 1 times the 1.105 contour; keep a small margin.
+      const reach=1.11,footprint=new Box3(new Vector3(sign*cx-rx*reach-1e-4,-Infinity,cz+shiftZ-rz*reach-1e-4),new Vector3(sign*cx+rx*reach+1e-4,Infinity,cz+shiftZ+rz*reach+1e-4));
+      const inspection=new Mesh(triangleSubset(source.geometry,footprint,soleIndices),inspectionMaterial);
+      inspection.updateMatrixWorld();
       const positions=[],joints=[],weights=[],indices=[];
       const morphEntries=Object.entries(source.geometry.morphAttributes);
       const morphs=Object.fromEntries(morphEntries.map(([key,list])=>[key,list.map(()=>[])]));
@@ -88,8 +92,8 @@ export function addLucyPawPads(root) {
       mesh.bind(source.skeleton,source.bindMatrix);mesh.frustumCulled=false;
       mesh.morphTargetDictionary={...source.morphTargetDictionary};mesh.morphTargetInfluences=source.morphTargetInfluences;
       mesh.castShadow=true;mesh.receiveShadow=true;source.parent.add(mesh);
+      inspection.geometry.dispose();
     }
   }
-  inspection.material.dispose();
-  inspectionGeometry.dispose();
+  inspectionMaterial.dispose();
 }

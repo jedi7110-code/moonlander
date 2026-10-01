@@ -13,7 +13,8 @@ export function finishStaticCups(root){
   // Omit the original station's small plain cup at the far left.
   const cup=kitchen?.children.find(mesh=>mesh.isMesh&&mesh.geometry.type==='CylinderGeometry'&&
     mesh.position.x===-11.50&&mesh.position.y===1.13&&mesh.position.z===-.02);
-  if(cup){cup.removeFromParent();cup.geometry.dispose();}
+  // The cylinder helper shares geometry between equal cups; only detach it.
+  if(cup)cup.removeFromParent();
 }
 
 export function finishCabinFixtures(view){

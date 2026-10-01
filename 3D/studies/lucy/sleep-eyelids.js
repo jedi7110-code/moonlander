@@ -1,5 +1,6 @@
 import { BufferGeometry, TubeGeometry, CatmullRomCurve3, Vector3, Float32BufferAttribute,
-  Uint16BufferAttribute, SkinnedMesh, Mesh, Raycaster, MeshStandardMaterial, DoubleSide } from 'three';
+  Uint16BufferAttribute, SkinnedMesh, Mesh, Raycaster, MeshStandardMaterial, DoubleSide, Box3 } from 'three';
+import { triangleSubset } from '../../src/obs/triangle-subset.js';
 
 const smooth = (a, b, v) => {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
@@ -24,8 +25,6 @@ export function addSleepingEyelids(root) {
   const lidMaterial = new MeshStandardMaterial({name:'Closed eyelid coat', vertexColors:true, roughness:.88, side:DoubleSide});
   const seamMaterial = new MeshStandardMaterial({name:'Closed eyelid crease', color:0x594535, roughness:1});
   const inspectionMaterial = new MeshStandardMaterial({side:DoubleSide});
-  const inspection = new Mesh(source.geometry,inspectionMaterial);
-  inspection.updateMatrixWorld();
   const ray = new Raycaster();
   function attach(geometry, material, name) {
     const count = geometry.attributes.position.count;
@@ -42,6 +41,9 @@ export function addSleepingEyelids(root) {
     // Sample the socket rim on the actual coat. A curved patch meets that
     // sloping rim; a separate ellipsoid would look like a button on the face.
     const segments=64,rings=12,cx=side*.015,cy=.1875,rx=.007,ry=.0045;
+    // Only the coat triangles under this socket can be hit by its rim rays.
+    const inspection=new Mesh(triangleSubset(source.geometry,new Box3(new Vector3(cx-rx-1e-4,cy-ry-1e-4,-Infinity),new Vector3(cx+rx+1e-4,cy+ry+1e-4,Infinity))),inspectionMaterial);
+    inspection.updateMatrixWorld();
     const rim=Array.from({length:segments},(_,i)=>{
       const angle=i/segments*Math.PI*2;
       ray.set(new Vector3(cx+rx*Math.cos(angle),cy+ry*Math.sin(angle),.30),new Vector3(0,0,-1));
@@ -85,6 +87,7 @@ export function addSleepingEyelids(root) {
       points.push(new Vector3(refine(cx+u*rx),y,depth(u,v)+.00008));
     }
     attach(new TubeGeometry(new CatmullRomCurve3(points),32,.00014,6,false),seamMaterial,'Sleeping eyelid crease '+label);
+    inspection.geometry.dispose();
   }
   inspectionMaterial.dispose();
 }

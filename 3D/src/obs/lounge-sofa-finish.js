@@ -187,7 +187,7 @@ export function finishLoungeSofa(sofa,m){
   webMetal.defines={...titanium.defines};
   webMetal.color.setHex(0x818987);webMetal.roughness=.63;
   for(const arm of arms){
-    arm.geometry.dispose();arm.geometry=sideGeometry.frame;arm.position.set(arm.position.x,0,0);
+    arm.geometry=sideGeometry.frame;arm.position.set(arm.position.x,0,0);
     arm.material=titanium;
     const shoulders=new Mesh(sideGeometry.shoulders,titanium);shoulders.name='Study leg pressed shoulders';
     const web=new Mesh(sideGeometry.web,webMetal);web.name='Study leg recessed web with lightening holes';
@@ -195,14 +195,14 @@ export function finishLoungeSofa(sofa,m){
     addSideFasteners(arm,webMetal,m.dark);
   }
   // Continue the same front recess and flared foot across the black plinth.
-  const base=sofa.getObjectByName('Sofa floor plinth');base.geometry.dispose();
+  const base=sofa.getObjectByName('Sofa floor plinth');
   // Terminate between the side plates; overlapping their matching front faces
   // would put two materials on the same plane along the recessed step.
   base.geometry=profileGeometry([[-.70,.40],[.252,.40],[.10,.24],[.10,.12],[.22,.04],[.22,-.015],[-.53,-.015],[-.53,.18],[-.70,.30]],4.01);
   base.position.set(7.405,0,0);
 
   const seat=sofa.getObjectByName('Sofa seat');
-  seat.geometry.dispose();seat.geometry=returnedSeatGeometry();
+  seat.geometry=returnedSeatGeometry();
   seat.name='Study seat with returned front edge';seat.position.set(7.4,0,0);
   // A slightly lighter, warmer sage separates the horizontal seat from the
   // original deep-green back. Share the upholstery maps, not its colour state.
@@ -210,7 +210,7 @@ export function finishLoungeSofa(sofa,m){
   seat.material.color.setHex(0x58675f);
 
   const back=sofa.getObjectByName('Sofa backrest');
-  back.geometry.dispose();back.geometry=chamferedBackGeometry();
+  back.geometry=chamferedBackGeometry();
   const mainCushions=sofa.children.filter(part=>part.name==='Sofa hexagonal cushion').sort((a,b)=>a.position.x-b.position.x);
   const centerShift=back.position.x-(mainCushions[0].position.x+mainCushions.at(-1).position.x)/2;
   for(const cushion of mainCushions)cushion.position.x+=centerShift;

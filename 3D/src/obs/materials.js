@@ -121,8 +121,13 @@ export async function materials() {
 
 const boxGeo = new THREE.BoxGeometry();
 const ballGeo = new THREE.SphereGeometry(1,24,16);
+// Identical dimensions share one geometry: the cabin repeats the same rivets,
+// rungs and plates thousands of times, and building a rounded box costs more
+// than placing it. Code that edits a helper geometry in place clones it first.
+const roundedBoxes=new Map(),cylinders=new Map(),tubes=new Map();
+function shared(cache,key,build){let geometry=cache.get(key);if(!geometry){geometry=build();cache.set(key,geometry);}return geometry;}
 export function box(parent,mat,x,y,z,w,h,d,r=0) {
-  const mesh=new THREE.Mesh(r ? new RoundedBoxGeometry(w,h,d,2,r) : boxGeo,mat);
+  const mesh=new THREE.Mesh(r ? shared(roundedBoxes,`${w},${h},${d},${r}`,()=>new RoundedBoxGeometry(w,h,d,2,r)) : boxGeo,mat);
   if(!r)mesh.scale.set(w,h,d);
   mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
@@ -130,15 +135,18 @@ export function ball(parent,mat,x,y,z,w,h,d) {
   const mesh=new THREE.Mesh(ballGeo,mat);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
 export function cylinder(parent,mat,x,y,z,r,h,top=r,segments=16) {
-  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(top,r,h,segments),mat);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+  const mesh=new THREE.Mesh(shared(cylinders,`${top},${r},${h},${segments}`,()=>new THREE.CylinderGeometry(top,r,h,segments)),mat);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
 export function pipe(parent,mat,points,r=.04) {
-  const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
-  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(8,points.length*5),r,8,false),mat);mesh.castShadow=true;parent.add(mesh);return mesh;
+  const geometry=shared(tubes,`${r}|${points.map(p=>[...p].join(',')).join(';')}`,()=>{
+    const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
+    return new THREE.TubeGeometry(curve,Math.max(8,points.length*5),r,8,false);
+  });
+  const mesh=new THREE.Mesh(geometry,mat);mesh.castShadow=true;parent.add(mesh);return mesh;
 }
 export function rod(parent,mat,a,b,r=.035) {
-  const from=new THREE.Vector3(...a),to=new THREE.Vector3(...b);
-  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(r,r,from.distanceTo(to),10),mat);
+  const from=new THREE.Vector3(...a),to=new THREE.Vector3(...b),length=from.distanceTo(to);
+  const mesh=new THREE.Mesh(shared(cylinders,`${r},${r},${length},10`,()=>new THREE.CylinderGeometry(r,r,length,10)),mat);
   mesh.position.copy(from).add(to).multiplyScalar(.5);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.sub(from).normalize());mesh.castShadow=true;parent.add(mesh);return mesh;
 }
@@ -180,22 +188,31 @@ export function batchStatic(root,{xrLOD=false}={}) {
       geometry.computeBoundingBox();
       // At model-scale viewing, sub-16 cm bolts, beads and droplets add very
       // little to the silhouette. Keep labels and thin but long structural parts.
-      if(geometry.boundingBox.getSize(new THREE.Vector3()).length()>=.16||mesh.material.name.startsWith('Sign:')){
-        const coarse=makeXRWideGeometry(mesh.geometry);
-        const wide=coarse.index?coarse.toNonIndexed():coarse;
-        if(wide!==coarse)coarse.dispose();
-        wide.applyMatrix4(mesh.matrixWorld);wide.deleteAttribute('uv2');group.wide.push(wide);
-      }
+      if(geometry.boundingBox.getSize(new THREE.Vector3()).length()>=.16||mesh.material.name.startsWith('Sign:'))group.wide.push({source:mesh.geometry,matrix:mesh.matrixWorld.clone()});
     }
   });
   const merged=new THREE.Group();for(const {mat,geometries,wide} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;
-    if(xrLOD){
-      mesh.userData.xrWideGeometry=wide.length?mergeGeometries(wide,false):new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([],3));
-      if(!mesh.userData.xrWideGeometry)throw new Error('Invalid XR ship geometry');
-      geometry.addEventListener('dispose',()=>mesh.userData.xrWideGeometry.dispose());
-      wide.forEach(g=>g.dispose());
-    }
+    if(xrLOD)deferXRWideGeometry(mesh,wide);
     merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
+}
+
+// Only Quest's wide view swaps in the coarse cabin, so build it on first use
+// instead of during startup. Reading `userData.xrWideGeometry` builds it once.
+function deferXRWideGeometry(mesh,sources){
+  let built=null;
+  const build=()=>{
+    const parts=sources.map(({source,matrix})=>{
+      const coarse=makeXRWideGeometry(source),wide=coarse.index?coarse.toNonIndexed():coarse;
+      if(wide!==coarse)coarse.dispose();
+      wide.applyMatrix4(matrix);wide.deleteAttribute('uv2');return wide;
+    });
+    const geometry=parts.length?mergeGeometries(parts,false):new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([],3));
+    if(!geometry)throw new Error('Invalid XR ship geometry');
+    parts.forEach(g=>g.dispose());sources.length=0;
+    return geometry;
+  };
+  Object.defineProperty(mesh.userData,'xrWideGeometry',{configurable:true,enumerable:true,get(){return built??=build();}});
+  mesh.geometry.addEventListener('dispose',()=>built?.dispose());
 }
 
 // The shadow pass costs one draw per material batch (135 in the cabin); triangles
