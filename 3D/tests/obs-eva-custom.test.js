@@ -31,7 +31,9 @@ test('the custom garment loads with separately authored helmets and cabin-safe g
   assert.equal(shared.color.getHex(),0xffffff);
   assert.ok(new Box3().setFromObject(bay.equipmentRack).min.x>bounds[2].max.x);
   const batched=batchStatic(bay.root);assert.ok(batched.children.length>0,'custom geometry must participate in cabin batching');
-  const glass=batched.children.filter(mesh=>mesh.material.userData.castShadow===false);
+  // Stencilled equipment also omits shadows; identify the actual three visors.
+  const visorMaterials=new Set(bay.suits.map(suit=>suit.getObjectByName('Continuous face visor').material));
+  const glass=batched.children.filter(mesh=>visorMaterials.has(mesh.material));
   assert.equal(glass.length,3,'retain each helmet glass in the cabin batch');
   for(const mesh of glass){assert.equal(mesh.castShadow,false,'transparent visor must not cast an opaque shadow over the interior');assert.equal(mesh.material.transparent,true);}
 });

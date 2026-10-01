@@ -1,12 +1,16 @@
 import * as THREE from 'three';
-import {box,ball,cylinder,rod,label} from './materials.js';
+import {box,cylinder,rod} from './materials.js';
 import {EVA_PASSAGE,CABIN_AISLE} from './layout.js';
 import {hangingSuit} from './eva-suit.js';
 import {createEquipmentRack} from './eva-equipment.js';
 import {EVA_SPOT_LAYOUT} from './lighting.js';
+import {createPressureHatch,animatePressureHatch,PRESSURE_HATCH,PRESSURE_LOCK_SERVICE,pressureCassetteOutline} from './pressure-hatch.js';
+export {PRESSURE_HATCH} from './pressure-hatch.js';
 export {hangingSuit} from './eva-suit.js';
 
-export const EVA_BAY={suitX:EVA_SPOT_LAYOUT.suitX,suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:-.12};
+export const EVA_BAY={suitX:EVA_SPOT_LAYOUT.suitX,suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:CABIN_AISLE.crewZ};
+// World X/Z and deck-relative Y, shared by OBS and the repair study.
+export const HATCH_SERVICE_POINT={x:EVA_BAY.innerX-PRESSURE_LOCK_SERVICE.z-PRESSURE_LOCK_SERVICE.tip,y:PRESSURE_HATCH.centerY+PRESSURE_LOCK_SERVICE.y,z:EVA_BAY.depth+PRESSURE_LOCK_SERVICE.x};
 
 export function createEVASpotlights(m,y){
   const root=new THREE.Group();root.name='EVA overhead spotlights';
@@ -27,65 +31,9 @@ export function createEVASpotlights(m,y){
   return root;
 }
 
-function ring(parent,material,x,y,z,r,tube=.025){
-  const mesh=new THREE.Mesh(new THREE.TorusGeometry(r,tube,8,32),material);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
-}
-function chamfer(w,h,r){
-  return new THREE.Shape([
-    new THREE.Vector2(-w/2+r,-h/2),new THREE.Vector2(w/2-r,-h/2),new THREE.Vector2(w/2,-h/2+r),new THREE.Vector2(w/2,h/2-r),
-    new THREE.Vector2(w/2-r,h/2),new THREE.Vector2(-w/2+r,h/2),new THREE.Vector2(-w/2,h/2-r),new THREE.Vector2(-w/2,-h/2+r)
-  ]);
-}
-function plate(parent,material,w,h,r,z,depth){
-  const mesh=new THREE.Mesh(new THREE.ExtrudeGeometry(chamfer(w,h,r),{depth,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.015,bevelThickness:.015}),material);
-  mesh.position.z=z;mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
-}
-
-function frame(parent,material,width,height,z,depth){
-  const shape=chamfer(width,height,.25);
-  shape.holes.push(new THREE.Path(chamfer(2.78,2.42,.17).getPoints().reverse()));
-  const mesh=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false,steps:1}),material);
-  mesh.position.z=z;mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
-}
-
 export function createEVAHatch(m,y,inner=false){
-  const root=new THREE.Group();root.name=inner?'Inner airlock / sealed':'EVA airlock / sealed';
-  root.position.set(inner?EVA_BAY.innerX:EVA_BAY.hatchX,y+1.38,EVA_BAY.depth);root.rotation.y=EVA_BAY.hatchYaw;
-  frame(root,m.dark,3.22,2.94,-.15,.22);frame(root,m.metal,3.10,2.79,.07,.10);frame(root,m.rubber,2.86,2.53,.18,.035);
-  const door=new THREE.Group();door.name='Pressure door assembly';root.add(door);
-  plate(door,m.enamel,2.78,2.42,.17,.22,.085).name='Sealed pressure door';
-  plate(door,m.dark,.84,1.30,.15,.308,.025).position.y=-.18;
-  plate(door,m.enamel,.74,1.20,.12,.335,.018).position.y=-.18;
-  if(!inner){
-    const screw=cylinder(door,m.metal,.18,-.12,.360,.019,.028,.019,8);
-    screw.rotation.x=Math.PI/2;screw.name='EVA lock service screw';
-  }
-  const porthole=ring(door,m.metal,0,.66,.356,.209,.045);porthole.name='Pressure window rim';
-  const pane=cylinder(door,inner?m.black:m.evaWindow,0,.66,.354,.185,.017,.185,40);pane.rotation.x=Math.PI/2;
-  if(!inner)for(const [x,yy,r]of [[-.072,.71,.009],[.082,.61,.007],[.035,.78,.006]])ball(door,m.white,x,yy,.371,r,r,.003);
-  ring(door,m.red,0,-.23,.439,.225,.029);
-  cylinder(door,m.dark,0,-.23,.387,.059,.10,.059,20).rotation.x=Math.PI/2;
-  for(let i=0;i<4;i++){
-    const angle=i*Math.PI/2;rod(door,m.red,[0,-.23,.439],[Math.cos(angle)*.22,-.23+Math.sin(angle)*.22,.439],.018);
-  }
-  for(const side of [-1,1])for(const yy of [-.78,0,.78]){
-    box(door,m.metal,side*1.25,yy,.357,.18,.09,.09,.016);
-    cylinder(door,m.dark,side*1.19,yy,.415,.024,.025,.024,8).rotation.x=Math.PI/2;
-  }
-  for(const yy of [-.81,.80])box(root,m.dark,1.48,yy,.24,.12,.30,.20,.025);
-  label(door,inner?'CABIN':'EVA',0,.29,.378,.60,.18,{size:62});
-  label(door,'PRESSURE LOCK',0,-.79,.378,.90,.13,{fg:'#c6cfbd',size:44});
-  box(root,m.metal,0,-1.30,.17,3.03,.085,.38,.018);
-  // The cutaway exposes the front jamb, not an artificially camera-facing door leaf.
-  const edge=new THREE.Group();edge.rotation.y=Math.PI/2;edge.position.set(1.59,0,.035);root.add(edge);
-  box(edge,m.enamel,0,0,0,.27,2.87,.11,.015);
-  box(edge,m.rubber,0,0,.066,.095,2.50,.018);
-  for(const yy of [-.90,.90])box(edge,m.metal,0,yy,.098,.33,.075,.13,.012);
-  box(edge,m.red,0,-.10,.095,.046,.44,.025,.005);
-  const signal=new THREE.MeshBasicMaterial({color:0x85e3af,toneMapped:false});
-  signal.userData.cabinAlwaysPowered=true;
-  box(edge,signal,0,.61,.094,.10,.055,.025,.006);
-  root.userData={door,signal,inner};
+  const root=createPressureHatch({inner,materials:m});root.name=inner?'Inner airlock / sealed':'EVA airlock / sealed';
+  root.position.set(inner?EVA_BAY.innerX:EVA_BAY.hatchX,y+PRESSURE_HATCH.centerY,EVA_BAY.depth);root.rotation.y=EVA_BAY.hatchYaw;
   return root;
 }
 
@@ -109,7 +57,7 @@ export function createEVABay(m,y){
 }
 
 // Fixed pressure partitions belong to the ship, not the removable viewing wall.
-// Their octagonal openings fit the existing frames while the surrounding wall
+// Their openings fit the complete pocket cassettes while the surrounding wall
 // reaches the widened deck's front edge in every camera mode.
 export function createEVAPartitions(m,y){
   const root=new THREE.Group();root.name='Permanent airlock partitions';
@@ -117,23 +65,19 @@ export function createEVAPartitions(m,y){
   for(const x of [EVA_BAY.innerX,EVA_BAY.hatchX]){
     const top=x===EVA_BAY.innerX?3.396:3.242;
     const shape=new THREE.Shape();shape.moveTo(back,0);shape.lineTo(front,0);shape.lineTo(front,top);shape.lineTo(back,top);shape.closePath();
-    // Bury the return edge inside the frame instead of duplicating its reveal.
-    const left=EVA_BAY.depth-1.405,right=EVA_BAY.depth+1.405,bottom=.155,high=2.605,cut=.17;
-    const points=[[left+cut,bottom],[right-cut,bottom],[right,bottom+cut],[right,high-cut],[right-cut,high],[left+cut,high],[left,high-cut],[left,bottom+cut]].reverse();
+    const points=pressureCassetteOutline().map(([z,yy])=>[z+EVA_BAY.depth,yy+PRESSURE_HATCH.centerY]).reverse();
     const opening=new THREE.Path();opening.moveTo(...points[0]);for(const point of points.slice(1))opening.lineTo(...point);opening.closePath();shape.holes.push(opening);
     const bulkhead=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.20,bevelEnabled:false,steps:1}),m.enamel);
     bulkhead.name='Hatch bulkhead return';bulkhead.position.set(x+.155,y,0);bulkhead.rotation.y=-Math.PI/2;bulkhead.castShadow=bulkhead.receiveShadow=true;root.add(bulkhead);
-    box(root,m.metal,x-.057,y+1.38,EVA_BAY.depth+1.645,.024,2.94,.07).name='Hatch return steel edge';
   }
   return root;
 }
 
 export function animateAirlock(door,signal,opening){
-  door.position.z=EVA_BAY.depth-opening*3.2;
-  door.visible=opening<.999;
+  animatePressureHatch(door,opening);
   signal.color.setHex(opening>.01?0xf3bd62:0x85e3af);
 }
 
-export function animateHatchFault(signal,environment){
-  signal.color.setHex(environment?.fault?0xff6254:0x85e3af);
+export function animateHatchFault(signal,environment,{hatchId='innerHatch',opening=0}={}){
+  signal.color.setHex(environment?.fault?.id===hatchId?0xff6254:opening>.01?0xf3bd62:0x85e3af);
 }

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>扉修理スタディー | TARAIRON</title>
+  <script type="module" crossorigin src="/3D/assets/hatchRepairStudy-FP9D1__s.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-D_l1qIn7.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CVtbbMuF.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-uEL6Cgr8.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/industrial-BrSHzYHX.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-BUzERox2.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/triangle-subset-DZfP0SvM.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/head-px4q3HDI.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/milo-body--ujSeFPX.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/characters-NiEJ43MB.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/milo-toon-Qslr5bBc.js">
+  <link rel="stylesheet" crossorigin href="/3D/assets/hatchRepairStudy-C1brO8-7.css">
+</head>
+<body>
+  <header><div><h1>扉修理 / モーションスタディー</h1><p>中央分割・アイボリーの船内ハッチ · OBSと同じ人物・扉・修理動作</p></div><a href="./obs.html">OBSへ</a></header>
+  <main>
+    <section class="stage" aria-label="修理動作の3D確認">
+      <canvas id="repair-view" tabindex="0" aria-label="扉修理の3Dビュー。ドラッグで回転、ホイールで拡大、右ドラッグで移動。"></canvas>
+      <div class="stage-caption"><span id="mode-label">現行 / OBS</span><strong id="phase-label">読み込み中</strong><span id="contact-label"></span></div>
+      <div id="loading" role="status">人物と船内ハッチを読み込み中…</div>
+      <nav class="views" aria-label="確認する視点">
+        <button data-view="hands" aria-pressed="true" disabled>手元</button><button data-view="side" aria-pressed="false" disabled>真横</button><button data-view="front" aria-pressed="false" disabled>扉側</button><button data-view="wide" aria-pressed="false" disabled>全身</button>
+      </nav>
+    </section>
+    <aside aria-label="修理動作の調整">
+      <fieldset><legend>比較する動作</legend><div class="pair"><button id="current" aria-pressed="true" disabled>現行 / OBS</button><button id="tuned" aria-pressed="false" disabled>調整案</button></div><p>調整はこのスタディー内だけ。OBSは変更しません。</p></fieldset>
+      <fieldset><legend>手首の反復動作</legend>
+        <label class="check"><input id="stabilize" type="checkbox" checked disabled>肘の切り替わりを滑らかに</label>
+        <label for="amplitude">振れ幅 <output id="amplitude-value"></output></label><input id="amplitude" type="range" min="0" max="30" step=".1" disabled>
+        <label for="frequency">往復速度 <output id="frequency-value"></output></label><input id="frequency" type="range" min=".1" max="1" step=".01" disabled>
+        <label for="reach">手を伸ばす・戻す時間 <output id="reach-value"></output></label><input id="reach" type="range" min=".5" max="3" step=".1" disabled>
+        <div class="pair"><button id="gentle" disabled>小さく・ゆっくり</button><button id="reset-tuning" disabled>現行値に戻す</button></div>
+      </fieldset>
+      <fieldset><legend>見え方</legend><label class="check"><input id="guides" type="checkbox" disabled>関節・接触ガイド</label><label class="check"><input id="door" type="checkbox" checked disabled>扉を表示</label><p>緑＝ネジ / 橙＝工具先端 / 青＝腕の関節。扉側は手が隠れないよう扉を自動で隠します。</p></fieldset>
+      <button id="copy-link" disabled>この状態のURLをコピー</button><p id="copy-status" role="status"></p>
+    </aside>
+    <section class="transport" aria-label="再生操作">
+      <div class="timeline-title"><label for="repair-time">時間</label><output id="time-output">0.000 秒</output></div>
+      <input id="repair-time" type="range" min="0" max="28.8" step=".001" disabled>
+      <div class="toolbar"><button id="play" aria-pressed="false" disabled>再生</button><button id="restart" disabled>最初から</button><button id="step-back" disabled>−1コマ</button><button id="step-forward" disabled>＋1コマ</button><label>速度 <select id="speed" disabled><option value=".1">0.1×</option><option value=".25" selected>0.25×</option><option value=".5">0.5×</option><option value="1">1×</option></select></label><label>範囲 <select id="range" disabled><option value="all">全工程</option><option value="inspect">点検</option><option value="repair" selected>修理</option><option value="verify">確認</option></select></label><label class="check"><input id="loop" type="checkbox" checked disabled>繰り返し</label></div>
+      <nav class="phases" aria-label="工程の頭出し"></nav><p>1コマ＝1/60秒 · 時間スライダーで停止・頭出し · キャンバス上で Space＝再生 / ← →＝コマ送り</p>
+    </section>
+  </main>
+</body>
+</html>

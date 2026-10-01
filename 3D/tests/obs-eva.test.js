@@ -5,7 +5,7 @@ import {DECK,EVA,EVA_PASSAGE,STATIONS,getStation,CABIN_AISLE} from '../src/obs/l
 import {getStation as sharedStation} from '../../js/obs/layout.js?v=15';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies} from '../src/obs/state.js';
-import {createEVABay,EVA_BAY,animateAirlock} from '../src/obs/eva.js';
+import {createEVABay,createEVAHatch,EVA_BAY,PRESSURE_HATCH,animateAirlock} from '../src/obs/eva.js';
 import {AirlockPassage} from '../src/obs/airlock.js';
 import {addCabinDressing} from '../src/obs/cabin-dressing.js';
 import {FLOOR_Y} from '../src/obs/ship.js';
@@ -14,6 +14,21 @@ test('the EVA rack replaces audio in 3D without changing the original 2D station
   assert.equal(getStation('stereo'),undefined);assert.ok(sharedStation('stereo'));
   assert.equal(getStation('eva').floor,0);assert.equal(getStation('airlock').floor,0);assert.equal(getStation('hatch').floor,2);
   assert.equal(STATIONS.filter(station=>station.id==='eva').length,1);
+});
+test('both pressure doors have no sign plates while retaining their hardware',()=>{
+  const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});
+  for(const inner of [true,false]){
+    const hatch=createEVAHatch(m,0,inner),signs=[];
+    hatch.traverse(object=>{if(object.name.startsWith('Sign:'))signs.push(object.name);});
+    assert.deepEqual(signs,[],inner?'CABIN and PRESSURE LOCK plates are removed':'EVA and PRESSURE LOCK plates are removed');
+    assert.ok(hatch.getObjectByName('Sealed pressure door'));
+    assert.equal(hatch.getObjectByName('Pressure window rim'),undefined,'the round porthole is removed');
+    assert.ok(hatch.getObjectByName('Angular safety window'));
+    assert.ok(hatch.getObjectByName('Pressure lock / cabin face'));
+    assert.ok(hatch.getObjectByName('Pressure lock / reverse face'));
+    assert.ok(hatch.userData.signal);
+    assert.equal(Boolean(hatch.getObjectByName('Inner lock service screw')),inner);
+  }
 });
 test('music requests and old station references cannot send Milo to removed equipment',()=>{
   const actor=new CrewMotion(),brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care:new Supplies()});
@@ -90,9 +105,10 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
   animated.attach(door);
   const original=door.position.clone(),outer=bay.hatch.userData.door.position.clone();
   animateAirlock(door,signal,.5);
-  assert.equal(door.position.x,EVA_BAY.innerX);assert.equal(door.position.y,3.392+1.38);
-  assert.equal(door.position.z,EVA_BAY.depth-1.6);assert.equal(door.visible,true);
-  animateAirlock(door,signal,1);assert.equal(door.visible,false);
+  assert.equal(door.position.x,EVA_BAY.innerX);assert.equal(door.position.y,3.392+PRESSURE_HATCH.centerY);
+  assert.equal(door.position.z,EVA_BAY.depth);assert.equal(door.visible,true);
+  assert.deepEqual(door.userData.leaves.map(leaf=>leaf.position.x),[-PRESSURE_HATCH.travel/2,PRESSURE_HATCH.travel/2]);
+  animateAirlock(door,signal,1);assert.equal(door.visible,true,'leaves park inside pockets instead of disappearing');
   animateAirlock(door,signal,0);assert.equal(door.visible,true);assert.ok(door.position.distanceTo(original)<1e-10);
   assert.deepEqual(bay.hatch.userData.door.position,outer);
   assert.ok(EVA.x<getStation('airlock').x);

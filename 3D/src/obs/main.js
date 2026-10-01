@@ -75,7 +75,7 @@ const scene={
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     environmentEvent(event){
       if(event.type==='fault'){
-        showMessage(words('船外ハッチのロック異常。点検・修理が必要。','EVA hatch lock fault. Inspection and repair required.'),'SYSTEM');audio.tone(210,.3,.035);
+        showMessage(words('手前の船内ハッチにロック異常。点検・修理が必要。','Inner cabin hatch lock fault. Inspection and repair required.'),'SYSTEM');audio.tone(210,.3,.035);
       }else if(event.type==='stage'&&event.stage==='repair')showMessage(words('ロックの接点を調整する。','I will adjust the lock contact.'));
       else if(event.type==='restored')showMessage(words('ロックの修理と確認を終えた。船内環境、正常。','Lock repaired and checked. Cabin systems normal.'));
     },
@@ -125,6 +125,9 @@ function updateHUD(reopenCameraControls=false){
   const environment=environmentDisplay(brain.environment,getLang());
   $('ship-environment').dataset.state=environment.state;$('ship-environment').title=environment.detail;
   if($('ship-environment-label').textContent!==environment.label)$('ship-environment-label').textContent=environment.label;
+  const issue=$('ship-environment-issue');
+  if(issue.textContent!==environment.issue)issue.textContent=environment.issue;
+  issue.hidden=!environment.issue;
   $('ship-temperature').textContent=environment.temperature;$('ship-pressure').textContent=environment.pressure;
   const minutes=Math.floor(brain.hour*60);$('ship-clock').textContent=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
   $('milo-mood').textContent=t('mood_'+brain.mood);

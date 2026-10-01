@@ -17,7 +17,7 @@ function crewActivity(brain,actor){
   if(actor?.waitingForHatch||actor?.waitingForCat||actor?.waitingForDroid)return 'HOLD / AISLE CLEARANCE';
   const destination=stationNames[brain.cur?.id]??code(brain.cur?.id);
   if(actor?.busy||brain.state==='goingTo')return `TRANSIT > ${destination}`;
-  if(brain.hatchRepair)return `EVA / ${code(brain.hatchRepair.phase)}`;
+  if(brain.hatchRepair)return `${destination} / ${code(brain.hatchRepair.phase)}`;
   if(brain.state==='playingGame')return 'LOUNGE / GAME';
   if(brain.bunkVisit?.phase==='sleeping')return 'BUNK / REST';
   if(brain.state==='performing')return destination;
@@ -105,7 +105,7 @@ function systems(ctx,t){
   header(ctx,2,'ENVIRONMENT / INTERLOCKS',t);
   text(ctx,'CABIN TEMP',22,76,17,C.dim);text(ctx,t.temperature.toFixed(1),22,122,47,C.white);text(ctx,'°C',153,121,21,C.text);
   text(ctx,'PRESSURE',224,76,17,C.dim);text(ctx,t.pressure.toFixed(1),224,122,47,C.white);text(ctx,'kPa',382,121,21,C.text);
-  text(ctx,t.fault?'EVA LOCK / ATTENTION':'PRESSURE BOUNDARY / SEALED',22,166,20,t.fault?C.red:C.crew);
+  text(ctx,t.fault?'INNER LOCK / ATTENTION':'PRESSURE BOUNDARY / SEALED',22,166,20,t.fault?C.red:C.crew);
   text(ctx,t.fault?`MAINTENANCE / ${code(t.faultStage)}`:'LOCAL ENVIRONMENT CONTROL',22,194,17,C.dim);
   line(ctx,454,55,454,198);
   [['OPS INNER',t.rooms.inner],['WC',t.rooms.toilet],['SHOWER',t.rooms.shower]].forEach(([name,status],i)=>{
@@ -157,10 +157,10 @@ export class AISupervision {
     const t=supervisionTelemetry(state);
     if(this.lastClock!==null&&t.clock<this.lastClock){this.events=[];this.previous=null;}
     const snapshot={CREW:t.crewStatus,LUCY:t.catStatus,DROID:t.droidStatus,
-      'EVA LOCK':t.fault?code(t.faultStage):'SEALED',HEALTH:t.healthStage,CARGO:t.supplyState};
+      'INNER LOCK':t.fault?code(t.faultStage):'SEALED',HEALTH:t.healthStage,CARGO:t.supplyState};
     if(!this.previous)this.events.push({time:t.shipTime,source:'SUPERVISOR',message:t.source,alert:false});
     else for(const [source,message]of Object.entries(snapshot))if(message!==this.previous[source]){
-      this.events.push({time:t.shipTime,source,message,alert:source==='EVA LOCK'&&t.fault||source==='HEALTH'&&['WARNING','URGENT','CRITICAL'].includes(message)});
+      this.events.push({time:t.shipTime,source,message,alert:source==='INNER LOCK'&&t.fault||source==='HEALTH'&&['WARNING','URGENT','CRITICAL'].includes(message)});
     }
     this.events=this.events.slice(-24);this.previous=snapshot;this.lastClock=t.clock;
     // Upload only changed pixels; an unchanged journal or gauge keeps its GPU

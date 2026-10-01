@@ -13,7 +13,7 @@
   <main id="observation">
     <header class="masthead">
       <a href="./" class="ship-brand"><h1><img class="ship-logo" src="/assets/obs/tarairon-logo.svg?v=2" alt="TARAIRON" width="1427" height="754"></h1></a>
-      <div id="ship-environment" class="ship-system" data-state="normal"><span class="status-led" aria-hidden="true"></span><span id="ship-environment-label" role="status" aria-live="polite">船内環境 正常</span><span class="environment"><span id="ship-temperature">21.4°C</span> <b>/</b> <span id="ship-pressure">101.3 kPa</span></span></div>
+      <div id="ship-environment" class="ship-system" data-state="normal"><span class="status-led" aria-hidden="true"></span><span class="ship-environment-status" role="status" aria-live="polite" aria-atomic="true"><span id="ship-environment-label">船内環境 正常</span><span id="ship-environment-issue" hidden></span></span><span class="environment"><span id="ship-temperature">21.4°C</span> <b>/</b> <span id="ship-pressure">101.3 kPa</span></span></div>
       <div class="header-actions">
         <time id="ship-clock">08:00</time>
         <button id="obs-pause" class="icon-button" aria-label="一時停止" data-tip="一時停止"><i data-lucide="pause"></i></button>

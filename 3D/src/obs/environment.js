@@ -10,7 +10,7 @@ export class CabinEnvironment {
   schedule(){this.nextFault=this.clock+HATCH_FAULT_INTERVAL.min+this.random()*(HATCH_FAULT_INTERVAL.max-HATCH_FAULT_INTERVAL.min);}
   triggerFault(){
     if(this.fault)return false;
-    this.fault={id:'airlock',serial:++this.serial,stage:'detected'};
+    this.fault={id:'innerHatch',serial:++this.serial,stage:'detected'};
     this.onEvent({type:'fault',...this.fault});return true;
   }
   update(dt){
@@ -34,6 +34,7 @@ export function environmentDisplay(environment,lang='ja'){
   const abnormal=Boolean(environment.fault),ja=lang==='ja';
   return{state:abnormal?'abnormal':'normal',
     label:ja?(abnormal?'船内環境 異常':'船内環境 正常'):(abnormal?'LIFE SUPPORT ALERT':'LIFE SUPPORT NOMINAL'),
+    issue:abnormal?(ja?'船内ハッチ故障':'INNER HATCH FAULT'):'',
     temperature:`${environment.temperature.toFixed(1)}°C`,pressure:`${environment.pressure.toFixed(1)} kPa`,
-    detail:abnormal?(ja?'船外ハッチのロック異常 — 点検・修理待ち':'EVA hatch lock fault — inspection and repair required'):''};
+    detail:abnormal?(ja?'手前の船内ハッチのロック異常 — 点検・修理が必要':'Inner cabin hatch lock fault — inspection and repair required'):''};
 }

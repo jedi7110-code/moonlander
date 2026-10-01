@@ -205,11 +205,11 @@ export class CabinBrain extends Brain {
     if(!this.environment.fault||this.hatchRepair)return false;
     if(this.health.needsCare){this._go(getStation('medical'));return true;}
     if(Math.min(this.needs.energy,this.needs.hunger,this.needs.thirst,this.needs.bladder)<20)return false;
-    this._go(getStation('airlock'));return true;
+    this._go(getStation(this.environment.fault.id));return true;
   }
   _go(station){
     station=getStation(station?.id);if(!station)return false;
-    if(station.id==='airlock'&&this.hatchRepair)return true;
+    if(station.id===this.cur?.id&&this.hatchRepair)return true;
     if(station.id==='smoking'&&this.actStation==='smoking')return true;
     if(station.id==='grooming'&&(this.actStation==='grooming'||this.groomingQueued))return true;
     this.cancelQueuedGrooming();
@@ -231,8 +231,8 @@ export class CabinBrain extends Brain {
     return true;
   }
   _startPerform(station,seated=false){
-    if(station.id==='airlock'&&this.environment.fault){
-      this.cur=station;this.state='repairingHatch';this.actKey='perform';this.actStation='airlock';this.recoverNeed=null;
+    if(station.id===this.environment.fault?.id){
+      this.cur=station;this.state='repairingHatch';this.actKey='perform';this.actStation=station.id;this.recoverNeed=null;
       this.hatchRepair=new HatchRepairVisit(this.environment.fault.serial);return;
     }
     if(station.id==='smoking'){
@@ -452,8 +452,8 @@ export class CabinBrain extends Brain {
       return words('ヘッドホンで少し聴いてくる。','I will listen on my headphones for a while.');
     }
     if(/修理|故障|環境異常|ロック.*(?:確認|点検)|repair|fix (?:the )?(?:door|hatch)/i.test(text)){
-      this._go(getStation('airlock'));
-      return this.environment.fault?words('船外ハッチのロックを点検して直してくる。','I will inspect and repair the EVA hatch lock.'):words('船外ハッチのロックを点検してくる。','I will inspect the EVA hatch lock.');
+      this._go(getStation('innerHatch'));
+      return this.environment.fault?words('船内ハッチのロックを点検して直してくる。','I will inspect and repair the inner hatch lock.'):words('船内ハッチのロックを点検してくる。','I will inspect the inner hatch lock.');
     }
     if(/内扉|船内ハッチ|左.*ハッチ|inner (?:hatch|door)|cabin hatch/i.test(text)){
       this._go(getStation('innerHatch'));return words('船内側のハッチを点検してくる。','I will inspect the inner hatch.');

@@ -1,14 +1,15 @@
 import {CABIN_AISLE} from './layout.js';
 import {angleDelta,headingEase} from './heading.js';
 
-export const HATCH_REPAIR_DEPTH=-.12;
+// Keep the working shoulder beside the new lock, on the crew-lane side.
+export const HATCH_REPAIR_DEPTH=CABIN_AISLE.crewZ+.14;
 export const HATCH_REPAIR_PHASES={turnIn:1.4,approach:2.0,align:1.4,inspect:4,repair:10,verify:4,release:1.2,turnOut:1.4,return:2.0,alignOut:1.4};
 const order=Object.keys(HATCH_REPAIR_PHASES);
 const clamp=t=>Math.max(0,Math.min(1,t));
 const smooth=t=>{t=clamp(t);return t*t*(3-2*t);};
 const mix=(a,b,t)=>a+(b-a)*t;
 export const HATCH_REPAIR_LABELS={
-  turnIn:['船外ハッチを点検に向かう','Approaching the EVA hatch'],approach:['船外ハッチを点検に向かう','Approaching the EVA hatch'],align:['船外ハッチを点検に向かう','Approaching the EVA hatch'],
+  turnIn:['船内ハッチを点検に向かう','Approaching the inner hatch'],approach:['船内ハッチを点検に向かう','Approaching the inner hatch'],align:['船内ハッチを点検に向かう','Approaching the inner hatch'],
   inspect:['扉のロックを点検中','Inspecting the hatch lock'],repair:['扉のロックを修理中','Repairing the hatch lock'],verify:['ロックの復旧を確認中','Checking the repaired lock'],
   release:['工具をしまう','Putting the tool away'],turnOut:['ハッチの点検を終える','Finishing the hatch check'],return:['通路に戻る','Returning to the aisle'],alignOut:['通路に戻る','Returning to the aisle'],done:['点検完了','Inspection complete'],
 };

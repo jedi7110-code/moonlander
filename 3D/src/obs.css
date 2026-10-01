@@ -67,10 +67,13 @@
 #observation{touch-action:manipulation}
 .ship-system[data-state=abnormal] #ship-environment-label{color:#ff8175}
 .ship-system[data-state=abnormal]>.status-led{background:#ff8175}
+.ship-environment-status{display:flex;flex-direction:column;gap:2px;line-height:1.15;white-space:nowrap}
+#ship-environment-issue{color:#ffb29a;font-size:10px}
 .ship-system .environment{font-variant-numeric:tabular-nums;white-space:nowrap}
 @media(max-width:1100px){.ship-system{gap:6px;font-size:10px}.ship-system .environment{display:inline;font-size:12px;margin-left:7px}.environment b{margin:0 4px}}
 @media(max-width:760px){.ship-system{display:flex;flex-direction:column;gap:1px;font-size:9px;white-space:nowrap}.ship-system>.status-led{display:none}.ship-system .environment{font-size:10px;margin:0}.environment b{margin:0 2px}}
 @media(max-width:360px){.ship-system .environment{font-size:8px}.masthead{gap:6px;padding-inline:10px}.header-actions{gap:0}.ship-logo{height:24px}}
+@media(max-width:760px){.ship-environment-status{align-items:center;gap:0}#ship-environment-issue{font-size:9px}}
 .character-view-controls{position:absolute;top:calc(100% + 9px);left:50%;transform:translateX(-50%);display:flex;gap:3px;padding:4px;background:#111617f5;border:1px solid #a6bb7b65;border-radius:5px;box-shadow:0 5px 18px #0005;z-index:8}
 .character-view-controls::before{content:"";position:absolute;top:-5px;left:calc(50% - 4px);width:8px;height:8px;transform:rotate(45deg);background:#111617;border-top:1px solid #a6bb7b65;border-left:1px solid #a6bb7b65}
 .character-view-controls .icon-button{width:40px;height:40px}

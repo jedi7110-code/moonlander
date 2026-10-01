@@ -58,6 +58,17 @@ test('the journal records actual transitions once, bounds history and freezes wi
   environment.clock=0;screens.update(state);assert.equal(screens.events.length,1,'new session discards old events');
 });
 
+test('repair tracking and alarm journal identify the inner hatch, not the EVA exit',()=>{
+  const screens=new AISupervision(),environment=new CabinEnvironment();
+  const brain={environment,state:'idle'},state={brain};screens.update(state);
+  environment.triggerFault();environment.update(1);screens.update(state);
+  assert.deepEqual(screens.events.at(-1),{time:'08:00',source:'INNER LOCK',message:'DETECTED',alert:true});
+  brain.cur={id:'innerHatch'};brain.hatchRepair={phase:'repair'};brain.state='repairingHatch';
+  assert.equal(supervisionTelemetry(state).crewStatus,'INNER HATCH / REPAIR');
+  environment.resolve(environment.fault.serial);environment.update(1);screens.update(state);
+  assert.deepEqual(screens.events.at(-1),{time:'08:00',source:'INNER LOCK',message:'SEALED',alert:false});
+});
+
 test('rack bezels leave four distinct correctly proportioned displays visible ahead of the backplate',()=>{
   const {root,screens}=createRack();root.updateMatrixWorld(true);
   assert.equal(screens.displays.length,4);

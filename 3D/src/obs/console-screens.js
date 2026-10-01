@@ -119,12 +119,12 @@ function atmosphere(ctx,t,history){
     box(ctx,478,y,98,33,C.muted);text(ctx,label,527,y+23,20,C.text,'center');
   }
   line(ctx,491,277,491,291,C.muted);line(ctx,491,324,491,338,C.muted);
-  line(ctx,576,260,607,260,t.innerDoor==='OPEN'?C.green:C.muted);
-  if(t.innerDoor==='CLOSED')line(ctx,590,251,590,269,C.text,3);
-  box(ctx,607,244,102,33,t.fault?C.red:C.green);text(ctx,'EVA',658,267,20,t.fault?C.red:C.green,'center');
-  line(ctx,719,243,719,279,t.fault?C.red:C.green,4);
-  text(ctx,'INNER',602,313,16,C.muted);text(ctx,t.innerDoor,602,338,20,C.text);
-  footer(ctx,t.fault?'EVA LOCK / FAULT':'OUTER HATCH / SEALED','LOCAL SENSOR FEED',t.fault?C.red:C.green);
+  line(ctx,576,260,607,260,t.fault?C.red:t.innerDoor==='OPEN'?C.green:C.muted);
+  if(t.innerDoor==='CLOSED')line(ctx,590,251,590,269,t.fault?C.red:C.text,3);
+  box(ctx,607,244,102,33,C.green);text(ctx,'EVA',658,267,20,C.green,'center');
+  line(ctx,719,243,719,279,C.green,4);
+  text(ctx,'INNER',602,313,16,t.fault?C.red:C.muted);text(ctx,t.innerDoor,602,338,20,C.text);
+  footer(ctx,t.fault?'INNER LOCK / FAULT':'OUTER HATCH / SEALED','LOCAL SENSOR FEED',t.fault?C.red:C.green);
 }
 
 const freightLabels={idle:'STANDBY',queued:'ORDER QUEUED',transmitting:'TRANSMITTING',inbound:'INBOUND',unloading:'UNLOADING'};
@@ -145,7 +145,7 @@ function power(ctx,t){
     box(ctx,454,y-7,159,12,C.line);ctx.fillStyle=active?C.green:C.line;ctx.fillRect(457,y-4,153*Math.min(1,load.watts/load.rating),6);
     text(ctx,`${String(load.watts).padStart(3,' ')} W`,743,y+7,20,active?C.bright:C.muted,'right');
   });
-  const status=t.fault?`EVA LOCK / ${repairLabels[t.faultStage]??'CHECK REQUIRED'}`:'PROTECTION / NO TRIPPED CIRCUITS';
+  const status=t.fault?`INNER LOCK / ${repairLabels[t.faultStage]??'CHECK REQUIRED'}`:'PROTECTION / NO TRIPPED CIRCUITS';
   text(ctx,status,24,382,18,t.fault?C.red:C.muted);
   footer(ctx,`CARGO / ${freightLabels[t.freight]??'STANDBY'}`,`F:${t.stock.food} W:${t.stock.water} C:${t.stock.catfood}`,t.freight==='idle'?C.green:C.amber);
 }

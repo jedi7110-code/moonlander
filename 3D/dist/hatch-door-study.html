@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>中央分割ハッチ | TARAIRON</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;height:100%;background:#182124;color:#dce5e3;font:13px system-ui,sans-serif}body{display:flex;flex-direction:column}
+    header{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:14px 18px;border-bottom:1px solid #3a494b}h1{font-size:15px;margin:0}header p{color:#a4b8b7;margin:0}a{color:#bacbc4;margin-left:auto}
+    .tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 18px;background:#202c30}nav{display:flex;gap:4px;flex-wrap:wrap}button{font:inherit;background:#2d3c41;color:inherit;border:1px solid #586a6b;border-radius:4px;padding:8px 12px;cursor:pointer}button[aria-pressed=true]{background:#536c69;border-color:#adc4bc}button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #b3e2ce;outline-offset:3px}
+    label{display:flex;align-items:center;gap:6px}input[type=range]{width:150px;accent-color:#a4c7b8}main{position:relative;flex:1;min-height:300px}canvas{width:100%;height:100%;display:block;touch-action:none}#status{position:absolute;inset:0;display:grid;place-content:center;pointer-events:none}#status[hidden]{display:none}footer{padding:9px 18px;color:#a4b8b7;font-size:12px}
+  </style>
+  <script type="module" crossorigin src="/3D/assets/hatchDoorStudy-klskvx3G.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-D_l1qIn7.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CVtbbMuF.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-uEL6Cgr8.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/industrial-BrSHzYHX.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-BUzERox2.js">
+</head>
+<body>
+  <header><h1>中央分割ハッチ / デザイン確認</h1><p>開口 1.08 × 2.16 m · 収納部を含む幅 2.60 m · 内扉・外扉共通</p><a href="./obs.html">OBSへ</a><a href="./hatch-repair-study.html">修理スタディー</a></header>
+  <div class="tools">
+    <nav aria-label="扉の視点"><button data-view="front">表</button><button data-view="back">裏</button><button data-view="angle">斜め</button><button data-view="pockets">収納部を見る</button></nav>
+    <nav aria-label="開閉"><button data-open="0">閉じる</button><button data-open=".5">半開</button><button data-open="1">全開</button><button id="play" aria-pressed="false">開閉を再生</button></nav>
+    <label>開き具合 <input id="opening" type="range" min="0" max="1" step=".001" value="0"><output id="opening-value">0%</output></label>
+    <label><input id="human" type="checkbox">マイロと寸法比較</label>
+  </div>
+  <main><canvas id="hatch-view" tabindex="0" aria-label="中央で分かれて壁内に収まるハッチの3D表示"></canvas><div id="status" role="status">読み込み中</div></main>
+  <footer>ドラッグ：回転 / ホイール：拡大 · 収納部を見る：表のカバーだけ外して、左右の扉が壁内に収まる様子を確認</footer>
+</body>
+</html>

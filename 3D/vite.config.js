@@ -15,6 +15,8 @@ export default defineConfig({
         main: fileURLToPath(new URL('./src/index.html', import.meta.url)),
         obs: fileURLToPath(new URL('./src/obs.html', import.meta.url)),
         sofaStudy: fileURLToPath(new URL('./src/sofa-study.html', import.meta.url)),
+        hatchRepairStudy: fileURLToPath(new URL('./src/hatch-repair-study.html', import.meta.url)),
+        hatchDoorStudy: fileURLToPath(new URL('./src/hatch-door-study.html', import.meta.url)),
         gateFrameStudy: fileURLToPath(new URL('./src/gate-frame-study.html', import.meta.url)),
         equipmentLabelStudy: fileURLToPath(new URL('./src/equipment-label-study.html', import.meta.url)),
         servicePartsStudy: fileURLToPath(new URL('./src/service-parts-study.html', import.meta.url)),

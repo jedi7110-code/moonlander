@@ -56,7 +56,7 @@ test('fixture geometry, pick targets, signs and lights use the same new deck hei
   assert.equal(ship.diningDocks.hydro.mug.position.x,waterX-.17);
   const bedBounds=new Box3().setFromObject(ship.medical.bed);
   assert(bedBounds.min.y>=FLOOR_Y[DECK.OPERATIONS]);
-  assert.equal(ship.innerDoor.position.y,FLOOR_Y[DECK.OPERATIONS]+1.38);
+  assert.equal(ship.innerDoor.position.y,FLOOR_Y[DECK.OPERATIONS]+1.14);
   for(const [i,floor]of FLOORS.entries()){
     const sign=ship.staticMesh.getObjectByName(`Sign: ${String(i+1).padStart(2,'0')} / ${floor.name}`);
     assert(sign);const b=new Box3().setFromObject(sign);assert(b.min.y>FLOOR_Y[i]+2);
