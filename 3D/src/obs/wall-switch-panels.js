@@ -8,7 +8,6 @@ export const WALL_SWITCH_PANELS=[
   {name:'Operations doorway',deck:DECK.OPERATIONS,x:-3.63,y:1.90,z:-1.605,w:.30,h:.58,style:2},
   {name:'Medical lighting',deck:DECK.OPERATIONS,x:1.06,y:2.22,z:-1.605,w:.42,h:.40,style:0},
   {name:'Bunk entrance',deck:DECK.HABITATION,x:-6.00,y:1.45,z:-1.869,w:.32,h:.58,style:2},
-  {name:'Lounge lighting',deck:DECK.HABITATION,x:5.45,y:1.63,z:-1.605,w:.52,h:.52,style:0},
   {name:'Engine services',deck:DECK.LIFE_SUPPORT,x:7.47,y:1.56,z:-1.869,w:.40,h:.62,style:0},
   {name:'Cargo lighting',deck:DECK.LIFE_SUPPORT,x:10.75,y:2.05,z:-1.605,w:.38,h:.58,style:2},
 ];

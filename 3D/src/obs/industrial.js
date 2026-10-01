@@ -307,7 +307,7 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
     cableRun(root,m,x-.60,x+.62,y+2.52,-1.19,2,.12);
   }
   // Exposed services in the formerly bare wall bays; never in the ladder well.
-  for(const [x,width] of (level===DECK.HABITATION?[[-4.2,1.5],[3.0,.7]]:level===DECK.OPERATIONS?[]:[[1.65,1.2]])){
+  for(const [x,width] of (level===DECK.HABITATION?[[3.0,.7]]:[])){
     box(root,m.dark,x,y+1.95,-1.40,width,.64,.18,.035);
     for(let i=0;i<3;i++){
       const yy=y+1.72+i*.21;

@@ -5,7 +5,6 @@ import {finishStaticCups} from './cabin-fixtures.js';
 import {addFireExtinguishers} from './fire-extinguishers.js';
 import {createPilotSeat} from './pilot-seats.js';
 import {createMachinedMetals,finishMachinedFixtures} from './machined-metals.js';
-import {finishServicePanels} from './service-panel.js';
 import {createWallControlMaterials,createWallControlPanel} from './wall-control-panel.js';
 import {addWallSwitchPanels} from './wall-switch-panels.js';
 import {finishWallPrints} from './wall-prints.js';
@@ -151,7 +150,6 @@ export function addCabinDressing(parent,m,floors){
   const metals=createMachinedMetals();
   arrangeConsoleChairs(parent,operations,metals);
   finishMachinedFixtures(parent,m,metals);
-  finishServicePanels(parent,m,habitation,bottom);
   finishWallPrints(parent,m,habitation);
   floors.forEach(y=>heavyServices(root,m,y));underdeck(root,m);
   const extinguishers=addFireExtinguishers(root,m,floors);
@@ -160,7 +158,7 @@ export function addCabinDressing(parent,m,floors){
   const coffeeStation=createLoungeCoffeeStation(m,casePaint,parent.getObjectByName('Sofa floor-reaching arm')?.material);
   coffeeStation.position.set(10.20,habitation,0);root.add(coffeeStation);
   const controlMaterials=createWallControlMaterials();
-  for(const [x,y,w]of [[-11.94,habitation+1.73,.62],[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]]){
+  for(const [x,y,w]of [[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]]){
     const cabinet=createWallControlPanel(controlMaterials,w);cabinet.position.set(x,y,-1.15);root.add(cabinet);
   }
   const toiletCasePaint=casePaint.clone();

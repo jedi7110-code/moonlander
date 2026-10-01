@@ -34,6 +34,7 @@ import {createLoungeTableFrame} from './lounge-table-frame.js';
 import {createRearWindowStars} from './space-stars.js';
 import {finishGateFrames} from './gate-frame-finish.js';
 import {createCatFoodCarton,createCatFoodMaterial} from './cat-food-package.js';
+import {createServicePartsPanel} from './service-parts.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -114,7 +115,10 @@ function bolts(parent,m,x,y,z,w,h) {
   }
 }
 function panel(parent,m,x,y,z,w,h,color=m.enamel) {
-  box(parent,m.rubber,x,y,z,w+.025,h+.025,.10,.02);box(parent,color,x,y,z+.064,w,h,.06,.025);bolts(parent,m,x,y,z+.102,w,h);
+  box(parent,m.rubber,x,y,z,w+.025,h+.025,.10,.02);
+  const face=box(parent,color,x,y,z+.064,w,h,.06,.025);
+  bolts(parent,m,x,y,z+.102,w,h);
+  return face;
 }
 function grille(parent,m,x,y,z,w,h) {
   box(parent,m.rubber,x,y,z,w,h,.08,.018);
@@ -410,9 +414,11 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   const incinerator=createWasteIncinerator(m);animated.add(incinerator.root);
   const plants=createPlantRack(m,positionX(PLANT.x));animated.add(plants.root);
   const gym=createGym(m,positionX(GYM.x));animated.add(gym.root);
-  panel(staticRoot,m,positionX(GYM.x)-.70,.97,-1.36,.57,.93,m.dark);
+  const gymServiceX=1.90;
+  const gymWeightsX=gymServiceX+(2.61*.48-.57)/2;
+  panel(staticRoot,m,gymWeightsX,.97,-1.36,.57,.93,m.dark).name='Gym dumbbell wall plate';
   for(let i=0;i<3;i++){
-    const y=.69+i*.28,x=positionX(GYM.x)-.70;
+    const y=.69+i*.28,x=gymWeightsX;
     for(const side of [-1,1])rod(staticRoot,m.metal,[x+side*.1,y-.045,-1.28],[x+side*.1,y-.045,-1.08],.019);
     rod(staticRoot,m.metal,[x-.16,y,-1.1],[x+.16,y,-1.1],.024);
     for(const side of [-1,1]){const weight=cylinder(staticRoot,m.black,x+side*.14,y,-1.1,.085,.08,.085,12);weight.rotation.z=Math.PI/2;}
@@ -457,6 +463,16 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
   const dressing=addCabinDressing(staticRoot,m,FLOOR_Y);
+  for(const {name,variant,x,floor,scale,height,z=-1.35,heightScale=scale} of [
+    {name:'Bunk service parts / cassette',variant:'cassette',x:-4.2,floor:DECK.HABITATION,scale:.43,height:1.95},
+    {name:'Gym service parts / manifold',variant:'manifold',x:gymServiceX,floor:DECK.LIFE_SUPPORT,scale:.48,height:1.95},
+    {name:'Ashtray service parts / rack',variant:'rack',x:ASHTRAY.x,floor:DECK.HABITATION,scale:.48,height:1.91},
+    {name:'Lounge service parts / rack',variant:'rack',x:6.37,floor:DECK.HABITATION,scale:.48,height:1.60,z:-1.52,heightScale:.36},
+  ]){
+    const panel=createServicePartsPanel(m,variant);
+    panel.name=name;panel.position.set(x,FLOOR_Y[floor]+height,z);
+    panel.scale.set(scale,heightScale,scale);staticRoot.add(panel);
+  }
   const gateFinish=finishGateFrames(staticRoot,REAR_ROOM_GATES);
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
