@@ -21,7 +21,8 @@ test('water and kitchen studies use production durations, dock positions and con
   const galley=study.stations.galley.root;
   assert.ok(!galley.children.some(o=>o.isMesh&&o.position.x<-11.6),'the unused vent box and grille to the left of the kitchen stay removed');
   assert.ok(galley.children.some(o=>o.isMesh&&o.position.x===-11.50&&o.position.y===1.13),'keep the adjacent countertop cup');
-  assert.equal(galley.children.filter(o=>o.geometry?.type==='TorusGeometry').length,4,'keep all four stove rings');
+  const hob=galley.getObjectByName('Aircraft cabin galley');assert.ok(hob,'approved galley is also used in the dining study');
+  assert.equal(hob.children.filter(o=>o.geometry?.type==='TorusGeometry').length,4,'keep all four stove rings');
   const milo=createMilo(m);
   for(const id of ['hydro','galley','hydro']){
     const duration=diningStudyDuration(id);assert.equal(duration,getStation(id).dur/1000);

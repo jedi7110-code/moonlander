@@ -23,7 +23,7 @@ for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clea
  const available={color:lamp.material.color.clone(),emissive:lamp.material.emissive.clone()};
  let occupiedFrames=0,emptyFrames=0;
  for(let frame=0;!visit.done&&frame<1440;frame++){
-  const pose=visit.pose;animateBathroom(fixture,pose);animated.updateMatrixWorld(true);
+  const pose=visit.pose;animateBathroom(fixture,pose,Infinity);animated.updateMatrixWorld(true);
   assert.equal(fixture.ceilingLight.power.value,['reach','open','shut'].includes(visit.phase)?0:1,'light stays on from full entry opening through use and exit, then switches off after departure');
   if(pose.inside){
     occupiedFrames++;
@@ -47,7 +47,7 @@ for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clea
   visit.update(1/120);
  }
  assert.ok(visit.done&&exited&&occupiedFrames>0&&emptyFrames>0);
- animateBathroom(fixture,null);assert.deepEqual(door.position.toArray(),initial.toArray());
+ animateBathroom(fixture,null,Infinity);assert.deepEqual(door.position.toArray(),initial.toArray());
  assert.ok(lamp.material.color.equals(available.color)&&lamp.material.emissive.equals(available.emissive),'inactive room returns to cyan');
  assert.ok(initial.z< -1.6,'door is flush with the cabin wall, not a projecting booth');
  assert.equal(material.clippingPlanes,null,'fixed walls keep their unclipped materials');
@@ -67,7 +67,7 @@ test('only the occupied room turns red, including pause and switching to the oth
    for(let frame=0;frame<3;frame++){
      visit.update(0);
      for(const [id,fixture]of Object.entries(rooms)){
-       animateBathroom(fixture,id===active?visit.pose:null);
+       animateBathroom(fixture,id===active?visit.pose:null,Infinity);
        assert.equal(fixture.lamp.material.color.getHex(),id===active?0xe23832:0x4b9982);
        assert.equal(fixture.lamp.material.emissive.getHex(),id===active?0xff1e14:0x6fddaa);
        assert.equal(fixture.lamp.material.emissiveIntensity,.6);
@@ -90,12 +90,12 @@ test('ceiling and local bounce switch together, independently of the other bathr
    assert.equal(shader.uniforms[`bathroomPower${i}`],room.ceilingLight.power,'shader keeps the live door switch after startup finishes');
    const inactive=rooms[1-i].ceilingLight;
    for(const opening of [0,.25,.75,.999,1,.999,0,1]){
-     animateBathroom(room,{opening});assert.equal(room.ceilingLight.power.value,opening===1?1:0);
+     animateBathroom(room,{opening},Infinity);assert.equal(room.ceilingLight.power.value,opening===1?1:0);
      assert.equal(inactive.power.value,0);
      assert.equal(room.ceilingLight.root.children[0].material,room.ceilingLight.diffuser,'toon must not clone the animated diffuser');
    }
-   animateBathroom(room,{opening:1,phase:'close'});assert.equal(room.ceilingLight.power.value,0);
-   animateBathroom(room,null);assert.equal(room.ceilingLight.power.value,0);
+   animateBathroom(room,{opening:1,phase:'close'},Infinity);assert.equal(room.ceilingLight.power.value,0);
+   animateBathroom(room,null,Infinity);assert.equal(room.ceilingLight.power.value,0);
  }
  effect.dispose();toon.dispose();
  for(const root of [fixed,animated])root.traverse(part=>part.geometry?.dispose());material.dispose();

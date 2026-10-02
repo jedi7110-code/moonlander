@@ -6,6 +6,7 @@ import {FLOORS as originalFloors,getStation as originalStation} from '../../js/o
 import {CrewMotion,CatRoutine,Supplies} from '../src/obs/state.js';
 import {CabinBrain} from '../src/obs/brain.js';
 import {buildShip,FLOOR_Y,positionX,positionY,REAR_ROOM_GATES} from '../src/obs/ship.js';
+import {EVA_HATCH_FIT} from '../src/obs/eva.js';
 
 test('missions occupy 01 and living facilities occupy 02 next to 03 without changing 2D',()=>{
   assert.deepEqual(FLOORS.map(f=>f.name),['OPERATIONS','HABITATION','LIFE SUPPORT']);
@@ -56,7 +57,7 @@ test('fixture geometry, pick targets, signs and lights use the same new deck hei
   assert.equal(ship.diningDocks.hydro.mug.position.x,waterX-.17);
   const bedBounds=new Box3().setFromObject(ship.medical.bed);
   assert(bedBounds.min.y>=FLOOR_Y[DECK.OPERATIONS]);
-  assert.equal(ship.innerDoor.position.y,FLOOR_Y[DECK.OPERATIONS]+1.14);
+  assert.equal(ship.innerDoor.position.y,FLOOR_Y[DECK.OPERATIONS]+EVA_HATCH_FIT.centerY);
   for(const [i,floor]of FLOORS.entries()){
     const sign=ship.staticMesh.getObjectByName(`Sign: ${String(i+1).padStart(2,'0')} / ${floor.name}`);
     assert(sign);const b=new Box3().setFromObject(sign);assert(b.min.y>FLOOR_Y[i]+2);

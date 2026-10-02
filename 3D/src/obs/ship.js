@@ -35,6 +35,7 @@ import {createRearWindowStars} from './space-stars.js';
 import {finishGateFrames} from './gate-frame-finish.js';
 import {createCatFoodCarton,createCatFoodMaterial} from './cat-food-package.js';
 import {createServicePartsPanel} from './service-parts.js';
+import {createGalley} from './galley.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -299,15 +300,7 @@ export function createDiningStation(m,action){
     box(root,m.metal,stationX,1.05,HYDRO_TRAY.z,.74,.04,HYDRO_TRAY.depth).name='Shallow cup tray';
     docks.mug.position.set(stationX-.17,1.134,HYDRO_TRAY.cupZ);docks.mug.rotation.y=Math.PI;docks.mug.visible=true;
   }else{
-    for(let i=0;i<2;i++){
-      const x=-10.8+i*1.50;box(root,m.dark,x,.49,-.48,1.47,.95,1.13,.03);panel(root,m,x,.47,.13,1.39,.83,m.white);box(root,m.black,x,.76,.215,.49,.035,.044,.01);box(root,m.metal,x,1.0,-.42,1.51,.07,1.25,.018);
-      cupboard(root,m,x,1.65,-1.20,1.41,1.03);
-    }
-    box(root,m.dark,-10.8,1.052,-.36,1.02,.028,.72,.04);
-    for(const x of [-11.11,-10.56])for(const z of [-.58,-.17]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.17,.017,8,22),m.metal);ring.rotation.x=Math.PI/2;ring.position.set(x,1.075,z);root.add(ring);}
-    cylinder(root,m.metal,-11.11,1.19,-.58,.146,.23,.17);
-    box(root,m.dark,-9.3,1.075,-.29,.85,.03,.52,.08);
-    pipe(root,m.metal,[[-9.3,1.01,-.73],[-9.3,1.41,-.73],[-9.3,1.45,-.44],[-9.3,1.30,-.38]],.028);
+    root.add(createGalley(m,{cookware:false}));
     cylinder(root,m.white,-11.50,1.13,-.02,.055,.18,.065);
     docks.bowl.position.set(stationX+.095,1.077,.10);docks.bowl.rotation.y=Math.PI;docks.bowl.visible=true;
     docks.spoon.position.set(stationX-.17,1.039,.10);docks.spoon.visible=true;docks.bite.visible=false;
@@ -360,7 +353,8 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     for(const zz of [-1.25,-.94])pipe(staticRoot,zz===-1.25?m.red:m.metal,[[-12.8,y+2.6,zz],[-6,y+2.6,zz],[0,y+2.6,zz],[6,y+2.6,zz],[12.8,y+2.6,zz]],zz===-1.25?.055:.075);
     for(let xx=-12;xx<=12;xx+=2.4){box(staticRoot,m.dark,xx,y+2.60,-1.08,.052,.29,.55);}
     for(const xx of [-12.83,-3.1,7.1,12.83]){
-      if(level===DECK.OPERATIONS&&xx===7.1)continue;
+      // Both pressure-hatch assemblies occupy these former trim/rib positions.
+      if(level===DECK.OPERATIONS&&(xx===7.1||xx===12.83))continue;
       box(staticRoot,m.dark,xx,y+1.5,-1.32,.10,2.98,.48);
       box(staticRoot,m.enamel,xx,y+1.50,-1.035,.16,2.98,.10,.02);
       box(staticRoot,m.red,xx,y+1.15,-.958,.06,.45,.04,.01);
@@ -457,7 +451,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   STATIONS.forEach(({id,x,floor:level})=>{
     const w=id==='galley'?3.06:id==='plant'?2.90:id==='medical'?5.10:id==='eva'?3.65:['airlock','innerHatch'].includes(id)?.62:1.9;
     const fixtureX=id==='galley'?-10.05:id==='airlock'?evaBay.hatch.position.x:id==='innerHatch'?evaBay.innerHatch.position.x:id==='medical'?MED_BED.x-.52:positionX(x);
-    const bounds=id==='smoking'?new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(ASHTRAY.x,FLOOR_Y[level]+1.0,ASHTRAY.z),new THREE.Vector3(.52,.43,.45)):id==='grooming'?groomingGateBounds():id==='plant'?new THREE.Box3().setFromObject(plants.root).expandByScalar(.04):id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
+    const bounds=id==='smoking'?new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(ASHTRAY.x,FLOOR_Y[level]+1.0,ASHTRAY.z),new THREE.Vector3(.52,.43,.45)):id==='grooming'?groomingGateBounds():id==='plant'?new THREE.Box3().setFromObject(plants.root).expandByScalar(.04):id==='galley'?new THREE.Box3().setFromObject(diningStations.galley.root):id==='lounge'?loungeBounds:new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(fixtureX,FLOOR_Y[level]+1.25,0),new THREE.Vector3(w,2.5,3));
     const {mesh,group,material}=createStationInteraction(id,bounds,pickMaterial);
     if(!['lounge','grooming','smoking'].includes(id))group.position.z=1.75;
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};

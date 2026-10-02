@@ -64,22 +64,32 @@ function attachDetails(parent,detail,name){
   for(const part of baked.children)if(part.material.transparent){part.castShadow=false;part.renderOrder=1;}
 }
 
-export function finishPressureHatch(root,left,right,m,leafFace){
+export function finishPressureHatch(root,left,right,m,leafFace,cassette){
   const fixed=new THREE.Group();
+  const extraWidth=(cassette.width-2.60)/2,extraHeight=cassette.height-2.26,cy=cassette.offsetY;
   for(const side of [-1,1]){
-    for(const x of [-.92,.92]){
+    for(const direction of [-1,1]){
+      const x=direction*(.92+extraWidth/2),skinWidth=.58+extraWidth;
       // Gasket-backed removable cassette skins, with distinct access hatches.
-      panel(fixed,m.graphite,x,0,.171,.58,1.98,.008,side);
-      panel(fixed,m.panel,x,0,.180,.56,1.96,.008,side);
-      for(const yy of [-.88,.88])for(const dx of [-.23,.23])fastener(fixed,m.metal,x+dx,yy,.189,side);
-      panel(fixed,m.graphite,x,-.57,.188,.44,.40,.006,side);
-      panel(fixed,m.paint,x,-.57,.195,.42,.38,.006,side);
-      for(const yy of [-.70,-.44])for(const dx of [-.16,.16])fastener(fixed,m.metal,x+dx,yy,.203,side);
-      stencil(fixed,m.print,'service',x,.70,.187,.44,.11,side);
+      panel(fixed,m.graphite,x,cy,.171,skinWidth,1.98+extraHeight,.008,side);
+      panel(fixed,m.panel,x,cy,.180,skinWidth-.02,1.96+extraHeight,.008,side);
+      for(const yy of [-1,1])for(const dx of [-1,1])fastener(fixed,m.metal,x+dx*(skinWidth/2-.06),cy+yy*(.88+extraHeight/2),.189,side);
+      panel(fixed,m.graphite,x,-.57,.188,.44+extraWidth*.6,.40,.006,side);
+      panel(fixed,m.paint,x,-.57,.195,.42+extraWidth*.6,.38,.006,side);
+      for(const yy of [-.70,-.44])for(const dx of [-1,1])fastener(fixed,m.metal,x+dx*(.16+extraWidth*.3),yy,.203,side);
+      stencil(fixed,m.print,'service',x,.70+cy,.187,.44,.11,side);
       stencil(fixed,m.print,'serial',x,-.57,.201,.34,.085,side);
-      for(const yy of [.44,.395,.35,.305])box(fixed,m.graphite,x,yy,side*.187,.27,.010,.002);
+      for(const yy of [.44,.395,.35,.305])box(fixed,m.graphite,x,yy+cy,side*.187,.27+extraWidth*.65,.010,.002);
       // Folded longitudinal pressings give the tall panels readable relief.
-      for(const dx of [-.19,.19])box(fixed,m.metal,x+dx,-.005,side*.192,.014,.43,.012);
+      for(const dx of [-1,1])box(fixed,m.metal,x+dx*(.19+extraWidth*.35),-.005,side*.192,.014,.43,.012);
+    }
+    if(extraHeight>0){
+      const y=1.13+extraHeight/2;
+      panel(fixed,m.graphite,0,y,.171,1.03,extraHeight-.10,.008,side);
+      panel(fixed,m.panel,0,y,.180,1.01,extraHeight-.12,.008,side);
+      stencil(fixed,m.print,'service',-.16,y+.07,.187,.40,.10,side);
+      for(const x of [-.43,.43])for(const dy of [-.12,.12])fastener(fixed,m.metal,x,y+dy,.189,side);
+      for(const dy of [-.06,-.095,-.13])box(fixed,m.graphite,.11,y+dy,side*.187,.51,.009,.002);
     }
     for(const x of [-.573,.573]){
       for(const yy of [-.81,.81])box(fixed,m.red,x,yy,side*.183,.025,.19,.005);

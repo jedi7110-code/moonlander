@@ -4,6 +4,9 @@ import {pressureHatchFinish,finishPressureHatch} from './pressure-hatch-finish.j
 
 // Metres. The two leaves remain inside this cassette at every opening amount.
 export const PRESSURE_HATCH=Object.freeze({width:1.08,height:2.16,bottom:.06,centerY:1.14,cut:.10,cassetteWidth:2.60,cassetteHeight:2.26,cassetteDepth:.33,leafDepth:.128,edgeDepth:.238,edgeOverlap:.011,travel:.70});
+export const STANDARD_HATCH_CASSETTE=Object.freeze({width:2.60,height:2.26,offsetY:0});
+// The approved reference includes the larger side skins and upper access panel.
+export const REFERENCE_HATCH_CASSETTE=Object.freeze({width:3.30,height:2.79,offsetY:.265});
 const leafFace=PRESSURE_HATCH.leafDepth/2,lockFace=leafFace+.003;
 export const PRESSURE_LOCK_SERVICE=Object.freeze({x:.35,y:.12,z:lockFace+.035,tip:.014});
 const {width:w,height:h,cut:c}=PRESSURE_HATCH;
@@ -56,19 +59,27 @@ function lockModule(parent,finish,signal,side,inner){
   return module;
 }
 
-export function createPressureHatch({inner=false,materials=null}={}){
+export function createPressureHatch({inner=false,materials=null,cassette=STANDARD_HATCH_CASSETTE,mountingSeal=false}={}){
   const root=new THREE.Group();root.name='Biparting pocket hatch';
   const finish=pressureHatchFinish(materials);
   const signal=new THREE.MeshBasicMaterial({name:'Pressure hatch / powered status',color:0x85e3af,toneMapped:false});signal.userData.cabinAlwaysPowered=true;
-  const aperture=perimeter(w,h,c),outer=perimeter(PRESSURE_HATCH.cassetteWidth,PRESSURE_HATCH.cassetteHeight,.06);
+  const aperture=perimeter(w,h,c),outer=perimeter(cassette.width,cassette.height,.06).map(([x,y])=>[x,y+cassette.offsetY]);
   for(const side of [-1,1]){
     ring(root,finish.paint,outer,aperture,side>0?.120:-.165,.045,`Pocket cassette cover / ${side>0?'front':'back'}`);
     ring(root,finish.metal,perimeter(w+.075,h+.075,c+.024),aperture,side>0?.166:-.178,.012,'Chamfered metal jamb');
     // Pocket covers, not clipping or disappearing meshes, conceal the leaves.
   }
+  if(mountingSeal){
+    // The wall cutout includes installation clearance. A physical gasket laps
+    // that joint on both faces, preventing a bright slit at the cassette edge.
+    const bottom=cassette.offsetY-cassette.height/2;
+    const rim=delta=>perimeter(cassette.width+delta,cassette.height+delta,.06).map(([x,y])=>[x,Math.max(bottom-.006,y+cassette.offsetY)]);
+    for(const side of [-1,1])ring(root,finish.graphite,rim(.024),rim(-.04),side>0?.103:-.181,.014,'Cassette mounting gasket');
+  }
   // End caps meet the covers at their inside faces, not their visible surfaces.
-  for(const side of [-1,1])box(root,finish.graphite,side*(PRESSURE_HATCH.cassetteWidth/2-.012),0,0,.024,PRESSURE_HATCH.cassetteHeight,.24).name='Closed pocket end cap';
-  for(const y of [-h/2-.032,h/2+.032])box(root,finish.metal,0,y,0,PRESSURE_HATCH.cassetteWidth-.06,.024,.24).name='Internal slide rail';
+  for(const side of [-1,1])box(root,finish.graphite,side*(cassette.width/2-.012),cassette.offsetY,0,.024,cassette.height,.24).name='Closed pocket end cap';
+  for(const y of [-h/2-.032,h/2+.032])box(root,finish.metal,0,y,0,cassette.width-.06,.024,.24).name='Internal slide rail';
+  if(cassette.offsetY>0)box(root,finish.graphite,0,cassette.offsetY+cassette.height/2-.014,0,cassette.width-.12,.028,.24).name='Upper housing end cap';
   const door=new THREE.Group();door.name='Pressure door assembly';root.add(door);
   const left=new THREE.Group(),right=new THREE.Group();left.name='Left pocket leaf';right.name='Right pocket leaf';door.add(left,right);
   const leftShape=path([[-w/2+c,-h/2],...seam.slice().reverse(),[-w/2+c,h/2],[-w/2,h/2-c],[-w/2,-h/2+c]]);
@@ -85,8 +96,8 @@ export function createPressureHatch({inner=false,materials=null}={}){
   for(const side of [-1,1])ring(left,finish.graphite,paneBorder,panePoints,side>0?leafFace+.001:-leafFace-.011,.010,'Angular safety window frame');
   const pane=solid(left,finish.glass,path(panePoints),-.006,.012,'Angular safety window');pane.castShadow=false;
   for(const side of [-1,1])lockModule(right,finish,signal,side,inner);
-  finishPressureHatch(root,left,right,finish,leafFace);
-  door.userData.leaves=[left,right];root.userData={door,signal,inner};return root;
+  finishPressureHatch(root,left,right,finish,leafFace,cassette);
+  door.userData.leaves=[left,right];root.userData={door,signal,inner,cassette};return root;
 }
 
 export function animatePressureHatch(door,opening){
@@ -97,4 +108,4 @@ export function animatePressureHatch(door,opening){
   door.visible=true;
 }
 
-export function pressureCassetteOutline(){return perimeter(PRESSURE_HATCH.cassetteWidth+.006,PRESSURE_HATCH.cassetteHeight+.006,.06);}
+export function pressureCassetteOutline(cassette=STANDARD_HATCH_CASSETTE){return perimeter(cassette.width+.006,cassette.height+.006,.06).map(([x,y])=>[x,y+cassette.offsetY]);}

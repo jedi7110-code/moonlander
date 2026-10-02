@@ -5,10 +5,30 @@ import {DECK,EVA,EVA_PASSAGE,STATIONS,getStation,CABIN_AISLE} from '../src/obs/l
 import {getStation as sharedStation} from '../../js/obs/layout.js?v=15';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies} from '../src/obs/state.js';
-import {createEVABay,createEVAHatch,EVA_BAY,PRESSURE_HATCH,animateAirlock} from '../src/obs/eva.js';
+import {createEVABay,createEVAHatch,EVA_BAY,EVA_HATCH_FIT,PRESSURE_HATCH,animateAirlock} from '../src/obs/eva.js';
 import {AirlockPassage} from '../src/obs/airlock.js';
 import {addCabinDressing} from '../src/obs/cabin-dressing.js';
 import {FLOOR_Y} from '../src/obs/ship.js';
+import {addIndustrialDeck} from '../src/obs/industrial.js';
+
+test('side-wall services leave the EVA exit clear without removing other decks or ceiling wiring',()=>{
+  const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});
+  for(const level of [DECK.OPERATIONS,DECK.HABITATION,DECK.LIFE_SUPPORT]){
+    const root=new Group(),y=FLOOR_Y[level];addIndustrialDeck(root,m,y,level,{floorDetails:false});
+    root.updateMatrixWorld(true);
+    const tubes=root.children.filter(mesh=>mesh.name==='Side wall thin service pipe');
+    assert.equal(tubes.filter(mesh=>mesh.position.x<0).length,4,'left-wall bundle stays');
+    assert.equal(tubes.filter(mesh=>mesh.position.x>0).length,level===DECK.OPERATIONS?0:4,'only the bundle across the EVA door is omitted');
+    assert.ok(root.getObjectByName('Ceiling cable hanger'),'retain ceiling wiring');
+    if(level!==DECK.OPERATIONS)continue;
+    const opening=new Box3(new Vector3(EVA_BAY.hatchX-.65,y+.1,EVA_BAY.depth-PRESSURE_HATCH.width*EVA_HATCH_FIT.scale/2),
+      new Vector3(EVA_BAY.hatchX+.1,y+2.4,EVA_BAY.depth+PRESSURE_HATCH.width*EVA_HATCH_FIT.scale/2));
+    root.traverse(mesh=>{
+      if(mesh.isMesh)assert.equal(opening.intersectsBox(new Box3().setFromObject(mesh)),false,`no service cable or orphan clamp across the doorway: ${mesh.name}`);
+    });
+  }
+  material.dispose();
+});
 
 test('the EVA rack replaces audio in 3D without changing the original 2D station',()=>{
   assert.equal(getStation('stereo'),undefined);assert.ok(sharedStation('stereo'));
@@ -105,7 +125,7 @@ test('three hanging suits have separate silhouettes, clear boots, and a sealed r
   animated.attach(door);
   const original=door.position.clone(),outer=bay.hatch.userData.door.position.clone();
   animateAirlock(door,signal,.5);
-  assert.equal(door.position.x,EVA_BAY.innerX);assert.equal(door.position.y,3.392+PRESSURE_HATCH.centerY);
+  assert.equal(door.position.x,EVA_BAY.innerX);assert.equal(door.position.y,3.392+EVA_HATCH_FIT.centerY);
   assert.equal(door.position.z,EVA_BAY.depth);assert.equal(door.visible,true);
   assert.deepEqual(door.userData.leaves.map(leaf=>leaf.position.x),[-PRESSURE_HATCH.travel/2,PRESSURE_HATCH.travel/2]);
   animateAirlock(door,signal,1);assert.equal(door.visible,true,'leaves park inside pockets instead of disappearing');

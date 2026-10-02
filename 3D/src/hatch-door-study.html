@@ -11,8 +11,9 @@
   </style>
 </head>
 <body>
-  <header><h1>中央分割ハッチ / デザイン確認</h1><p>開口 1.08 × 2.16 m · 収納部を含む幅 2.60 m · 内扉・外扉共通</p><a href="./obs.html">OBSへ</a><a href="./hatch-repair-study.html">修理スタディー</a></header>
+  <header><h1>中央分割ハッチ / デザイン確認</h1><p id="dimensions">開口 1.08 × 2.16 m</p><a href="./obs.html">OBSへ</a><a href="./hatch-repair-study.html">修理スタディー</a></header>
   <div class="tools">
+    <nav aria-label="確認する扉"><button data-hatch="inner">内扉</button><button data-hatch="outer">船外出口</button></nav>
     <nav aria-label="扉の視点"><button data-view="front">表</button><button data-view="back">裏</button><button data-view="angle">斜め</button><button data-view="pockets">収納部を見る</button></nav>
     <nav aria-label="開閉"><button data-open="0">閉じる</button><button data-open=".5">半開</button><button data-open="1">全開</button><button id="play" aria-pressed="false">開閉を再生</button></nav>
     <label>開き具合 <input id="opening" type="range" min="0" max="1" step=".001" value="0"><output id="opening-value">0%</output></label>

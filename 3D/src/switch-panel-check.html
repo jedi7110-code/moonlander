@@ -13,6 +13,9 @@ import {animateBathroom} from './obs/bathroom.js';
 const view=await ObservationView.create(document.querySelector('canvas'));
 // Inspect static fixtures without the uninitialised actor and treatment poses.
 view.milo.visible=false;view.cat.visible=false;view.droidService.root.visible=false;
+// The permanent saucepan belongs to the service rig but is part of the fitted
+// kitchen even when this static check hides the droid and other job props.
+view.scene.attach(view.droidService.props.pot);
 view.ship.medical.rig.root.visible=false;
 const viewingWall=createViewingWall(cabinWallMaterials(view.ship.staticMesh));view.scene.add(viewingWall);
 const nearWallViews=[
@@ -39,12 +42,15 @@ doorButton.onclick=()=>{
 };
 const labels=document.getElementById('labels');const names=['操縦席の脇','上層の扉脇','医療区画','寝台の入口','ラウンジ','機関区','貨物区画'];
 labels.innerHTML=names.map(n=>`<b>${n}</b>`).join('');
+let lightFrame=0,lastLightingTime=performance.now();
 function render(){
+ cancelAnimationFrame(lightFrame);lightFrame=0;
+ const now=performance.now(),lightingDt=Math.min(.1,Math.max(0,(now-lastLightingTime)/1000));lastLightingTime=now;
  const width=innerWidth,height=innerHeight-72,r=view.renderer;
  viewingWall.visible=mode==='front';
  const bathroom=['shower','toilet'].includes(mode);doorControls.style.display=bathroom?'flex':'none';doorButton.textContent=opening>.5?'ドアを閉める':'ドアを開ける';
- for(const [id,room] of Object.entries(view.ship.bathrooms))animateBathroom(room,{opening:mode===id?opening:0,phase:closing?'close':undefined});
- document.getElementById('status').textContent=bathroom?`${mode==='shower'?'シャワー':'トイレ'} / ${Math.round(opening*100)}% / ${view.ship.bathrooms[mode].ceilingLight.power.value?'点灯':'消灯'}`:mode==='console'?'FLIGHT / ATMOSPHERE / POWER':mode==='kitchen'?'キッチン':mode==='plants'?'栽培棚':mode==='front'?'主観側 / 3フロア':mode==='pipes'?`${REAR_WALL_PIPE_RUNS.length}か所 / 4本組`:'7か所 / 3種類';
+ for(const [id,room] of Object.entries(view.ship.bathrooms))animateBathroom(room,{opening:mode===id?opening:0,phase:closing?'close':undefined},lightingDt);
+ document.getElementById('status').textContent=bathroom?`${mode==='shower'?'シャワー':'トイレ'} / 扉 ${Math.round(opening*100)}% / 照明 ${Math.round(view.ship.bathrooms[mode].ceilingLight.power.value*100)}%`:mode==='console'?'FLIGHT / ATMOSPHERE / POWER':mode==='kitchen'?'キッチン':mode==='plants'?'栽培棚':mode==='front'?'主観側 / 3フロア':mode==='pipes'?`${REAR_WALL_PIPE_RUNS.length}か所 / 4本組`:'7か所 / 3種類';
  labels.style.display=['sites','pipes','front'].includes(mode)?'grid':'none';
  labels.style.gridTemplateColumns=`repeat(${mode==='pipes'||mode==='front'?3:5},1fr)`;
  labels.innerHTML=(mode==='front'?nearWallViews.map(p=>p.label):mode==='pipes'?REAR_WALL_PIPE_RUNS.map(p=>p.label):names).map(n=>`<b>${n}</b>`).join('');
@@ -76,7 +82,7 @@ function render(){
   camera.fov=62;camera.aspect=width/height;camera.position.set(x-.17,4.94,-.95);camera.lookAt(x+.10,5.01,-3.12);camera.updateProjectionMatrix();
   view.cabinToon.update(width,height,2.5,15);r.render(view.scene,camera);
  }else if(mode==='kitchen'){
-  camera.fov=38;camera.aspect=width/height;camera.position.set(-10.0,2.25,4.1);camera.lookAt(-10.0,1.1,-.6);camera.updateProjectionMatrix();
+  camera.fov=70;camera.aspect=width/height;camera.position.set(-9.75,1.64,2.40);camera.lookAt(-10.05,1.40,-.6);camera.updateProjectionMatrix();
   view.cabinToon.update(width,height,3.0,15);r.render(view.scene,camera);
  }else if(mode==='gym'){
   camera.fov=38;camera.aspect=width/height;camera.position.set(2.5,1.8,3.2);camera.lookAt(2.0,.88,-.9);camera.updateProjectionMatrix();
@@ -102,7 +108,9 @@ function render(){
    const yy=FLOOR_Y[p.deck]+(pipes?1.55:p.y),yaw=p.yaw??0,distance=pipes?4.4:2.4;camera.position.set(p.x+Math.sin(yaw)*distance+Math.cos(yaw)*.13,yy+.10,p.z+Math.cos(yaw)*distance);camera.lookAt(p.x,yy,p.z);r.render(view.scene,camera);
   });r.setScissorTest(false);r.setViewport(0,0,width,height);
  }
+ if(Object.values(view.ship.bathrooms).some(room=>room.ceilingLight.power.value!==room.ceilingLight.targetPower))lightFrame=requestAnimationFrame(render);
 }
 view.observer.disconnect();for(const name of ['detail','sites','bunk','lounge','magazines','locker','gym','cargo','pipes','front','shower','toilet','console','plants'])document.getElementById(name).onclick=()=>{mode=name;render();};window.addEventListener('resize',render);
 render();
+window.addEventListener('pagehide',()=>{cancelAnimationFrame(doorFrame);cancelAnimationFrame(lightFrame);window.removeEventListener('resize',render);toon.dispose();view.dispose();},{once:true});
 </script></html>

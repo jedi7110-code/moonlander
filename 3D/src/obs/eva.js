@@ -4,13 +4,18 @@ import {EVA_PASSAGE,CABIN_AISLE} from './layout.js';
 import {hangingSuit} from './eva-suit.js';
 import {createEquipmentRack} from './eva-equipment.js';
 import {EVA_SPOT_LAYOUT} from './lighting.js';
-import {createPressureHatch,animatePressureHatch,PRESSURE_HATCH,PRESSURE_LOCK_SERVICE,pressureCassetteOutline} from './pressure-hatch.js';
+import {createPressureHatch,animatePressureHatch,PRESSURE_HATCH,PRESSURE_LOCK_SERVICE,REFERENCE_HATCH_CASSETTE,pressureCassetteOutline} from './pressure-hatch.js';
 export {PRESSURE_HATCH} from './pressure-hatch.js';
 export {hangingSuit} from './eva-suit.js';
 
-export const EVA_BAY={suitX:EVA_SPOT_LAYOUT.suitX,suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:CABIN_AISLE.crewZ};
+// Uniformly enlarge the supplied reference, keeping its design and proportions.
+// The sill stays on the floor; a small centering adjustment contains the wider
+// pockets within the ship without moving the crew's walking lane.
+const hatchScale=1.10,cassette=REFERENCE_HATCH_CASSETTE,sill=PRESSURE_HATCH.centerY+cassette.offsetY-cassette.height/2;
+export const EVA_HATCH_FIT=Object.freeze({scale:hatchScale,width:cassette.width*hatchScale,height:cassette.height*hatchScale,centerY:sill+(PRESSURE_HATCH.centerY-sill)*hatchScale});
+export const EVA_BAY={suitX:EVA_SPOT_LAYOUT.suitX,suitZ:-.73,railY:2.62,hatchX:13.03,innerX:(EVA_PASSAGE.x-700)*.022,hatchYaw:-Math.PI/2,depth:Math.min(CABIN_AISLE.crewZ,CABIN_AISLE.deckFront-EVA_HATCH_FIT.width/2-.035)};
 // World X/Z and deck-relative Y, shared by OBS and the repair study.
-export const HATCH_SERVICE_POINT={x:EVA_BAY.innerX-PRESSURE_LOCK_SERVICE.z-PRESSURE_LOCK_SERVICE.tip,y:PRESSURE_HATCH.centerY+PRESSURE_LOCK_SERVICE.y,z:EVA_BAY.depth+PRESSURE_LOCK_SERVICE.x};
+export const HATCH_SERVICE_POINT={x:EVA_BAY.innerX-(PRESSURE_LOCK_SERVICE.z+PRESSURE_LOCK_SERVICE.tip)*hatchScale,y:EVA_HATCH_FIT.centerY+PRESSURE_LOCK_SERVICE.y*hatchScale,z:EVA_BAY.depth+PRESSURE_LOCK_SERVICE.x*hatchScale};
 
 export function createEVASpotlights(m,y){
   const root=new THREE.Group();root.name='EVA overhead spotlights';
@@ -32,8 +37,9 @@ export function createEVASpotlights(m,y){
 }
 
 export function createEVAHatch(m,y,inner=false){
-  const root=createPressureHatch({inner,materials:m});root.name=inner?'Inner airlock / sealed':'EVA airlock / sealed';
-  root.position.set(inner?EVA_BAY.innerX:EVA_BAY.hatchX,y+PRESSURE_HATCH.centerY,EVA_BAY.depth);root.rotation.y=EVA_BAY.hatchYaw;
+  const root=createPressureHatch({inner,materials:m,cassette,mountingSeal:true});root.name=inner?'Inner airlock / sealed':'EVA airlock / sealed';
+  root.scale.setScalar(hatchScale);
+  root.position.set(inner?EVA_BAY.innerX:EVA_BAY.hatchX,y+EVA_HATCH_FIT.centerY,EVA_BAY.depth);root.rotation.y=EVA_BAY.hatchYaw;
   return root;
 }
 
@@ -65,7 +71,7 @@ export function createEVAPartitions(m,y){
   for(const x of [EVA_BAY.innerX,EVA_BAY.hatchX]){
     const top=x===EVA_BAY.innerX?3.396:3.242;
     const shape=new THREE.Shape();shape.moveTo(back,0);shape.lineTo(front,0);shape.lineTo(front,top);shape.lineTo(back,top);shape.closePath();
-    const points=pressureCassetteOutline().map(([z,yy])=>[z+EVA_BAY.depth,yy+PRESSURE_HATCH.centerY]).reverse();
+    const points=pressureCassetteOutline(cassette).map(([z,yy])=>[z*hatchScale+EVA_BAY.depth,yy*hatchScale+EVA_HATCH_FIT.centerY]).reverse();
     const opening=new THREE.Path();opening.moveTo(...points[0]);for(const point of points.slice(1))opening.lineTo(...point);opening.closePath();shape.holes.push(opening);
     const bulkhead=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.20,bevelEnabled:false,steps:1}),m.enamel);
     bulkhead.name='Hatch bulkhead return';bulkhead.position.set(x+.155,y,0);bulkhead.rotation.y=-Math.PI/2;bulkhead.castShadow=bulkhead.receiveShadow=true;root.add(bulkhead);

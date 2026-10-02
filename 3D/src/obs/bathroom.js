@@ -7,9 +7,9 @@ export const BATHROOM_OUTSIDE_DEPTH=.78,BATHROOM_INSIDE_DEPTH=-2.8;
 // A longer visual turn must not charge extra hunger/thirst to the visit.
 export const BATHROOM_TURN_DECAY={reach:.4/1.4,reopen:.7/1.8};
 
-export function animateBathroom(fixture,pose=null){
+export function animateBathroom(fixture,pose=null,dt=0){
   animatePocketShutter(fixture.door,pose?.opening??0);
-  updateBathroomCeilingLight(fixture.ceilingLight,pose);
+  updateBathroomCeilingLight(fixture.ceilingLight,pose,dt);
   const {lamp}=fixture,material=lamp.material;
   // Pocket-door materials are cloned per fixture, so the other room and all
   // shared cyan indicators stay unchanged. Preserve the original idle glow.

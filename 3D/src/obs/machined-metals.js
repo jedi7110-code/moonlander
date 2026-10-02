@@ -64,18 +64,6 @@ export function finishMachinedFixtures(root,m,metals){
         }
       }
     }
-    if(group.name==='Kitchen station'){
-      for(const mesh of group.children){
-        if(!mesh.isMesh)continue;
-        if(mesh.material===m.dark&&mesh.position.x===-9.3&&
-          mesh.position.y===1.075&&mesh.position.z===-.29){
-          mesh.name='Machined kitchen sink';mesh.material=metals.shell;
-        }else if(mesh.material===m.metal&&mesh.geometry.type==='TubeGeometry'&&
-          mesh.geometry.parameters.path.points[0].x===-9.3){
-          mesh.name='Machined kitchen faucet';mesh.material=metals.alloy;
-        }
-      }
-    }
     if(group.name==='Washing machine'||group.name==='Dryer'){
       for(const mesh of group.children){
         if(!mesh.isMesh)continue;

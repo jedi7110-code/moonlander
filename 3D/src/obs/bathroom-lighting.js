@@ -1,6 +1,8 @@
 import {Group,MeshBasicMaterial,Vector3} from 'three';
 import {box,batchStatic} from './materials.js';
 
+export const BATHROOM_LIGHT_FADE={on:.8,off:1.2};
+
 export function createBathroomCeilingLight(m,x,y,type){
   const housing=new Group(),strips=new Group();
   const diffuser=new MeshBasicMaterial({name:`${type} ceiling cove diffuser`,color:0x171c1b,toneMapped:false});
@@ -15,18 +17,28 @@ export function createBathroomCeilingLight(m,x,y,type){
   }
   const root=batchStatic(strips);root.name=`${type} indirect ceiling light`;root.position.set(x,y,0);
   housing.name=`${type} ceiling cove lip`;housing.position.copy(root.position);
-  const light={root,housing,diffuser,power:{value:0},origin:{value:new Vector3(x,y,0)}};
+  const light={root,housing,diffuser,power:{value:0},fadeLevel:0,targetPower:0,origin:{value:new Vector3(x,y,0)}};
   root.userData.bathroomLighting={power:light.power,origin:light.origin};
   return light;
 }
 
-export function updateBathroomCeilingLight(light,pose){
+export function updateBathroomCeilingLight(light,pose,dt=0){
   if(!light)return;
   // Occupancy keeps the room lit through closing, use and reopening for exit.
   // Eased opening may round to 1 just before the opening phase has ended.
   const on=pose?.inside||(pose?.opening>=1&&!['open','reopen','close','shut'].includes(pose?.phase));
-  light.power.value=on?1:0;
-  light.diffuser.color.setRGB(...(on?[1,.89,.70]:[.009,.012,.011]));
+  light.targetPower=on?1:0;
+  // Keep the switch condition, but ease its level over simulation time. Using
+  // one reversible ramp avoids a jump when someone re-enters during fade-out.
+  // Infinity is reserved for static snapshots; dt=0 freezes a paused fade.
+  const step=dt===Infinity?1:Number.isFinite(dt)?Math.max(0,dt)/BATHROOM_LIGHT_FADE[on?'on':'off']:0;
+  light.fadeLevel=Math.max(0,Math.min(1,light.fadeLevel+(on?step:-step)));
+  if(light.fadeLevel<1e-9)light.fadeLevel=0;
+  if(light.fadeLevel>1-1e-9)light.fadeLevel=1;
+  const power=light.fadeLevel*light.fadeLevel*(3-2*light.fadeLevel);
+  light.power.value=power;
+  // The visible diffuser and the room's shader bounce share the same ramp.
+  light.diffuser.color.setRGB(.009+.991*power,.012+.878*power,.011+.689*power);
 }
 
 // Local indirect bounce shares the ceiling's live switch. Evaluate only inside

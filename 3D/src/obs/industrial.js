@@ -273,6 +273,9 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
     }
   }
   for(const x of [-12.8,12.82]){
+    // The operations deck's right wall is the EVA exit. Omit the whole bundle,
+    // including its clamps, so nothing crosses the door or its angular window.
+    if(level===DECK.OPERATIONS&&x>0)continue;
     const direction=x<0?1:-1,side=-direction;
     for(let i=0;i<4;i++){
       const xx=x+direction*i*.062,key=`${side}/${i}`;

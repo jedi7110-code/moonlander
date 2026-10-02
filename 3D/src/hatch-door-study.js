@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {createEVAHatch,animateAirlock,PRESSURE_HATCH} from './obs/eva.js';
+import {createEVAHatch,animateAirlock,PRESSURE_HATCH,EVA_HATCH_FIT} from './obs/eva.js';
 import {createCabinToon} from './obs/cabin-toon.js';
 import {materials} from './obs/materials.js';
 import {industrialMaterials} from './obs/industrial.js';
@@ -10,6 +10,11 @@ const $=id=>document.getElementById(id),params=new URLSearchParams(location.sear
 const number=Number(params.get('opening'));
 let opening=Number.isFinite(number)?THREE.MathUtils.clamp(number,0,1):0;
 let view=['front','back','angle','pockets'].includes(params.get('view'))?params.get('view'):'front';
+const inner=params.get('hatch')!=='outer';
+document.querySelectorAll('[data-hatch]').forEach(button=>{
+  button.setAttribute('aria-pressed',button.dataset.hatch===(inner?'inner':'outer'));
+  button.onclick=()=>{const url=new URL(location.href);url.searchParams.set('hatch',button.dataset.hatch);location.assign(url);};
+});
 async function init(){
 const cabinMaterials=await materials(),worn=industrialMaterials(cabinMaterials);
 const canvas=$('hatch-view'),renderer=new THREE.WebGLRenderer({canvas,antialias:true});
@@ -18,8 +23,9 @@ const scene=new THREE.Scene();scene.background=new THREE.Color(0x253136);
 const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment(),environment=pmrem.fromScene(room,.04);scene.environment=environment.texture;room.dispose();pmrem.dispose();
 scene.add(new THREE.HemisphereLight(0xe6f2ed,0x536168,2));
 for(const [x,y,z,color]of [[-3,4,4,0xffedda],[2,3,-3,0xc6e0ee]]){const light=new THREE.DirectionalLight(color,2);light.position.set(x,y,z);scene.add(light);}
-const hatch=createEVAHatch(worn,0,true);hatch.position.set(0,PRESSURE_HATCH.centerY,0);hatch.rotation.set(0,0,0);scene.add(hatch);
-const floor=new THREE.Mesh(new THREE.BoxGeometry(3.5,.035,1.6),new THREE.MeshStandardMaterial({color:0x334146,roughness:.85}));floor.position.y=-.02;scene.add(floor);
+const hatch=createEVAHatch(worn,0,inner);hatch.position.set(0,EVA_HATCH_FIT.centerY,0);hatch.rotation.set(0,0,0);scene.add(hatch);
+$('dimensions').textContent=`${inner?'内扉':'船外出口'} · 全体スケール ${(hatch.scale.x*100).toFixed(0)}% · 全体 ${EVA_HATCH_FIT.width.toFixed(2)} × ${EVA_HATCH_FIT.height.toFixed(2)} m · 開口 ${(PRESSURE_HATCH.width*hatch.scale.x).toFixed(2)} × ${(PRESSURE_HATCH.height*hatch.scale.y).toFixed(2)} m`;
+const floor=new THREE.Mesh(new THREE.BoxGeometry(4.0,.035,1.6),new THREE.MeshStandardMaterial({color:0x334146,roughness:.85}));floor.position.set(0,-.02,0);scene.add(floor);
 const toon=createCabinToon([hatch]);toon.setStyle('cartoon');
 const camera=new THREE.PerspectiveCamera(37,1,.01,40),controls=new OrbitControls(camera,canvas);controls.minDistance=.35;controls.maxDistance=9;controls.enableDamping=false;
 let width=1,height=1,pending=0,playing=false,last=performance.now(),direction=1,human=null,humanLoading=null,disposed=false;
@@ -32,7 +38,7 @@ function updateOpening(){
 }
 function setPlaying(value){playing=value;$('play').textContent=value?'一時停止':'開閉を再生';$('play').setAttribute('aria-pressed',value);last=performance.now();if(!value)save();}
 function showView(){
-  controls.target.set(0,1.13,0);const distance=Math.max(4.5,4.4/camera.aspect);
+  controls.target.set(0,EVA_HATCH_FIT.height/2,0);const distance=Math.max(5.9,5.9/camera.aspect);
   const offset={front:[0,.07,distance],back:[0,.07,-distance],angle:[distance*.58,.65,distance*.85],pockets:[distance*.32,.5,distance*.86]}[view];
   camera.position.copy(controls.target).add(new THREE.Vector3(...offset));controls.update();
   hatch.getObjectByName('Pocket cassette cover / front').visible=view!=='pockets';

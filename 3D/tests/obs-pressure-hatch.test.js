@@ -113,7 +113,8 @@ test('OBS reparenting and study-local animation yield identical doors, lock targ
       assert.ok(a.min.distanceTo(b.min)<1e-7&&a.max.distanceTo(b.max)<1e-7);
       assert.ok(a.min.z>CABIN_AISLE.deckBack&&a.max.z<CABIN_AISLE.deckFront,'neither leaf leaves the ship');
     }
-    assert.equal(study.position.z,CABIN_AISLE.crewZ,'narrow opening is centered on the real walking lane');
+    assert.equal(study.position.z,EVA_BAY.depth);
+    assert.ok(Math.abs(study.position.z-CABIN_AISLE.crewZ)<.1,'the enlarged opening stays aligned with the real walking lane');
     if(inner){const screw=study.getObjectByName('Inner lock service screw');assert.ok(screw.localToWorld(new Vector3(0,.014,0)).distanceTo(new Vector3(...Object.values(HATCH_SERVICE_POINT)))<1e-7);}
   }
 });

@@ -16,6 +16,24 @@ const WELL_EDGE=.94,WELL_STANCE=WELL_EDGE+.04+.188;
 export const ladderStanceDepth=depth=>depth>1?WELL_STANCE:depth;
 const phase=(u,[start,end])=>THREE.MathUtils.clamp((u-start)/(end-start),0,1);
 
+// Retarget the pose's deck bounds as well as the logical route. Keeping the old
+// departure after a reversal can put both bounds on the same deck (or on the
+// same side of Milo), clamping the gait to one frame while his root still moves.
+export function updateCabinClimb(previous,next){
+  if(!next)return null;
+  if(!previous)return {...next};
+  const direction=Math.sign(next.endHeight-next.height),before=Math.sign(previous.endHeight-previous.startHeight);
+  if(direction&&direction!==before){
+    // If he has not yet left the deck transfer, retrace the same planted-foot
+    // stance. The normal walking turn can face the new destination afterwards.
+    const returning=next.endHeight===previous.startHeight&&Math.abs(next.height-previous.startHeight)<CABIN_LADDER.transfer;
+    return {...next,startHeight:previous.endHeight,startYaw:previous.arrivalYaw??(before<0?Math.PI:previous.endYaw),startDepth:previous.endDepth,
+      arrivalYaw:returning?previous.startYaw:undefined};
+  }
+  return {...next,startHeight:previous.startHeight,startYaw:previous.startYaw,startDepth:previous.startDepth,
+    arrivalYaw:next.endHeight===previous.endHeight?previous.arrivalYaw:undefined};
+}
+
 // Carry a sole between the bridge edge and a rung inside the well. It rises
 // 4.5 cm before it travels and stays that high until the heel has cleared the edge.
 function wellStep(start,end,t){
@@ -200,7 +218,7 @@ function applyLadderEntry(root,sample,{height,startHeight,startYaw,startDepth,po
 
 // Absolute height locks held hands/feet to the physical rungs in either direction,
 // including pause and mid-shaft retargeting. Only the deck transfers blend out.
-export function applyCabinLadder(root,{height,startHeight,endHeight,startYaw,endYaw,startDepth=CABIN_AISLE.crewZ,endDepth=CABIN_AISLE.crewZ}){
+export function applyCabinLadder(root,{height,startHeight,endHeight,startYaw,endYaw,startDepth=CABIN_AISLE.crewZ,endDepth=CABIN_AISLE.crewZ,arrivalYaw}){
   const from=Math.abs(height-startHeight),to=Math.abs(endHeight-height);
   const weight=THREE.MathUtils.smoothstep(Math.min(from,to),0,CABIN_LADDER.transfer);
   const descendingLanding=startHeight>endHeight&&to<=CABIN_LADDER.transfer&&from>=CABIN_LADDER.transfer;
@@ -223,7 +241,7 @@ export function applyCabinLadder(root,{height,startHeight,endHeight,startYaw,end
     // Arriving upward on a deck with a well mirrors its mount: step each foot up
     // onto the edge while holding the rungs, bring the pelvis over the feet,
     // release, step back to the aisle and turn to face it on planted feet.
-    const arrival=applyLadderEntry(root,sample,{height,startHeight:endHeight,startYaw:endYaw,startDepth:endDepth,poseHeight,reverse:true},rest,nodes,ladderBody);
+    const arrival=applyLadderEntry(root,sample,{height,startHeight:endHeight,startYaw:arrivalYaw??endYaw,startDepth:endDepth,poseHeight,reverse:true},rest,nodes,ladderBody);
     arrival.progress=1-arrival.progress;
     return {...sample,weight,arrival};
   }
@@ -231,7 +249,7 @@ export function applyCabinLadder(root,{height,startHeight,endHeight,startYaw,end
     // Reverse the supported mount: step straight back onto the destination
     // deck one foot at a time, then release the hands. Fit the body to those
     // contacts rather than blending it through the opening or turning early.
-    const landing=applyLadderEntry(root,sample,{height,startHeight:endHeight,startYaw:Math.PI,startDepth:endDepth,poseHeight},rest,nodes,ladderBody);
+    const landing=applyLadderEntry(root,sample,{height,startHeight:endHeight,startYaw:arrivalYaw??Math.PI,startDepth:endDepth,poseHeight},rest,nodes,ladderBody);
     landing.progress=1-landing.progress;
     return {...sample,weight,landing};
   }

@@ -3,7 +3,7 @@ import {createSpaceStars,SPACE_COLOR} from './space-stars.js';
 import {box,cylinder,batchStatic} from './materials.js';
 import {CABIN_AISLE,DECK} from './layout.js';
 import {FLOOR_Y} from './ship.js';
-import {EVA_BAY} from './eva.js';
+import {EVA_BAY,EVA_HATCH_FIT} from './eva.js';
 import {FOOTLIGHT} from './viewing-footlights.js';
 import {addViewingWallDressing} from './viewing-wall-dressing.js';
 import {addViewingWallDetails} from './viewing-wall-details.js';
@@ -114,6 +114,19 @@ export function createViewingWall(m,{mergeStatic=true}={}){
   const overhead=new MeshBasicMaterial({name:'POV / upper diffuser',color:0xe0e8e2,toneMapped:false});overhead.userData.castShadow=false;
   const windowGlass=new MeshBasicMaterial({name:'POV / pressure glass',color:0x8aa4b0,transparent:true,opacity:.065,depthWrite:false,toneMapped:false});windowGlass.userData.castShadow=false;
   const solid=(name,material,x,y,z,w,h,d,r=0)=>{const part=box(root,material,x,y,z,w,h,d,r);part.name=name;return part;};
+  const footlight=(name,material,x,floor,y,z,width,height,depth)=>{
+    let spans=[[x-width/2,x+width/2]];
+    if(floor===operations){
+      const clearance=.22*EVA_HATCH_FIT.scale+.02;
+      for(const hatchX of [EVA_BAY.innerX,EVA_BAY.hatchX])spans=spans.flatMap(([left,right])=>{
+        const a=hatchX-clearance,b=hatchX+clearance;
+        if(right<=a||left>=b)return[[left,right]];
+        return[[left,Math.min(right,a)],[Math.max(left,b),right]].filter(([l,r])=>r-l>.01);
+      });
+    }
+    // End the strip and its recess before the pressure housing, not through it.
+    for(const [left,right]of spans)solid(name,material,(left+right)/2,floor+y,z,right-left,height,depth);
+  };
   // Three connected faces, with real holes through both the lining and backing.
   // No full-height sheet sits behind the windows.
   for(const floor of FLOOR_Y){
@@ -135,8 +148,8 @@ export function createViewingWall(m,{mergeStatic=true}={}){
       const vent=surfaceMount(root,'POV / lower ventilation',x,floor,PROFILE.bottom,PROFILE.knee);
       box(vent,m.dark,0,0,.022,1.10,.23,.028).name='Lower vent recess';
       for(let n=0;n<4;n++)box(vent,m.metal,0,(n-1.5)*.05,.047,1.03,.016,.026).name='Lower vent louver';
-      solid('Footlight recess',m.rubber,x,floor+.104,front-.009,1.47,.077,.012);
-      solid('Concealed footlight strip',diffuser,x,floor+FOOTLIGHT.y,FOOTLIGHT.wallFaceZ+FOOTLIGHT.inset,FOOTLIGHT.width,FOOTLIGHT.height,.008);
+      footlight('Footlight recess',m.rubber,x,floor,.104,front-.009,1.47,.077,.012);
+      footlight('Concealed footlight strip',diffuser,x,floor,FOOTLIGHT.y,FOOTLIGHT.wallFaceZ+FOOTLIGHT.inset,FOOTLIGHT.width,FOOTLIGHT.height,.008);
       for(const dx of [-.69,.69])for(const dy of [-height/2+.09,height/2-.09]){
         const bolt=cylinder(root,m.metal,x+dx,floor+mid+dy,PROFILE.faceZ-.012,.018,.015,.018,6);bolt.rotation.x=Math.PI/2;
       }

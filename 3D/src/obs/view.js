@@ -23,7 +23,7 @@ import {animateBunk} from './bunk.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {diningPhase,diningApproach} from './dining.js';
 import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
-import {applyCabinLadder} from './cabin-ladder.js';
+import {applyCabinLadder,updateCabinClimb} from './cabin-ladder.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {updateTableLeisureProps} from './lounge-table-props.js';
 import {createLucyToon} from './lucy-toon.js';
@@ -210,8 +210,11 @@ export class ObservationView {
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
     const walkway=crewWalkway(positionX(actor.x),actor.floor,actor.facing);
     this.milo.position.set(positionX(actor.x),positionY(actor.y),walkway.z);
-    if(actor.climbing)this.cabinClimb??={startHeight:positionY(FLOORS[actor.floor].y),startYaw:this.milo.rotation.y,startDepth:walkway.z};
-    else this.cabinClimb=null;
+    const climb=actor.climbing?actor.queue[0]:null,nextX=actor.queue[1]?.x??actor.x;
+    this.cabinClimb=updateCabinClimb(this.cabinClimb,climb?{
+      height:positionY(actor.y),startHeight:positionY(FLOORS[actor.floor].y),startYaw:this.milo.rotation.y,startDepth:walkway.z,
+      endHeight:positionY(climb.y),endYaw:(Math.sign(nextX-actor.x)||actor.facing)*Math.PI/2,endDepth:crewWalkway(0,climb.floor).z,
+    }:null);
     const bathroom=brain.bathroom?.pose;
     if(action==='plant'&&!brain.harvestDelivery)this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
     if(['galley','hydro'].includes(action))this.milo.position.z=CABIN_AISLE.crewZ-diningApproach(action)*diningPhase(actionTime,brain.curDurSec).approach;
@@ -224,14 +227,11 @@ export class ObservationView {
       this.milo.position.x=positionX(getStation('lounge').x)+passage.x;this.milo.position.z=passage.depth;
     }
     if(!brain.grooming)animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair});
-    if(actor.climbing){
-      const nextX=actor.queue[1]?.x??actor.x,endYaw=(Math.sign(nextX-actor.x)||actor.facing)*Math.PI/2;
-      applyCabinLadder(this.milo,{...this.cabinClimb,height:positionY(actor.y),endHeight:positionY(actor.queue[0].y),endYaw,endDepth:crewWalkway(0,actor.queue[0].floor).z});
-    }
+    if(this.cabinClimb)applyCabinLadder(this.milo,this.cabinClimb);
     this.harvestDelivery.update(this.milo,brain);
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
       const cleaning=this.droidRoutine?.door===id?{opening:this.droidRoutine.opening,inside:false}:null;
-      animateBathroom(fixture,brain.bathroom?.id===id?bathroom:cleaning);
+      animateBathroom(fixture,brain.bathroom?.id===id?bathroom:cleaning,paused?0:dt);
     }
     animateCatPorts(this.ship.catPorts,catMotion.portal);
     for(const [id,docks]of Object.entries(this.ship.diningDocks)){
