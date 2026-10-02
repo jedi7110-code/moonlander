@@ -7,24 +7,53 @@
   <title>TARAIRON | 遠心重力生活区画 3D</title>
   <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船内猫ルーシーの暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/3D/assets/favi.ico">
-  <script type="module" crossorigin src="/3D/assets/obs-CKVMbPqa.js"></script>
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-D_l1qIn7.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CVtbbMuF.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/industrial-BikHdAK5.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/triangle-subset-DZfP0SvM.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/milo-body--ujSeFPX.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/eva-DUN7KoHl.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/characters-BHMxSWiz.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/machined-metals-D8CEoRCu.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-DFQhKo6O.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-dressing-DKdz1kou.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/service-parts-CAmdTwvE.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/galley-BQQrtusW.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/ship-XUqRiL6J.js">
+  <!-- Start the cabin assets alongside the script bundle instead of after it. crossorigin matches three's fetch/image requests. -->
+  <link rel="preload" href="/3D/assets/obs/lucy/lucy-cabin.glb?v=20260915-approved-2" as="fetch" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/lucy/lucy-approved.json?v=20260915-approved-2" as="fetch" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/head/LeePerrySmith.glb" as="fetch" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/head/supplied-hair/supplied-hair.glb" as="fetch" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/milo/body.json" as="fetch" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/eva/pressure-garment.glb" as="fetch" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/head/supplied-hair/hair-normal-2k.webp" as="image" crossorigin fetchpriority="high">
+  <link rel="preload" href="/3D/assets/obs/head/supplied-hair/hair-color-2k.webp" as="image" crossorigin fetchpriority="high">
+  <link rel="preload" href="/3D/assets/obs/head/supplied-hair/hair-opacity-2k.jpg" as="image" crossorigin fetchpriority="high">
+  <link rel="preload" href="/3D/assets/obs/milo/tattoo-cat-red.webp" as="image" crossorigin fetchpriority="high">
+  <link rel="preload" href="/3D/assets/obs/head/tattoo-naval-barcode.webp" as="image" crossorigin fetchpriority="high">
+  <link rel="preload" href="/3D/assets/obs/milo/tshirt-back-print.webp" as="image" crossorigin fetchpriority="high">
+  <link rel="preload" href="/3D/assets/obs/industrial-paint.webp" as="image" crossorigin fetchpriority="high">
+  <link rel="preload" href="/3D/assets/obs/head/Map-COL.jpg" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/head/Infinite-Level_02_Tangent_SmoothUV.jpg" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/head/supplied-hair/scalp-color.jpg" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/head/supplied-hair/scalp-opacity.jpg" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/milo/tattoo-cosmo-atomic-bold.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/milo/tattoo-right-upper.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/hoist-safety-paint.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/workshirt-patch-right.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/workshirt-patch-left.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/ai-rack-wiring.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/twill.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/fur.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/cat-food-luna.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/paxcreation-sports-print.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/steel.webp" as="image" crossorigin>
+  <link rel="preload" href="/3D/assets/obs/enamel.webp" as="image" crossorigin>
+  <script type="module" crossorigin src="/3D/assets/obs-8tgPjiKg.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-C530VLcl.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-BJ0zZOjq.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/industrial-DDNLLJkh.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/triangle-subset-B6OSYCn5.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/milo-body-CjElhTw4.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-DGQgnrEg.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/characters-Dro0A0KX.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/rear-room-furnishings-DPxKejfG.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-dressing-B-PtN9eZ.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/bathroom-window-nCIDye_v.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/service-parts-CcR1cKpN.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/ship-nWvxUOWF.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/plant-state-04NGcDSI.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/head-BXLhTen0.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/milo-toon-Qslr5bBc.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/startup-lighting-BqndyDC7.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/head-Bk7RcMiE.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/milo-toon-BTM6UkOm.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/startup-lighting-DT_GHaLp.js">
   <link rel="stylesheet" crossorigin href="/3D/assets/obs-B2g7pKKP.css">
 </head>
 <body>

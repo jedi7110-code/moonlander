@@ -1,12 +1,47 @@
 {
   "rewrites": [
-    { "source": "/3D", "destination": "/3D/dist/index.html" },
-    { "source": "/3D/", "destination": "/3D/dist/index.html" },
-    { "source": "/3D/index.html", "destination": "/3D/dist/index.html" },
-    { "source": "/3D/obs.html", "destination": "/3D/dist/obs.html" },
-    { "source": "/3D/obs", "destination": "/3D/dist/obs.html" },
-    { "source": "/3D/sofa-study.html", "destination": "/3D/dist/sofa-study.html" },
-    { "source": "/3D/gate-frame-study.html", "destination": "/3D/dist/gate-frame-study.html" },
-    { "source": "/3D/assets/:path*", "destination": "/3D/dist/assets/:path*" }
+    {
+      "source": "/3D",
+      "destination": "/3D/dist/index.html"
+    },
+    {
+      "source": "/3D/",
+      "destination": "/3D/dist/index.html"
+    },
+    {
+      "source": "/3D/index.html",
+      "destination": "/3D/dist/index.html"
+    },
+    {
+      "source": "/3D/obs.html",
+      "destination": "/3D/dist/obs.html"
+    },
+    {
+      "source": "/3D/obs",
+      "destination": "/3D/dist/obs.html"
+    },
+    {
+      "source": "/3D/sofa-study.html",
+      "destination": "/3D/dist/sofa-study.html"
+    },
+    {
+      "source": "/3D/gate-frame-study.html",
+      "destination": "/3D/dist/gate-frame-study.html"
+    },
+    {
+      "source": "/3D/assets/:path*",
+      "destination": "/3D/dist/assets/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/3D/assets/([A-Za-z0-9_-]+-[A-Za-z0-9_-]{8})\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
   ]
 }

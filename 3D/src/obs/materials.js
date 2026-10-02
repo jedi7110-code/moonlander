@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import './bump-scale-compat.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {makeXRWideGeometry} from './xr-geometry.js';
@@ -9,10 +10,10 @@ export async function materials() {
   const base=import.meta.env?.BASE_URL??'/3D/';
   const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring,taraironLogo,catFoodPrint]=await Promise.all([
     Promise.all(['enamel','steel','twill','fur','industrial-paint','hoist-safety-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
-    loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.png`),
-    loader.loadAsync(`${base}assets/obs/workshirt-patch-left.png`),
-    loader.loadAsync(`${base}assets/obs/workshirt-patch-right.png`),
-    loader.loadAsync(`${base}assets/obs/ai-rack-wiring.png`),
+    loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.webp`),
+    loader.loadAsync(`${base}assets/obs/workshirt-patch-left.webp`),
+    loader.loadAsync(`${base}assets/obs/workshirt-patch-right.webp`),
+    loader.loadAsync(`${base}assets/obs/ai-rack-wiring.webp`),
     loader.loadAsync(`${base}assets/obs/tarairon-logo.svg`),
     loader.loadAsync(`${base}${CAT_FOOD_PRINT}`),
   ]);
@@ -177,11 +178,26 @@ export function screen(parent,x,y,z,w=.85,h=.58,seed=0) {
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),material);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
 }
 
+// Batches keep their indices: copying each mesh's buffers is far cheaper than
+// expanding 1.4M triangles, and the merged mesh uploads fewer vertices. The
+// triangles, their order and every vertex value are unchanged.
+function indexedCopy(source){
+  const geometry=new THREE.BufferGeometry();
+  for(const [name,attribute] of Object.entries(source.attributes))geometry.setAttribute(name,attribute.clone());
+  if(source.index)geometry.setIndex(source.index.clone());
+  else{
+    const count=source.attributes.position.count,index=count>65535?new Uint32Array(count):new Uint16Array(count);
+    for(let i=0;i<count;i++)index[i]=i;
+    geometry.setIndex(new THREE.BufferAttribute(index,1));
+  }
+  return geometry;
+}
+
 // Ship fixtures are static; merge by material so rivets and switches stay inexpensive.
 export function batchStatic(root,{xrLOD=false}={}) {
   root.updateMatrixWorld(true);
   const grouped=new Map();
-  root.traverse(mesh=>{if(!mesh.isMesh || Array.isArray(mesh.material))return;const geometry=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
+  root.traverse(mesh=>{if(!mesh.isMesh || Array.isArray(mesh.material))return;const geometry=indexedCopy(mesh.geometry);geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
     if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[],wide:[]});
     const group=grouped.get(key);group.geometries.push(geometry);
     if(xrLOD){
@@ -202,8 +218,7 @@ function deferXRWideGeometry(mesh,sources){
   let built=null;
   const build=()=>{
     const parts=sources.map(({source,matrix})=>{
-      const coarse=makeXRWideGeometry(source),wide=coarse.index?coarse.toNonIndexed():coarse;
-      if(wide!==coarse)coarse.dispose();
+      const coarse=makeXRWideGeometry(source),wide=indexedCopy(coarse);coarse.dispose();
       wide.applyMatrix4(matrix);wide.deleteAttribute('uv2');return wide;
     });
     const geometry=parts.length?mergeGeometries(parts,false):new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([],3));
@@ -218,7 +233,7 @@ function deferXRWideGeometry(mesh,sources){
 // The shadow pass costs one draw per material batch (135 in the cabin); triangles
 // barely matter. One position-only copy of every opaque front-sided batch casts the
 // identical shadow in a single draw, while the batches keep receiving shadows.
-// Three r155 calls onBeforeRender in every visible pass but not in its shadow pass,
+// Three (r158) calls onBeforeRender in every visible pass but not in its shadow pass,
 // so an empty draw range there keeps the proxy out of all visible views.
 export function createStaticShadowProxy(batches){
   const casters=batches.children.filter(({isMesh,castShadow,material:mat})=>isMesh&&castShadow&&!Array.isArray(mat)&&
@@ -226,7 +241,7 @@ export function createStaticShadowProxy(batches){
   if(!casters.length)return null;
   batches.updateMatrixWorld(true);
   const geometry=mergeGeometries(casters.map(mesh=>new THREE.BufferGeometry()
-    .setAttribute('position',mesh.geometry.attributes.position.clone()).applyMatrix4(mesh.matrixWorld)),false);
+    .setAttribute('position',mesh.geometry.attributes.position.clone()).setIndex(mesh.geometry.index.clone()).applyMatrix4(mesh.matrixWorld)),false);
   for(const mesh of casters)mesh.castShadow=false;
   const proxy=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial());
   proxy.name='Cabin shadow proxy';proxy.castShadow=true;proxy.frustumCulled=false;

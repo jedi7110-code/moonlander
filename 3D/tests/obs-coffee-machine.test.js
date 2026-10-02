@@ -149,6 +149,22 @@ test('service decal sits only on the open lounge-side cheek, upright and clear o
   }
 });
 
+test('coffee display sits in an open bezel and every printed surface resists depth fighting',t=>{
+  stub(t);const machine=createCoffeeMachine();t.after(()=>dispose(machine));machine.updateMatrixWorld(true);
+  const bezel=machine.getObjectByName('Coffee / screen bezel'),screen=machine.getObjectByName('Coffee / screen print');
+  assert.ok(bounds(bezel).max.z-bounds(screen).max.z>.01,'display is recessed inside its frame');
+  for(const dx of [-.19,0,.19])for(const dy of [-.10,0,.10]){
+    const ray=new Raycaster(new Vector3(-.15+dx,1.09+dy,.5),new Vector3(0,0,-1));
+    assert.equal(ray.intersectObject(bezel).length,0,'no metal backing in the viewing aperture');
+    assert.equal(ray.intersectObject(machine,true)[0].object,screen);
+  }
+  for(const print of machine.children.filter(o=>o.name.endsWith(' print'))){
+    assert.equal(print.material.polygonOffset,true,print.name);
+    assert.ok(print.material.polygonOffsetFactor<0&&print.material.polygonOffsetUnits<0);
+    assert.equal(print.material.depthTest,true,'other foreground objects still occlude the print');
+  }
+});
+
 test('OBS includes the same coffee station and removes only the targeted towel and pipe bay',()=>{
   const ship=buildSurfaceFixture();try{
     const station=ship.staticMesh.getObjectByName('Lounge coffee station');assert.ok(station);

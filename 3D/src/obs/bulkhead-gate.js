@@ -3,6 +3,7 @@ import {box,cylinder,pipe,rod} from './materials.js';
 import {CABIN_LIGHT_COLOR} from './lighting.js';
 import {createRearRoomFurnishings} from './rear-room-furnishings.js';
 import {addRearSpaceWindow} from './bathroom-window.js';
+import {createOperationsFurnishings} from './galley-storage.js';
 
 export const BULKHEAD_GATE={x:-1.88,floor:6.784,width:1.82,height:2.42,bottom:.10,front:-1.36,back:-5.65};
 
@@ -82,17 +83,7 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
   }
   if(g.room==='laundry'||g.room==='stores')root.add(createRearRoomFurnishings(m,g,wearMaterials));
   else {
-  for(let i=0;i<4;i++){
-    const yy=y+.55+i*.34;
-    box(root,m.metal,g.x-.92,yy,-3.79,.38,.035,1.24);
-    for(const z of [-3.36,-3.85,-4.3])box(root,i%2?m.olive:m.enamel,g.x-.92,yy+.13,z,.25,.23,.30,.012);
-  }
-  box(root,m.dark,g.x-.37,y+.47,-5.25,.78,.72,.54,.03);
-  box(root,m.enamel,g.x-.37,y+.47,-4.96,.68,.64,.045,.016);
-  box(root,m.metal,g.x-.37,y+.87,-5.20,.87,.05,.69,.02);
-  box(root,m.dark,g.x+.74,y+.49,-4.06,.42,.70,1.68,.025);
-  box(root,m.enamel,g.x+.74,y+.87,-4.06,.48,.06,1.77,.018);
-  for(const z of [-3.48,-4.30])box(root,m.olive,g.x+.74,y+1.06,z,.34,.31,.47,.035);
+  const furnishings=createOperationsFurnishings(m);furnishings.position.set(g.x,y,0);root.add(furnishings);
   pipe(root,m.pipeSteel,[[g.x+.93,y+.24,-5.40],[g.x+.93,y+1.9,-5.40],[g.x+.60,y+2.22,-5.40],[g.x-.65,y+2.22,-5.40]],.055);
   }
   for(const z of [-2.85,-4.7]){

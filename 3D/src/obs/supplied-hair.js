@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
 // Trim only the two low outer nape corners. Interpolate the cut through cards
 // rather than deleting entire triangles, keeping their texture coordinates.
@@ -71,24 +72,27 @@ export function hairFitField(source,target){
   };
 }
 
+// supplied-hair.glb holds both cards and scalp with the nape trim already
+// applied (studies/head/pack-supplied-hair.mjs bakes it from the JSON sources).
 export async function loadSuppliedHair(base){
-  const textures=new THREE.TextureLoader(),geometries=new THREE.BufferGeometryLoader();
-  const [hair,scalp,color,opacity,normal,scalpColor,scalpOpacity]=await Promise.all([
-    geometries.loadAsync(base+'hair-solid.json'),geometries.loadAsync(base+'scalp.json'),
-    textures.loadAsync(base+'hair-color-2k.png'),textures.loadAsync(base+'hair-opacity-2k.jpg'),
-    textures.loadAsync(base+'hair-normal-2k.png'),textures.loadAsync(base+'scalp-color.jpg'),textures.loadAsync(base+'scalp-opacity.jpg'),
+  const textures=new THREE.TextureLoader();
+  const [gltf,color,opacity,normal,scalpColor,scalpOpacity]=await Promise.all([
+    new GLTFLoader().loadAsync(base+'supplied-hair.glb'),
+    textures.loadAsync(base+'hair-color-2k.webp'),textures.loadAsync(base+'hair-opacity-2k.jpg'),
+    textures.loadAsync(base+'hair-normal-2k.webp'),textures.loadAsync(base+'scalp-color.jpg'),textures.loadAsync(base+'scalp-opacity.jpg'),
   ]);
   for(const texture of [color,scalpColor])texture.colorSpace=THREE.SRGBColorSpace;
   for(const texture of [color,opacity,normal,scalpColor,scalpOpacity])texture.anisotropy=8;
+  const geometryOf=name=>{const mesh=gltf.scene.getObjectByName(name);if(!mesh?.isMesh)throw new Error(`Supplied hair mesh is missing: ${name}`);return mesh.geometry;};
   const group=new THREE.Group();group.name='Supplied Jacob hairstyle';
   for(const [geometry,map,alphaMap,normalMap,name] of [
-    [scalp,scalpColor,scalpOpacity,null,'Supplied scalp'],[hair,color,opacity,normal,'Supplied hair cards'],
+    [geometryOf('scalp'),scalpColor,scalpOpacity,null,'Supplied scalp'],[geometryOf('hair-cards'),color,opacity,normal,'Supplied hair cards'],
   ]){
     // Keep broader locks filled while reducing micro-normal/specular noise.
     const material=new THREE.MeshStandardMaterial({map,alphaMap,normalMap,normalScale:new THREE.Vector2(.18,.18),roughness:.84,metalness:0,side:THREE.DoubleSide,alphaTest:normalMap ? .22 : .35,alphaToCoverage:true});
-    const trimmed=trimSuppliedNape(geometry);geometry.dispose();
-    trimmed.computeBoundingBox();trimmed.computeBoundingSphere();
-    const mesh=new THREE.Mesh(trimmed,material);mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);
+    geometry.computeBoundingBox();geometry.computeBoundingSphere();
+    const mesh=new THREE.Mesh(geometry,material);mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);
   }
+  gltf.scene.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(m=>m.dispose());});
   return group;
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Group,Mesh,InstancedMesh,BoxGeometry,MeshStandardMaterial,MeshBasicMaterial,MeshPhysicalMaterial,ShaderLib,PointLight,AdditiveBlending,Raycaster,Vector3,Box3} from 'three';
+import {Group,Mesh,InstancedMesh,BoxGeometry,MeshStandardMaterial,MeshBasicMaterial,MeshPhysicalMaterial,ShaderLib,PointLight,AdditiveBlending,Raycaster,Vector3,Box3,ShaderChunk} from 'three';
 import {CabinStartupLighting,STARTUP_LIGHT_DELAY,STARTUP_LIGHT_SECONDS,STARTUP_TOTAL_SECONDS,STARTUP_CIRCUITS,circuitDelay,circuitPower,revealStartupScene} from '../src/obs/startup-lighting.js';
 import {createCabinToon} from '../src/obs/cabin-toon.js';
 import {createMiloToon} from '../src/obs/milo-toon.js';
@@ -307,7 +307,10 @@ test('short-range fills marked for shaders light lit materials in range with the
   const standard=compile(lit,ShaderLib.standard);
   assert.equal(standard.uniforms.cabinShaderLightPositions,positions,'shared uniforms, no per-material copies');
   assert.match(standard.fragmentShader,/#define CABIN_SHADER_LIGHTS 1/);
-  const loop=standard.fragmentShader.indexOf('RE_Direct(directLight, geometry, material, reflectedLight);');
+  // The injected call must use the same RE_Direct signature as three's own light loop.
+  const call='RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);';
+  assert.equal(call.replace(/\s+/g,''),ShaderChunk.lights_fragment_begin.match(/RE_Direct\(\s*directLight,[^;]*;/)[0].replace(/\s+/g,''),'matches the signature in lights_fragment_begin');
+  const loop=standard.fragmentShader.indexOf(call);
   assert.ok(loop>0&&loop<standard.fragmentShader.indexOf('#include <lights_fragment_end>'),'added to the direct light sum before indirect light');
   assert.match(standard.fragmentShader,/if \(lightDistance < cabinShaderLightFalloff\[i\]\.x\)/,'pixels out of range skip the light');
   assert.match(standard.fragmentShader,/getDistanceAttenuation\(lightDistance, cabinShaderLightFalloff\[i\]\.x, cabinShaderLightFalloff\[i\]\.y\)/);

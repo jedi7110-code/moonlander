@@ -97,8 +97,7 @@ function sink(parent,metal,dark){
   for(let i=-2;i<=2;i++)box(parent,dark,s.x+.17+i*.009,s.bottom+.008,s.z-.055,.004,.001,.033-Math.abs(i)*.006);
 }
 
-export function createGalley(m={}, {cookware=true}={}){
-  const root=new THREE.Group();root.name='Aircraft cabin galley';root.position.x=GALLEY.x;
+export function createGalleyFinishes(m={}){
   const metals=createMachinedMetals(),metal=metals.alloy;
   metal.name='Galley / satin aluminium';metal.color.setHex(0xb4baba);metal.roughness=.48;
   const paint=(m.enamel??new THREE.MeshStandardMaterial()).clone();paint.name='Galley / ivory laminate';
@@ -107,6 +106,14 @@ export function createGalley(m={}, {cookware=true}={}){
   paint.map=null;paint.roughnessMap=null;paint.bumpMap=m.enamel?.bumpMap??null;
   const dark=new THREE.MeshStandardMaterial({name:'Galley / graphite seals',color:0x252d2d,roughness:.77,metalness:.18});
   const red=new THREE.MeshStandardMaterial({name:'Galley / oxblood safety latches',color:0xa34432,roughness:.58,metalness:.25});
+  return{metals,metal,paint,dark,red};
+}
+
+export {panel as galleyPanel,fastener as galleyFastener};
+
+export function createGalley(m={}, {cookware=true}={}){
+  const root=new THREE.Group();root.name='Aircraft cabin galley';root.position.x=GALLEY.x;
+  const {metals,metal,paint,dark,red}=createGalleyFinishes(m);
   const map=createGalleyPrint(),ink=new THREE.MeshStandardMaterial({name:'Galley / direct service print',map,alphaTest:.2,roughness:1,metalness:0,
     polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1,userData:{cabinKeepSurface:true,cabinNoOutline:true,castShadow:false}});
   const screen=ink.clone();screen.name='Galley / processor display';screen.alphaTest=0;

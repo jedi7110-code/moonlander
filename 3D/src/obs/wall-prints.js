@@ -13,9 +13,9 @@ export const LOUNGE_LOCKER_MAGAZINES=[
   {x:2.6073,height:1.25,width:.21,angle:2*Math.PI/180,file:'newyorker.jpg',aspect:1442/1091},
 ];
 export const BUNK_FAMILY_PHOTOS=[
-  {x:-5.43,height:1.50,width:.19,angle:-4*Math.PI/180,file:'milo-family-01.png'},
-  {x:-5.19,height:1.46,width:.19,angle:3*Math.PI/180,file:'milo-family-02.png'},
-  {x:-5.34,height:1.26,width:.19,angle:-2*Math.PI/180,file:'milo-family-03.png'},
+  {x:-5.43,height:1.50,width:.19,angle:-4*Math.PI/180,file:'milo-family-01.webp'},
+  {x:-5.19,height:1.46,width:.19,angle:3*Math.PI/180,file:'milo-family-02.webp'},
+  {x:-5.34,height:1.26,width:.19,angle:-2*Math.PI/180,file:'milo-family-03.webp'},
 ];
 
 // Print on the existing wall surface; there is no overlapping decal mesh.
@@ -61,8 +61,8 @@ export function finishWallPrints(root,m,floor){
   root.updateMatrixWorld(true);
   const base=import.meta.env?.BASE_URL??'/3D/',walls=new Map();
   const prints=[
-    {...LOCKER_CALENDAR,file:'bunk-calendar-1987.png',aspect:1261/1247},
-    {...LOCKER_POSTER,file:'bunk-beach-poster.png',aspect:1427/1102},
+    {...LOCKER_CALENDAR,file:'bunk-calendar-1987.webp',aspect:1261/1247},
+    {...LOCKER_POSTER,file:'bunk-beach-poster.webp',aspect:1427/1102},
     {...LOUNGE_POSTER,file:'lounge-paradise-poster.jpg',aspect:1200/1800},
     ...LOUNGE_LOCKER_MAGAZINES,
     ...BUNK_FAMILY_PHOTOS.map(photo=>({...photo,aspect:2/3})),

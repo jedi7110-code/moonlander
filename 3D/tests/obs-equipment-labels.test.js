@@ -72,7 +72,7 @@ test('tank warnings share the existing atlas and follow the shell without a yell
   assert.ok(prints.every(p=>p.material===material&&p.material.map===map));
   assert.equal(material.alphaTest,.35);assert.equal(material.transparent,false);assert.equal(material.emissive.getHex(),0);
   const batch=batchStatic(root,{xrLOD:true}),inkBatch=batch.children.find(o=>o.material===material);
-  assert.equal(inkBatch.geometry.attributes.position.count/3,32);assert.equal(inkBatch.castShadow,false);
+  assert.equal(inkBatch.geometry.index.count/3,32);assert.equal(inkBatch.castShadow,false);
   const toon=createCabinToon([batch]);toon.setStyle('cartoon');toon.update(1000,700,3,15);
   assert.equal(batch.children.filter(o=>o.material===material).length,1);assert.equal(inkBatch.material,material);
   toon.dispose();root.traverse(o=>o.geometry?.dispose());batch.traverse(o=>o.geometry?.dispose());
@@ -129,7 +129,7 @@ test('case stickers replace the backing face without losing the metal rim or nor
   }
   const batch=batchStatic(root,{xrLOD:true}),mat=equipmentLabelMaterial(m);
   const printBatch=batch.children.find(o=>o.material===mat);
-  assert.equal(printBatch.geometry.attributes.position.count/3,14,'still two triangles per sticker in one shared draw');
+  assert.equal(printBatch.geometry.index.count/3,14,'still two triangles per sticker in one shared draw');
   assert.equal(printBatch.castShadow,false);
   root.traverse(o=>o.geometry?.dispose());batch.traverse(o=>o.geometry?.dispose());mat.map.dispose();mat.dispose();standard.dispose();
 });

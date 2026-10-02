@@ -227,7 +227,7 @@ export function createMiloEye(source,{x,y,halfWidth,halfHeight}){
       vec3 eyeT=normalize(eyeDx*uvDy.y-eyeDy*uvDx.y);
       vec3 eyeB=normalize(-eyeDx*uvDy.x+eyeDy*uvDx.x);
       vec2 corneaSlope=ep*2.4;
-      clearcoatNormal=normalize(geometryNormal-eyeT*corneaSlope.x-eyeB*corneaSlope.y);
+      clearcoatNormal=normalize(nonPerturbedNormal-eyeT*corneaSlope.x-eyeB*corneaSlope.y);
     `);
   };
   material.customProgramCacheKey=()=> 'milo-fitted-eye-v3-fibers';
@@ -254,7 +254,7 @@ export const NAPE_TATTOO_GLSL=`
 export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/head/`){
   const loader=new THREE.TextureLoader();
   // Request the supplied hair alongside the scan; it must not wait for the scan to finish.
-  const [gltf,map,normalMap,napeTattoo,suppliedHair]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg'),loader.loadAsync(base+'tattoo-naval-barcode.png'),loadSuppliedHair(base+'supplied-hair/')]);
+  const [gltf,map,normalMap,napeTattoo,suppliedHair]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg'),loader.loadAsync(base+'tattoo-naval-barcode.webp'),loadSuppliedHair(base+'supplied-hair/')]);
   napeTattoo.colorSpace=THREE.NoColorSpace;napeTattoo.anisotropy=4;
   map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;normalMap.anisotropy=4;
   const material=new THREE.MeshStandardMaterial({color:0xd2c8bd,map,normalMap,normalScale:new THREE.Vector2(.45,.45),roughness:.74,metalness:0,envMapIntensity:.3});

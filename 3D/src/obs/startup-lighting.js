@@ -161,7 +161,7 @@ const shaderLightLoop=`
             directLight.color *= PI;
           #endif
           directLight.visible = true;
-          RE_Direct(directLight, geometry, material, reflectedLight);
+          RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
         }
       }
     }

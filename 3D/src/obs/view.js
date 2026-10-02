@@ -107,6 +107,84 @@ export class ObservationView {
     limitShadowCasters(this.scene);
   }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
+  // Compile every program in parallel behind the loading screen; three's
+  // compileAsync polls KHR_parallel_shader_compile so the page stays live.
+  // compile() has two gaps covered here: it uses whatever clipping state the
+  // last draw left, and it never prepares the shadow pass. A throwaway 1x1
+  // draw sets the clipping state for each plane count before the materials
+  // with that count compile, and probe meshes prepare the shadow-pass depth
+  // variants. Every compile starts synchronously; all are awaited together.
+  async compilePrograms(){
+    const {renderer,scene,camera}=this;
+    const planeCount=material=>Math.max(...(Array.isArray(material)?material:[material]).map(m=>m?.clipIntersection?0:(m?.clippingPlanes?.length||0)));
+    const group=(map,key,value)=>{if(!map.has(key))map.set(key,[]);map.get(key).push(value);};
+    const clipped=new Map(),depth=new Map();
+    scene.traverse(object=>{if(object.material){const count=planeCount(object.material);if(count)group(clipped,count,object);}});
+    // The characters toggle eyelids, eyes and tools per frame, so all of their
+    // parts count as shadow casters; elsewhere only visible casters do.
+    const characters=new Set([this.milo,this.cat].filter(Boolean));
+    const underCharacter=object=>{for(let o=object;o;o=o.parent)if(characters.has(o))return true;return false;};
+    const casting=object=>{if(underCharacter(object))return true;for(let o=object;o;o=o.parent)if(!o.visible)return false;return true;};
+    for(const probe of this.shadowDepthProbes(casting))group(depth,probe.userData.clippingCount,probe);
+    const target=new THREE.WebGLRenderTarget(1,1),pending=[];
+    for(const count of new Set([0,...clipped.keys(),...depth.keys()])){
+      this.primeClipping(count,target);
+      // The shadow pass renders into a target, which is part of the program key.
+      for(const probe of depth.get(count)??[])pending.push(renderer.compileAsync(probe,camera,scene));
+      renderer.setRenderTarget(null);
+      if(count){for(const object of clipped.get(count)??[])pending.push(renderer.compileAsync(object,camera,scene));continue;}
+      // Clipped materials would compile here with no planes; leave them to their own pass.
+      const stash=new Map();
+      for(const object of [...clipped.values()].flat()){stash.set(object,object.material);object.material=undefined;}
+      try{pending.push(renderer.compileAsync(scene,camera));}
+      finally{for(const [object,material] of stash)object.material=material;}
+    }
+    target.dispose();
+    // Keep the probes' depth materials until dispose(): they hold the programs
+    // for casters that only appear later (eyelids, grooming tools).
+    this.depthProbeMaterials=[...depth.values()].flat().filter(probe=>probe.userData.ownsMaterial).map(probe=>probe.material);
+    await Promise.all(pending);
+  }
+  primeClipping(count,target){
+    const planes=count?Array.from({length:count},()=>new THREE.Plane()):null;
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({clippingPlanes:planes}));
+    mesh.frustumCulled=false;
+    this.renderer.setRenderTarget(target);this.renderer.render(new THREE.Scene().add(mesh),this.camera);
+    mesh.geometry.dispose();mesh.material.dispose();
+  }
+  // Mirror WebGLShadowMap.getDepthMaterial: one detached probe per distinct
+  // depth program the first shadow pass will build (custom depth materials,
+  // and the shared depth material's side / alpha / clipping / rig variants).
+  shadowDepthProbes(visible){
+    const {renderer,scene}=this,probes=[],seen=new Set();
+    const shadowSide={[THREE.FrontSide]:THREE.BackSide,[THREE.BackSide]:THREE.FrontSide,[THREE.DoubleSide]:THREE.DoubleSide};
+    scene.traverse(object=>{
+      if(!object.isMesh||!object.castShadow||!visible(object)||Array.isArray(object.material))return;
+      const material=object.material,geometry=object.geometry;
+      const clippingCount=renderer.localClippingEnabled&&material.clipShadows===true&&Array.isArray(material.clippingPlanes)&&material.clippingPlanes.length?material.clippingPlanes.length:0;
+      const rig=[!!object.isSkinnedMesh,!!object.isInstancedMesh,geometry.morphAttributes.position?.length??0,geometry.morphAttributes.normal?.length??0,geometry.morphAttributes.color?.length??0].join('|');
+      let depthMaterial,key;
+      if(object.customDepthMaterial){depthMaterial=object.customDepthMaterial;key=`custom|${depthMaterial.uuid}|${rig}`;}
+      else{
+        key=[material.shadowSide??shadowSide[material.side],!!material.map,material.map?.channel??0,!!material.alphaMap,material.alphaMap?.channel??0,material.alphaTest>0,!!material.displacementMap&&material.displacementScale!==0,clippingCount,!!material.clipIntersection,rig].join('|');
+        if(seen.has(key))return;
+        depthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});
+      }
+      if(seen.has(key))return;
+      seen.add(key);
+      // The shadow pass copies these onto its depth material every frame,
+      // custom ones included; the program key depends on them.
+      depthMaterial.side=material.shadowSide??shadowSide[material.side];
+      depthMaterial.alphaMap=material.alphaMap;depthMaterial.alphaTest=material.alphaTest;depthMaterial.map=material.map;
+      depthMaterial.displacementMap=material.displacementMap;depthMaterial.displacementScale=material.displacementScale;depthMaterial.displacementBias=material.displacementBias;
+      depthMaterial.clipShadows=material.clipShadows;depthMaterial.clippingPlanes=material.clippingPlanes;depthMaterial.clipIntersection=material.clipIntersection;
+      const probe=object.isSkinnedMesh?new THREE.SkinnedMesh(geometry,depthMaterial):object.isInstancedMesh?new THREE.InstancedMesh(geometry,depthMaterial,1):new THREE.Mesh(geometry,depthMaterial);
+      if(object.isSkinnedMesh)probe.bind(object.skeleton,object.bindMatrix);
+      probe.userData.clippingCount=clippingCount;probe.userData.ownsMaterial=!object.customDepthMaterial;
+      probes.push(probe);
+    });
+    return probes;
+  }
   startLighting({waitForActivation=false}={}){
     if(this.startupLighting){this.startupLighting.restart(this.reducedMotion,{waitForActivation});return;}
     this.startupLighting=new CabinStartupLighting([this.ship.staticMesh,this.ship.animated,this.droidBay.root,this.droidService.root,this.harvestDelivery.root,this.milo,this.cat,this.mouse.root],{reducedMotion:this.reducedMotion,waitForActivation});
@@ -305,5 +383,5 @@ export class ObservationView {
     try{this.renderer.render(this.scene,this.camera);}
     finally{quality?.endFrame();}
   }
-  dispose(){this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

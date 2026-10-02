@@ -414,8 +414,8 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   for(let i=0;i<3;i++){
     const y=.69+i*.28,x=gymWeightsX;
     for(const side of [-1,1])rod(staticRoot,m.metal,[x+side*.1,y-.045,-1.28],[x+side*.1,y-.045,-1.08],.019);
-    rod(staticRoot,m.metal,[x-.16,y,-1.1],[x+.16,y,-1.1],.024);
-    for(const side of [-1,1]){const weight=cylinder(staticRoot,m.black,x+side*.14,y,-1.1,.085,.08,.085,12);weight.rotation.z=Math.PI/2;}
+    rod(staticRoot,m.metal,[x-.16,y,-1.1],[x+.16,y,-1.1],.024).name='Gym dumbbell grip';
+    for(const side of [-1,1]){const weight=cylinder(staticRoot,m.black,x+side*.14,y,-1.1,.085,.08,.085,12);weight.rotation.z=Math.PI/2;weight.name='Gym dumbbell weight';}
   }
   engine(staticRoot,m,5.65,0);
   const supplyHatch=hatch(staticRoot,animated,m,positionX(1110),0);

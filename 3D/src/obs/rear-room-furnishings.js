@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {box,cylinder,rod,pipe} from './materials.js';
 import {createMiloBoot} from './characters.js';
 import {addEquipmentLabel} from './equipment-labels.js';
+import {createStorageHardware,fitStoresGalley,fitLaundryGalley} from './galley-storage.js';
 
 function ring(root,material,x,y,z,r,tube){
   const mesh=new THREE.Mesh(new THREE.TorusGeometry(r,tube,8,32),material);
@@ -101,7 +102,7 @@ function laundry(root,m,wearMaterials){
   // Stacked front-loading washer/dryer: round doors face the cabin entrance.
   for(const [i,name]of ['Washing machine','Dryer'].entries()){
     const unit=new THREE.Group();unit.name=name;unit.position.set(-.46,.14+i*.94,-4.72);root.add(unit);
-    box(unit,m.enamel,0,.45,0,.88,.90,.76,.045);
+    box(unit,root.userData.storageHardware.paint,0,.45,0,.88,.90,.76,.045);
     box(unit,m.dark,0,.75,.39,.74,.13,.025,.01);
     box(unit,m.teal,-.16,.75,.408,.24,.055,.012);
     const knob=cylinder(unit,m.metal,.25,.75,.416,.042,.025,.042,16);knob.rotation.x=Math.PI/2;
@@ -118,9 +119,6 @@ function laundry(root,m,wearMaterials){
     }
   }
   const closet=new THREE.Group();closet.name='Open clothes closet';closet.position.set(.51,.14,-4.77);root.add(closet);
-  box(closet,m.dark,0,1.02,-.39,.845,2.00,.06);
-  for(const side of [-1,1])box(closet,m.enamel,side*.45,1.02,0,.055,2.04,.72);
-  for(const h of [.03,.37,2.01])box(closet,m.enamel,0,h,0,.845,.055,.72);
   rod(closet,m.metal,[-.38,1.76,.12],[.38,1.76,.12],.018);
   const whiteCloth=m.cloth.clone();whiteCloth.name='Laundry / white cotton';
   whiteCloth.color.setHex(0xffffff);whiteCloth.map=null;
@@ -158,16 +156,13 @@ function laundry(root,m,wearMaterials){
     pair.position.set(.43+side*.12,.11,-3.98);root.add(pair);
   }
   const basket=new THREE.Group();basket.name='Laundry basket';basket.position.set(.84,.13,-3.45);root.add(basket);
-  box(basket,m.enamel,0,.04,0,.42,.08,.48);
-  for(const side of [-1,1])for(let i=0;i<5;i++)box(basket,m.enamel,side*.20,.11+i*.045,0,.025,.018,.47);
-  for(const side of [-1,1])box(basket,m.enamel,0,.22,side*.23,.42,.025,.026);
-  box(basket,m.cloth,0,.27,0,.33,.11,.36,.045);
+  box(basket,m.cloth,0,.27,0,.33,.11,.36,.045).name='Laundry bin load';
+  fitLaundryGalley(root,closet,root.userData.storageHardware);
 }
 
 function stores(root,m){
   const rack=new THREE.Group();rack.name='Food and household storage rack';rack.position.z=-4.70;root.add(rack);
-  for(const x of [-.93,.04,.93])for(const z of [-.34,.35])box(rack,m.metal,x,1.16,z,.045,2.12,.045);
-  for(const y of [.18,.69,1.20,1.71,2.22])box(rack,m.metal,0,y,0,1.94,.045,.78);
+  fitStoresGalley(rack,root.userData.storageHardware);
   // Strapped ration cases and tins occupy the left half of the rack.
   for(let row=0;row<3;row++){
     const y=.38+row*.51;
@@ -189,10 +184,13 @@ function stores(root,m){
     addEquipmentLabel(rack,m,'detergent',{x,y:.42,z:.188,width:.14,height:.14});
   }
   for(let i=0;i<4;i++)box(rack,i%2?m.cloth:m.enamel,.49,.77+i*.09,.04,.69,.075,.55,.02).name='Stored linen';
-  for(let row=0;row<2;row++)for(let col=0;col<3;col++){
-    const x=.25+col*.24,y=1.34+row*.23;
-    const roll=cylinder(rack,m.cloth,x,y,.07,.105,.30,.105,20);roll.rotation.x=Math.PI/2;roll.name='Paper roll';
-    const core=cylinder(rack,m.dark,x,y,.225,.030,.012,.030,12);core.rotation.x=Math.PI/2;
+  const rollRadius=.105,rollPitch=.24,shelfTop=1.20+.027/2;
+  const stackRise=Math.sqrt((2*rollRadius)**2-(rollPitch/2)**2);
+  for(let row=0;row<2;row++)for(let col=0;col<3-row;col++){
+    const x=.25+col*rollPitch+row*rollPitch/2,y=shelfTop+rollRadius+row*stackRise;
+    const roll=cylinder(rack,m.cloth,x,y,.07,rollRadius,.30,rollRadius,20);roll.rotation.x=Math.PI/2;roll.name='Paper roll';
+    roll.userData.stackRow=row;
+    const core=cylinder(rack,m.dark,x,y,.225,.030,.012,.030,12);core.rotation.x=Math.PI/2;core.name='Paper roll core';
   }
   for(let i=0;i<2;i++){
     const x=.29+i*.38;
@@ -203,6 +201,7 @@ function stores(root,m){
 
 export function createRearRoomFurnishings(m,g,wearMaterials=m){
   const root=new THREE.Group();root.name=g.room==='laundry'?'Laundry and wardrobe room':'Food and household storeroom';
+  root.userData.storageHardware=createStorageHardware(m);
   root.position.set(g.x,g.floor,0);
   if(g.room==='laundry')laundry(root,m,wearMaterials);else stores(root,m);
   return root;

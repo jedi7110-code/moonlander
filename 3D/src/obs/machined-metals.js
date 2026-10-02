@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import {GYM} from './layout.js';
 
 export function createMachinedMetals(){
   // Shared fine tool marks, filtered down naturally at wider camera views.
@@ -38,16 +37,12 @@ export function createLoungeTitanium(){
 }
 
 export function finishMachinedFixtures(root,m,metals){
-  // The three wall-racked dumbbells are separate meshes in the source ship.
-  const rackX=(GYM.x-700)*.022-.70;
+  // Match semantic parts, not the rack's old position: it moved beside the
+  // service panel, leaving one end outside the former coordinate tolerance.
   for(const mesh of root.children){
-    if(!mesh.isMesh||mesh.geometry.type!=='CylinderGeometry'||
-      mesh.position.z!==-1.1||Math.abs(mesh.position.x-rackX)>.17||
-      ![.69,.97,1.25].some(y=>Math.abs(mesh.position.y-y)<1e-6))continue;
-    const shape=mesh.geometry.parameters;
-    if(mesh.material===m.black&&shape.radiusTop===.085&&shape.height===.08){
+    if(mesh.name==='Gym dumbbell weight'){
       mesh.name='Machined dumbbell weight';mesh.material=metals.shell;
-    }else if(mesh.material===m.metal&&shape.radiusTop===.024&&Math.abs(shape.height-.32)<1e-6){
+    }else if(mesh.name==='Gym dumbbell grip'){
       mesh.name='Machined dumbbell grip';mesh.material=metals.alloy;
     }
   }

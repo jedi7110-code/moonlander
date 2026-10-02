@@ -19,7 +19,7 @@ export function decodeGroomCache(buffer,metadata){
   return {duration:metadata.duration,steps,indices:new Int32Array(buffer,16,count),
     frames:Array.from({length:steps+1},(_,i)=>new Float32Array(buffer,16+count*4+i*count*24,count*6))};
 }
-const LUCY_ASSET_VERSION='20260915-approved-2';
+export const LUCY_ASSET_VERSION='20260915-approved-2';
 async function readLucyAsset(name,method){
   const base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/lucy/`;
   const response=await fetch(`${base}${name}?v=${LUCY_ASSET_VERSION}`);if(!response.ok)throw new Error(`Lucy ${name}: ${response.status}`);return response[method]();

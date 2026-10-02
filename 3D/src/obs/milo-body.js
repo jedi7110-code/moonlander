@@ -64,7 +64,7 @@ export async function loadMiloBody(url=`${import.meta.env?.BASE_URL??'/3D/'}asse
   if(bodyData)return bodyData;
   // Request the prints together with the body, not after it has arrived.
   const base=import.meta.env?.BASE_URL??'/3D/',loader=typeof document!=='undefined'?new THREE.TextureLoader():null;
-  const prints=loader?Promise.all(['tattoo-cosmo-atomic-bold.png','tattoo-cat-red.png','tshirt-back-print.png','tattoo-right-upper.png'].map(name=>loader.loadAsync(`${base}assets/obs/milo/${name}`))):null;
+  const prints=loader?Promise.all(['tattoo-cosmo-atomic-bold.webp','tattoo-cat-red.webp','tshirt-back-print.webp','tattoo-right-upper.webp'].map(name=>loader.loadAsync(`${base}assets/obs/milo/${name}`))):null;
   prints?.catch(()=>{});
   const response=await fetch(url);if(!response.ok)throw new Error('Milo body could not be loaded');
   const data=await response.json();

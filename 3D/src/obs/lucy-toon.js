@@ -21,11 +21,13 @@ function toonMaterial(source,thresholds){
       varying vec3 vViewPosition;
       uniform vec2 toonThresholds;
       struct ToonMaterial { vec3 diffuseColor; };
-      void RE_Direct_Toon(const in IncidentLight light, const in GeometricContext geometry,
+      void RE_Direct_Toon(const in IncidentLight light, const in vec3 geometryPosition, const in vec3 geometryNormal,
+        const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal,
         const in ToonMaterial material, inout ReflectedLight reflectedLight) {
-        reflectedLight.directDiffuse += saturate(dot(geometry.normal, light.direction)) * light.color * RECIPROCAL_PI;
+        reflectedLight.directDiffuse += saturate(dot(geometryNormal, light.direction)) * light.color * RECIPROCAL_PI;
       }
-      void RE_IndirectDiffuse_Toon(const in vec3 irradiance, const in GeometricContext geometry,
+      void RE_IndirectDiffuse_Toon(const in vec3 irradiance, const in vec3 geometryPosition, const in vec3 geometryNormal,
+        const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal,
         const in ToonMaterial material, inout ReflectedLight reflectedLight) {
         reflectedLight.indirectDiffuse += irradiance * RECIPROCAL_PI;
       }

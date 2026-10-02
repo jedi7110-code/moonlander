@@ -51,10 +51,14 @@ function print(root,material,key,x,y,z,w,h){
 }
 
 // One bevel ring, unlike the many-segment rounded boxes used on soft furnishings.
-function housing(root,material,name,x,y,z,w,h,d,corner=.025){
+function housing(root,material,name,x,y,z,w,h,d,corner=.025,opening=null){
   const a=w/2,b=h/2,r=Math.min(corner,w*.2,h*.2),s=new THREE.Shape();
   const points=[[-a+r,-b],[a-r,-b],[a,-b+r],[a,b-r],[a-r,b],[-a+r,b],[-a,b-r],[-a,-b+r]];
   points.forEach(([px,py],i)=>i?s.lineTo(px,py):s.moveTo(px,py));s.closePath();
+  if(opening){
+    const [ow,oh]=opening,hole=new THREE.Path();
+    hole.moveTo(-ow/2,-oh/2);hole.lineTo(-ow/2,oh/2);hole.lineTo(ow/2,oh/2);hole.lineTo(ow/2,-oh/2);hole.closePath();s.holes.push(hole);
+  }
   const bevel=Math.min(.004,d/4),g=new THREE.ExtrudeGeometry(s,{depth:d-bevel*2,steps:1,curveSegments:1,bevelEnabled:true,bevelSize:bevel,bevelThickness:bevel,bevelSegments:1});
   g.translate(0,0,-(d-bevel*2)/2);const mesh=new THREE.Mesh(g,material);mesh.name=`Coffee / ${name}`;mesh.position.set(x,y,z);mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);return mesh;
 }
@@ -63,9 +67,11 @@ export function createCoffeeMachine(m={},titanium=createLoungeTitanium()){
   const root=new THREE.Group();root.name='Atelier coffee vending machine';
   const dark=new THREE.MeshStandardMaterial({name:'Coffee / graphite ceramic',color:0x172021,metalness:.25,roughness:.43});
   const map=createCoffeePrint(),ink=new THREE.MeshStandardMaterial({name:'Coffee / enamel control print',map,roughness:.6,metalness:.1,
+    polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1,
     userData:{cabinKeepSurface:true,cabinNoOutline:true,castShadow:false}});
   const screen=new THREE.MeshBasicMaterial({name:'Coffee / recessed control display',map,color:0x93b6a5,toneMapped:false,
-    userData:{cabinAlwaysPowered:true,castShadow:false}});
+    polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1,
+    userData:{cabinAlwaysPowered:true,cabinKeepSurface:true,cabinNoOutline:true,castShadow:false}});
   const light=new THREE.MeshBasicMaterial({name:'Coffee / warm work strip',color:0xd7c7a2,toneMapped:false,
     userData:{cabinAlwaysPowered:true,castShadow:false}});
   // Strong side cheeks, a recessed back and removable bottom pan.
@@ -84,16 +90,18 @@ export function createCoffeeMachine(m={},titanium=createLoungeTitanium()){
   housing(root,titanium,'top cap',0,1.45,.02,1.055,.075,.65);
   housing(root,dark,'control fascia',0,1.12,.13,.86,.58,.40);
   print(root,ink,'brand',0,1.345,.338,.80,.10);
-  housing(root,titanium,'screen bezel',-.15,1.09,.348,.49,.34,.033,.012);
-  print(root,screen,'screen',-.15,1.09,.367,.445,.264);
+  // A real aperture, not a solid metal face 2.5 mm behind the display. The
+  // screen sits inside the rim and retains separation at the wide OBS camera.
+  housing(root,titanium,'screen bezel',-.15,1.09,.348,.49,.34,.033,.012,[.445,.264]);
+  print(root,screen,'screen',-.15,1.09,.350,.453,.272);
   const gauge=cylinder(root,titanium,.315,1.185,.362,.080,.048,.080,24);gauge.rotation.x=Math.PI/2;
-  print(root,ink,'gauge',.315,1.185,.388,.137,.137);
+  print(root,ink,'gauge',.315,1.185,.394,.137,.137);
   const dial=cylinder(root,titanium,.315,.98,.365,.060,.048,.060,20);dial.rotation.x=Math.PI/2;dial.name='Coffee / rotary selector';
   box(root,titanium,.315,1.013,.393,.007,.022,.004);
   // Physical beverage keys, rather than a single generic sticker.
   for(const [key,x]of [['espresso',-.219],['americano',.219]]){
     housing(root,titanium,`${key} key`,x,.80,.33,.409,.145,.05,.012);
-    print(root,ink,key,x,.80,.358,.386,.128);
+    print(root,ink,key,x,.80,.363,.386,.128);
   }
   housing(root,dark,'dispensing recess',0,.44,-.115,.86,.62,.065);
   housing(root,titanium,'brew head',-.065,.59,.115,.23,.27,.26,.012);

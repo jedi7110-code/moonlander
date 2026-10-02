@@ -366,6 +366,10 @@ async function start(){
       view.viewHeight=view.targetHeight=3.1;view.zoom=view.fitHeight/3.1;
     }
     view.startLighting({waitForActivation:true});
+    // Compile every cabin program behind the connection screen. With
+    // KHR_parallel_shader_compile the driver links them on worker threads and
+    // the page stays responsive, instead of the first draw stalling on each one.
+    await view.compilePrograms();
     await revealStartupScene({
       draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),
       reveal:()=>{$('loading').hidden=true;},
