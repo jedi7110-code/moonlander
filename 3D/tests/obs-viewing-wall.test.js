@@ -56,3 +56,17 @@ test('pressure partitions continue to the recessed wall without opening a bypass
     }
   }
 });
+
+test('corridor windows show deep space beyond the former card edges at grazing angles',t=>{
+  const {wall}=fixture(t,true),opaque=[];
+  wall.traverse(object=>{if(object.isMesh&&!object.material.transparent)opaque.push(object);});
+  const sky=wall.getObjectByName('POV / seamless space backdrop');
+  assert.ok(sky);assert.equal(wall.getObjectByName('POV / stars').userData.panoramic,true);
+  for(const floor of FLOOR_Y)for(const i of [2,5,8,11,14])for(const angle of [-65,-55,55,65]){
+    const direction=new Vector3(Math.sin(angle*Math.PI/180),0,Math.cos(angle*Math.PI/180));
+    const target=new Vector3(viewingWallPanelX(i),floor+PROFILE.windowY,PROFILE.faceZ+.145);
+    const eye=target.clone().addScaledVector(direction,-.7/direction.z);
+    const intersection=new Raycaster(eye,direction).intersectObjects(opaque,false)[0];
+    assert.equal(intersection?.object,sky,`window ${i}, floor ${floor}, angle ${angle} must have no background edge`);
+  }
+});

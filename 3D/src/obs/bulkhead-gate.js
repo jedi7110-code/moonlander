@@ -62,12 +62,15 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
   box(root,m.dark,g.x,y+.013,-3.68,2.36,.158,4.12).name='Recessed rear-room floor';
   box(root,m.metal,g.x,y+.101,-3.68,2.20,.018,4.08).name='Rear-room floor cap';
   for(const z of [-2.1,-2.75,-3.4,-4.05,-4.7,-5.35])box(root,m.rubber,g.x,y+.115,z,2.18,.012,.028);
+  const roomBounds=new THREE.Box3();
   for(const side of [-1,1]){
-    box(root,m.dark,g.x+side*1.19,y+1.37,-3.76,.15,2.70,4.03);
+    const wall=box(root,m.dark,g.x+side*1.19,y+1.37,-3.76,.15,2.70,4.03);
+    roomBounds.union(new THREE.Box3().setFromObject(wall));
     rod(root,m.pipeSteel,[g.x+side*.98,y+.20,-2.5],[g.x+side*.98,y+.20,-5.4],.045);
     for(const z of [-2.8,-4.1,-5.3])box(root,m.enamel,g.x+side*1.10,y+1.43,z,.06,2.44,.09);
   }
-  box(root,m.dark,g.x,y+2.76,-3.75,2.4,.16,4.1);
+  const ceiling=box(root,m.dark,g.x,y+2.76,-3.75,2.4,.16,4.1);
+  roomBounds.union(new THREE.Box3().setFromObject(ceiling));
   if(g.room==='laundry'||g.room==='stores')box(root,m.enamel,g.x,y+1.35,g.back,2.23,2.66,.16);
   else addRearSpaceWindow(root,m,g.x,y,'Operations room',{
     width:1.20,height:.82,y:1.51,wallBack:g.back-.08,wallDepth:.16,
@@ -91,5 +94,12 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
     box(root,m.coolLamp,g.x,y+2.375,z,.71,.022,.25);
     const light=new THREE.PointLight(CABIN_LIGHT_COLOR,5,4.2,2);light.position.set(g.x,y+2.24,z);lights.add(light);
   }
-  return{root,lights};
+  // Conservative room enclosure, from the actual solid side/ceiling meshes.
+  // The doorway remains a portal: corridor objects visible through it must stay.
+  roomBounds.min.y=y-.10;roomBounds.max.z=g.front+.08;roomBounds.expandByScalar(.04);
+  const mirrorRoom=g.room==='laundry'?{bounds:roomBounds,portal:{
+    left:g.x-g.width/2-.05,right:g.x+g.width/2+.05,
+    bottom:y+g.bottom-.05,top:y+g.bottom+g.height+.05,z:g.front,
+  }}:null;
+  return{root,lights,mirrorRoom};
 }

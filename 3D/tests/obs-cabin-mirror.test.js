@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Mesh,PerspectiveCamera,PlaneGeometry,Scene,Vector3,Vector4} from 'three';
+import {BoxGeometry,Group,Mesh,MeshBasicMaterial,PerspectiveCamera,PlaneGeometry,Scene,Vector3,Vector4} from 'three';
 import {createCabinMirror,createMirrorProjection,isMiloMirrorView,mirrorTargetSize,MIRROR_BUDGET} from '../src/obs/cabin-mirror.js';
+import {batchStatic} from '../src/obs/materials.js';
 
 function setup(){
   const mirror=createCabinMirror(),scene=new Scene(),camera=new PerspectiveCamera(62,16/9,.025,100);
@@ -11,7 +12,7 @@ function setup(){
   mirror.getRenderTarget().addEventListener('dispose',()=>resizes++);
   const renderer={xr:{enabled:true,isPresenting:false},shadowMap:{autoUpdate:true},capabilities:{maxSamples:4},autoClear:true,
     getDrawingBufferSize(out){return out.set(1280,720);},getRenderTarget:()=>current,setRenderTarget:target=>current=target,
-    state:{buffers:{depth:{setMask(){}}},viewport(){}},render(_scene,reflected){renders++;renderer.check?.(reflected);}};
+    state:{buffers:{depth:{setMask(){}}},viewport(){}},render(_scene,reflected){renders++;_scene.onBeforeRender(renderer,_scene,reflected);renderer.check?.(reflected);}};
   return {mirror,scene,camera,renderer,get renders(){return renders;},get resizes(){return resizes;},draw(){mirror.onBeforeRender(renderer,scene,camera);}};
 }
 
@@ -49,6 +50,7 @@ test('cropped capture keeps reflected UVs aligned, clips behind the glass, and l
     assert.equal(s.mirror.visible,false,'no recursive reflection');
     assert.equal(s.renderer.shadowMap.autoUpdate,false,'do not re-render shadow maps');
     assert.equal(s.renderer.xr.enabled,false);
+    assert.equal(s.scene.matrixWorldAutoUpdate,false,'reuse matrices from the outer render');
     for(const point of [new Vector3(0,0,0),new Vector3(-.22,.27,0),new Vector3(.25,-.29,0)]){
       const uv=new Vector4(...point.toArray(),1).applyMatrix4(s.mirror.material.uniforms.textureMatrix.value);
       const ndc=point.clone().project(reflected);
@@ -62,6 +64,7 @@ test('cropped capture keeps reflected UVs aligned, clips behind the glass, and l
   s.draw();assert.equal(s.renders,1);assert.equal(s.mirror.getRenderTarget().samples,2);
   assert.deepEqual(s.camera.projectionMatrix,projection);assert.deepEqual(s.camera.projectionMatrixInverse,inverse);
   assert.equal(s.renderer.getRenderTarget(),null);assert.equal(s.renderer.shadowMap.autoUpdate,true);assert.equal(s.renderer.xr.enabled,true);
+  assert.equal(s.scene.matrixWorldAutoUpdate,true);
   const allocations=s.resizes;for(let i=0;i<12;i++)s.draw();assert.equal(s.resizes,allocations,'steady view does not allocate targets per frame');
   s.mirror.dispose();s.mirror.geometry.dispose();
 });
@@ -75,4 +78,28 @@ test('hidden and XR mirrors perform zero reflection renders, and failures restor
   assert.equal(s.mirror.getRenderTarget().samples,0);assert.equal(s.mirror.visible,true);
   assert.equal(s.renderer.getRenderTarget(),null);assert.equal(s.renderer.shadowMap.autoUpdate,true);assert.equal(s.renderer.xr.enabled,true);
   s.mirror.dispose();s.mirror.geometry.dispose();
+});
+
+test('reflection selects only in-frustum fixtures and restores full batches even after a render failure',()=>{
+  const s=setup(),parts=new Group(),geometry=new BoxGeometry(.1,.1,.1),material=new MeshBasicMaterial();
+  for(const [x,y,z] of [[0,0,.2],[20,0,.2],[0,0,-1]]){
+    const part=new Mesh(geometry,material);part.position.set(x,y,z);parts.add(part);
+  }
+  const root=batchStatic(parts),mesh=root.children[0],original=mesh.geometry;
+  s.scene.add(root);s.scene.updateMatrixWorld(true);
+  let sceneCalls=0;const sceneHook=()=>sceneCalls++;s.scene.onBeforeRender=sceneHook;
+  s.renderer.check=()=>{
+    assert.notEqual(mesh.geometry,original);
+    assert.equal(mesh.geometry.attributes.position,original.attributes.position,'share the actual vertex buffer');
+    assert.equal(mesh.geometry.drawRange.count,36,'no other room or behind-mirror geometry');
+    assert.deepEqual(Array.from(mesh.geometry.index.array.slice(0,36)),Array.from(original.index.array.slice(0,36)));
+  };
+  s.draw();assert.equal(mesh.geometry,original);assert.equal(sceneCalls,1);assert.equal(s.scene.onBeforeRender,sceneHook);
+  const uploads=s.mirror.userData.mirrorQuality.batches.indexUploads;
+  s.draw();assert.equal(s.mirror.userData.mirrorQuality.batches.indexUploads,uploads,'stable captures reuse their index buffer');
+  s.renderer.check=()=>{throw Error('filtered capture failed');};
+  assert.throws(()=>s.draw(),/filtered capture failed/);
+  assert.equal(mesh.geometry,original);assert.equal(mesh.visible,true);assert.equal(s.scene.onBeforeRender,sceneHook);
+  assert.equal(s.scene.matrixWorldAutoUpdate,true);
+  s.mirror.dispose();s.mirror.geometry.dispose();original.dispose();geometry.dispose();material.dispose();
 });

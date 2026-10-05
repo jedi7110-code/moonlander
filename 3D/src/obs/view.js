@@ -93,7 +93,7 @@ export class ObservationView {
       tool.visible=false;
       tool.traverse(part=>{if(part.material?.anisotropy>0)part.material.defines.USE_UV='';});
     }
-    this.groomingMirror=createCabinMirror();
+    this.groomingMirror=createCabinMirror({room:this.ship.groomingStation.mirrorRoom});
     this.restingMirror=new THREE.Mesh(new THREE.PlaneGeometry(.72,.89),new THREE.MeshStandardMaterial({color:0xa8b5b5,metalness:1,roughness:.08}));
     this.restingMirror.material.userData.cabinKeepSurface=true;
     this.ship.groomingStation.mirror.add(this.groomingMirror,this.restingMirror);

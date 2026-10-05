@@ -28,8 +28,8 @@ const mat=createWallSwitchMaterials();
 [[.44,.70,0],[.70,.40,1],[.32,.65,2]].forEach(([w,h,style],i)=>{const p=createWallSwitchPanel(mat,{w,h,style});p.position.x=(i-1)*.88;p.rotation.y=-.12;examples.add(p);});
 const wall=new THREE.Mesh(new THREE.BoxGeometry(5,3,.08),new THREE.MeshStandardMaterial({color:0xa1a69a,roughness:.94}));wall.position.z=-.044;examples.add(wall);
 const toon=createCabinToon([examples]);toon.setStyle('cartoon');
-const camera=view.camera;camera.near=.02;const initialArea=new URLSearchParams(location.search).get('area');let mode=['kitchen','shower','toilet','console','lounge','plants'].includes(initialArea)?initialArea:'detail';
-for(const [id,text] of [['console','コンソール'],['shower','シャワー'],['toilet','トイレ'],['plants','栽培棚']]){const button=document.createElement('button');button.id=id;button.textContent=text;document.getElementById('detail').before(button);}
+const camera=view.camera;camera.near=.02;const initialArea=new URLSearchParams(location.search).get('area');let mode=['kitchen','shower','toilet','console','lounge','plants','cabinet'].includes(initialArea)?initialArea:'detail';
+for(const [id,text] of [['cabinet','配電盤'],['console','コンソール'],['shower','シャワー'],['toilet','トイレ'],['plants','栽培棚']]){const button=document.createElement('button');button.id=id;button.textContent=text;document.getElementById('detail').before(button);}
 const doorControls=document.createElement('div');doorControls.style.cssText='display:flex;align-items:center;gap:6px';
 doorControls.innerHTML='<button id="bathroom-door">ドアを閉める</button><input aria-label="ドアの開き" type="range" min="0" max="1" step=".01" value="1" style="width:90px">';
 document.getElementById('detail').before(doorControls);
@@ -51,6 +51,7 @@ function render(){
  const bathroom=['shower','toilet'].includes(mode);doorControls.style.display=bathroom?'flex':'none';doorButton.textContent=opening>.5?'ドアを閉める':'ドアを開ける';
  for(const [id,room] of Object.entries(view.ship.bathrooms))animateBathroom(room,{opening:mode===id?opening:0,phase:closing?'close':undefined},lightingDt);
  document.getElementById('status').textContent=bathroom?`${mode==='shower'?'シャワー':'トイレ'} / 扉 ${Math.round(opening*100)}% / 照明 ${Math.round(view.ship.bathrooms[mode].ceilingLight.power.value*100)}%`:mode==='console'?'FLIGHT / ATMOSPHERE / POWER':mode==='kitchen'?'キッチン':mode==='plants'?'栽培棚':mode==='front'?'主観側 / 3フロア':mode==='pipes'?`${REAR_WALL_PIPE_RUNS.length}か所 / 4本組`:'7か所 / 3種類';
+ if(mode==='cabinet')document.getElementById('status').textContent='配電盤 / 壁面への取り付け';
  labels.style.display=['sites','pipes','front'].includes(mode)?'grid':'none';
  labels.style.gridTemplateColumns=`repeat(${mode==='pipes'||mode==='front'?3:5},1fr)`;
  labels.innerHTML=(mode==='front'?nearWallViews.map(p=>p.label):mode==='pipes'?REAR_WALL_PIPE_RUNS.map(p=>p.label):names).map(n=>`<b>${n}</b>`).join('');
@@ -58,6 +59,10 @@ function render(){
  if(mode==='detail'){
   camera.fov=28;camera.aspect=width/height;camera.position.set(.16,40.13,Math.max(3.20,3.0/(2*Math.tan(14*Math.PI/180)*camera.aspect)));camera.lookAt(0,40,0);camera.updateProjectionMatrix();
   toon.update(width,height,1.7,15);view.cabinToon.update(width,height,1.7,15);r.render(view.scene,camera);
+ }else if(mode==='cabinet'){
+  const y=FLOOR_Y[1]+1.64;
+  camera.fov=34;camera.aspect=width/height;camera.position.set(-7.65,y+.20,.8);camera.lookAt(-8.57,y,-1.70);camera.updateProjectionMatrix();
+  view.cabinToon.update(width,height,1.8,15);r.render(view.scene,camera);
  }else if(mode==='console'){
   camera.fov=35;camera.aspect=width/height;camera.position.set(-8.58,9.35,Math.max(3.3,5.2/(2*Math.tan(17.5*Math.PI/180)*camera.aspect))-.45);camera.lookAt(-8.58,8.55,-.45);camera.updateProjectionMatrix();
   view.cabinToon.update(width,height,3.2,15);r.render(view.scene,camera);
@@ -110,7 +115,7 @@ function render(){
  }
  if(Object.values(view.ship.bathrooms).some(room=>room.ceilingLight.power.value!==room.ceilingLight.targetPower))lightFrame=requestAnimationFrame(render);
 }
-view.observer.disconnect();for(const name of ['detail','sites','bunk','lounge','magazines','locker','gym','cargo','pipes','front','shower','toilet','console','plants'])document.getElementById(name).onclick=()=>{mode=name;render();};window.addEventListener('resize',render);
+view.observer.disconnect();for(const name of ['detail','sites','bunk','lounge','magazines','locker','gym','cargo','pipes','front','shower','toilet','console','plants','cabinet'])document.getElementById(name).onclick=()=>{mode=name;render();};window.addEventListener('resize',render);
 render();
 window.addEventListener('pagehide',()=>{cancelAnimationFrame(doorFrame);cancelAnimationFrame(lightFrame);window.removeEventListener('resize',render);toon.dispose();view.dispose();},{once:true});
 </script></html>

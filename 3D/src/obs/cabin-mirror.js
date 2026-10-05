@@ -1,5 +1,6 @@
 import {Matrix4,PerspectiveCamera,PlaneGeometry,Vector2,Vector3,Vector4} from 'three';
 import {Reflector} from 'three/addons/objects/Reflector.js';
+import {createMirrorBatchFilter} from './mirror-batches.js';
 
 export const MIRROR_BUDGET=Object.freeze({maxEdge:512,maxPixels:131072,samples:2});
 
@@ -45,13 +46,17 @@ export function createMirrorProjection(){
   };
 }
 
-export function createCabinMirror(){
+export function createCabinMirror({cullStatic=true,room=null}={}){
   const mirror=new Reflector(new PlaneGeometry(.72,.89),{color:0xa8b5b5,textureWidth:32,textureHeight:32,clipBias:.002,multisample:MIRROR_BUDGET.samples});
   mirror.name='POV laundry mirror';mirror.visible=false;
   const target=mirror.getRenderTarget();target.stencilBuffer=true;
   const reflect=mirror.onBeforeRender,project=createMirrorProjection(),size=new Vector2();
   const captureCamera=new PerspectiveCamera(),crop=new Matrix4();
   const stats=mirror.userData.mirrorQuality={width:32,height:32,samples:MIRROR_BUDGET.samples,frames:0};
+  const batches=cullStatic?createMirrorBatchFilter({room}):null;
+  if(batches)stats.batches=batches.stats;
+  const dispose=mirror.dispose;
+  mirror.dispose=()=>{batches?.dispose();dispose();};
   mirror.onBeforeRender=function(renderer,scene,camera){
     if(!mirror.visible||renderer.xr.isPresenting)return;
     renderer.getDrawingBufferSize(size);
@@ -70,9 +75,16 @@ export function createCabinMirror(){
     // The real POV camera (including its self-head mask) is never modified.
     captureCamera.copy(camera,false);captureCamera.projectionMatrix.premultiply(crop);
     captureCamera.projectionMatrixInverse.copy(captureCamera.projectionMatrix).invert();
-    const previous=renderer.getRenderTarget(),xr=renderer.xr.enabled,shadows=renderer.shadowMap.autoUpdate;
+    const previous=renderer.getRenderTarget(),xr=renderer.xr.enabled,shadows=renderer.shadowMap.autoUpdate,beforeScene=scene.onBeforeRender,autoMatrix=scene.matrixWorldAutoUpdate;
+    // Three has now reflected/cropped the camera when the nested scene hook
+    // runs. Filter static batches for that exact frustum, not the POV camera.
+    if(batches){
+      scene.onBeforeRender=function(...args){beforeScene.apply(this,args);batches.begin(scene,args[2]);};
+      // The outer render already updated every world matrix for this frame.
+      scene.matrixWorldAutoUpdate=false;
+    }
     try{reflect.call(mirror,renderer,scene,captureCamera);stats.frames++;}
-    finally{mirror.visible=true;renderer.xr.enabled=xr;renderer.shadowMap.autoUpdate=shadows;renderer.setRenderTarget(previous);}
+    finally{batches?.end();scene.onBeforeRender=beforeScene;scene.matrixWorldAutoUpdate=autoMatrix;mirror.visible=true;renderer.xr.enabled=xr;renderer.shadowMap.autoUpdate=shadows;renderer.setRenderTarget(previous);}
   };
   return mirror;
 }

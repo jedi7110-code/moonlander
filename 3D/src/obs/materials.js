@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {makeXRWideGeometry} from './xr-geometry.js';
 import {CAT_FOOD_PRINT,createCatFoodMaterial} from './cat-food-package.js';
+import {registerMirrorSections} from './mirror-batches.js';
 
 export async function materials() {
   const loader = new THREE.TextureLoader();
@@ -208,6 +209,7 @@ export function batchStatic(root,{xrLOD=false}={}) {
     }
   });
   const merged=new THREE.Group();for(const {mat,geometries,wide} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;
+    registerMirrorSections(geometry,geometries);
     if(xrLOD)deferXRWideGeometry(mesh,wide);
     merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
 }

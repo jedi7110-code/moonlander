@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Box3} from 'three';
+import {Box3,Raycaster,Vector3} from 'three';
 import {buildSurfaceFixture,disposeSurfaceFixture} from './helpers/cabin-surface-fixture.js';
 import {ASHTRAY,DECK} from '../src/obs/layout.js';
 import {FLOOR_Y} from '../src/obs/ship.js';
@@ -39,5 +39,29 @@ test('service panels occupy the selected bunk, gym, ashtray and lounge walls',()
     assert.ok(cabinets.every(cabinet=>
       Math.abs(cabinet.position.x-ASHTRAY.x)>.5||
       Math.abs(cabinet.position.y-(FLOOR_Y[DECK.HABITATION]+1.73))>.5));
+  }finally{disposeSurfaceFixture(ship);}
+});
+
+test('all rear auxiliary cabinets sit flush against the actual wall lining',()=>{
+  const ship=buildSurfaceFixture();
+  try{
+    const root=ship.staticMesh,cabinets=[];
+    root.updateMatrixWorld(true);
+    root.traverse(object=>{if(object.name==='Wall auxiliary control cabinet')cabinets.push(object);});
+    assert.equal(cabinets.length,3);
+    // Select the ship's lining meshes, not a mock wall or the cabinet itself.
+    const lining=root.children.filter(object=>object.isMesh&&
+      (Math.abs(object.position.z+1.636)<1e-6||object.name==='Bulkhead with octagonal opening'));
+    const ray=new Raycaster(new Vector3(),new Vector3(0,0,-1));
+    for(const cabinet of cabinets){
+      const bounds=new Box3().setFromObject(cabinet),center=bounds.getCenter(new Vector3());
+      for(const [dx,dy] of [[0,0],[-.12,-.3],[.12,-.3],[-.12,.3],[.12,.3]]){
+        ray.ray.origin.set(center.x+dx,center.y+dy,0);
+        const hit=ray.intersectObjects(lining,false)[0];
+        assert.ok(hit,`wall behind cabinet at ${cabinet.position.toArray()}`);
+        assert.ok(Math.abs(bounds.min.z-hit.point.z)<1e-5,
+          `cabinet at ${cabinet.position.toArray()} floats ${bounds.min.z-hit.point.z}m from its wall`);
+      }
+    }
   }finally{disposeSurfaceFixture(ship);}
 });

@@ -158,8 +158,11 @@ export function addCabinDressing(parent,m,floors){
   const coffeeStation=createLoungeCoffeeStation(m,casePaint,parent.getObjectByName('Sofa floor-reaching arm')?.material);
   coffeeStation.position.set(10.20,habitation,0);root.add(coffeeStation);
   const controlMaterials=createWallControlMaterials();
-  for(const [x,y,w]of [[-8.57,habitation+1.64,.70],[-12.02,operations+1.7,.67],[-5.74,operations+1.42,.48]]){
-    const cabinet=createWallControlPanel(controlMaterials,w);cabinet.position.set(x,y,-1.15);root.add(cabinet);
+  // Bathroom-side bulkhead is recessed farther than the operations wall lining.
+  // Place the rear of each enclosure against its wall, including the shell bevel.
+  for(const [x,y,w,wallZ]of [[-8.57,habitation+1.64,.70,-1.87],[-12.02,operations+1.7,.67,-1.606],[-5.74,operations+1.42,.48,-1.606]]){
+    const cabinet=createWallControlPanel(controlMaterials,w),rear=new THREE.Box3().setFromObject(cabinet).min.z;
+    cabinet.position.set(x,y,wallZ-rear);root.add(cabinet);
   }
   const toiletCasePaint=casePaint.clone();
   toiletCasePaint.name='Industrial / warm yellow toilet case';toiletCasePaint.color.setHex(0xe2ae35);

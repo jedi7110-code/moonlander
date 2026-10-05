@@ -1,5 +1,5 @@
-import {BoxGeometry,ExtrudeGeometry,Group,Matrix4,Mesh,MeshBasicMaterial,Path,PlaneGeometry,Shape,ShapeGeometry,Vector3} from 'three';
-import {createSpaceStars,SPACE_COLOR} from './space-stars.js';
+import {BoxGeometry,ExtrudeGeometry,Group,Matrix4,Mesh,MeshBasicMaterial,Path,Shape,ShapeGeometry,Vector3} from 'three';
+import {createSpaceBackdrop,createSpaceStars} from './space-stars.js';
 import {box,cylinder,batchStatic} from './materials.js';
 import {CABIN_AISLE,DECK} from './layout.js';
 import {FLOOR_Y} from './ship.js';
@@ -65,10 +65,12 @@ function viewport(parent,m,x,floor){
 }
 function exteriorSpace(){
   const root=new Group();root.name='POV / space beyond windows';
-  const background=new Mesh(new PlaneGeometry(240,140),new MeshBasicMaterial({name:'POV / deep space',color:SPACE_COLOR,toneMapped:false,depthWrite:false}));
-  background.renderOrder=-1;
-  background.position.set(0,6,90);background.rotation.y=Math.PI;root.add(background);
-  root.add(createSpaceStars());return root;
+  const windows=[];
+  for(const floor of FLOOR_Y)for(let i=0;i<PROFILE.count;i++)if(viewingWallWindow(i))windows.push({
+    x:viewingWallPanelX(i),y:floor+PROFILE.windowY,z:PROFILE.faceZ+.145,
+    width:PROFILE.windowWidth,height:PROFILE.windowHeight,cut:.12,
+  });
+  root.add(createSpaceBackdrop(),createSpaceStars({panoramic:true,windows}));return root;
 }
 
 function pressureReturns(parent,m,floor){

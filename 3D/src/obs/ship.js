@@ -362,11 +362,14 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     addIndustrialDeck(staticRoot,m,y,level,{floorDetails:floorBuilder===createDeckFloor});
     addWorkLights(animated,y,level);
   });
+  let laundryMirrorRoom=null;
   for(const g of REAR_ROOM_GATES){
     gateWall(staticRoot,m.enamel,{left:-3.435,right:-.405,bottom:g.floor+.07,top:g.floor+2.81,z:-1.68,depth:.12,openingClearance:.02,gates:[g]});
     const gate=createBulkheadGate(m,g,sourceMaterials);staticRoot.add(gate.root);animated.add(gate.lights);
+    if(gate.mirrorRoom)laundryMirrorRoom=gate.mirrorRoom;
   }
   const groomingStation=createVanity(m,createMachinedMetals()),groomingGate=REAR_ROOM_GATES[DECK.HABITATION];
+  groomingStation.mirrorRoom=laundryMirrorRoom;
   groomingStation.origin=new THREE.Vector3(groomingGate.x,groomingGate.floor,0);
   groomingStation.root.position.add(groomingStation.origin);staticRoot.add(groomingStation.root);
   // Keep the fixture batched with the cabin; only the mirror and tool mounts need transforms.
