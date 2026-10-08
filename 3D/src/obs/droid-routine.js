@@ -2,7 +2,7 @@ import {FLOORS,LADDER_X,CAT_BOWL,WASTE_INCINERATOR as WASTE} from './layout.js';
 import {planDroidTurn,sampleDroidTurn} from './droid-turn.js';
 import {DROID_STARTUP_SECONDS} from './droid-startup.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
-import {DROID_LADDER_LANDING,LADDER_ENTRY} from './pace.js';
+import {DROID_LADDER_LANDING,LADDER_ENTRY,DROID_GAIT} from './pace.js';
 
 export const DROID_JOBS=Object.freeze({
   cargo:'支援物資を倉庫へ運搬',harvest:'野菜を収穫',laundry:'衣類を洗濯',
@@ -15,7 +15,7 @@ export const DROID_LADDER_TRAFFIC=Object.freeze({droidWaitX:1.15,crewWaitX:1.35,
 const STATIONS={cargo:'hatch',harvest:'plant',laundry:'grooming',toilet:'toilet',shower:'shower',cook:'galley'};
 export const DROID_PACE=1.6;
 export const DROID_LANE=1.48;
-const LANE=DROID_LANE,SPEED=.58*DROID_PACE,CLIMB_SPEED=.40*DROID_PACE;
+const LANE=DROID_LANE,SPEED=DROID_GAIT.speed*DROID_PACE,CLIMB_SPEED=.40*DROID_PACE;
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
 const mix=(a,b,t)=>a+(b-a)*t;
 const angle=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));

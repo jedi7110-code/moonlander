@@ -287,6 +287,7 @@ export class CatRoutine {
   }
   beginBunkWake(visit){
     this.mouseChase?.cancel(this);
+    this.energy=100; // Lucy shares the same rested opening as Milo.
     const bunk=getStation('bunk');
     this.motion.floor=bunk.floor;this.motion.x=bunk.x+24;this.motion.y=FLOORS[bunk.floor].y;
     this.motion.queue=[];this.motion.onArrive=null;this.motion.destination=null;this.motion.onDestination=null;

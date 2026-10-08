@@ -67,6 +67,24 @@ test('sleep lowers and rises continuously, then walking resets every pose transf
   assert.equal(milo.visible,true);assert.equal(milo.userData.mug.visible,false);
 });
 
+test('opening sleep starts both rested without refilling other needs or resetting ordinary sleep',()=>{
+  for(const value of [0,.25,.5,.99]){
+    const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{random:()=>value});
+    const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>value});brain.catRoutine=cat;
+    const needs={...brain.needs},exercise=brain.exercise;
+    const catNeeds={hunger:cat.hunger,groomNeed:cat.groomNeed,curiosity:cat.curiosity};
+    assert.equal(brain.beginWakeUp({waitForActivation:true}),true);
+    assert.deepEqual(brain.needs,{...needs,energy:100});assert.equal(brain.statusNeeds.energy,100);
+    assert.equal(cat.energy,100);assert.equal(brain.exercise,exercise);
+    assert.deepEqual({hunger:cat.hunger,groomNeed:cat.groomNeed,curiosity:cat.curiosity},catNeeds);
+    brain.update(60);cat.update(60,actor);
+    assert.equal(brain.needs.energy,100);assert.equal(cat.energy,100,'dark standby does not drain rested sleepers');
+    brain.needs.energy=80;assert.equal(brain.beginWakeUp(),false);assert.equal(brain.needs.energy,80,'duplicate opening is not an energy refill');
+    const ordinary=new CatRoutine(care,{random:()=>value});ordinary.energy=30;ordinary.rest('sleep',20);
+    assert.equal(ordinary.energy,30);ordinary.update(2);assert.equal(ordinary.energy,36,'normal sleep still recovers gradually');
+  }
+});
+
 test('the cabin opens with Milo and Lucy asleep together, then wakes and releases both',()=>{
   const actor=new CrewMotion(),care=new Supplies(),cat=new CatRoutine(care,{random:()=>.5,turns:true});
   const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care,random:()=>.5});brain.catRoutine=cat;

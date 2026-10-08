@@ -7,7 +7,7 @@ import {LADDER} from './ladder-pose.js';
 import {CABIN_LADDER} from './cabin-ladder.js';
 import {CAT_BOWL,LADDER_X,WASTE_INCINERATOR as WASTE} from './layout.js';
 import {sampleDroidTurn} from './droid-turn.js';
-import {DROID_LADDER_LANDING,LADDER_ENTRY} from './pace.js';
+import {DROID_LADDER_LANDING,LADDER_ENTRY,DROID_WALK_CYCLE_DISTANCE} from './pace.js';
 import {fitLadderEntryBody} from './ladder-entry.js';
 
 const mix=THREE.MathUtils.lerp,clamp=THREE.MathUtils.clamp;
@@ -70,9 +70,9 @@ function fitCarriedObject(out,p,loads){
 }
 
 function walkingFeet(distance,age){
-  const period=DROID_SPEC.stepPeriod,stride=.58*period*DROID_SPEC.stance;
+  const stride=DROID_WALK_CYCLE_DISTANCE*DROID_SPEC.stance;
   return [-1,1].map(side=>{
-    const phase=((distance/(.58*period)+(side<0?.5:0))%1+1)%1;
+    const phase=((distance/DROID_WALK_CYCLE_DISTANCE+(side<0?.5:0))%1+1)%1;
     const swing=clamp((phase-.64)/.36,0,1);
     const point=[side*.137,.099+.075*Math.sin(swing*Math.PI),.045+(phase<.64?stride*(.5-phase/.64):mix(-stride/2,stride/2,smooth(swing)))];
     return lerpPoint([side*.137,.099,.045],point,smooth(age/.25));
@@ -98,8 +98,8 @@ export function sampleDroidServicePose(p,loads=LOADS){
   const out={rest:p.rest,wakeAge:p.mode==='wake'?p.age:undefined,hipHeight:.905,lean:DROID_POSTURE.idleLean,nod:-DROID_POSTURE.idleLean*.6,bodyZ:DROID_POSTURE.bodyZ,hands:p.carrying?hold:undefined};
   let hands=null,hip=.905,lean=0,nod=.22;
   if(p.walking){
-    const period=DROID_SPEC.stepPeriod,stride=.58*period*DROID_SPEC.stance;
-    out.walkAmount=smooth(t/.3)*smooth((d-t)/.3);out.walkPhase=p.walkDistance/(.58*period);
+    const stride=DROID_WALK_CYCLE_DISTANCE*DROID_SPEC.stance;
+    out.walkAmount=smooth(t/.3)*smooth((d-t)/.3);out.walkPhase=p.walkDistance/DROID_WALK_CYCLE_DISTANCE;
     out.lean=mix(DROID_POSTURE.idleLean,DROID_POSTURE.walkLean,out.walkAmount);out.nod=-out.lean*.6;
     out.feet=walkingFeet(p.walkDistance,t);
     out.hipHeight+=.004*Math.cos(p.walkDistance/stride*Math.PI*2);

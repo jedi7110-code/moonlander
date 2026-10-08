@@ -1,44 +1,121 @@
-import {sampleCondensate} from './condensate.js';
+import {CABIN_SOUNDS,CABIN_AUDIO_BASE} from './sound-library.js';
+import {PLANT,FLOORS} from './layout.js';
+
+const clamp=value=>Math.max(0,Math.min(1,value));
+const smooth=value=>{const t=clamp(value);return t*t*(3-2*t);};
+const plantFan={x:(PLANT.x-700)*.022+2.03,y:(870-FLOORS[PLANT.floor].y)*.016+2.18,z:-.65};
 
 export class CabinAudio {
-  constructor(){this.enabled=false;this.context=null;this.stepTime=0;this.dripClock=0;this.dripImpact=-1;this.dripState={};}
+  constructor({createContext=()=>{const Context=globalThis.AudioContext||globalThis.webkitAudioContext;return Context?new Context():null;},fetchAudio=(...args)=>fetch(...args),ambience=true}={}){
+    this.enabled=false;this.paused=false;this.context=null;this.createContext=createContext;this.fetchAudio=fetchAudio;
+    this.buffers=new Map();this.voices=new Set();this.loops=new Map();this.failures=[];this.disposed=false;
+    this.ambience=ambience;
+    this.listener={x:0,y:3.4,z:1,rightX:1,rightY:0,rightZ:0,overview:true,focus:0};
+  }
   async toggle(){
+    if(this.disposed)return false;
     if(!this.context){
-      const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return false;
-      this.context=new Context();this.master=this.context.createGain();this.master.gain.value=0;this.master.connect(this.context.destination);
-      for(const frequency of [48,96]){const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.frequency.value=frequency;gain.gain.value=frequency===48?.055:.018;oscillator.connect(gain).connect(this.master);oscillator.start();}
+      this.context=this.createContext();if(!this.context)throw new Error('Web Audio unavailable');
+      this.master=this.context.createGain();this.master.gain.value=0;this.master.connect(this.context.destination);
+      if(this.ambience){
+      this.ambientGain=this.context.createGain();this.ambientGain.gain.value=.4;this.ambientGain.connect(this.master);
+      for(const frequency of [48,96]){const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.frequency.value=frequency;gain.gain.value=frequency===48?.055:.018;oscillator.connect(gain).connect(this.ambientGain);oscillator.start();}
       const buffer=this.context.createBuffer(1,this.context.sampleRate*2,this.context.sampleRate),samples=buffer.getChannelData(0);
       for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
       const fan=this.context.createBufferSource(),filter=this.context.createBiquadFilter();
       fan.buffer=buffer;fan.loop=true;filter.type='lowpass';filter.frequency.value=380;
       this.fanGain=this.context.createGain();this.fanGain.gain.value=.012;
-      fan.connect(filter).connect(this.fanGain).connect(this.master);fan.start();
+      fan.connect(filter).connect(this.fanGain).connect(this.ambientGain);fan.start();this.update();
+      }
     }
-    await this.context.resume();this.enabled=!this.enabled;this.master.gain.setTargetAtTime(this.enabled?.55:0,this.context.currentTime,.2);return this.enabled;
+    this.enabled=!this.enabled;
+    if(this.enabled){
+      try{await this.context.resume();}catch(error){this.enabled=false;throw error;}
+      if(!this.disposed)void this.load();
+    }else this.stopAll();
+    this.syncMaster();return this.enabled;
   }
+  // No audio network or decoding work before the explicit sound-on gesture.
+  // Three concurrent fetches, one decode per local file, no delayed one-shot queue.
+  load(){
+    if(this.loading)return this.loading;
+    this.abort=new AbortController();const pending=Object.entries(CABIN_SOUNDS);
+    const worker=async()=>{
+      while(pending.length&&!this.disposed){
+        const [id,definition]=pending.shift();
+        try{
+          const response=await this.fetchAudio(CABIN_AUDIO_BASE+definition.file,{signal:this.abort.signal});
+          if(!response.ok)throw new Error(`HTTP ${response.status}`);
+          const data=await response.arrayBuffer();if(this.disposed)return;
+          const buffer=await this.context.decodeAudioData(data);if(!this.disposed)this.buffers.set(id,buffer);
+        }catch(error){if(!this.disposed)this.failures.push({id,message:String(error.message??error)});}
+      }
+    };
+    this.loading=Promise.all([worker(),worker(),worker()]);return this.loading;
+  }
+  get audible(){return this.enabled&&!this.paused&&!this.disposed&&this.context?.state==='running';}
+  get stats(){return{loaded:this.buffers.size,total:Object.keys(CABIN_SOUNDS).length,active:this.voices.size,loops:this.loops.size,failed:this.failures.length};}
+  syncMaster(){if(this.context&&!this.disposed)this.master.gain.setTargetAtTime(this.enabled&&!this.paused?.55:0,this.context.currentTime,.08);}
+  get focus(){return this.listener.overview?clamp(this.listener.focus??0):1;}
+  setViewListener(camera,view,firstPerson=false){
+    const e=camera.matrixWorld.elements;
+    // Desktop zoom changes FOV while its camera stays 40 m outside the ship.
+    // Listen at the visible focus plane, using the eased (not target) framing.
+    const ratio=(view.fitHeight??15)/Math.max(.1,view.viewHeight??15);
+    this.setListener({x:firstPerson?e[12]:view.center.x,y:firstPerson?e[13]:view.center.y,z:firstPerson?e[14]:view.center.z+1,
+      rightX:e[0],rightY:e[1],rightZ:e[2],overview:!firstPerson,focus:firstPerson?1:smooth(Math.log2(Math.max(1,ratio))/2)});
+  }
+  setListener(listener){Object.assign(this.listener,listener);for(const voice of this.voices)if(!voice.stopping)this.positionVoice(voice);this.update();}
+  spatial(position){
+    if(!position)return{gain:1,pan:0};
+    const l=this.listener,dx=position.x-l.x,dy=position.y-l.y,dz=position.z-l.z;
+    const distance=Math.hypot(dx,dy,dz),deck=1-.85*smooth((Math.abs(dy)-1.5)/1.5),focus=this.focus;
+    const local=deck/(1+Math.pow(Math.max(0,distance-1.5)/4,2));
+    const widePan=Math.max(-.8,Math.min(.8,dx/16)),nearPan=Math.max(-.9,Math.min(.9,(dx*l.rightX+dy*l.rightY+dz*l.rightZ)/Math.max(2,distance)));
+    // Quiet whole-ship mix -> modest local lift, never boosting distant rooms.
+    return{gain:.18*(1-focus)+.55*local*focus,pan:widePan*(1-focus)+nearPan*focus};
+  }
+  positionVoice(voice){
+    const spatial=this.spatial(voice.position),now=this.context.currentTime;
+    voice.gain.gain.setTargetAtTime(voice.volume*spatial.gain,now,.04);
+    voice.pan?.pan.setTargetAtTime(spatial.pan,now,.04);
+  }
+  play(id,{position=null,volume=1,rate=1,loop=false,key=null}={}){
+    const definition=CABIN_SOUNDS[id],buffer=this.buffers.get(id);
+    if(!definition||!buffer||!this.audible||this.voices.size>=12)return null;
+    if([...this.voices].filter(v=>v.id===id&&!v.stopping).length>=3)return null;
+    if(this.spatial(position).gain*definition.gain*volume<.003)return null;
+    const source=this.context.createBufferSource(),gain=this.context.createGain(),pan=this.context.createStereoPanner?.();
+    source.buffer=buffer;source.loop=loop;source.playbackRate.value=Math.max(.7,Math.min(1.3,(definition.rate??1)*rate));
+    gain.gain.value=0;source.connect(gain);if(pan)gain.connect(pan).connect(this.master);else gain.connect(this.master);
+    const voice={id,source,gain,pan,position:position?{...position}:null,volume:definition.gain*volume,key,stopping:false};
+    this.voices.add(voice);this.positionVoice(voice);
+    source.onended=()=>{source.disconnect();gain.disconnect();pan?.disconnect();this.voices.delete(voice);if(key&&this.loops.get(key)===voice)this.loops.delete(key);this.onChange?.();};
+    source.start();return voice;
+  }
+  setLoop(key,id,active,options={}){
+    let voice=this.loops.get(key);
+    if(!active||!this.audible){if(voice)this.stopVoice(voice);return;}
+    if(voice&&voice.id!==id){this.stopVoice(voice);voice=null;}
+    if(!voice){voice=this.play(id,{...options,loop:true,key});if(voice)this.loops.set(key,voice);}
+    else{if(options.position)Object.assign(voice.position??={},options.position);this.positionVoice(voice);}
+  }
+  stopVoice(voice){
+    if(voice.stopping)return;voice.stopping=true;
+    if(voice.key&&this.loops.get(voice.key)===voice)this.loops.delete(voice.key);
+    const now=this.context.currentTime;voice.gain.gain.cancelScheduledValues(now);voice.gain.gain.setTargetAtTime(0,now,.015);voice.source.stop(now+.08);
+  }
+  stopAll(){for(const voice of this.voices)this.stopVoice(voice);}
+  stopLoop(key){const voice=this.loops.get(key);if(voice)this.stopVoice(voice);}
   tone(frequency,duration=.12,volume=.025,type='sine'){
-    if(!this.enabled)return;
+    if(!this.audible)return;
     const now=this.context.currentTime,osc=this.context.createOscillator(),gain=this.context.createGain();osc.type=type;osc.frequency.value=frequency;gain.gain.setValueAtTime(volume,now);gain.gain.exponentialRampToValueAtTime(.0001,now+duration);osc.connect(gain).connect(this.master);osc.start();osc.stop(now+duration);osc.onended=()=>{osc.disconnect();gain.disconnect();};
   }
-  waterDrop(index,proximity){
-    if(!this.enabled)return;
-    const now=this.context.currentTime,osc=this.context.createOscillator(),gain=this.context.createGain();
-    // Brief resonant water plip; a soft attack avoids a mechanical click.
-    const pitch=[760,1080,850,960,710,1020][index%6],volume=.007+.012*Math.max(0,Math.min(1,proximity));
-    osc.type='sine';osc.frequency.setValueAtTime(pitch,now);osc.frequency.exponentialRampToValueAtTime(pitch*1.65,now+.055);
-    gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(volume,now+.004);gain.gain.exponentialRampToValueAtTime(.0001,now+.20);
-    osc.connect(gain).connect(this.master);osc.start(now);osc.stop(now+.21);osc.onended=()=>{osc.disconnect();gain.disconnect();};
+  update(){
+    if(this.ambientGain)this.ambientGain.gain.setTargetAtTime(.4+.25*this.focus,this.context.currentTime,.4);
+    if(this.fanGain)this.fanGain.gain.setTargetAtTime(.012+.028*this.spatial(plantFan).gain,this.context.currentTime,.4);
+    // Condensate drops remain visual only; no synthetic pitched water plips.
   }
-  update(dt,walking,plantProximity=0,elapsed=this.dripClock+dt){
-    if(this.fanGain)this.fanGain.gain.setTargetAtTime(.012+.028*Math.max(0,Math.min(1,plantProximity)),this.context.currentTime,.4);
-    this.stepTime-=dt;
-    if(walking&&this.stepTime<=0){this.tone(83,.06,.055,'triangle');this.stepTime=.47;}
-    this.dripClock=elapsed;
-    const state=sampleCondensate(elapsed,this.dripState);
-    if(state.impactIndex>this.dripImpact&&state.impactAge<Math.min(.12,Math.max(0,dt)+.002))this.waterDrop(state.impactIndex,plantProximity);
-    // Advance even when muted: enabling sound must not replay previous drops.
-    this.dripImpact=state.impactIndex;
-  }
-  pause(paused){if(this.context)this.master.gain.setTargetAtTime(this.enabled&&!paused?.55:0,this.context.currentTime,.15);}
-  dispose(){this.context?.close();}
+  pause(paused){this.paused=Boolean(paused);if(this.paused)this.stopAll();this.syncMaster();}
+  dispose(){this.stopAll();this.disposed=true;this.enabled=false;this.abort?.abort();this.buffers.clear();this.loops.clear();this.voices.clear();this.context?.close();}
 }

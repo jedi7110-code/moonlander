@@ -4,10 +4,11 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createDroidLowParts,batchDroidLow} from './droid-low.js';
 import {DROID_STARTUP_SECONDS,droidStartupLight} from './droid-startup.js';
 import {createDroidBatteryAtlas} from './droid-textures.js';
+import {DROID_GAIT} from './pace.js';
 
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z),DOWN=V(0,-1,0),UP=V(0,1,0);
 const TAU=Math.PI*2,clamp=THREE.MathUtils.clamp;
-export const DROID_SPEC=Object.freeze({serial:'3817',height:1.72,shoulderHalfWidth:.175,upperLeg:.34,middleLeg:.29,lowerLeg:.35,upperArm:.31,forearm:.295,stepPeriod:1.4,stance:.64});
+export const DROID_SPEC=Object.freeze({serial:'3817',height:1.72,shoulderHalfWidth:.175,upperLeg:.34,middleLeg:.29,lowerLeg:.35,upperArm:.31,forearm:.295,stepPeriod:DROID_GAIT.period,stance:DROID_GAIT.stance});
 export const DROID_POSTURE=Object.freeze({idleLean:.13,walkLean:.18,bodyZ:-.02});
 export const DROID_EXPRESSIONS=Object.freeze({neutral:'通常',happy:'喜び',sad:'悲しみ',surprised:'驚き',angry:'怒り',strained:'大変',sleepy:'眠い'});
 

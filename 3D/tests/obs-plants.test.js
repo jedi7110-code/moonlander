@@ -6,7 +6,6 @@ import {Supplies,CrewMotion,getStation} from '../src/obs/state.js';
 import {MeshStandardMaterial,Box3,Vector3} from 'three';
 import {createPlantRack,animatePlants} from '../src/obs/plants.js';
 import {CONDENSATE,CONDENSATE_INTERVALS,sampleCondensate} from '../src/obs/condensate.js';
-import {CabinAudio} from '../src/obs/audio.js';
 
 test('three beds grow at staggered rates and stop at maturity',()=>{
   const bed=new PlantBed();bed.update(70);assert.equal(bed.ready,1);
@@ -112,19 +111,6 @@ test('condensate forms one drop, accelerates into the water, and settles between
   assert.ok(idle>0,'the surface rests before another drop forms');
   const loop=CONDENSATE_INTERVALS.reduce((sum,seconds)=>sum+seconds,0),first=sampleCondensate(0),next=sampleCondensate(loop);
   assert.equal(next.phase,first.phase);assert.equal(next.y,first.y);
-});
-test('water sounds follow visible impacts once, with no replay on unmute or a time jump',()=>{
-  const audio=new CabinAudio(),played=[];
-  audio.waterDrop=(index)=>{if(audio.enabled)played.push(index);};
-  for(let time=0;time<7;time+=1/60)audio.update(1/60,false,0,time);
-  assert.deepEqual(played,[]);
-  audio.enabled=true;
-  for(let time=7;time<11;time+=1/60)audio.update(1/60,false,0,time);
-  assert.deepEqual(played,[2]);
-  audio.update(1/60,false,0,11);audio.update(0,false,0,11);
-  assert.deepEqual(played,[2]);
-  audio.update(1/60,false,0,30);
-  assert.deepEqual(played,[2],'a jump does not play old impacts');
 });
 test('growth and harvest do not silently subtract potable water reserves',()=>{
   const bed=new PlantBed(),care=new Supplies(),water=care.supplies.water;

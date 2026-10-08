@@ -44,6 +44,9 @@ export class CabinBrain extends Brain {
   }
   beginWakeUp({waitForActivation=false}={}){
     if(this.bunkVisit)return false;
+    // The opening follows a full night's rest, not a random mid-day reserve.
+    // Leave other needs and ordinary sleep/recovery behaviour unchanged.
+    this.needs.energy=100;
     const station=getStation('bunk');
     this.actor.floor=station.floor;this.actor.x=station.x;this.actor.y=FLOORS[station.floor].y;
     this.actor.queue=[];this.actor.onArrive=null;this.actor.facing=1;this.actor.setSymbol('');

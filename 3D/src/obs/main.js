@@ -12,10 +12,10 @@ import {revealStartupScene} from './startup-lighting.js';
 import {bindStartupLightingInput} from './startup-input.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
+import {CabinSoundEvents} from './sound-events.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
 import {AirlockPassage} from './airlock.js';
 import {Sprout} from 'lucide';
-import {PLANT} from './layout.js';
 import {healthDisplay} from './health-display.js';
 import {DroidRoutine} from './droid-routine.js';
 import {Eye} from 'lucide';
@@ -45,6 +45,7 @@ const needOrders={
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
 const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio();
+const soundEvents=new CabinSoundEvents(audio);
 // Lucy's grooming correction cache arrives after the cabin is on screen.
 cat.groomAvailable=false;
 const feedback=new StationFeedback(),airlock=new AirlockPassage();
@@ -106,7 +107,7 @@ care.onPhase=phase=>{
   if(phase==='inbound'){showMessage(words('配送を受け付けた。補給ハッチへ搬入する。','Order received. Cargo is inbound to the supply hatch.'),'LOGISTICS');audio.tone(620,.15,.025);}
   if(phase==='unloading'){
     feedback.notify('hatch','unloading');showMessage(words('補給便が到着。ハッチを開放する。','Supply shipment docked. Opening the hatch.'),'LOGISTICS');
-    for(const delay of [1360,1540,1720])scene.time.delayedCall(delay,()=>audio.tone(65,.35,.14,'triangle'));
+    // Cargo impacts follow the actual delivery phase in CabinSoundEvents.
   }
 };
 care.onDeliver=()=>{feedback.notify('hatch','delivered');showMessage(words('食料、水、猫餌を受領。備蓄を補充した。','Food, water and cat food received. Reserves replenished.'),'LOGISTICS');};
@@ -220,6 +221,7 @@ function localize(){
   $('obs-input').placeholder=words('マイロに話しかける','Talk to Milo');$('obs-input').setAttribute('aria-label',$('obs-input').placeholder);
   for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   updateFullscreenUI(document,words,refreshIcons);
+  $('obs-sound').setAttribute('aria-label',audio.enabled?words('船内音をオフ','Turn cabin audio off'):words('船内音をオン','Turn cabin audio on'));
   const pauseLabel=paused?words('再開','Resume'):words('一時停止','Pause');$('obs-pause').setAttribute('aria-label',pauseLabel);$('obs-pause').dataset.tip=pauseLabel;
   $('play-chess').setAttribute('aria-label',words('ラウンジゲーム','Lounge games'));$('play-chess').dataset.tip=words('チェス・ポーカー・リバーシ・小説を読む','Chess · Poker · Reversi · Read a novel');
   $('dismiss-need').setAttribute('aria-label',words('閉じる','Close'));
@@ -227,7 +229,7 @@ function localize(){
   immersive?.localize();
   if(brain.isCalling())scene.obsUI.showWant(brain._wantText());updateHUD();
 }
-function setPause(next){paused=next;$('obs-pause').innerHTML=`<i data-lucide="${paused?'play':'pause'}"></i>`;$('obs-pause').setAttribute('aria-pressed',String(paused));audio.pause(paused);refreshIcons();localize();}
+function setPause(next){paused=next;$('obs-pause').innerHTML=`<i data-lucide="${paused?'play':'pause'}"></i>`;$('obs-pause').setAttribute('aria-pressed',String(paused));visibilityChanged();refreshIcons();localize();}
 function confirmOrder(id){feedback.accept(id);feedback.update(0,brain,actor,paused);audio.tone(620,.1,.025);updateHUD();}
 function acknowledge(){const reply=brain.acknowledge();if(brain.gamePending&&paused)setPause(false);showMessage(reply);if(brain.actStation)confirmOrder(brain.actStation);else feedback.notify('console','acknowledged');updateHUD();}
 function requestGame(){
@@ -279,7 +281,12 @@ function headquarters(){
 }
 $('obs-pause').addEventListener('click',()=>setPause(!paused));
 $('obs-lang').addEventListener('click',()=>{toggleLang();localize();});
-$('obs-sound').addEventListener('click',async()=>{try{const enabled=await audio.toggle();audio.pause(paused);$('obs-sound').setAttribute('aria-pressed',String(enabled));$('obs-sound').innerHTML=`<i data-lucide="${enabled?'volume-2':'volume-x'}"></i>`;refreshIcons();}catch{showMessage(words('このブラウザでは船内音を再生できません。','Audio is unavailable in this browser.'),'SYSTEM');}});
+$('obs-sound').addEventListener('click',async()=>{
+  const button=$('obs-sound');button.disabled=true;
+  try{const enabled=await audio.toggle();visibilityChanged();button.setAttribute('aria-pressed',String(enabled));button.innerHTML=`<i data-lucide="${enabled?'volume-2':'volume-x'}"></i>`;refreshIcons();localize();if(enabled)audio.load().then(()=>{if(audio.failures.length&&audio.enabled)showMessage(words('一部の船内SEを読み込めませんでした。再読み込みで再試行できます。','Some cabin sounds failed to load. Reload to retry.'),'SYSTEM');});}
+  catch{showMessage(words('このブラウザでは船内音を再生できません。','Audio is unavailable in this browser.'),'SYSTEM');}
+  finally{button.disabled=false;}
+});
 $('obs-chat').addEventListener('submit',event=>{
   event.preventDefault();const text=$('obs-input').value.trim();if(!text)return;const version=actor.commandVersion;
   let reply;
@@ -388,10 +395,14 @@ async function start(){
         accumulator+=dt;
         if(openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);audio.update(step,actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid,actor.floor===PLANT.floor?Math.max(0,1-Math.abs(actor.x-PLANT.x)/220):0,elapsed);for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
       if(visible){view.startupLighting?.update(paused||games.open||firstVisibleFrame?0:frameDt);feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);firstVisibleFrame=false;if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
+      if(visible&&audio.enabled){
+        const camera=immersive.active?view.renderer.xr.getCamera(view.camera):view.camera;
+        audio.setViewListener(camera,view,immersive.active||Boolean(view.characterCamera?.active));
+      }
       hudTime+=dt;if(hudTime>.15){updateHUD();hudTime=0;}
     }
     view.renderer.setAnimationLoop(tick);
