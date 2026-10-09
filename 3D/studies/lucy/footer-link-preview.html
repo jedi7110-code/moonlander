@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OBS footer link · Lucy</title>
+<style>
+body{margin:0;min-height:100vh;display:grid;place-content:center;gap:32px;background:#eeeae3;color:#24282b;font:14px system-ui;padding:24px}
+.row{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.sample{width:200px;height:249px;overflow:hidden;background:#dfe2de}
+.sample img{display:block;width:1600px;height:249px;max-width:none}
+.footer{display:flex;align-items:center;gap:32px;border-top:1px solid #b8bcb9;padding-top:24px;min-height:70px}
+.footer span{color:#777;font-size:12px;letter-spacing:.08em}
+.link{height:48px;display:inline-flex;align-items:center;text-decoration:none;color:inherit}
+.frame{display:block;width:calc(48px * 200 / 249);height:48px;overflow:hidden}
+.frame img{display:block;width:auto;height:48px;max-width:none}
+.frame.wide{width:calc(48px * 560 / 315)}
+.link:hover img{animation:spin 1.28s steps(8) infinite}
+@keyframes spin{to{transform:translateX(-100%)}}
+@media(prefers-reduced-motion:reduce){.link:hover img{animation:none}}
+</style>
+<h1>ルーシー · フッタ導線用スプライト</h1>
+<div class="row"><div class="sample"><img src="/3D/public/assets/obs/lucy/footer-link/lucy-sprite.webp" alt="ルーシーの座り姿、8方向"></div><p>左: 正面コマを原寸200×249で表示<br>右下: PAXフッタと同じ高さ48pxの表示</p></div>
+<div class="footer"><span>既存の縦長枠</span><a class="link" href="/3D/obs.html" aria-label="OBSを見る"><span class="frame"><img src="/3D/public/assets/obs/lucy/footer-link/lucy-sprite.webp" alt=""></span></a><span>← ホバーで回転</span></div>
+<div class="footer"><span>猫向けの横長枠</span><a class="link" href="/3D/obs.html" aria-label="OBSを見る"><span class="frame wide"><img src="/3D/public/assets/obs/lucy/footer-link/lucy-sprite-wide.webp" alt=""></span></a><span>← ホバーで回転</span></div>
+</html>

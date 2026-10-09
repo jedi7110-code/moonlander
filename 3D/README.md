@@ -19,7 +19,7 @@ npm run dev
 ## 船内SE
 
 OBSは初期状態で音オンです。最初のタップ／クリック／キー操作から再生し、スピーカーボタンでミュートできます。
-CC0の26素材、Pixabayのガスストラット1素材、ユーザー提供の点灯音1素材を
+CC0の27素材、Pixabayのガスストラット1素材、ユーザー提供の点灯音1素材を
 `public/assets/obs/audio/` に同梱し、OBSの接続中に先読み・デコードします。初回操作前には再生しません。
 音声スタディーは従来どおり手動オン・遅延読み込みです。
 iPhone（Chromeを含む）では対応端末のAudioSessionをplaybackに設定し、古いiOSでは
@@ -79,6 +79,10 @@ iPhone（Chromeを含む）では対応端末のAudioSessionをplaybackに設定
 実録の猫の声と、ラットの異なる2テイクを原速で使用します。追加は計約60KB、ループなし。
 別階でネズミだけ通る時や追跡中断後は鳴らさず、ミュート・途中読み込み・シークからの追い鳴きもしません。
 `/3D/cabin-audio-study.html?scenario=mouseChase` で、本編と同じ追跡処理を試聴できます。
+調理の `cook-stir`（鍋をかき混ぜて煮込む約10秒）には、静かな鍋の実録音を追加。
+4秒・約176KBのループを鍋の位置から小さく鳴らし、待機・盛り付け・中断で停止します。
+原速で、追加の合成水滴や実行時フィルターは使いません。
+`/3D/cabin-audio-study.html?scenario=simmer` で煮込みから盛り付けまで確認できます。
 
 `/3D/cabin-audio-study.html` は個別試聴と動作シナリオの確認用です。OBSと同じ
 `obs/audio.js` と `obs/sound-events.js` を使い、3D描画なしで音を確認できます。

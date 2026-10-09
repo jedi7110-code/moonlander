@@ -1,11 +1,31 @@
 # TARAIRON cabin sound effects
 
-Original library selected on 2026-10-05. There are 26 clips under **CC0 1.0 Universal**.
+Original library selected on 2026-10-05. There are 27 clips under **CC0 1.0 Universal**.
 License: https://creativecommons.org/publicdomain/zero/1.0/
 The bed lid is under the **Pixabay Content License**, not CC0.
 The user-supplied power-on edit below has an unverified license.
 No remotely streamed audio. Do not describe the complete library as CC0.
 Attribution is retained here voluntarily, including the exact source and edit recipe.
+
+## Gentle pot simmer — Joseph SARDIN / BigSoundBank, 2026-10-09
+
+- **Small Broth in a Pot**, sound #0492: a real pot simmering gently.
+- Source and explicit CC0 license, checked 2026-10-09:
+  https://bigsoundbank.com/small-broth-in-a-pot-s0492.html
+- Public MP3: https://bigsoundbank.com/UPLOAD/mp3/0492.mp3
+- `pot-simmer.mp3` SHA-256: `b7f11e07c5ab3e7f173556b3ac65365ce8a2d62bc93f0e7696f10195d1bfb3a5`.
+- Source 2.000–6.120 s → `pot-simmer.wav`: 4.0-second loop, 176,444 bytes.
+  Mono 22,050 Hz PCM16, high-pass 90 Hz / low-pass 5,000 Hz, 120 ms cosine
+  crossfade at the join, -9 dBFS peak. Original speed and pitch; no synthetic
+  bubbling, pitch sweep, time stretching or live filters. Playback gain 0.18.
+- Only the existing `cook-stir` work phase enables the loop. It stops during
+  waiting, serving, cleanup and cancellation. The source stays at the saucepan's
+  liquid surface (-10.56, 1.305, -0.17), with normal camera/deck attenuation.
+  One reused buffer/voice, independent of hand revolutions. Mute, pause and
+  hidden tabs use the existing mixer cleanup; finished cooking never replays.
+- Rebuild: `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY pot-simmer`.
+  Preview: `/3D/cabin-audio-study.html?scenario=simmer` uses the real droid
+  action speed (16 authored seconds / DROID_PACE 1.6 = 10 seconds of stirring).
 
 ## Mouse chase — recorded rat squeaks and cat chirp, 2026-10-09
 

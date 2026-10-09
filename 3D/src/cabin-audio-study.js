@@ -51,6 +51,12 @@ function start(){
     droid.job='feed';droid.carriedFood=true;droid.position={x:(CAT_BOWL.x-700)*.022+.40,y:0,z:CAT_BOWL.depth+.48};
     droid.act('food-pour',6,()=>{droid.carriedFood=false;});driver.update(1/60,state);
   }
+  if(kind==='simmer'){
+    const droid=state.droid=new DroidRoutine({care:state.care,brain:state.brain,actor:state.actor});
+    droid.job='cook';droid.position={x:-10.25,y:0,z:.66,floor:2,yaw:Math.PI};
+    // Same authored durations and DROID_PACE as planCooking in OBS.
+    droid.act('cook-stir',16);droid.act('cook-serve',3);driver.update(1/60,state);
+  }
   if(['washer','cook'].includes(kind))state.droid={position:{x:-2,y:3.4,z:-2},step:{kind:'work',action:{washer:'wash',cook:'cook-chop'}[kind],duration:6},age:0,time:0,washingUntil:kind==='washer'?6:0};
   if(kind==='droidWalk')state.droid={position:{x:-2,y:3.4,z:.78},step:{kind:'walk'},walkDistance:0,age:0,time:0,washingUntil:0};
   if(kind.startsWith('miloClimb')){
@@ -80,13 +86,14 @@ function tick(now){
   if(r.kind==='walk'){s.actor.busy=t<4;if(s.actor.busy){s.actor.walkDistance+=dt*48;s.actor.x+=dt*48;}}
   if(r.kind.startsWith('miloClimb'))s.actor.update(dt);
   if(r.kind==='droidWalk'){s.droid.waiting=t>=4;if(!s.droid.waiting){const travel=dt*DROID_GAIT.speed*DROID_PACE;s.droid.walkDistance+=travel;s.droid.position.x+=travel;}}
-  if(['washerDoor','feed'].includes(r.kind))s.droid.update(dt);
+  if(['washerDoor','feed','simmer'].includes(r.kind))s.droid.update(dt);
   else if(s.droid){s.droid.time=t;s.droid.age=Math.min(t,s.droid.step?.duration??6);if(r.kind==='droidClimb')s.droid.position.y=Math.min(3.392,t*.40*DROID_PACE);if(t>=(s.droid.step?.duration??6))s.droid.step=null;}
   if(r.kind==='mouseChase')s.cat.update(dt);
   else if(s.cat)s.cat.motion.update(dt);
   if(s.care.delivery){s.care.delivery.age=t;if(t>3.3)s.care.phase='idle';}
   r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.cat?.mouseChase?.pose?.phase??s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.bathroom?.phase??s.droid?.step?.action??s.care.phase}`;
-  if(['washerDoor','feed'].includes(r.kind)&&!s.droid.step){stop();return;}
+  if(['washerDoor','feed','simmer'].includes(r.kind)&&!s.droid.step){stop();return;}
+  if(r.kind==='simmer'){frame=requestAnimationFrame(tick);return;}
   if(r.kind==='mouseChase'){
     if(!s.cat.mouseChase.sim.active||t>45){stop();return;}
     frame=requestAnimationFrame(tick);return;

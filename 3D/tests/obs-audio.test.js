@@ -81,7 +81,7 @@ test('local assets are compact mono PCM, finite, non-silent, bounded and loop se
     const peak=Math.max(...data.map(Math.abs));assert.ok(peak>.3&&peak<.36);
     if(definition.loop)assert.ok(Math.abs(data[0]-data.at(-1))<.15,`${definition.file} seam`);
   }
-  assert.ok(total<1360000,`ships ${total} bytes, including 50 KB lighting, 170 KB bed and 133 KB kibble edits, not entire source packs`);
+  assert.ok(total<1540000,`ships ${total} bytes, including short mechanism, animal and 176 KB simmer edits, not entire source packs`);
 });
 test('bed piston and slide are short faded recordings, without live loops or filters',async()=>{
   const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
@@ -879,8 +879,82 @@ test('the feed study runs the real routine at OBS pace and offers a separate kib
   const html=await readFile(new URL('../src/cabin-audio-study.html',import.meta.url),'utf8');
   const js=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
   assert.match(html,/猫餌の袋 ＋ カリカリを皿へ/);assert.match(js,/droid\.act\('food-pour',6/);
-  assert.match(js,/\['washerDoor','feed'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
+  assert.match(js,/\['washerDoor','feed','simmer'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
   assert.match(CABIN_SOUNDS.kibblePour.label,/カリカリを皿へ/);
+});
+test('simmer is a compact native-speed recording with a quiet gain and a continuous loop join',async()=>{
+  const definition=CABIN_SOUNDS.simmer,file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));
+  assert.equal(file.length,176444);assert.equal((file.length-44)/44100,4);
+  assert.equal(definition.gain,.18);assert.equal(definition.loop,true);assert.equal(definition.rate,undefined);
+  const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+  const energy=samples=>Math.sqrt(samples.reduce((sum,value)=>sum+value*value,0)/samples.length);
+  const head=energy(data.slice(0,2205)),tail=energy(data.slice(-2205)),body=energy(data);
+  assert.ok(head>body*.2&&tail>body*.2,'no silence baked into the loop boundary');
+  assert.ok(Math.abs(data[0]-data.at(-1))<.05,'no click at the join');
+  const credits=await readFile(new URL('../public/assets/obs/audio/CREDITS.md',import.meta.url),'utf8');
+  assert.match(credits,/small-broth-in-a-pot-s0492\.html/);
+  const packer=await readFile(new URL('../studies/audio/pack-cabin-audio.mjs',import.meta.url),'utf8');
+  assert.match(packer,/\['pot-simmer','pot-simmer\.mp3',2,4\.12,true,false,'highpass=f=90,lowpass=f=5000'\]/);
+});
+test('the real cooking plan simmers once at the pot, only during stirring at 30, 60 and 120 fps',()=>{
+  for(const fps of [30,60,120]){
+    const h=harness(),dt=1/fps;h.state.care=new Supplies();
+    const droid=h.state.droid=new DroidRoutine({care:h.state.care,brain:h.state.brain,actor:h.state.actor});
+    droid.job='cook';droid.position={x:-9.75,y:0,z:.66,floor:2,yaw:Math.PI};droid.plan={...droid.position};droid.planCooking();
+    h.driver.update(dt,h.state);
+    let previous=false,starts=0,stops=0,seconds=0;const phases=new Set();
+    for(let frame=0;frame<fps*90&&droid.step;frame++){
+      droid.update(dt);h.driver.update(dt,h.state);
+      const action=droid.step?.action,loop=h.loops.get('pot-simmer');phases.add(action);
+      assert.equal(loop.active,action==='cook-stir'&&!droid.waiting);
+      if(loop.active){
+        seconds+=dt;assert.equal(loop.id,'simmer');
+        assert.deepEqual(loop.position,{x:-10.56,y:1.075+.23,z:-.17});
+        assert.notEqual(loop.position.x,droid.position.x,'the pot, not the robot, is the source');
+        if(!previous)starts++;
+      }else if(previous)stops++;
+      previous=loop.active;
+    }
+    assert.equal(droid.step,null);assert.equal(starts,1);assert.equal(stops,1);
+    assert.ok(Math.abs(seconds-16/DROID_PACE)<=dt+1e-6);
+    for(const phase of ['cook-chop','cook-stir','cook-serve','cook-cleanup'])assert.ok(phases.has(phase));
+    assert.ok(h.events.some(event=>event.id==='chop'),'existing chopping remains');
+    assert.equal(h.events.some(event=>event.id==='simmer'),false,'not a one-shot per stir');
+  }
+});
+test('waiting, serving, cancellation and missing droids cannot leave the simmer running',()=>{
+  const h=harness(),droid={position:{x:-10.25,y:0,z:.66},step:{kind:'work',action:'cook-stir',duration:10},age:1};
+  h.state.droid=droid;
+  const active=()=>{h.driver.update(1/60,h.state);return h.loops.get('pot-simmer').active;};
+  assert.equal(active(),true);droid.waiting=true;assert.equal(active(),false);
+  droid.waiting=false;assert.equal(active(),true);
+  for(const action of ['cook-chop','cook-serve','cook-cleanup','food-pour']){droid.step.action=action;assert.equal(active(),false);}
+  droid.step.action='cook-stir';assert.equal(active(),true);droid.step=null;assert.equal(active(),false);
+  h.state.droid=null;assert.equal(active(),false);
+});
+test('simmer reuses one voice and stops on mute or pause without restarting a completed phase',async()=>{
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  const h=harness();h.driver=new CabinSoundEvents(audio);
+  h.state.droid={position:{x:-10.25,y:0,z:.66},step:{kind:'work',action:'cook-stir',duration:10},age:1};
+  try{
+    await audio.toggle();await audio.load();const before=ctx.created.length;
+    h.driver.update(1/60,h.state);const voice=audio.loops.get('pot-simmer');assert.ok(voice);
+    assert.equal(voice.source.loop,true);assert.equal(voice.source.playbackRate.value,1);
+    for(let i=0;i<600;i++)h.driver.update(1/60,h.state);
+    assert.equal(audio.loops.get('pot-simmer'),voice);assert.equal(ctx.created.length-before,3);
+    audio.pause(true);h.driver.update(1/60,h.state);assert.equal(audio.loops.size,0);assert.equal(voice.stopping,true);
+    voice.source.onended();audio.pause(false);h.driver.update(1/60,h.state);
+    const resumed=audio.loops.get('pot-simmer');assert.ok(resumed);
+    await audio.toggle();resumed.source.onended();assert.equal(audio.loops.size,0);
+    h.state.droid.step.action='cook-serve';h.driver.update(1/60,h.state);
+    await audio.toggle();h.driver.update(1/60,h.state);assert.equal(audio.loops.size,0);
+  }finally{audio.dispose();}
+});
+test('simmer study previews actual stir and serve phases instead of a synthetic timer',async()=>{
+  const page=await readFile(new URL('../src/cabin-audio-study.html',import.meta.url),'utf8');
+  const source=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
+  assert.match(page,/<option value="simmer">/);assert.match(source,/droid\.act\('cook-stir',16\);droid\.act\('cook-serve',3\)/);
+  assert.match(source,/\['washerDoor','feed','simmer'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
 });
 test('disposal during an in-flight download aborts and cannot repopulate the cache',async()=>{
   let release;const pending=new Promise(resolve=>release=resolve),ctx=context();

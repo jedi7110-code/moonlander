@@ -11,6 +11,8 @@ const station=(id,z=-1.5)=>{const s=getStation(id);return{x:(s.x-700)*.022,y:(87
 const locations={shower:station('shower',-2.8),toilet:station('toilet',-2.8),hatch:station('hatch'),inner:{x:(EVA_PASSAGE.x-700)*.022,y:(870-FLOORS[EVA_PASSAGE.floor].y)*.016+1,z:.78},washer:{x:-2.34,y:(870-FLOORS[1].y)*.016+.8,z:-3.73}};
 const wasteLocation={x:WASTE_INCINERATOR.x,y:(870-FLOORS[WASTE_INCINERATOR.floor].y)*.016+.6,z:WASTE_INCINERATOR.z};
 const bowlLocation={x:(CAT_BOWL.x-700)*.022,y:(870-FLOORS[CAT_BOWL.floor].y)*.016+CAT_BOWL.foodHeight,z:CAT_BOWL.depth};
+// Permanent saucepan in createDroidServiceRig, at its liquid surface, not the robot.
+const potLocation={x:-10.56,y:1.075+.23,z:-.17};
 const catDoorLocations=FLOORS.map(floor=>({x:(CAT_PORT.x-700)*.022,y:(870-floor.y)*.016+.045+CAT_PORT.height/2,z:CAT_PORT.wallZ+.055}));
 const catVocalModes=new Set(['look','prone','walk','follow','fetch','idle']);
 const chaseMouseCues=[{age:.65,id:'mouseSqueak1'},{age:2.8,id:'mouseSqueak2'}];
@@ -146,6 +148,9 @@ export class CabinSoundEvents {
     // One recorded stream at the bowl, independent of the approved bag rustle.
     // Reuse the voice while active; no source or random sound per visible grain.
     audio.setLoop('kibble-pour','kibblePour',Boolean(pouring),{position:bowlLocation});
+    // One shared recording while stirring; chopping, serving and a removed or
+    // interrupted robot cannot leave a simmer loop running on the idle hob.
+    audio.setLoop('pot-simmer','simmer',droid?.step?.action==='cook-stir'&&!droid.waiting,{position:potLocation});
     audio.setLoop('shower','shower',bathroom?.id==='shower'&&bathroom.phase==='use',{position:locations.shower});
     if(bathroom===this.previousBathroom&&bathroom?.id==='toilet'&&this.previousBathroomPhase==='use'&&bathroom.phase==='reopen')audio.play('flush',{position:locations.toilet});
     this.previousBathroom=bathroom;this.previousBathroomPhase=bathroom?.phase;

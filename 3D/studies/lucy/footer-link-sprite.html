@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>Lucy footer sprite render</title>
+<style>html,body{margin:0;width:400px;height:498px;overflow:hidden;background:transparent}canvas{display:block;width:400px;height:498px}</style>
+<canvas width="400" height="498"></canvas>
+<script type="importmap">{"imports":{"three":"/3D/node_modules/three/build/three.module.js","three/addons/":"/3D/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createLucy,animateLucy} from '/3D/src/obs/lucy.js';
+import {addLucyWhiskerPads} from '/3D/studies/lucy/whisker-pads.js';
+import {addLucyPupilShape} from '/3D/studies/lucy/pupil-study.js';
+import {createLucyToon} from '/3D/src/obs/lucy-toon.js';
+
+const canvas=document.querySelector('canvas');
+const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,stencil:true,preserveDrawingBuffer:true});
+renderer.setSize(400,498,false);
+renderer.setPixelRatio(1);
+renderer.setClearColor(0x000000,0);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff,0x303943,2.25));
+const key=new THREE.DirectionalLight(0xfff5e9,2.3);key.position.set(-2,4,5);scene.add(key);
+const rim=new THREE.DirectionalLight(0xc7dbe1,.65);rim.position.set(3,2,-4);scene.add(rim);
+const gltf=await new GLTFLoader().loadAsync('/review/outline-study.glb');
+const cat=createLucy(gltf,{random:()=>.5});scene.add(cat);
+addLucyWhiskerPads(cat);addLucyPupilShape(cat);
+animateLucy(cat,{dt:.1,time:3,actionTime:3,mode:'look',remaining:100,yaw:0});
+const toon=createLucyToon(cat,{thresholds:[.8,1.3]});
+const camera=new THREE.OrthographicCamera(-.48,.48,.5976,-.5976,.01,20);
+const target=new THREE.Vector3(0,.235,0);
+window.renderDirection=(index)=>{
+  const az=index*Math.PI/4;
+  camera.position.copy(target).add(new THREE.Vector3(Math.sin(az)*3,.48,Math.cos(az)*3));
+  camera.lookAt(target);camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
+  cat.updateMatrixWorld(true);
+  const hip=cat.getObjectByName('pelvis').getWorldPosition(new THREE.Vector3());
+  const shoulder=cat.getObjectByName('Bone002').getWorldPosition(new THREE.Vector3());
+  // The midpoint of the torso rig is the turn axis, independent of the tail.
+  const body=hip.lerp(shoulder,.5).project(camera);
+  window.bodyPivotPx={x:(body.x+1)*200,y:(1-body.y)*249};
+  toon.update(400,498);renderer.render(scene,camera);
+  document.body.dataset.direction=String(index);
+  return canvas.toDataURL('image/png');
+};
+window.renderDirection(0);
+document.body.dataset.ready='true';
+</script></html>

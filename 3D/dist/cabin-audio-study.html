@@ -2,13 +2,13 @@
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TARAIRON | 船内SEスタディー</title>
 <style>
 :root{color-scheme:dark;font:15px system-ui,sans-serif;background:#151c20;color:#dce5e3}*{box-sizing:border-box}body{margin:0}main{max-width:1100px;margin:0 auto;padding:38px 24px}header{border-bottom:1px solid #3b4c50;padding-bottom:24px;margin-bottom:26px}small{letter-spacing:.18em;color:#89b9b5}h1{font-size:30px;margin:10px 0}h2{font-size:18px;margin:28px 0 14px}p{line-height:1.8;color:#b2c1c2}button,a,select{font:inherit}button,select{border:1px solid #57706f;border-radius:5px;padding:12px 16px;background:#243338;color:#ecf3f2;cursor:pointer}button:disabled{opacity:.4;cursor:wait}button:hover:not(:disabled){background:#34514f}button[aria-pressed=true]{background:#527e74}a{color:#abd4ca}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:12px}.card{background:#1e2a2e;border:1px solid #36464a;border-radius:6px;padding:17px}.card b{display:block;margin-bottom:8px;font-size:15px}.card p{margin:0 0 14px;font-size:12px}.card button{width:100%;padding:8px}#status{padding:16px;background:#0d1417;border-left:3px solid #86b5a1;font:13px ui-monospace,monospace;margin:20px 0}#scene-state{min-height:55px}footer{margin-top:32px;font-size:12px;color:#9dafb1}
-</style>  <script type="module" crossorigin src="/3D/assets/cabinAudioStudy-D21R6BWl.js"></script>
+</style>  <script type="module" crossorigin src="/3D/assets/cabinAudioStudy-CFv3j_fx.js"></script>
   <link rel="modulepreload" crossorigin href="/3D/assets/three-QTzUF3zZ.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-DNfABVdX.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/materials-BSxp4dZ1.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/bathroom-lighting-BkdBIO7x.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/cat-rest-CR2Togz-.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/droid-routine-CGbtaJoq.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/droid-routine-Vsbzg9qt.js">
 </head><body><main>
 <header><small>TARAIRON / CABIN SOUND STUDY 01</small><h1>船内の音を、動作に合わせる。</h1><p>OBSと同じ音源・再生処理・動作判定。まず「音声オン」、次に個別の音か動作を選んでください。<br>大音量の警報や常時鳴る効果は加えず、短い機械音と生活音を中心にしています。</p><div class="row"><button id="enable" aria-pressed="false">音声オン</button><button id="stop">すべて停止</button><a href="./obs.html">OBS本編へ</a></div></header>
 <div id="status" role="status">未読み込み / 音声をオンにするまで音源通信なし</div>
@@ -30,6 +30,7 @@
 <option value="delivery">補給ハッチ：受け取り</option>
 <option value="feed">ドロイド：猫餌の袋 ＋ カリカリを皿へ</option>
 <option value="cook">ドロイド：食材を刻む</option>
+<option value="simmer">ドロイド：鍋で煮込む → 盛り付け（煮込み音停止）</option>
 </select><button id="run" disabled>動作を試聴</button></div>
 <p id="scene-state">シナリオを選択。ブラウザを別タブにすると再生を停止します。</p>
 <h2>音源ライブラリー</h2><div id="library" class="grid"></div>
