@@ -8,6 +8,7 @@ import {CAT_PORT,CAT_BOWL,LADDER_X} from './obs/layout.js';
 import {planDroidTurn} from './obs/droid-turn.js';
 import {DroidRoutine,DROID_PACE} from './obs/droid-routine.js';
 import {DROID_GAIT} from './obs/pace.js';
+import {bindCabinAudioGestures} from './obs/audio-unlock.js';
 const $=id=>document.getElementById(id),audio=new CabinAudio({ambience:false});
 let running=null,previous=0,previewTimer=null,frame=null;
 function status(){const s=audio.stats;$('status').textContent=`${audio.enabled?'音声 ON':'音声 OFF'} / 読み込み ${s.loaded} / ${s.total} / 発音 ${s.active} / ループ ${s.loops} / エラー ${s.failed}`;}
@@ -21,16 +22,17 @@ $('enable').addEventListener('click',async()=>{
   finally{$('enable').disabled=false;}
 });
 $('stop').addEventListener('click',stop);
+const unbindAudioGestures=bindCabinAudioGestures(audio,{ignore:event=>Boolean(event.target?.closest?.('#enable'))});
 for(const [id,definition]of Object.entries(CABIN_SOUNDS)){
   const card=document.createElement('article');card.className='card';
   const title=document.createElement('b');title.textContent=definition.label;
   const detail=document.createElement('p');detail.textContent=`${definition.description?definition.description+' · ':''}${definition.loop?'ループ / 試聴は4秒':'単発'} · mono WAV · ${definition.license??'CC0'}`;
   const button=document.createElement('button');button.textContent='試聴';button.dataset.sound=id;button.disabled=true;
-  button.addEventListener('click',()=>{stop();audio.pause(false);if(definition.loop)audio.setLoop('preview',id,true);else audio.play(id);$('scene-state').textContent=`個別試聴：${definition.label}`;status();previewTimer=setTimeout(()=>{audio.stopLoop('preview');status();},4000);});
+  button.addEventListener('click',()=>{stop();audio.pause(false);audio.unlock();if(definition.loop)audio.setLoop('preview',id,true);else audio.play(id);$('scene-state').textContent=`個別試聴：${definition.label}`;status();previewTimer=setTimeout(()=>{audio.stopLoop('preview');status();},4000);});
   card.append(title,detail,button);$('library').append(card);
 }
 function start(){
-  stop();audio.pause(false);
+  stop();audio.pause(false);audio.unlock();
   const kind=$('scenario').value,state={actor:{x:700,y:650,floor:1,walkDistance:0,queue:[],busy:false},brain:{},care:{phase:'idle'},airlock:{opening:0}};
   const driver=new CabinSoundEvents(audio);driver.update(1/60,state);
   if(['shower','toilet'].includes(kind))state.brain.bathroom=new BathroomVisit(kind);
@@ -80,4 +82,4 @@ function tick(now){
 }
 $('run').addEventListener('click',start);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){stop();audio.pause(true);}else audio.pause(false);});
-window.addEventListener('pagehide',()=>{stop();audio.dispose();});
+window.addEventListener('pagehide',event=>{stop();if(!event.persisted){unbindAudioGestures();audio.dispose();}});

@@ -13,6 +13,7 @@ import {bindStartupLightingInput,activateStartupLighting} from './startup-input.
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
 import {CabinSoundEvents} from './sound-events.js';
+import {bindCabinAudioGestures} from './audio-unlock.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
 import {AirlockPassage} from './airlock.js';
 import {Sprout} from 'lucide';
@@ -44,7 +45,7 @@ const needOrders={
   bladder:{station:'toilet',icon:'toilet',label:['トイレへ行く','Use the toilet'],detail:['トイレを使用して回復します。','Restore this level by using the toilet.']},
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
-const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio();
+const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true});
 const soundEvents=new CabinSoundEvents(audio);
 // Lucy's grooming correction cache arrives after the cabin is on screen.
 cat.groomAvailable=false;
@@ -287,6 +288,11 @@ $('obs-sound').addEventListener('click',async()=>{
   catch{showMessage(words('このブラウザでは船内音を再生できません。','Audio is unavailable in this browser.'),'SYSTEM');}
   finally{button.disabled=false;}
 });
+const unbindAudioGestures=bindCabinAudioGestures(audio,{
+  // Tapping an initially-on mute button must not briefly start the sound first.
+  ignore:event=>Boolean(event.target?.closest?.('#obs-sound')),
+  onError:()=>showMessage(words('音声を開始できませんでした。もう一度タップしてください。','Tap again to start cabin audio.'),'SYSTEM'),
+});
 $('obs-chat').addEventListener('submit',event=>{
   event.preventDefault();const text=$('obs-input').value.trim();if(!text)return;const version=actor.commandVersion;
   let reply;
@@ -338,10 +344,14 @@ document.addEventListener('keydown',event=>{
 });
 function visibilityChanged(){previous=performance.now();accumulator=0;audio.pause((immersive?.active?!immersive.visible:document.hidden)||paused||games.open);}
 document.addEventListener('visibilitychange',visibilityChanged);
+window.addEventListener('pageshow',visibilityChanged);
 refreshIcons();localize();
 
 async function start(){
   try{
+    // Decode beside the 3D startup so the first lighting/bed stroke is ready.
+    // The mixer remains silent until a real input gesture unlocks it.
+    if(audio.enabled){try{audio.prepare();void audio.load();}catch(error){console.warn('Cabin audio preparation failed.',error);}}
     view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true});
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     view.feedback=feedback;
@@ -383,7 +393,7 @@ async function start(){
     });
     $('lighting-hint').hidden=false;
     loadCabinLucyGroomCache(view.cat).then(()=>{cat.groomAvailable=true;},error=>console.warn('Lucy grooming correction unavailable; grooming stays off.',error));
-    view.onSceneActivate=()=>activateStartupLighting(view.startupLighting,{audio,onActivate:()=>{brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}});
+    view.onSceneActivate=()=>{try{audio.unlock();}catch(error){console.warn('Cabin audio activation failed.',error);}return activateStartupLighting(view.startupLighting,{audio,onActivate:()=>{brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}});};
     unbindStartupLighting=bindStartupLightingInput($('ship-view'),()=>view.onSceneActivate());
     previous=performance.now();
     let firstVisibleFrame=true;
@@ -409,5 +419,5 @@ async function start(){
   }catch(error){console.error(error);$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
 }
 $('ship-view').addEventListener('webglcontextlost',event=>{event.preventDefault();setPause(true);$('obs-error').hidden=false;$('obs-error').textContent=words('映像接続が中断されました。ページを再読み込みしてください。','Graphics connection interrupted. Please reload the page.');});
-window.addEventListener('pagehide',event=>{if(!event.persisted){unbindStartupLighting?.();unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
+window.addEventListener('pagehide',event=>{audio.pause(true);if(!event.persisted){unbindAudioGestures();unbindStartupLighting?.();unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
 start();

@@ -24,6 +24,52 @@ function context(){
 }
 const response=()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)});
 const soundCount=Object.keys(CABIN_SOUNDS).length;
+test('default-on OBS may preload while locked, then a first gesture resumes and primes once',async()=>{
+  const ctx=context();let resumes=0,starts=0;
+  ctx.resume=async()=>{resumes++;ctx.state='running';};
+  const audio=new CabinAudio({enabled:true,ambience:false,createContext:()=>ctx,fetchAudio:async()=>response(),
+    playbackSession:{start(){starts++;},pause(){},dispose(){}}});
+  audio.prepare();await audio.load();
+  assert.equal(audio.enabled,true);assert.equal(audio.audible,false);assert.equal(audio.master.gain.value,0);
+  assert.equal(resumes,0);assert.equal(starts,0);assert.equal(audio.play('powerOn'),null);
+  audio.pause(true);audio.pause(false);assert.equal(resumes,0,'returning before a first gesture cannot auto-play');
+  const before=ctx.created.length;audio.unlock();
+  assert.equal(resumes,1);assert.equal(audio.audible,true);assert.equal(audio.master.gain.value,.55);
+  assert.equal(ctx.created.length,before+1,'one silent prime only');
+  audio.unlock();audio.unlock();assert.equal(ctx.created.length,before+1);assert.equal(resumes,1);
+  assert.ok(audio.play('powerOn'));audio.dispose();
+});
+test('a pending iPhone resume cannot hang the toggle, mute, loading or next-gesture retry',async()=>{
+  const ctx=context();let resumes=0;
+  ctx.resume=()=>{resumes++;return new Promise(()=>{});};
+  const audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  assert.equal(await audio.toggle(),true);await audio.load();
+  assert.equal(audio.stats.loaded,soundCount);assert.equal(resumes,1);assert.equal(audio.audible,false);
+  assert.equal(await audio.toggle(),false);audio.unlock();assert.equal(resumes,1,'muted gestures never enable sound');
+  assert.equal(await audio.toggle(),true);assert.equal(resumes,2);
+  ctx.resume=async()=>{resumes++;ctx.state='running';};audio.unlock();assert.equal(audio.audible,true);
+  assert.equal(resumes,3);audio.dispose();
+});
+test('interrupted audio resumes on foreground or next touch but never replays old one-shots',async()=>{
+  const ctx=context();let resumes=0,paused=0;
+  ctx.resume=async()=>{resumes++;ctx.state='running';};
+  const audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false,
+    playbackSession:{start(){},pause(){paused++;},dispose(){}}});
+  await audio.toggle();await audio.load();ctx.state='interrupted';
+  assert.equal(audio.play('bedPiston'),null);
+  audio.pause(true);assert.equal(paused,1);audio.pause(false);
+  assert.equal(resumes,2);assert.equal(audio.audible,true);assert.equal(audio.voices.size,0);
+  ctx.state='interrupted';audio.unlock();assert.equal(resumes,3);
+  await audio.toggle();audio.pause(true);audio.pause(false);audio.unlock();
+  assert.equal(resumes,3);assert.equal(audio.enabled,false);assert.equal(audio.master.gain.value,0);audio.dispose();
+});
+test('a rejected resume is handled and can retry without changing the enabled preference',async()=>{
+  const ctx=context(),errors=[];ctx.resume=()=>Promise.reject(new Error('NotAllowedError'));
+  const audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  audio.onError=error=>errors.push(error.message);await audio.toggle();await Promise.resolve();
+  assert.deepEqual(errors,['NotAllowedError']);assert.equal(audio.enabled,true);
+  ctx.resume=async()=>{ctx.state='running';};audio.unlock();assert.equal(audio.audible,true);audio.dispose();
+});
 test('local assets are compact mono PCM, finite, non-silent, bounded and loop seams are smooth',async()=>{
   let total=0;
   const credits=await readFile(new URL('../public/assets/obs/audio/CREDITS.md',import.meta.url),'utf8');

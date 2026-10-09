@@ -1,18 +1,20 @@
 import {CABIN_SOUNDS,CABIN_AUDIO_BASE} from './sound-library.js';
 import {PLANT,FLOORS} from './layout.js';
+import {CabinPlaybackSession} from './audio-unlock.js';
 
 const clamp=value=>Math.max(0,Math.min(1,value));
 const smooth=value=>{const t=clamp(value);return t*t*(3-2*t);};
 const plantFan={x:(PLANT.x-700)*.022+2.03,y:(870-FLOORS[PLANT.floor].y)*.016+2.18,z:-.65};
 
 export class CabinAudio {
-  constructor({createContext=()=>{const Context=globalThis.AudioContext||globalThis.webkitAudioContext;return Context?new Context():null;},fetchAudio=(...args)=>fetch(...args),ambience=true}={}){
-    this.enabled=false;this.paused=false;this.context=null;this.createContext=createContext;this.fetchAudio=fetchAudio;
+  constructor({createContext=()=>{const Context=globalThis.AudioContext||globalThis.webkitAudioContext;return Context?new Context():null;},fetchAudio=(...args)=>fetch(...args),ambience=true,enabled=false,playbackSession=new CabinPlaybackSession()}={}){
+    this.enabled=enabled;this.unlocked=false;this.paused=false;this.context=null;this.createContext=createContext;this.fetchAudio=fetchAudio;
+    this.playbackSession=playbackSession;
     this.buffers=new Map();this.voices=new Set();this.loops=new Map();this.failures=[];this.disposed=false;
     this.ambience=ambience;
     this.listener={x:0,y:3.4,z:1,rightX:1,rightY:0,rightZ:0,overview:true,focus:0};
   }
-  async toggle(){
+  prepare(){
     if(this.disposed)return false;
     if(!this.context){
       this.context=this.createContext();if(!this.context)throw new Error('Web Audio unavailable');
@@ -28,14 +30,40 @@ export class CabinAudio {
       fan.connect(filter).connect(this.fanGain).connect(this.ambientGain);fan.start();this.update();
       }
     }
+    return true;
+  }
+  unlock({gesture=true}={}){
+    if(this.disposed||!this.enabled||this.paused)return false;
+    // Only an input gesture may start a fresh page's audio. Restoration is
+    // allowed after activation, but never changes the user's on/off choice.
+    if(!gesture&&!this.unlocked)return false;
+    this.prepare();this.playbackSession.start();
+    const needsResume=this.context.state!=='running';
+    if(gesture&&(!this.unlocked||needsResume)){
+      const prime=this.context.createBufferSource();
+      prime.buffer=this.context.createBuffer(1,1,this.context.sampleRate);
+      prime.connect(this.context.destination);prime.onended=()=>prime.disconnect();prime.start();
+    }
+    this.unlocked=true;
+    // Do not await: iOS can leave resume pending until another touchend. A
+    // pending promise must never disable the mute button or block downloads.
+    if(needsResume){
+      try{this.context.resume()?.catch(error=>{if(!this.disposed)this.onError?.(error);});}
+      catch(error){this.onError?.(error);}
+    }
+    void this.load();this.syncMaster();return true;
+  }
+  async toggle(){
+    if(this.disposed)return false;
     this.enabled=!this.enabled;
     if(this.enabled){
-      try{await this.context.resume();}catch(error){this.enabled=false;throw error;}
-      if(!this.disposed)void this.load();
-    }else this.stopAll();
+      try{this.prepare();this.unlock();void this.load();}
+      catch(error){this.enabled=false;this.syncMaster();throw error;}
+    }else{this.stopAll();this.playbackSession.pause();}
     this.syncMaster();return this.enabled;
   }
-  // No audio network or decoding work before the explicit sound-on gesture.
+  // OBS preloads while connecting (enabled by default); manual studies remain
+  // lazy until enabled. No playback, media-session claim or resume in load().
   // Three concurrent fetches, one decode per local file, no delayed one-shot queue.
   load(){
     if(this.loading)return this.loading;
@@ -53,9 +81,9 @@ export class CabinAudio {
     };
     this.loading=Promise.all([worker(),worker(),worker()]);return this.loading;
   }
-  get audible(){return this.enabled&&!this.paused&&!this.disposed&&this.context?.state==='running';}
+  get audible(){return this.enabled&&this.unlocked&&!this.paused&&!this.disposed&&this.context?.state==='running';}
   get stats(){return{loaded:this.buffers.size,total:Object.keys(CABIN_SOUNDS).length,active:this.voices.size,loops:this.loops.size,failed:this.failures.length};}
-  syncMaster(){if(this.context&&!this.disposed)this.master.gain.setTargetAtTime(this.enabled&&!this.paused?.55:0,this.context.currentTime,.08);}
+  syncMaster(){if(this.context&&!this.disposed)this.master.gain.setTargetAtTime(this.enabled&&this.unlocked&&!this.paused?.55:0,this.context.currentTime,.08);}
   get focus(){return this.listener.overview?clamp(this.listener.focus??0):1;}
   setViewListener(camera,view,firstPerson=false){
     const e=camera.matrixWorld.elements;
@@ -116,6 +144,11 @@ export class CabinAudio {
     if(this.fanGain)this.fanGain.gain.setTargetAtTime(.012+.028*this.spatial(plantFan).gain,this.context.currentTime,.4);
     // Condensate drops remain visual only; no synthetic pitched water plips.
   }
-  pause(paused){this.paused=Boolean(paused);if(this.paused)this.stopAll();this.syncMaster();}
-  dispose(){this.stopAll();this.disposed=true;this.enabled=false;this.abort?.abort();this.buffers.clear();this.loops.clear();this.voices.clear();this.context?.close();}
+  pause(paused){
+    const wasPaused=this.paused;this.paused=Boolean(paused);
+    if(this.paused){this.stopAll();this.playbackSession.pause();}
+    else if(wasPaused&&this.enabled&&this.unlocked)this.unlock({gesture:false});
+    this.syncMaster();
+  }
+  dispose(){this.stopAll();this.disposed=true;this.enabled=false;this.playbackSession.dispose();this.abort?.abort();this.buffers.clear();this.loops.clear();this.voices.clear();this.context?.close();}
 }
