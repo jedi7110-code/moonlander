@@ -1,11 +1,40 @@
 # TARAIRON cabin sound effects
 
-Original library selected on 2026-10-05. There are 23 clips under **CC0 1.0 Universal**.
+Original library selected on 2026-10-05. There are 26 clips under **CC0 1.0 Universal**.
 License: https://creativecommons.org/publicdomain/zero/1.0/
 The bed lid is under the **Pixabay Content License**, not CC0.
 The user-supplied power-on edit below has an unverified license.
 No remotely streamed audio. Do not describe the complete library as CC0.
 Attribution is retained here voluntarily, including the exact source and edit recipe.
+
+## Mouse chase — recorded rat squeaks and cat chirp, 2026-10-09
+
+- Rat: Zabuhailo — **ratSqueak.wav**, recorded pet rat, not a synthesizer or mouth imitation.
+  Source and CC0 license: https://freesound.org/people/Zabuhailo/sounds/143125/
+  Public HQ preview: https://cdn.freesound.org/previews/143/143125_2580450-hq.mp3
+  `rat-squeaks.mp3` SHA-256: `2f6d2447616474a89617db231600ed1d3947da499cde8a2304ba127667491937`.
+  These rat recordings represent the fictional cabin mouse; not a house-mouse recording.
+  - 6.840–7.180 s → `mouse-squeak-1.wav`: 0.34 s, 15,038 bytes, gain 0.12.
+  - 7.780–8.160 s → `mouse-squeak-2.wav`: 0.38 s, 16,802 bytes, gain 0.10.
+  High-pass 1,000 Hz / low-pass 9,000 Hz to reduce handling and background noise.
+- Cat: dreamstobecome — **cat chirp.wav**, Queen Felicia's quiet chirping.
+  Source and CC0 license: https://freesound.org/people/dreamstobecome/sounds/451250/
+  Public HQ preview: https://cdn.freesound.org/previews/451/451250_7758073-hq.mp3
+  `cat-chirps.mp3` SHA-256: `be493a43c91b5078eeaf8d08010382e7dec64e2d96197132bf2c26af048c6ab4`.
+  6.320–6.960 s → `cat-chase-chirp.wav`: 0.64 s, 28,268 bytes, gain 0.18.
+  High-pass 180 Hz / low-pass 7,500 Hz. A contented domestic-cat voice adapted
+  for Lucy noticing the mouse, not a recording of an actual hunt.
+- Both source pages declare CC0, checked 2026-10-09. Three short edits total
+  60,108 bytes; originals remain outside the repository. Mono 22,050 Hz PCM16,
+  4 ms attack / 45 ms release, -9 dBFS peak. No stretching, pitch change,
+  synthetic layer, repeated syllables or live audio filters.
+- One cat chirp at `notice`, two different squeaks at 0.65 and 2.8 seconds of
+  the visible mouse's `run` phase. Cancellation and mouse-only crossings stay
+  silent. Calls use each animal's own position and the existing distance/deck
+  attenuation. Mute, late loading, pauses and seeks cannot queue old calls.
+- Rebuild (the packer checks both source hashes):
+  `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY mouse-squeak-1 mouse-squeak-2 cat-chase-chirp`.
+  Preview: `/3D/cabin-audio-study.html?scenario=mouseChase`.
 
 ## User-supplied Glitch 13 — cabin lighting starter, 2026-10-09
 

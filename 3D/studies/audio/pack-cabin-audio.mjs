@@ -2,7 +2,8 @@
 // downloaded/extracted CC0 sources named in public/assets/obs/audio/CREDITS.md.
 // No original multi-minute recordings or complete source packs are shipped.
 import {spawnSync} from 'node:child_process';
-import {mkdir,writeFile,rename,rm} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,rename,rm} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 
@@ -28,8 +29,16 @@ const recipes=[
   ['bag','foley/sfx-cc0/plastic-bag-pickup-01.wav',0,1.5],
   ['kibble-pour','cat-biscuit-pour.mp3',.60,3.12,true,false,'highpass=f=140,lowpass=f=6000'],
   ['cat-meow','cat-meow.mp3',0,1.544,false,true,'highpass=f=100,lowpass=f=6500'],
+  // Actual pet rat squeaks and a short recorded cat chirp, at native speed.
+  ['mouse-squeak-1','rat-squeaks.mp3',6.84,.34,false,true,'highpass=f=1000,lowpass=f=9000'],
+  ['mouse-squeak-2','rat-squeaks.mp3',7.78,.38,false,true,'highpass=f=1000,lowpass=f=9000'],
+  ['cat-chase-chirp','cat-chirps.mp3',6.32,.64,false,true,'highpass=f=180,lowpass=f=7500'],
   ['chop','foley/sfx-cc0/apple-cut-01.wav',0,1.2],
 ];
+const sourceHashes={
+  'rat-squeaks.mp3':'2f6d2447616474a89617db231600ed1d3947da499cde8a2304ba127667491937',
+  'cat-chirps.mp3':'be493a43c91b5078eeaf8d08010382e7dec64e2d96197132bf2c26af048c6ab4',
+};
 const knownNames=new Set([...recipes.map(([name])=>name),'door-open-air-motor','door-close-air-motor']);
 for(const name of selected)if(!knownNames.has(name))throw new Error(`Unknown clip: ${name}`);
 const rate=22050;
@@ -53,6 +62,10 @@ async function writeWave(name,samples){
 await mkdir(output,{recursive:true});
 for(const [name,file,start,duration,loop,envelope,filter]of recipes){
   if(selected.size&&!selected.has(name))continue;
+  if(sourceHashes[file]){
+    const hash=createHash('sha256').update(await readFile(path.join(input,file))).digest('hex');
+    if(hash!==sourceHashes[file])throw new Error(`Wrong source for ${name}: ${hash}`);
+  }
   const raw=decode(file,start,duration,filter);
   let samples=raw;
   if(loop){

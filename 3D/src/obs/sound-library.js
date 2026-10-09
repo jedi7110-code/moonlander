@@ -25,6 +25,9 @@ export const CABIN_SOUNDS=Object.freeze({
   bag:{file:'bag.wav',label:'猫餌 / 袋の扱い',gain:.24},
   kibblePour:{file:'kibble-pour.wav',label:'猫餌 / カリカリを皿へ',description:'実録の乾燥フード / 皿へ落ちるカラカラ・袋音とは別',gain:.23,loop:true},
   catMeow:{file:'cat-meow.wav',label:'ルーシー / 空腹の小さな鳴き声',description:'実録：空腹の猫 / 控えめ・たまに一声',gain:.14},
+  catChirp:{file:'cat-chase-chirp.wav',label:'ルーシー / ネズミに気づく声',description:'実録の短い猫の声 / 追いかけ始めに一声',gain:.18},
+  mouseSqueak1:{file:'mouse-squeak-1.wav',label:'ネズミ / 逃げる声 1',description:'実録のラット / 短く小さな鳴き声・原速',gain:.12},
+  mouseSqueak2:{file:'mouse-squeak-2.wav',label:'ネズミ / 逃げる声 2',description:'別の実録テイク / 追走中にもう一声・原速',gain:.10},
   chop:{file:'chop.wav',label:'調理 / 刻む',gain:.23},
 });
 export const CABIN_AUDIO_BASE='/3D/assets/obs/audio/';

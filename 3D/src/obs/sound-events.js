@@ -13,6 +13,7 @@ const wasteLocation={x:WASTE_INCINERATOR.x,y:(870-FLOORS[WASTE_INCINERATOR.floor
 const bowlLocation={x:(CAT_BOWL.x-700)*.022,y:(870-FLOORS[CAT_BOWL.floor].y)*.016+CAT_BOWL.foodHeight,z:CAT_BOWL.depth};
 const catDoorLocations=FLOORS.map(floor=>({x:(CAT_PORT.x-700)*.022,y:(870-floor.y)*.016+.045+CAT_PORT.height/2,z:CAT_PORT.wallZ+.055}));
 const catVocalModes=new Set(['look','prone','walk','follow','fetch','idle']);
+const chaseMouseCues=[{age:.65,id:'mouseSqueak1'},{age:2.8,id:'mouseSqueak2'}];
 const bedStrokes={opening:'bedPiston',closing:'bedPiston',waking:'bedPiston',sealing:'bedPiston',extending:'bedSlide',entering:'bedSlide',leaving:'bedSlide',retracting:'bedSlide'};
 const bedLocation={x:(getStation('bunk').x-700)*.022,y:(870-FLOORS[getStation('bunk').floor].y)*.016+.7,z:-.26};
 
@@ -53,6 +54,34 @@ export class CabinSoundEvents {
     this.audio.play('catMeow',{position:{x:(motion.x-700)*.022,y:(870-motion.y)*.016+(motion.elevation??0)+.3,z:motion.z},volume:1});
     // No catch-up loop, including after mute or a large simulation step.
     voice.cooldown=voice.due=now+45+this.random()*45;
+  }
+  chaseVocals(dt,cat){
+    const route=cat?.mouseChase,sim=route?.sim,motion=cat?.motion;
+    if(!sim||!motion){this.chaseVoice=null;return;}
+    const mouse=route.mouse,pose=route.pose,previous=this.chaseVoice;
+    // The route and mouse pose are reused; sim.events identifies a crossing.
+    // First snapshots taken during a run must not replay its earlier calls.
+    const same=previous?.route===route&&previous.event===sim.events;
+    const voice=this.chaseVoice={route,event:sim.events,active:sim.active,
+      controlled:route.controlled,mouseAge:mouse.age,runAge:mouse.phase==='run'?mouse.phaseTime:0,
+      catPhase:pose?.phase,catSpoken:same?previous.catSpoken:false,cues:same?previous.cues:0,
+      blocked:same?previous.blocked:mouse.phase==='run'};
+    if(!same)return;
+    if(dt>.1||mouse.age<previous.mouseAge||previous.controlled&&!route.controlled)voice.blocked=true;
+    if(voice.blocked||!sim.active||!mouse.visible)return;
+    const eligible=route.controlled&&!motion.hidden&&!motion.portal&&!motion.hop&&!cat.bunkWake;
+    if(!voice.catSpoken&&pose?.phase==='notice'&&previous.catPhase!=='notice'){
+      voice.catSpoken=true;
+      if(eligible)this.audio.play('catChirp',{position:{x:(motion.x-700)*.022,y:(870-motion.y)*.016+(motion.elevation??0)+.3,z:motion.z}});
+    }
+    for(let i=0;i<chaseMouseCues.length;i++){
+      const cue=chaseMouseCues[i],bit=1<<i;
+      if(!(voice.cues&bit)&&previous.runAge<cue.age&&voice.runAge>=cue.age){
+        // Consume even muted/unloaded/hidden events, with no delayed retry.
+        voice.cues|=bit;
+        if(eligible&&FLOORS[mouse.floor])this.audio.play(cue.id,{position:{x:mouse.x,y:(870-FLOORS[mouse.floor].y)*.016+.08,z:mouse.z}});
+      }
+    }
   }
   door(key,opening,position,volume=1){
     const previous=this.doors.get(key);let direction=0;
@@ -109,6 +138,7 @@ export class CabinSoundEvents {
     // not on Lucy as she travels behind the closed doors. Small, quiet motors.
     for(let level=0;level<catDoorLocations.length;level++)this.door(`cat-${level}`,catPortOpening(cat?.motion?.portal,level),catDoorLocations[level],.40);
     this.hungryCat(dt,cat);
+    this.chaseVocals(dt,cat);
     this.bunk(dt,brain.bunkVisit);
     const feedStep=droid?.step,feedRate=feedStep?.actionRate??1,feedAge=(droid?.age??0)*feedRate;
     const pouring=feedStep?.action==='food-pour'&&Boolean(droid.carriedFood)&&!droid.waiting&&

@@ -3,13 +3,15 @@ import {CabinSoundEvents} from './obs/sound-events.js';
 import {CABIN_SOUNDS} from './obs/sound-library.js';
 import {BathroomVisit} from './obs/bathroom.js';
 import {BunkVisit} from './obs/bunk-visit.js';
-import {CatMotion,CrewMotion} from './obs/state.js';
-import {CAT_PORT,CAT_BOWL,LADDER_X} from './obs/layout.js';
+import {CatMotion,CatRoutine,CrewMotion,Supplies} from './obs/state.js';
+import {CAT_PORT,CAT_BOWL,FLOORS,LADDER_X} from './obs/layout.js';
 import {planDroidTurn} from './obs/droid-turn.js';
 import {DroidRoutine,DROID_PACE} from './obs/droid-routine.js';
 import {DROID_GAIT} from './obs/pace.js';
 import {bindCabinAudioGestures} from './obs/audio-unlock.js';
 const $=id=>document.getElementById(id),audio=new CabinAudio({ambience:false});
+const requestedScenario=new URLSearchParams(location.search).get('scenario');
+if([...$('scenario').options].some(option=>option.value===requestedScenario))$('scenario').value=requestedScenario;
 let running=null,previous=0,previewTimer=null,frame=null;
 function status(){const s=audio.stats;$('status').textContent=`${audio.enabled?'音声 ON':'音声 OFF'} / 読み込み ${s.loaded} / ${s.total} / 発音 ${s.active} / ループ ${s.loops} / エラー ${s.failed}`;}
 audio.onChange=status;
@@ -60,6 +62,12 @@ function start(){
     state.droid={position:{x:0,y:0,z:.34},step:kind==='droidTurn'?{kind:'turn',turn,duration:turn.duration}:{kind:'climb',from:{y:0},duration:6},age:0,time:0,washingUntil:0};
   }
   if(kind==='catLift'){state.cat={motion:new CatMotion({floor:1,x:CAT_PORT.x})};state.cat.motion.goTo({floor:0,x:CAT_PORT.x+30});}
+  if(kind==='mouseChase'){
+    const cat=state.cat=new CatRoutine(new Supplies(),{turns:true,mouseChase:true,random:()=>.5});
+    Object.assign(cat.motion,{floor:2,x:510,y:FLOORS[2].y,z:CAT_PORT.walkZ,onSofa:false,elevation:0,heading:Math.PI/2,facing:1,turn:null});
+    Object.assign(cat,{mode:'idle',modeTime:0,remaining:100,hunger:90,energy:90});
+    driver.update(1/60,state);cat.mouseChase.appear(cat,2);
+  }
   if(kind==='delivery'){state.care.phase='unloading';state.care.delivery={age:0};}
   running={kind,state,driver,time:0};previous=performance.now();frame=requestAnimationFrame(tick);
 }
@@ -74,10 +82,15 @@ function tick(now){
   if(r.kind==='droidWalk'){s.droid.waiting=t>=4;if(!s.droid.waiting){const travel=dt*DROID_GAIT.speed*DROID_PACE;s.droid.walkDistance+=travel;s.droid.position.x+=travel;}}
   if(['washerDoor','feed'].includes(r.kind))s.droid.update(dt);
   else if(s.droid){s.droid.time=t;s.droid.age=Math.min(t,s.droid.step?.duration??6);if(r.kind==='droidClimb')s.droid.position.y=Math.min(3.392,t*.40*DROID_PACE);if(t>=(s.droid.step?.duration??6))s.droid.step=null;}
-  if(s.cat)s.cat.motion.update(dt);
+  if(r.kind==='mouseChase')s.cat.update(dt);
+  else if(s.cat)s.cat.motion.update(dt);
   if(s.care.delivery){s.care.delivery.age=t;if(t>3.3)s.care.phase='idle';}
-  r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.bathroom?.phase??s.droid?.step?.action??s.care.phase}`;
+  r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.cat?.mouseChase?.pose?.phase??s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.bathroom?.phase??s.droid?.step?.action??s.care.phase}`;
   if(['washerDoor','feed'].includes(r.kind)&&!s.droid.step){stop();return;}
+  if(r.kind==='mouseChase'){
+    if(!s.cat.mouseChase.sim.active||t>45){stop();return;}
+    frame=requestAnimationFrame(tick);return;
+  }
   if(s.brain.bunkVisit?s.brain.bunkVisit.phase==='done'||t>45:s.cat?!s.cat.motion.busy||t>60:r.kind.startsWith('miloClimb')?!s.actor.busy||t>35:t>(s.brain.bathroom?16:8)){stop();return;}frame=requestAnimationFrame(tick);
 }
 $('run').addEventListener('click',start);
