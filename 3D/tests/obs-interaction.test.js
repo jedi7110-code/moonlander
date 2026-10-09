@@ -77,3 +77,13 @@ test('station taps remain commands while dragging and cancelled touches never fo
   handlers.pointerdown(event());handlers.pointerdown(event(100,100,{pointerId:2,isPrimary:false}));handlers.pointerup(event(100,100,{pointerId:2,isPrimary:false}));assert.equal(view.mode,'all');
   handlers.pointerup(event());assert.equal(view.mode,'cat');assert.deepEqual(orders,['shower']);
 });
+
+test('a dark-cabin station tap only powers up, while later commands and camera selection still work',()=>{
+  const {view,handlers,orders,event}=controls();
+  view.startupLighting={waiting:true};view.targetAt=()=>({type:'station',id:'galley'});
+  handlers.pointerdown(event());handlers.pointerup(event());assert.deepEqual(orders,[],'no order acknowledgement under the startup sound');
+  view.targetAt=()=>({type:'character',id:'cat'});handlers.pointerdown(event());handlers.pointerup(event());
+  assert.equal(view.mode,'cat','camera selection remains usable in the dark');
+  view.startupLighting.waiting=false;view.targetAt=()=>({type:'station',id:'galley'});
+  handlers.pointerdown(event());handlers.pointerup(event());assert.deepEqual(orders,['galley'],'drag state was released by the first tap');
+});

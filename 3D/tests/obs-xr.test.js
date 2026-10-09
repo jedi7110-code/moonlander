@@ -150,6 +150,16 @@ test('VR movement and grips leave ceilings waiting; a visible controller trigger
   s.immersive.dispose();
 });
 
+test('the first XR trigger powers lights without also ordering a station or acknowledgement sound',async()=>{
+  const s=await start();let waiting=true;
+  s.view.onSceneActivate=()=>{if(!waiting)return false;waiting=false;return true;};
+  s.immersive.pick=()=>({type:'station',id:'medical',distance:10});
+  const controller=s.immersive.controllers[0].controller;
+  controller.dispatchEvent({type:'select'});assert.equal(waiting,false);assert.deepEqual(s.stations,[]);
+  controller.dispatchEvent({type:'select'});assert.deepEqual(s.stations,['medical']);
+  await s.immersive.exit();s.immersive.dispose();
+});
+
 test('repeated sessions release controllers and panel assets exactly once',async()=>{
   const s=setup();await s.immersive.ready;
   for(let i=0;i<3;i++){

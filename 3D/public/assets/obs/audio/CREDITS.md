@@ -1,27 +1,103 @@
 # TARAIRON cabin sound effects
 
-Selected on 2026-10-05. All sources below are **CC0 1.0 Universal**.
+Original library selected on 2026-10-05. There are 23 clips under **CC0 1.0 Universal**.
 License: https://creativecommons.org/publicdomain/zero/1.0/
-No paid assets, attribution-only/noncommercial assets, or remotely streamed audio.
+The bed lid is under the **Pixabay Content License**, not CC0.
+The user-supplied power-on edit below has an unverified license.
+No remotely streamed audio. Do not describe the complete library as CC0.
 Attribution is retained here voluntarily, including the exact source and edit recipe.
 
-## Kenney — Sci-fi Sounds 1.0
+## User-supplied Glitch 13 — cabin lighting starter, 2026-10-09
+
+- User-provided local file: `Glitch 13.wav` from their `sounds` directory.
+- Original author/pack/license: **not supplied / unverified**, not assumed CC0.
+  Confirm the source pack's game-use and distribution terms before public release.
+- Source SHA-256: `fa4f44b765b02483a070f48e2f8430dd4ad2b01d13295a6c7193ddc6d789272e`.
+- `power-on-glitch.wav`: 1.05 s, mono 22,050 Hz PCM16, 46,350 bytes.
+  Three source fragments, without synthetic oscillators, added reverb or loops:
+  - 0.320–0.445 s placed at 0 s, relative gain 1, 8 ms attack / 45 ms release,
+    high-pass 650 Hz / low-pass 5,400 Hz.
+  - 0.620–0.750 s placed at 0.25 s, relative gain 0.82, 8 ms attack / 50 ms release,
+    high-pass 650 Hz / low-pass 4,800 Hz.
+  - 1.100–1.700 s placed at 0.45 s, relative gain 0.36, 35 ms attack / 280 ms release,
+    high-pass 650 Hz / low-pass 2,600 Hz.
+- Cosine fades and -9 dBFS peak normalization are baked into one file.
+  Playback gain 0.24. One voice only when the dark cabin first powers up;
+  muted/not-yet-loaded activations are not replayed later.
+- Rebuild: `node studies/audio/pack-power-on.mjs SOURCE_DIRECTORY`.
+  The full 12-second source stays outside the repository; the source is not edited.
+
+## Bed movement: user-selected gas strut and pneumatic tray
+
+- Revised 2026-10-09 from the user's specific reference around second 2.
+  The generic air hiss is no longer used; the sliding tray is unchanged.
+- Lid: Gavin Mogensen / Fronbondi_Skegs —
+  **FOLEY - A Gas Strut Being Compressed, then Expanding Sound Effect** (#255504).
+  Source: https://pixabay.com/ja/sound-effects/映画と特殊効果-foley-a-gas-strut-being-compressed-then-expanding-sound-effect-255504/
+  License: **Pixabay Content License**, verified on the source page on 2026-10-09.
+  https://pixabay.com/service/license-summary/ and https://pixabay.com/service/terms/
+  This is not CC0. Use this derivative as part of TARAIRON's bed mechanism;
+  do not redistribute it as a standalone sound library or downloadable SFX pack.
+  The local study is an internal implementation preview, not a stock-audio service.
+  Original download: `fronbondi_skegs-foley-a-gas-strut-being-compressed-then-expanding-sound-effect-255504.mp3`.
+  SHA-256: `c8959326b07b18ccbb1d5d3d859afe0a53ae8a6c5990c485842efd925e1bcf59`.
+  The 7.824-second original remains outside the repository.
+- Tray: Joseph SARDIN / BigSoundBank — Pneumatic cylinder, small #3.
+- Source and explicit CC0 license: https://bigsoundbank.com/pneumatic-cylinder-small-3-s1493.html
+- Public preview used: https://bigsoundbank.com/UPLOAD/mp3/1493.mp3
+- Source SHA-256: `d86d898453e835d6030b140add2a5f8e8b3bd1ab1906ab4c61800b6f89b799dd`.
+- Actual seat-table pneumatic cylinder, edited to suggest the bed's mechanism;
+  this is not a recording of this fictional bed. No synthetic motor, beep or added impact.
+- `bed-piston.wav`: one extension, source 1.740–2.260 s (the user's roughly
+  2-second reference), excluding adjacent handling, silence and contact clacks.
+  The earlier 1.580–1.740 s onset was removed after the user reported it sounded
+  like a voice. This is an edit description, not a claim of recorded speech.
+  High-pass 180 Hz / low-pass 6,500 Hz; original speed, pitch and duration.
+  No time stretching, varispeed, padding, repeated strokes, runtime loop,
+  added hiss or synthetic motor.
+  0.52 s, 22,976 bytes, 45 ms attack / 65 ms release, gain **0.18**.
+  Playback rate is always 1 for opening, closing, waking and sealing, even
+  with custom phase durations. The clip plays once at motion start and ends
+  naturally; the 2.4–2.7-second lid animation is unchanged.
+- `bed-slide.wav`: 1.4 s, 61,784 bytes, 120 ms attack / 200 ms release, gain 0.30.
+  Unchanged: source 0.400–1.450 s, pitch 0.90, two equal tempo passes,
+  high-pass 160 Hz / low-pass 3,200 Hz.
+  Extending, entering, leaving and retracting follow the actual tray phases.
+- Mono 22,050 Hz PCM16, cosine fades, normalized to -9 dBFS. One finite buffer
+  per movement, stopped when the phase changes; no loops or runtime filtering.
+  Sleeping, sitting/rising, cancelled approaches, seeks and stale events are silent.
+  Bed-position distance attenuation uses the existing camera-aware mixer.
+- Rebuild: `node studies/audio/pack-bed-piston.mjs pneumatic-cylinder-1493.mp3 GAS_STRUT_MP3`.
+  The packer verifies the specified gas-strut source hash before writing.
+
+## Historical source, no longer used — Kenney / Sci-fi Sounds 1.0
 
 - Author: Kenney (https://kenney.nl)
 - Source and license: https://kenney.nl/assets/sci-fi-sounds
 - Commercial-use clarification: https://kenney.nl/support
 - Download: https://kenney.nl/media/pages/assets/sci-fi-sounds/6b296f9ecf-1677589334/kenney_sci-fi-sounds.zip
-- `Audio/spaceEngineLow_000.ogg` (starting at 0.5 s, pitch ratios 0.88 / 0.80,
-  high-pass 55 Hz / low-pass 1,100 Hz) → low motor layer in
-  `door-open-air-motor.wav` / `door-close-air-motor.wav`.
+- The low `Audio/spaceEngineLow_000.ogg` motor layers were removed from both
+  hatch clips on 2026-10-09. The legacy filenames still contain `air-motor`,
+  but the files now contain only the Vehicle compressed-air burst.
 - The earlier `Audio/engineCircular_000.ogg` engine loop was removed on 2026-10-08.
 
-## Kenney — Impact Sounds 1.0
+## Nox_Sound — Foley_Object_Toolbox_Metal_Drop_Mono.wav
 
-- Author: Kenney
-- Source and license: https://kenney.nl/assets/impact-sounds
-- Download: https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip
-- `Audio/impactMetal_medium_000.ogg` → `metal.wav`: cargo impacts only, no human/droid footsteps or ladder contacts.
+- Replaces the Kenney `impactMetal_medium_000.ogg` edit on 2026-10-09.
+- Source and explicit CC0 license: https://freesound.org/people/Nox_Sound/sounds/556648/
+- Public HQ preview used: https://cdn.freesound.org/previews/556/556648_9250976-hq.mp3
+- Source SHA-256: `5d8ff98f449eddaa5a219514368d4fba9f7d74ca12ea60a7b100d0cc2f44fd6a`.
+- The recording contains real metal-toolbox drops onto concrete, wood, gravel
+  and grass. This edit uses one of the initial concrete contacts, not a recording
+  of the ship's cases or metal floor.
+- `toolbox-drop.mp3` 2.555–2.855 s → `metal.wav`: one 0.30-second contact,
+  high-pass 45 Hz / low-pass 1,800 Hz, 3 ms attack / 100 ms release.
+  Original speed and pitch; no oscillator, pitch slide, reverb or layered hit.
+  The trailing shell rattle is excluded. Mono 22,050 Hz PCM16, -9 dBFS peak.
+- Playback gain 0.20, supply landings at 0.85 relative volume, shelf placement
+  at 0.45. Only cases use this clip: greens and served meals no longer trigger it.
+  Shelf contact follows the visible halfway placement, not the end of the job.
+- Rebuild: `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY metal`.
 
 ## alec_mackay — footsteps boots metal 2.wav
 
@@ -84,23 +160,30 @@ Attribution is retained here voluntarily, including the exact source and edit re
 - Author: Vehicle / Jan Schupke
 - Source and explicit CC0 notice: https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx
 - Download: https://opengameart.org/sites/default/files/tinysized.zip
-- `sfx-cc0/handcuffs-metal-lock-01.wav` → `latch.wav`: latch engagement and appliance lids.
+- `sfx-cc0/handcuffs-metal-lock-01.wav` → `latch.wav`, revised 2026-10-09:
+  0.065–0.225 s, first engagement only, excluding the second separated impact.
+  High-pass 180 Hz / low-pass 3,800 Hz, 4 ms attack / 45 ms release, gain 0.20
+  (previously 0.38). No pitch change, added reverb or synthetic layer.
+  Hatch locks and quiet appliance unlocking only; lid contact is separate below.
 - `sfx-cc0/plastic-bag-pickup-01.wav` → `bag.wav`: cat-food packet handling and pouring rustle (not fabricated pellet impacts).
 - `sfx-cc0/apple-cut-01.wav` → `chop.wav`: droid food preparation.
-- `sfx-cc0/compressed-air-spray-02.wav` (0.15–0.58 s, high-pass 320 Hz /
-  low-pass 5,800 Hz) → pneumatic layer in `door-open-air-motor.wav` /
+- `sfx-cc0/compressed-air-spray-02.wav` (decode 0.15–0.58 s; retain 0.15–0.53 s,
+  high-pass 320 Hz / low-pass 5,800 Hz) → sole source of `door-open-air-motor.wav` /
   `door-close-air-motor.wav`. Actual compressed-air foley, not a synthesized beep.
 
-### Revised hatch mix — 2026-10-05
+### Air-only hatch revision — 2026-10-09
 
-The earlier Kenney `doorOpen_000.ogg` / `doorClose_000.ogg` edits were replaced.
-Opening: 1.04 s; air release at 0, low motor starts at 0.13 s.
-Closing: 1.12 s; air release at 0, lower/heavier motor starts at 0.10 s.
-The air lasts 0.38 s with an 8 ms attack / 200 ms release; the motor has a
-100 ms attack / 260 ms release. Both layers are mixed offline into a single mono
-WAV per action, then normalized to -9 dBFS. No additional runtime voices.
+Opening and closing now contain only the original 0.38-second air burst.
+Both keep an 8 ms attack / 200 ms release, normalized to -9 dBFS. The motor
+layer is removed entirely, not merely quieted or filtered. No later rumble,
+extra layers, pitch changes or runtime voices. Each file is 16,802 bytes,
+down from 45,908 / 49,436 bytes. Playback gains remain 0.65 / 0.58.
+The legacy filenames are retained for all existing hatch consumers.
 The cat elevator reuses these buffers at 40% of the cabin hatch gain, plus a
 quiet latch at full closure; entrance and destination emit from their own decks.
+The separate closure latch and animation/event timing are unchanged.
+Rebuild only these clips:
+`node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY door-open-air-motor door-close-air-motor`.
 
 ## Fabrizio84 — Shower
 
@@ -120,6 +203,20 @@ quiet latch at full closure; entrance and destination emit from their own decks.
 - Public HQ preview used: https://cdn.freesound.org/previews/423/423210_4448255-hq.mp3
 - 2–6 s → `washer.wav`: drum operation only while the simulation's washer is running.
 
+## samplecat — washmachine close2.WAV
+
+- Added 2026-10-09. Actual AEG washing-machine door closing.
+- Source and CC0 license: https://freesound.org/people/samplecat/sounds/11574/
+- Public HQ preview used: https://cdn.freesound.org/previews/11/11574_31600-hq.mp3
+- `washer-door.mp3` 0.460–0.680 s → `appliance-lid.wav`: the central contact,
+  excluding the preceding handling and later bounce. High-pass 60 Hz / low-pass
+  1,800 Hz, 4 ms attack / 45 ms release, gain 0.24, original speed and pitch.
+- No extra ringing, reverb or synthetic thump. Mono 22,050 Hz PCM16, -9 dBFS peak.
+  Washer closure follows its actual hinge position, not a subsequent job token.
+  The waste-box lid reuses this contact at 75% volume; it is not a waste-box recording.
+- Rebuild these two short clips only:
+  `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY latch appliance-lid`.
+
 ## tuberatanka — cat meow
 
 - Added 2026-10-08. Source and CC0 license:
@@ -137,11 +234,33 @@ quiet latch at full closure; entrance and destination emit from their own decks.
   Suppressed/muted calls are never queued. Sound timing has its own random
   source, separate from the cat's behaviour/feeding decisions.
 
+## Caitlin_100 — Pouring cat biscuit into a bowl.mp3
+
+- Added 2026-10-09 alongside the approved bag rustle, which is unchanged.
+- Actual dry cat-food biscuits poured into a cat bowl; the author does not
+  identify the bowl material, so this is not labelled a metal-bowl recording.
+- Source and explicit CC0 license: https://freesound.org/people/Caitlin_100/sounds/365654/
+- Public HQ preview used: https://cdn.freesound.org/previews/365/365654_5407590-hq.mp3
+- Source SHA-256: `0e2f877f3f7faf3d03669fd766f275a990b5e83e5cc2ef3b11c27af2805ccac5`.
+- `cat-biscuit-pour.mp3` 0.600–3.720 s → `kibble-pour.wav`: 3.0 seconds,
+  132,344 bytes after a 120 ms seam crossfade, mono 22,050 Hz PCM16.
+  High-pass 140 Hz / low-pass 6,000 Hz, -9 dBFS peak, playback gain 0.23.
+  Original pitch/speed, without synthetic grains, added reverberation or layers.
+- A single source follows the shared visible pouring interval, with an approximate
+  0.24 authored-second delay for the grains to reach the bowl (0.15 seconds at
+  the normal 1.6 action rate). No per-particle audio or extra live filters.
+  Sound originates at the bowl, stops at pour end, on waiting, cancellation or
+  loss of food, and follows the existing mute/pause and camera-distance mixer.
+  The source is longer than the normal 2.19-second pour, so that pour does not
+  repeat a short burst. Only extended pours or the four-second solo preview loop.
+- Rebuild only this new clip:
+  `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY kibble-pour`.
+
 ## Processing / reproduction
 
 `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY` (Node 20+, ffmpeg).
-Extract source ZIPs into `scifi/`, `impact/`, `foley/`; name recordings
-`shower.mp3`, `flush.mp3`, `washer.mp3`, `boots-metal.mp3`, `rubber-sole.mp3`, `servo-sweep.mp3`, `cat-meow.mp3` in that scratch directory.
+Extract the Tinysized SFX ZIP into `foley/` (Kenney's ZIP is no longer needed); name recordings
+`shower.mp3`, `flush.mp3`, `washer.mp3`, `boots-metal.mp3`, `rubber-sole.mp3`, `servo-sweep.mp3`, `cat-meow.mp3`, `washer-door.mp3`, `toolbox-drop.mp3`, `cat-biscuit-pour.mp3` in that scratch directory.
 To rebuild only selected clips, append their names, for example:
 `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY step-rubber-1 step-rubber-2 step-rubber-3`.
 

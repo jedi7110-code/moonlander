@@ -25,3 +25,11 @@ export function bindStartupLightingInput(canvas,activate){
   for(const [type,handler]of Object.entries(handlers))canvas.addEventListener(type,handler);
   return()=>{for(const [type,handler]of Object.entries(handlers))canvas.removeEventListener(type,handler);pointers.clear();press=null;};
 }
+// Consume the lighting transition once, even when muted/loading: never queue a
+// delayed power-up sound after unmute. Desktop and XR share this entry point.
+export function activateStartupLighting(lighting,{audio,onActivate}={}){
+  if(!lighting.activate())return false;
+  audio?.play('powerOn');
+  onActivate?.();
+  return true;
+}

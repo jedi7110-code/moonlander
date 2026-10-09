@@ -1,6 +1,6 @@
 import {DynamicDrawUsage,Euler,InstancedMesh,Matrix4,Quaternion,SphereGeometry,Vector3} from 'three';
-
-export const KIBBLE_STREAM={capacity:64,start:1.5,finishLead:1,gravity:9.8};
+import {KIBBLE_STREAM} from './kibble-timing.js';
+export {KIBBLE_STREAM} from './kibble-timing.js';
 
 // Seeded per refill, not per frame: pause and study seeking preserve trajectories.
 export function kibbleDrops(seed,duration=6){

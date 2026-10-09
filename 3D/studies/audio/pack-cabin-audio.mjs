@@ -10,18 +10,23 @@ const input=process.argv[2];if(!input)throw new Error('Usage: node studies/audio
 const selected=new Set(process.argv.slice(3));
 const output=fileURLToPath(new URL('../../public/assets/obs/audio/',import.meta.url));
 const recipes=[
-  ['latch','foley/sfx-cc0/handcuffs-metal-lock-01.wav',0,1.3],
+  // One dry engagement, not the source's two separated metal clicks.
+  ['latch','foley/sfx-cc0/handcuffs-metal-lock-01.wav',.065,.16,false,true,'highpass=f=180,lowpass=f=3800'],
+  // Actual washer door contact, excluding the earlier handling and later bounce.
+  ['appliance-lid','washer-door.mp3',.46,.22,false,true,'highpass=f=60,lowpass=f=1800'],
   ...[6.665,7.625,8.455].map((start,n)=>[`step-metal-boots-${n+1}`,'boots-metal.mp3',start,.52,false,true]),
   // Derive rung contacts from the shipped real boot recordings, not a generic
   // metal impact. Selected ladder clips can be rebuilt without downloading.
   ...[1,2,3].map(n=>[`step-ladder-boots-${n}`,new URL(`../../public/assets/obs/audio/step-metal-boots-${n}.wav`,import.meta.url),0,.30,false,true,'highpass=f=75,lowpass=f=2400']),
   ...[.615,1.270,2.555].map((start,n)=>[`step-rubber-${n+1}`,'rubber-sole.mp3',start,.42,false,true,'highpass=f=70,lowpass=f=4200']),
-  ['metal','impact/Audio/impactMetal_medium_000.ogg',0,.7],
+  // One real toolbox landing; cut before the lingering shell rattle.
+  ['metal','toolbox-drop.mp3',2.555,.30,false,'cargo','highpass=f=45,lowpass=f=1800'],
   ['servo-stroke','servo-sweep.mp3',4.675,.20,false,'motor','highpass=f=100,lowpass=f=1800'],
   ['shower','shower.mp3',30,4,true],
   ['flush','flush.mp3',0,5],
   ['washer','washer.mp3',2,4,true],
   ['bag','foley/sfx-cc0/plastic-bag-pickup-01.wav',0,1.5],
+  ['kibble-pour','cat-biscuit-pour.mp3',.60,3.12,true,false,'highpass=f=140,lowpass=f=6000'],
   ['cat-meow','cat-meow.mp3',0,1.544,false,true,'highpass=f=100,lowpass=f=6500'],
   ['chop','foley/sfx-cc0/apple-cut-01.wav',0,1.2],
 ];
@@ -58,7 +63,7 @@ for(const [name,file,start,duration,loop,envelope,filter]of recipes){
     // Preserve recorded contacts and short motor strokes instead of trimming
     // them into clicks. Motor strokes ease in/out more gently than footsteps.
     samples=raw.slice();
-    const attack=Math.round((envelope==='motor'?.020:.004)*rate),release=Math.round((envelope==='motor'?.080:.045)*rate);
+    const attack=Math.round((envelope==='motor'?.020:envelope==='cargo'?.003:.004)*rate),release=Math.round((envelope==='motor'?.080:envelope==='cargo'?.10:.045)*rate);
     for(let i=0;i<attack;i++)samples[i]*=i/(attack-1);
     for(let i=0;i<release;i++)samples[samples.length-1-i]*=i/(release-1);
   }else{
@@ -72,28 +77,19 @@ for(const [name,file,start,duration,loop,envelope,filter]of recipes){
   await writeWave(name,samples);
 }
 
-// Pneumatic release first, then the low geared drive. Bake the two layers into
-// ONE buffer: no extra sources, timers or filters are needed during gameplay.
-// Keep the air blast brief; the motor carries the weight, without a sci-fi beep.
-for(const [name,duration,motorOffset,motorPitch,motorGain]of [
-  ['door-open-air-motor',1.04,.13,.88,.72],
-  ['door-close-air-motor',1.12,.10,.80,.82],
-]){
+// The user wants only the existing "bashu" air burst, not the trailing motor.
+// Keep the legacy filenames so every hatch consumer receives the same change.
+for(const name of ['door-open-air-motor','door-close-air-motor']){
   if(selected.size&&!selected.has(name))continue;
+  const duration=.38;
   const samples=new Array(Math.round(duration*rate)).fill(0);
   const air=decode('foley/sfx-cc0/compressed-air-spray-02.wav',.15,.43,'highpass=f=320,lowpass=f=5800');
-  const motor=decode('scifi/Audio/spaceEngineLow_000.ogg',.5,1.5,`aresample=${rate},asetrate=${Math.round(rate*motorPitch)},aresample=${rate},highpass=f=55,lowpass=f=1100`);
-  const layer=(source,offset,level,attack,release,length)=>{
-    const peak=peakOf(source),start=Math.round(offset*rate),count=Math.min(source.length,Math.round(length*rate),samples.length-start);
-    if(peak<.001)throw new Error(`Silent hatch layer: ${name}`);
-    for(let i=0;i<count;i++){
-      const t=i/rate,end=(count-1-i)/rate;
-      const fadeIn=Math.sin(Math.min(1,t/attack)*Math.PI/2)**2;
-      const fadeOut=Math.sin(Math.min(1,end/release)*Math.PI/2)**2;
-      samples[start+i]+=source[i]/peak*level*fadeIn*fadeOut;
-    }
-  };
-  layer(air,0,1,.008,.20,.38);
-  layer(motor,motorOffset,motorGain,.10,.26,duration-motorOffset);
+  if(air.length<samples.length)throw new Error(`Incomplete air source: ${name}`);
+  for(let i=0;i<samples.length;i++){
+    const t=i/rate,end=(samples.length-1-i)/rate;
+    const fadeIn=Math.sin(Math.min(1,t/.008)*Math.PI/2)**2;
+    const fadeOut=Math.sin(Math.min(1,end/.20)*Math.PI/2)**2;
+    samples[i]=air[i]*fadeIn*fadeOut;
+  }
   await writeWave(name,samples);
 }

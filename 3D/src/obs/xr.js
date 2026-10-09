@@ -146,7 +146,7 @@ export class ObservationXR {
       line.scale.z=4;
       const cursor=new THREE.Mesh(new THREE.SphereGeometry(.006,6,4),new THREE.MeshBasicMaterial({color:0xe3f4c9,toneMapped:false}));
       cursor.position.z=-4;controller.add(line,cursor);this.rig.add(controller);
-      const select=()=>{if(this.visible){this.view.onSceneActivate?.();this.view.scene.updateMatrixWorld(true);this.picker.update();this.activate(this.pick(controller));}};
+      const select=()=>{if(this.visible){if(this.view.onSceneActivate?.()===true)return;this.view.scene.updateMatrixWorld(true);this.picker.update();this.activate(this.pick(controller));}};
       const squeeze=()=>{if(this.visible)this.view.setMode('all');};
       controller.addEventListener('select',select);controller.addEventListener('squeeze',squeeze);
       return{controller,line,cursor,select,squeeze,target:null};

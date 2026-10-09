@@ -7,10 +7,12 @@
 <div id="status" role="status">未読み込み / 音声をオンにするまで音源通信なし</div>
 <h2>動作とのつながり</h2><div class="row"><select id="scenario" aria-label="動作シナリオ">
 <option value="door">船内ハッチ：開く → 閉じる → ロック</option>
+<option value="bed">ベッド：蓋が開く → 寝台が出る → 収納 → 蓋が閉じる</option>
 <option value="catLift">猫エレベーター：入口の開閉 → 移動 → 出口の開閉</option>
 <option value="shower">シャワー：入室 → 使用 → 退室</option>
 <option value="toilet">トイレ：入室 → 使用 → 排水</option>
 <option value="washer">洗濯機：運転 → 停止</option>
+<option value="washerDoor">洗濯機の蓋：ロック解除 → 開く → 閉じる</option>
 <option value="walk">マイロ：歩く → 停止</option>
 <option value="miloClimbUp">マイロ：ハシゴを上る → 停止</option>
 <option value="miloClimbDown">マイロ：ハシゴを下りる → 停止</option>
@@ -18,10 +20,10 @@
 <option value="droidTurn">ドロイド：方向転換 → 停止</option>
 <option value="droidClimb">ドロイド：ハシゴ → 停止</option>
 <option value="delivery">補給ハッチ：受け取り</option>
-<option value="feed">ドロイド：猫餌の袋</option>
+<option value="feed">ドロイド：猫餌の袋 ＋ カリカリを皿へ</option>
 <option value="cook">ドロイド：食材を刻む</option>
 </select><button id="run" disabled>動作を試聴</button></div>
 <p id="scene-state">シナリオを選択。ブラウザを別タブにすると再生を停止します。</p>
 <h2>音源ライブラリー</h2><div id="library" class="grid"></div>
-<footer>すべてCC0。Kenney / Vehicle (Jan Schupke) / alec_mackay / Aerny / Burningmonkey / Fabrizio84 / simosco / ANARKYA / tuberatanka。<a href="/3D/assets/obs/audio/CREDITS.md">出典・ライセンス・加工内容</a><p>このページは3Dを描画せず、音の確認だけを行います。本編は全景では控えめなステレオ、本人視点では距離と階の違いで減衰します。</p></footer>
+<footer>点灯音はユーザー提供素材（ライセンス未確認）、ベッドの蓋はPixabay Content License（Gavin Mogensen / Fronbondi_Skegs）、その他はCC0。Vehicle (Jan Schupke) / Joseph SARDIN / alec_mackay / Aerny / Burningmonkey / Fabrizio84 / simosco / ANARKYA / samplecat / Nox_Sound / Caitlin_100 / tuberatanka。<a href="/3D/assets/obs/audio/CREDITS.md">出典・ライセンス・加工内容</a><p>このページは3Dを描画せず、音の確認だけを行います。本編は全景では控えめなステレオ、本人視点では距離と階の違いで減衰します。</p></footer>
 </main><script type="module" src="./cabin-audio-study.js"></script></body></html>

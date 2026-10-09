@@ -9,7 +9,7 @@ import {ObservationView} from './view.js';
 import {loadCabinLucyGroomCache} from './lucy-cabin.js';
 import {ObservationXR} from './xr.js';
 import {revealStartupScene} from './startup-lighting.js';
-import {bindStartupLightingInput} from './startup-input.js';
+import {bindStartupLightingInput,activateStartupLighting} from './startup-input.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
 import {CabinSoundEvents} from './sound-events.js';
@@ -383,7 +383,7 @@ async function start(){
     });
     $('lighting-hint').hidden=false;
     loadCabinLucyGroomCache(view.cat).then(()=>{cat.groomAvailable=true;},error=>console.warn('Lucy grooming correction unavailable; grooming stays off.',error));
-    view.onSceneActivate=()=>{if(view.startupLighting.activate()){brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}};
+    view.onSceneActivate=()=>activateStartupLighting(view.startupLighting,{audio,onActivate:()=>{brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}});
     unbindStartupLighting=bindStartupLightingInput($('ship-view'),()=>view.onSceneActivate());
     previous=performance.now();
     let firstVisibleFrame=true;

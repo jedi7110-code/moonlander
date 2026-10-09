@@ -1,14 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,stat} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {CabinAudio} from '../src/obs/audio.js';
 import {CabinSoundEvents} from '../src/obs/sound-events.js';
 import {CABIN_SOUNDS} from '../src/obs/sound-library.js';
 import {BathroomVisit} from '../src/obs/bathroom.js';
+import {BunkVisit,BUNK_PHASE_SECONDS} from '../src/obs/bunk-visit.js';
 import {CatMotion,CatRoutine,CrewMotion,Supplies} from '../src/obs/state.js';
-import {CAT_PORT,FLOORS,PLANT,LADDER_X} from '../src/obs/layout.js';
+import {CAT_PORT,CAT_BOWL,FLOORS,PLANT,LADDER_X,WASTE_INCINERATOR,getStation} from '../src/obs/layout.js';
+import {KIBBLE_STREAM,KIBBLE_CONTACT_DELAY} from '../src/obs/kibble-timing.js';
 import {planDroidTurn} from '../src/obs/droid-turn.js';
-import {DROID_PACE} from '../src/obs/droid-routine.js';
+import {DroidRoutine,DROID_PACE} from '../src/obs/droid-routine.js';
 import {DROID_GAIT,DROID_WALK_CYCLE_DISTANCE,LADDER_PACE} from '../src/obs/pace.js';
 import {sampleDroidServicePose} from '../src/obs/droid-service.js';
 
@@ -21,7 +24,7 @@ function context(){
 }
 const response=()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)});
 const soundCount=Object.keys(CABIN_SOUNDS).length;
-test('CC0 assets are compact mono PCM, finite, non-silent, bounded and loop seams are smooth',async()=>{
+test('local assets are compact mono PCM, finite, non-silent, bounded and loop seams are smooth',async()=>{
   let total=0;
   const credits=await readFile(new URL('../public/assets/obs/audio/CREDITS.md',import.meta.url),'utf8');
   for(const definition of Object.values(CABIN_SOUNDS)){
@@ -32,7 +35,88 @@ test('CC0 assets are compact mono PCM, finite, non-silent, bounded and loop seam
     const peak=Math.max(...data.map(Math.abs));assert.ok(peak>.3&&peak<.36);
     if(definition.loop)assert.ok(Math.abs(data[0]-data.at(-1))<.15,`${definition.file} seam`);
   }
-  assert.ok(total<1000000,`ships ${total} bytes, not entire source packs`);
+  assert.ok(total<1360000,`ships ${total} bytes, including 50 KB lighting, 170 KB bed and 133 KB kibble edits, not entire source packs`);
+});
+test('bed piston and slide are short faded recordings, without live loops or filters',async()=>{
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  try{
+    await audio.toggle();await audio.load();let total=0;
+    for(const [id,duration,gain]of [['bedPiston',.52,.18],['bedSlide',1.4,.30]]){
+      const definition=CABIN_SOUNDS[id],file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));total+=file.length;
+      const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+      assert.equal(data.length/22050,duration);assert.equal(definition.duration,duration);
+      assert.equal(definition.gain,gain);assert.equal(definition.loop,undefined);
+      assert.equal(data[0],0);assert.equal(data.at(-1),0);
+      const rms=(start,end)=>{const s=data.slice(Math.round(start*22050),Math.round(end*22050));return Math.sqrt(s.reduce((sum,v)=>sum+v*v,0)/s.length);};
+      const body=rms(duration*.25,duration*.7);
+      assert.ok(body>.02,'a sliding texture, not a click');
+      assert.ok(rms(0,.01)<body*.2,'gentle attack without the source clack');
+      assert.ok(rms(duration-.015,duration)<body*.1,'settles quietly at the end');
+      const nodes=ctx.created.length,voice=audio.play(id);
+      assert.ok(voice);assert.equal(voice.source.loop,false);assert.equal(ctx.created.length-nodes,3);
+      voice.source.onended();
+    }
+    assert.ok(total<85000,'native-speed lid plus the unchanged tray stay below 85 KB');
+    const close=audio.play('bedPiston');
+    assert.equal(close.source.playbackRate.value,1,'direct preview uses the original speed');
+  }finally{audio.dispose();}
+});
+test('lock and appliance lid use separate, quiet single-contact edits without the delayed second click',async()=>{
+  const clips=[];
+  for(const [id,duration,gain]of [['latch',.16,.20],['applianceLid',.22,.24]]){
+    const definition=CABIN_SOUNDS[id],file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));
+    clips.push(file);
+    assert.equal((file.length-44)/2/22050,duration);
+    assert.equal(definition.gain,gain);assert.equal(definition.rate,undefined);assert.equal(definition.loop,undefined);
+    assert.equal(file.readInt16LE(44),0);assert.equal(file.readInt16LE(file.length-2),0);
+    const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+    const energy=data=>data.reduce((sum,s)=>sum+s*s,0)/data.length;
+    assert.ok(energy(data.slice(-Math.round(.02*22050)))<energy(data.slice(0,Math.round(.12*22050)))*.2,'the contact settles rather than rebounding');
+  }
+  assert.notDeepEqual(clips[0],clips[1]);
+  assert.ok(clips[0].length+clips[1].length<20000,'two shorter contacts cost less than the old shared sample');
+});
+test('bed lid uses the selected gas strut at original speed without stretching or padding',async()=>{
+  const file=await readFile(new URL('../public/assets/obs/audio/bed-piston.wav',import.meta.url));
+  const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+  // Two cascaded low-passes estimate bass energy without a test dependency.
+  const alpha=1-Math.exp(-2*Math.PI*600/22050);let low1=0,low2=0,bass=0,total=0;
+  for(const value of data){low1+=alpha*(value-low1);low2+=alpha*(low1-low2);bass+=low2*low2;total+=value*value;}
+  assert.ok(bass/total<.04,'no dominant sub-600 Hz piston rumble');
+  assert.ok(CABIN_SOUNDS.bedPiston.gain<=.18,'lid stays below half the old playback gain');
+  const source=await readFile(new URL('../studies/audio/pack-bed-piston.mjs',import.meta.url),'utf8');
+  const lidFilter=source.match(/const filter=lid\?`([^`]+)`/)?.[1];
+  assert.ok(lidFilter);assert.match(lidFilter,/highpass=f=180,lowpass=f=6500/);
+  assert.doesNotMatch(lidFilter,/atempo|asetrate|apad|aloop/);
+  assert.match(source,/cutStart=lid\?1\.74:start,cutDuration=lid\?\.52:sourceDuration/);
+  assert.match(source,/c8959326b07b18ccbb1d5d3d859afe0a53ae8a6c5990c485842efd925e1bcf59/);
+  assert.equal(CABIN_SOUNDS.bedPiston.license,'Pixabay Content License');
+  const credits=await readFile(new URL('../public/assets/obs/audio/CREDITS.md',import.meta.url),'utf8');
+  assert.match(credits,/Gavin Mogensen \/ Fronbondi_Skegs/);
+  assert.match(credits,/not CC0/);
+});
+test('bed lid omits the former voice-like onset and eases into the sliding sound',async()=>{
+  const file=await readFile(new URL('../public/assets/obs/audio/bed-piston.wav',import.meta.url));
+  const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+  const rms=(start,end)=>{const s=data.slice(Math.round(start*22050),Math.round(end*22050));return Math.sqrt(s.reduce((sum,v)=>sum+v*v,0)/s.length);};
+  // This guards the soft attack, not perceptual speech detection.
+  assert.ok(rms(0,.015)<rms(.1,.35)*.25,'onset remains quiet relative to the sliding body');
+  const source=await readFile(new URL('../studies/audio/pack-bed-piston.mjs',import.meta.url),'utf8');
+  assert.match(source,/\['bed-piston',\.52,\.045,\.065\]/);
+});
+test('bed lid is one native-length stroke and leaves the tray recording unchanged',async()=>{
+  const file=await readFile(new URL('../public/assets/obs/audio/bed-piston.wav',import.meta.url));
+  const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+  assert.equal(data.length/22050,.52,'no 2.4-second stretched or tiled replacement');
+  assert.equal(file.length,22976);
+  const levels=[];
+  for(let start=.1;start<.4;start+=.05){
+    const samples=data.slice(Math.round(start*22050),Math.round((start+.05)*22050));
+    levels.push(Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length));
+  }
+  assert.ok(Math.max(...levels)/Math.min(...levels)<2,'steady middle without repeated bursts or gaps');
+  const tray=await readFile(new URL('../public/assets/obs/audio/bed-slide.wav',import.meta.url));
+  assert.equal(createHash('sha256').update(tray).digest('hex'),'11a30896cc8694902e18a05d704239393464f98d7d76739ccbd775968d53d29f','tray sound unchanged');
 });
 test('explicit activation loads each local clip once with bounded concurrency, mute never fetches',async()=>{
   let calls=0,inFlight=0,max=0;const ctx=context();
@@ -62,21 +146,48 @@ test('ambient updates follow camera focus but never synthesize pitched water dro
   audio.tone(740,.07,.009);assert.ok(ctx.created.length>initialNodes,'notification tones are retained');
   audio.dispose();
 });
-test('hatches start with an air burst followed by a low motor, in one click-free buffer',async()=>{
+test('hatches contain only one short air burst, with no trailing motor',async()=>{
   const clips=[];
   for(const id of ['doorOpen','doorClose']){
     const definition=CABIN_SOUNDS[id];assert.match(definition.file,/-air-motor\.wav$/);
     const file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));clips.push(file);
     const samples=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
-    const duration=samples.length/22050;assert.ok(duration>=1&&duration<=1.2);
+    const duration=samples.length/22050;assert.equal(duration,.38);
+    assert.equal(definition.loop,undefined);assert.equal(definition.rate,undefined);
+    assert.match(definition.description,/バシュッだけ/);
     assert.equal(samples[0],0);assert.equal(samples.at(-1),0);
     const energy=(start,end)=>{let sum=0,delta=0,count=0;for(let i=Math.round(start*22050)+1;i<end*22050;i++){sum+=samples[i]**2;delta+=(samples[i]-samples[i-1])**2;count++;}return{rms:Math.sqrt(sum/count),brightness:Math.sqrt(delta/sum)};};
-    const air=energy(.02,.10),motor=energy(.40,.70);
+    const air=energy(.02,.10),tail=energy(.32,.38);
     assert.ok(air.rms>.03,'air release is present immediately, not a delayed hiss');
-    assert.ok(motor.rms>.035,'audible motor follows the air');
-    assert.ok(air.brightness>motor.brightness*4,'broadband air precedes the low drive');
+    assert.ok(tail.rms<air.rms*.12,'burst decays promptly instead of carrying a motor tail');
   }
-  assert.notDeepEqual(clips[0],clips[1],'opening and heavier closing are distinct mixes');
+  assert.deepEqual(clips[0],clips[1],'both actions use the requested air burst without different motors');
+  assert.equal(CABIN_SOUNDS.doorOpen.gain,.65);assert.equal(CABIN_SOUNDS.doorClose.gain,.58);
+  const packer=await readFile(new URL('../studies/audio/pack-cabin-audio.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(packer,/spaceEngineLow|motorOffset|layer\(motor/,'regeneration cannot restore the removed motor');
+});
+
+test('power-on uses a short labelled glitch edit with two faded starter fragments and a quiet tail',async()=>{
+  const definition=CABIN_SOUNDS.powerOn;
+  assert.equal(definition.file,'power-on-glitch.wav');assert.ok(definition.gain<=.24);
+  assert.match(definition.license,/ユーザー提供/);assert.doesNotMatch(definition.license,/CC0/);
+  const file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));
+  assert.ok(file.length<50000,'only the tiny edit ships, not the 12 second source');
+  const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+  assert.ok(Math.abs(data.length/22050-1.05)<.001);
+  assert.equal(data[0],0);assert.equal(data.at(-1),0);
+  const rms=(start,end)=>{const s=data.slice(Math.round(start*22050),Math.round(end*22050));return Math.sqrt(s.reduce((sum,v)=>sum+v*v,0)/s.length);};
+  assert.ok(rms(.015,.09)>.01,'first electrical starter');
+  assert.ok(rms(.265,.32)>.01,'second starter follows the second lamp flash');
+  assert.equal(rms(.13,.24),0);assert.equal(rms(.39,.44),0,'no pitched ping between fragments');
+  assert.ok(rms(.55,.75)>.001,'subdued source texture while the lights settle');
+  assert.ok(rms(.98,1.05)<rms(.55,.75)*.2,'the final fragment fades away');
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  try{
+    await audio.toggle();await audio.load();const before=ctx.created.length;
+    const voice=audio.play('powerOn');assert.ok(voice);assert.equal(voice.source.loop,false);
+    assert.equal(ctx.created.length-before,3,'one buffer voice, gain and panner; no live filters or oscillators');
+  }finally{audio.dispose();}
 });
 test('boot steps preserve separate recorded contacts and a natural metal-floor tail',async()=>{
   const clips=[];
@@ -133,7 +244,7 @@ test('boot playback is quieter and lower pitched in both direct previews and wal
     assert.equal(preview.source.playbackRate.value,.84);assert.equal(walking.source.playbackRate.value,.84);
     preview.source.onended();walking.source.onended();
   }
-  for(const [id,gain]of [['rubberStep1',.30],['rubberStep2',.28],['rubberStep3',.30],['metal',.28]]){
+  for(const [id,gain]of [['rubberStep1',.30],['rubberStep2',.28],['rubberStep3',.30],['metal',.20]]){
     const voice=audio.play(id);assert.equal(voice.volume,gain);assert.equal(voice.source.playbackRate.value,1);
     voice.source.onended();
   }
@@ -214,10 +325,107 @@ test('camera focus changes active loop and one-shot gains without restarting or 
   audio.dispose();
 });
 function harness(options){
-  const events=[],loops=new Map(),audio={enabled:true,play(id,options){if(this.enabled)events.push({id,...options});},setLoop(key,id,active){loops.set(key,{id,active});},tone(){}};
+  const events=[],loops=new Map(),audio={enabled:true,play(id,options){if(this.enabled)events.push({id,...options});},setLoop(key,id,active,options){loops.set(key,{id,active,...options});},tone(){}};
   const state={actor:{x:700,y:650,floor:1,walkDistance:0,queue:[],busy:false},brain:{},care:{phase:'idle'},airlock:{opening:0}};
   return{audio,events,loops,state,driver:new CabinSoundEvents(audio,options)};
 }
+function bedHarness(){
+  const h=harness(),play=h.audio.play;h.stops=[];
+  h.audio.play=function(id,options){play.call(this,id,options);return this.enabled?{id}:null;};
+  h.audio.stopVoice=voice=>h.stops.push(voice);
+  return h;
+}
+test('lid playback stays at original speed for every phase and custom animation duration',()=>{
+  for(const phase of ['opening','closing','waking','sealing']){
+    for(const seconds of [1,2.4,2.7,5]){
+      const h=bedHarness(),dt=1/60;
+      h.driver.update(dt,h.state);
+      const visit=h.state.brain.bunkVisit={phase,age:0,seconds:{[phase]:seconds}};
+      h.driver.update(dt,h.state);
+      assert.equal(h.events.length,1);
+      assert.equal(h.events[0].id,'bedPiston');
+      assert.equal(h.events[0].rate,1,`${phase} (${seconds}s) must not stretch the recording`);
+      for(let frame=0;frame<Math.ceil(seconds/dt);frame++){
+        visit.age+=dt;h.driver.update(dt,h.state);
+      }
+      assert.equal(h.events.length,1,'a long phase never fills time by repeating the stroke');
+    }
+  }
+});
+test('real bed entry and exit trigger each piston/slide once at 30, 60 and 120 fps, with sleeping silent',()=>{
+  for(const fps of [30,60,120]){
+    const h=bedHarness(),dt=1/fps,visit=new BunkVisit(),phases=[];
+    h.driver.update(dt,h.state);h.state.brain.bunkVisit=visit;
+    let woke=false;
+    for(let frame=0;frame<fps*90&&visit.phase!=='done';frame++){
+      if(visit.phase==='sleeping'&&!woke){
+        const count=h.events.length;
+        for(let i=0;i<fps*2;i++){visit.update(dt);h.driver.update(dt,h.state);}
+        assert.equal(h.events.length,count,'sleeping does not emit or loop');
+        visit.requestExit();woke=true;
+      }
+      visit.update(dt);const before=h.events.length;h.driver.update(dt,h.state);
+      if(h.events.length>before){
+        phases.push(visit.phase);
+        const event=h.events.at(-1),s=getStation('bunk');
+        if(event.id==='bedPiston')assert.equal(event.rate,1,'all lid phases retain natural playback speed');
+        else assert.equal(CABIN_SOUNDS[event.id].duration/event.rate,BUNK_PHASE_SECONDS[visit.phase]);
+        assert.deepEqual(event.position,{x:(s.x-700)*.022,y:(870-FLOORS[s.floor].y)*.016+.7,z:-.26});
+      }
+      const count=h.events.length;h.driver.update(0,h.state);h.driver.update(dt,h.state);
+      assert.equal(h.events.length,count,'same pose cannot replay a stroke');
+    }
+    assert.equal(visit.phase,'done');
+    assert.deepEqual(phases,['opening','extending','entering','closing','waking','leaving','retracting','sealing']);
+    assert.equal(h.stops.length,8,'each finished phase releases its voice');
+    assert.equal(h.driver.bedVoice,null);assert.equal(h.events.some(e=>e.id==='latch'||e.id==='servo'),false);
+  }
+});
+test('opening sleep is silent until the lid wakes, and muted or late-loaded bed strokes never replay',()=>{
+  const h=bedHarness(),dt=1/60,visit=new BunkVisit({startAsleep:true});h.state.brain.bunkVisit=visit;
+  for(let i=0;i<120;i++)h.driver.update(dt,h.state);
+  assert.equal(h.events.length,0);visit.requestExit();visit.update(dt);h.driver.update(dt,h.state);
+  assert.deepEqual(h.events.map(e=>e.id),['bedPiston']);
+  h.audio.enabled=false;
+  for(let i=0;i<180;i++){visit.update(dt);h.driver.update(dt,h.state);}
+  h.audio.enabled=true;h.driver.update(dt,h.state);
+  assert.equal(h.events.length,1,'unmute cannot replay a slide that already started');
+  for(let i=0;i<60;i++){visit.update(dt);h.driver.update(dt,h.state);}
+  assert.equal(h.events.length,1);
+  // A failed/not-yet-decoded play is consumed exactly like a muted stroke.
+  const late=bedHarness();late.driver.update(dt,late.state);
+  late.state.brain.bunkVisit={phase:'opening',age:0};let calls=0;
+  late.audio.play=()=>{calls++;return null;};late.driver.update(dt,late.state);
+  for(let i=0;i<90;i++){late.state.brain.bunkVisit.age+=dt;late.driver.update(dt,late.state);}
+  assert.equal(calls,1);
+});
+test('bed sound stops on cancellation, replacement, seek or removal without catching up',()=>{
+  for(const change of [
+    h=>h.state.brain.bunkVisit=null,
+    h=>h.state.brain.bunkVisit={phase:'opening',age:1},
+    h=>h.state.brain.bunkVisit.phase='sleeping',
+    h=>h.state.brain.bunkVisit.age=0,
+  ]){
+    const h=bedHarness(),dt=1/60;h.driver.update(dt,h.state);
+    h.state.brain.bunkVisit={phase:'opening',age:0};h.driver.update(dt,h.state);
+    h.state.brain.bunkVisit.age=.2;h.driver.update(dt,h.state);change(h);h.driver.update(dt,h.state);
+    assert.equal(h.events.length,1);assert.equal(h.stops.length,1);assert.equal(h.driver.bedVoice,null);
+  }
+  const h=bedHarness();h.driver.update(1/60,h.state);
+  h.state.brain.bunkVisit={phase:'waking',age:0};h.driver.update(1/60,h.state);
+  h.state.brain.bunkVisit={phase:'sealing',age:0};h.driver.update(10,h.state);
+  assert.equal(h.events.length,1);assert.equal(h.stops.length,1);
+  const cancelled=bedHarness(),visit=new BunkVisit();cancelled.state.brain.bunkVisit=visit;
+  cancelled.driver.update(1/60,cancelled.state);visit.requestExit();
+  for(let i=0;i<180;i++){visit.update(1/60);cancelled.driver.update(1/60,cancelled.state);}
+  assert.equal(cancelled.events.length,0,'cancelling during approach does not move the lid');
+});
+test('bed preview uses the real BunkVisit timeline and the shared sound driver',async()=>{
+  const page=await readFile(new URL('../src/cabin-audio-study.html',import.meta.url),'utf8');
+  const source=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
+  assert.match(page,/<option value="bed">/);assert.match(source,/new BunkVisit\(\{startAsleep:true\}\)/);
+  assert.match(source,/bunkVisit\.update\(dt\)/);assert.match(source,/r\.driver\.update\(dt,s\)/);
+});
 function hungryFixture(random=()=>0){
   const h=harness({random});
   h.state.cat={mode:'look',hunger:35,motion:{x:800,y:650,z:-.7,elevation:.45}};
@@ -369,9 +577,62 @@ test('droid rubber footfalls, Milo ladder contacts and cargo impacts stay separa
   h.state.actor.climbing=true;
   for(let i=0;i<30;i++){h.state.actor.y-=2;h.driver.update(1/60,h.state);}
   assert.ok(h.events.length>count);assert.ok(h.events.slice(count).every(e=>/^ladderStep[123]$/.test(e.id)));
-  h.state.actor.climbing=false;droid.step={kind:'work',action:'cargo-place'};h.driver.update(1/60,h.state);
-  const beforeCargo=h.events.length;droid.step={kind:'walk'};h.driver.update(1/60,h.state);
+  h.state.actor.climbing=false;droid.step={kind:'work',action:'cargo-place',duration:2};droid.age=0;h.driver.update(1/60,h.state);
+  const beforeCargo=h.events.length;droid.age=1.01;h.driver.update(1/60,h.state);
   assert.equal(h.events.length,beforeCargo+1);assert.equal(h.events.at(-1).id,'metal');
+  droid.step={kind:'walk'};h.driver.update(1/60,h.state);assert.equal(h.events.length,beforeCargo+1,'no second contact at the next job');
+});
+test('cargo contact is a short faded recording with subdued treble and no pitch processing',async()=>{
+  const definition=CABIN_SOUNDS.metal,file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));
+  const samples=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
+  assert.equal(samples.length/22050,.30);assert.equal(samples[0],0);assert.equal(samples.at(-1),0);
+  assert.equal(definition.gain,.20);assert.equal(definition.rate,undefined);assert.equal(definition.loop,undefined);
+  assert.match(definition.label,/ハードケース/);
+  const rms=data=>Math.sqrt(data.reduce((sum,s)=>sum+s*s,0)/data.length);
+  assert.ok(rms(samples.slice(0,2205))>.03,'retain the physical contact');
+  assert.ok(rms(samples.slice(-441))<rms(samples.slice(0,2205))*.1,'tail settles without another hit');
+  let energy=0,delta=0;
+  for(let i=1;i<samples.length;i++){energy+=samples[i]**2;delta+=(samples[i]-samples[i-1])**2;}
+  assert.ok(Math.sqrt(delta/energy)<.5,'contact is not a sharp, ringing generic clang');
+  const credits=await readFile(new URL('../public/assets/obs/audio/CREDITS.md',import.meta.url),'utf8');
+  assert.match(credits,/Nox_Sound/);assert.match(credits,/2\.555–2\.855/);
+});
+test('cargo lands once at shelf contact, not on serving food or leaving the placement step',()=>{
+  for(const fps of [30,60,120]){
+    const h=harness(),dt=1/fps,droid=new DroidRoutine({care:{lastDelivery:null}});h.state.droid=droid;droid.job='cargo';
+    droid.act('cargo-place',2.8);h.driver.update(dt,h.state);
+    while(droid.step){
+      droid.update(dt);const before=h.events.length;h.driver.update(dt,h.state);
+      if(h.events.length>before){assert.equal(droid.step?.action,'cargo-place');assert.ok(droid.age>droid.step.duration*.5);assert.ok(droid.age<=droid.step.duration*.5+dt+1e-8);}
+      const count=h.events.length;h.driver.update(dt,h.state);assert.equal(h.events.length,count);
+    }
+    assert.deepEqual(h.events.map(e=>e.id),['metal']);assert.equal(h.events[0].volume,.45);
+    for(const action of ['greens-place','cook-serve']){
+      droid.act(action,2);while(droid.step){droid.update(dt);h.driver.update(dt,h.state);}
+    }
+    assert.equal(h.events.length,1,'lightweight food is not a heavy case');
+  }
+});
+test('cargo contacts stay quiet after muted, late or missing snapshots',()=>{
+  const h=harness(),droid={position:{x:0,y:3,z:0},step:{kind:'work',action:'cargo-place',duration:2},age:0};h.state.droid=droid;
+  h.driver.update(1/60,h.state);h.audio.enabled=false;droid.age=1.1;h.driver.update(1/60,h.state);
+  h.audio.enabled=true;h.driver.update(1/60,h.state);assert.equal(h.events.length,0);
+  droid.step={kind:'work',action:'cargo-place',duration:2};droid.age=0;h.driver.update(1/60,h.state);
+  droid.age=1.1;h.driver.update(.5,h.state);h.driver.update(1/60,h.state);assert.equal(h.events.length,0);
+  droid.step={kind:'work',action:'cargo-place',duration:2};droid.age=0;h.driver.update(1/60,h.state);
+  h.state.droid=null;h.driver.update(1/60,h.state);droid.age=1.1;h.state.droid=droid;h.driver.update(1/60,h.state);
+  assert.equal(h.events.length,0);
+});
+test('the three supply cases keep one quieter contact each, without duplicate landings',()=>{
+  for(const fps of [30,60,120]){
+    const h=harness(),dt=1/fps;h.state.care={phase:'unloading',delivery:{age:0}};h.driver.update(dt,h.state);
+    for(let frame=1;frame<=fps*2.5;frame++){
+      h.state.care.delivery.age=frame*dt;h.driver.update(dt,h.state);
+      const count=h.events.length;h.driver.update(dt,h.state);assert.equal(h.events.length,count);
+    }
+    const contacts=h.events.filter(e=>e.id==='metal');assert.equal(contacts.length,3);
+    assert.ok(contacts.every(e=>e.volume===.85));
+  }
 });
 test('live Milo ascent and descent play the dedicated contacts, with silence while waiting and no duplicate updates',()=>{
   for(const [from,to]of [[1,0],[0,1]]){
@@ -461,12 +722,119 @@ test('droid ladder strokes follow height in both directions and stop when age ad
   }
 });
 test('appliances respect their real operating flags and no state transition is emitted twice',()=>{
-  const h=harness(),droid={position:{x:0,y:3,z:0},step:{kind:'work',action:'washer-start',duration:2},age:0,time:0,washingUntil:0};h.state.droid=droid;
+  const h=harness(),droid={position:{x:0,y:3,z:0},step:{kind:'work',action:'washer-start',duration:2},age:0,time:0,washingUntil:0,washerOpening:1};h.state.droid=droid;
   h.driver.update(1/60,h.state);assert.equal(h.loops.get('washer').active,false);
   droid.washingUntil=5;droid.time=1;h.driver.update(1/60,h.state);assert.equal(h.loops.get('washer').active,true);
   droid.time=6;h.driver.update(1/60,h.state);assert.equal(h.loops.get('washer').active,false);
-  droid.step={kind:'work',action:'washer-close'};h.driver.update(1/60,h.state);assert.equal(h.events.filter(e=>e.id==='latch').length,0);
-  droid.step={kind:'walk'};h.driver.update(1/60,h.state);h.driver.update(1/60,h.state);assert.equal(h.events.filter(e=>e.id==='latch').length,1);
+  droid.step={kind:'work',action:'washer-close'};droid.washerOpening=.5;h.driver.update(1/60,h.state);assert.equal(h.events.length,0);
+  droid.step=null;droid.washerOpening=0;h.driver.update(1/60,h.state);h.driver.update(1/60,h.state);
+  assert.deepEqual(h.events.map(e=>e.id),['applianceLid'],'closure still sounds with no following step, without a second lock impact');
+});
+test('real appliance hinges unlock once and contact only at full closure, at 30, 60 and 120 fps',()=>{
+  for(const fps of [30,60,120])for(const [prefix,property]of [['washer','washerOpening'],['waste','incineratorOpen']]){
+    const h=harness(),dt=1/fps,droid=new DroidRoutine({care:{lastDelivery:null}});h.state.droid=droid;
+    droid.job='laundry';
+    const duration=prefix==='washer'?1.8:.9;
+    droid.act(prefix+'-open',duration);droid.add('hold',.5);droid.act(prefix+'-close',duration);
+    h.driver.update(dt,h.state);
+    for(let frame=0;frame<fps*5&&droid.step;frame++){
+      droid.update(dt);const before=h.events.length;h.driver.update(dt,h.state);
+      for(const event of h.events.slice(before)){
+        if(event.id==='latch')assert.ok(droid[property]>0&&droid[property]<.03,'unlock at the start of actual hinge motion');
+        else{assert.equal(event.id,'applianceLid');assert.equal(droid[property],0,'impact only at the end of closure');}
+      }
+      const count=h.events.length;h.driver.update(dt,h.state);assert.equal(h.events.length,count,'a repeated snapshot is silent');
+    }
+    assert.equal(droid.step,null);assert.deepEqual(h.events.map(e=>e.id),['latch','applianceLid']);
+    const lid=h.events[1];
+    assert.equal(lid.position.x,prefix==='washer'?-2.34:WASTE_INCINERATOR.x,'contact comes from the appliance, not the droid');
+    assert.equal(lid.volume,prefix==='washer'?1:.75);
+    for(let i=0;i<fps;i++)h.driver.update(dt,h.state);
+    assert.equal(h.events.length,2,'closed and stationary is silent');
+  }
+});
+test('appliance closures never catch up after mute, late frames, missing state or droid replacement',()=>{
+  const h=harness(),droid={position:{x:0,y:3,z:0},step:null,washerOpening:0};h.state.droid=droid;
+  const update=(opening,dt=1/60)=>{droid.washerOpening=opening;h.driver.update(dt,h.state);};
+  update(0);h.audio.enabled=false;update(.01);update(1);update(.5);update(0);
+  h.audio.enabled=true;update(0);assert.equal(h.events.length,0);
+  update(1,.5);update(0,.5);update(0);assert.equal(h.events.length,0,'no late-frame replay');
+  update(undefined);update(1);assert.equal(h.events.length,0,'joining mid-stroke does not unlock again');
+  h.state.droid=null;h.driver.update(1/60,h.state);update(0);
+  h.state.droid=droid;update(0);assert.equal(h.events.length,0,'removed and returning droids cannot produce stale contact');
+  update(1);h.state.droid={...droid,washerOpening:0};h.driver.update(1/60,h.state);
+  assert.deepEqual(h.events.map(e=>e.id),['latch'],'a replacement closed state is not a real closure');
+});
+test('the study exposes separate lock and lid auditions and uses the live hinge routine',async()=>{
+  const html=await readFile(new URL('../src/cabin-audio-study.html',import.meta.url),'utf8');
+  const js=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
+  assert.match(html,/value="washerDoor"/);assert.match(js,/new DroidRoutine/);
+  assert.match(js,/droid\.act\('washer-open',1\.8\)/);assert.match(js,/droid\.act\('washer-close',1\.8\)/);
+  assert.match(CABIN_SOUNDS.latch.label,/ロック/);assert.match(CABIN_SOUNDS.applianceLid.label,/洗濯機/);
+});
+test('the approved bag clip and gain stay untouched alongside a compact recorded kibble stream',async()=>{
+  const bag=await readFile(new URL('../public/assets/obs/audio/bag.wav',import.meta.url));
+  assert.equal(createHash('sha256').update(bag).digest('hex'),'d0db374e8a080505e1d93b308c26fd8453cea1f2606c0cdaf4ab65573683786f');
+  assert.equal(CABIN_SOUNDS.bag.gain,.24);assert.equal(CABIN_SOUNDS.bag.loop,undefined);
+  const definition=CABIN_SOUNDS.kibblePour,file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));
+  assert.equal(file.length,132344);assert.equal((file.length-44)/2/22050,3);
+  assert.equal(definition.loop,true);assert.equal(definition.gain,.23);assert.equal(definition.rate,undefined);
+  assert.notDeepEqual(file,bag);
+});
+test('real food pouring adds bowl rattle only during grain arrivals and preserves all five bag rustles',()=>{
+  for(const fps of [30,60,120]){
+    const h=harness(),dt=1/fps,droid=new DroidRoutine({care:{lastDelivery:null}});h.state.droid=droid;
+    droid.job='feed';droid.carriedFood=true;droid.act('food-pour',6);h.driver.update(dt,h.state);
+    let first=null,last=null,activeBefore=false,starts=0,stops=0;
+    while(droid.step){
+      droid.update(dt);h.driver.update(dt,h.state);
+      const loop=h.loops.get('kibble-pour'),age=droid.age*DROID_PACE;
+      const expected=Boolean(droid.step&&age>=KIBBLE_STREAM.start+KIBBLE_CONTACT_DELAY&&age<6-KIBBLE_STREAM.finishLead+KIBBLE_CONTACT_DELAY);
+      assert.equal(loop.active,expected);
+      if(loop.active){first??=droid.time;last=droid.time;assert.equal(loop.id,'kibblePour');
+        assert.deepEqual(loop.position,{x:(CAT_BOWL.x-700)*.022,y:(870-FLOORS[CAT_BOWL.floor].y)*.016+CAT_BOWL.foodHeight,z:CAT_BOWL.depth});}
+      if(loop.active&&!activeBefore)starts++;if(!loop.active&&activeBefore)stops++;activeBefore=loop.active;
+    }
+    assert.equal(starts,1);assert.equal(stops,1);
+    assert.ok(Math.abs(first-(KIBBLE_STREAM.start+KIBBLE_CONTACT_DELAY)/DROID_PACE)<=dt+1e-8);
+    assert.ok(Math.abs(last-(6-KIBBLE_STREAM.finishLead+KIBBLE_CONTACT_DELAY)/DROID_PACE)<=dt+1e-8);
+    const bags=h.events.filter(e=>e.id==='bag');assert.equal(bags.length,5);assert.ok(bags.every(e=>e.volume===.7));
+    assert.equal(h.events.some(e=>e.id==='kibblePour'),false,'grains are a single stream, not repeated one-shots');
+  }
+});
+test('kibble stream stops on waiting, missing food, end of pour and droid removal',()=>{
+  const h=harness(),droid={position:{x:0,y:0,z:0},step:{kind:'work',action:'food-pour',duration:6},age:2,carriedFood:true};h.state.droid=droid;
+  const active=()=>{h.driver.update(1/60,h.state);return h.loops.get('kibble-pour').active;};
+  assert.equal(active(),true);droid.waiting=true;assert.equal(active(),false);
+  droid.waiting=false;assert.equal(active(),true);droid.carriedFood=false;assert.equal(active(),false);
+  droid.carriedFood=true;droid.age=5.5;assert.equal(active(),false);
+  droid.age=2;assert.equal(active(),true);droid.step=null;assert.equal(active(),false);
+  h.state.droid=null;assert.equal(active(),false);
+});
+test('kibble and bag share the bounded mixer with one reused stream and stop together on mute or pause',async()=>{
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  try{
+    await audio.toggle();await audio.load();
+    const before=ctx.created.length;audio.setLoop('kibble-pour','kibblePour',true);
+    const stream=audio.loops.get('kibble-pour');assert.ok(stream);assert.equal(stream.source.loop,true);
+    assert.equal(ctx.created.length-before,3,'one buffer, gain and panner, no filter or per-grain source');
+    for(let i=0;i<300;i++)audio.setLoop('kibble-pour','kibblePour',true);
+    assert.equal(audio.loops.get('kibble-pour'),stream);assert.equal(ctx.created.length-before,3);
+    const bag=audio.play('bag');assert.ok(bag);assert.equal(audio.voices.size,2);
+    audio.pause(true);assert.equal(stream.stopping,true);assert.equal(bag.stopping,true);assert.equal(audio.loops.size,0);
+    stream.source.onended();bag.source.onended();audio.pause(false);
+    audio.setLoop('kibble-pour','kibblePour',true);const resumed=audio.loops.get('kibble-pour');assert.ok(resumed);
+    await audio.toggle();assert.equal(audio.loops.size,0);assert.equal(resumed.stopping,true);
+    audio.setLoop('kibble-pour','kibblePour',false);resumed.source.onended();await audio.toggle();
+    assert.equal(audio.voices.size,0,'finished muted pours do not replay');
+  }finally{audio.dispose();}
+});
+test('the feed study runs the real routine at OBS pace and offers a separate kibble audition',async()=>{
+  const html=await readFile(new URL('../src/cabin-audio-study.html',import.meta.url),'utf8');
+  const js=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
+  assert.match(html,/猫餌の袋 ＋ カリカリを皿へ/);assert.match(js,/droid\.act\('food-pour',6/);
+  assert.match(js,/\['washerDoor','feed'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
+  assert.match(CABIN_SOUNDS.kibblePour.label,/カリカリを皿へ/);
 });
 test('disposal during an in-flight download aborts and cannot repopulate the cache',async()=>{
   let release;const pending=new Promise(resolve=>release=resolve),ctx=context();

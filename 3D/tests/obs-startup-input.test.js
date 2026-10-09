@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {bindStartupLightingInput} from '../src/obs/startup-input.js';
+import {bindStartupLightingInput,activateStartupLighting} from '../src/obs/startup-input.js';
 import {CabinStartupLighting} from '../src/obs/startup-lighting.js';
 
 function setup(){
@@ -47,4 +47,19 @@ test('camera looking, wheel, drag, cancelled gestures, multi-touch and nonprimar
 test('listeners are released on teardown',()=>{
   const s=setup();s.send('pointerdown');s.unbind();s.send('pointerup');s.send('pointerdown');s.send('pointerup');s.send('keydown',{key:'Enter'});
   assert.equal(s.activations(),0);s.close();
+});
+
+test('a successful light activation plays one sample, never a tone or a delayed unmute backlog',()=>{
+  for(const audible of [false,true]){
+    const effect=new CabinStartupLighting([],{waitForActivation:true}),calls=[];
+    let wake=0;
+    const audio={enabled:audible,play(id){calls.push(id);return this.enabled?{}:null;},tone(){assert.fail('no pitched plop');}};
+    const activate=()=>activateStartupLighting(effect,{audio,onActivate:()=>wake++});
+    try{
+      assert.equal(activate(),true);assert.equal(wake,1);assert.deepEqual(calls,['powerOn']);
+      audio.enabled=true;
+      for(let i=0;i<120;i++){effect.update(1/60);assert.equal(activate(),false);}
+      assert.equal(wake,1);assert.deepEqual(calls,['powerOn'],'not replayed by clicks, frames or sound enabling');
+    }finally{effect.dispose();}
+  }
 });

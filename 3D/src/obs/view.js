@@ -212,7 +212,9 @@ export class ObservationView {
     let drag=null;
     this.bind('pointerdown',e=>{if(this.characterCamera?.pointerDown(e))return;if(e.button!==0||e.isPrimary===false||drag)return;this.zoomAnchor=null;drag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,cx:this.targetCenter.x,cy:this.targetCenter.y,target:this.targetAt(e),moved:false};this.canvas.setPointerCapture(e.pointerId);});
     this.bind('pointermove',e=>{if(this.characterCamera?.pointerMove(e))return;if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.characterCamera?.select('manual');this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-13,13);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,HABITAT_VIEW.panMinY,HABITAT_VIEW.panMaxY);}});
-    this.bind('pointerup',e=>{if(this.characterCamera?.pointerEnd(e))return;if(!drag||e.pointerId!==drag.pointerId)return;const {target,moved}=drag;drag=null;this.hover(null);if(moved||!target)return;if(target.type==='character')this.setMode(target.id);else this.onStation?.(target.id);});
+    // The first dark-scene tap powers the lights, not a station order with a
+    // pitched acknowledgement. Clear drag normally so subsequent taps work.
+    this.bind('pointerup',e=>{if(this.characterCamera?.pointerEnd(e))return;if(!drag||e.pointerId!==drag.pointerId)return;const {target,moved}=drag;drag=null;this.hover(null);if(moved||!target)return;if(target.type==='character')this.setMode(target.id);else if(!this.startupLighting?.waiting)this.onStation?.(target.id);});
     this.bind('pointercancel',e=>{this.characterCamera?.pointerEnd(e);if(drag&&e.pointerId!==drag.pointerId)return;drag=null;this.hover(null);});
     this.bind('lostpointercapture',e=>{this.characterCamera?.pointerEnd(e);if(drag&&e.pointerId!==drag.pointerId)return;drag=null;this.hover(null);});
     this.bind('pointerleave',()=>this.hover(null));
