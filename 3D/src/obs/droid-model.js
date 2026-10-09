@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {createDroidLowParts,batchDroidLow} from './droid-low.js';
+import {createDroidLowParts,batchDroidLow,addDroidBalanceRotor} from './droid-low.js?v=balance-rotor-1';
 import {DROID_STARTUP_SECONDS,droidStartupLight} from './droid-startup.js';
 import {createDroidBatteryAtlas} from './droid-textures.js';
 import {DROID_GAIT} from './pace.js';
@@ -550,9 +550,11 @@ function buildDroidDetailed(){
   return {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators};
 }
 
-export function createDroid({detail='study'}={}){
+export function createDroid({detail='study',balanceRotor=false}={}){
   const low=detail==='obs';
   const {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators}=low?createDroidLowParts(DROID_SPEC,DROID_EXPRESSIONS,expressionPaths):buildDroidDetailed();
+  // OBS opts into the approved mechanism; keep the original for study comparison.
+  const balance=low&&balanceRotor?addDroidBalanceRotor(chassis,m):null;
   m.batteryTexture=createDroidBatteryAtlas();
   m.battery=new THREE.MeshBasicMaterial({name:'Droid / four amber battery lamps',map:m.batteryTexture,toneMapped:false});
   // Self-lit tubes and charge indicators run from the droid, not the ceiling
@@ -589,6 +591,7 @@ export function createDroid({detail='study'}={}){
     neckPivot.rotation.set(pose.nod??THREE.MathUtils.lerp(-lean*.6,.63,rest),0,-.055*rest);
     // Blend out of the resting head pose instead of snapping at the power threshold.
     head.rotation.set(THREE.MathUtils.lerp(-.025+(carry?.055:Math.sin(time*.62)*.014),.025,rest),THREE.MathUtils.lerp(Math.sin(time*.38)*.11,-.055,rest),Math.sin(time*.29)*.012*(1-rest));
+    balance?.update(time,{rest,walkAmount,lean:pose.lean??lean});
     poweredMeshes.forEach(mesh=>mesh.visible=facePower>0);
     for(const {material,color}of poweredMaterials)material.color.copy(color).multiplyScalar(facePower);
     const fromChassis=point=>point.applyQuaternion(chassis.quaternion).add(chassis.position);
@@ -660,5 +663,5 @@ export function createDroid({detail='study'}={}){
     Object.values(m).forEach(v=>v.dispose?.());
     skin?.skeleton.dispose();
   }
-  return {root,head,face,battery,neckPivot,chassis,arms,legs,tray,actuators,skin,update,dispose};
+  return {root,head,face,battery,neckPivot,chassis,arms,legs,tray,actuators,skin,balance,update,dispose};
 }

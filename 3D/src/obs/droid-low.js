@@ -88,7 +88,10 @@ function headAssembly(parent,m,names){
     hub(head,m,[side*.136,-.008,-.022],.049,.031);
     box(head,m,[side*.087,-.071,-.125],[.047,.058,.026],T.circuit);
   }
-  box(head,m,[0,-.116,-.014],[.125,.025,.14],T.circuit);
+  box(head,m,[0,-.116,-.014],[.125,.025,.14],T.circuit).name='Head / underside circuit cover';
+  // A compact bearing joins the shortened fixed post to the head. It moves
+  // with the cover, so yaw cannot sweep a broad flat face through the support.
+  hub(head,m,[0,-.128,-.040],.027,.048).name='Neck / rotating bearing';
   cable(head,m,[[-.074,.133,-.07],[-.07,.153,-.076],[.07,.153,-.076],[.074,.133,-.07]],.006,T.dark);
   cable(head,m,[[.094,-.039,-.108],[.08,-.099,-.144],[.044,-.126,-.092]],.005,T.copper);
   const faceMesh=new THREE.Mesh(new THREE.PlaneGeometry(.208,.172),m.amber);faceMesh.name='OBS droid / nixie expression image';faceMesh.position.z=.127;head.add(faceMesh);
@@ -195,7 +198,8 @@ export function createDroidLowParts(spec,expressions,expressionPaths){
     bar(chassis,m,[0,y,-.070],[0,y,-.124],.019,T.steel);
     box(chassis,m,[0,y,-.119],[.110,.060,.012],T.panel);
   }
-  box(chassis,m,[0,.509,-.027],[.064,.08,.062],T.neck);
+  // Stop below the moving underside cover, including service/charging nods.
+  box(chassis,m,[0,.4945,-.027],[.064,.051,.052],T.neck).name='Neck / fixed support';
   for(const side of [-1,1]){
     bar(chassis,m,[side*.062,.469,-.012],[side*.055,.551,-.034],.008,T.bright);
     cable(chassis,m,[[side*.08,side>0?.418:.441,.06],[side*.087,.506,.045],[side*.060,.544,.023],[side*.07,.603,-.07]],.006,T.copper);
@@ -219,6 +223,44 @@ export function createDroidLowParts(spec,expressions,expressionPaths){
   for(const a of arms)actuator(a.upper,[a.side*.055,-.115,-.025],a.lower,[a.side*.044,-.13,-.015],.015);
   for(const l of legs){actuator(l.upper,[l.side*.075,-.19,-.025],l.middle,[l.side*.075,-.095,-.025],.019);actuator(l.middle,[l.side*.077,-.19,.030],l.lower,[l.side*.077,-.125,.028],.018);}
   return {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators};
+}
+
+// Approved abdomen mechanism. It reuses the body atlas and rigid
+// skin: two counter-rotating drums and their cradle add joints, not draw calls.
+export function addDroidBalanceRotor(chassis,m){
+  const root=group(chassis,'Balance rotor / abdomen cassette',[0,.155,.115]);
+  // Open cage: the drums remain visible from the front and both sides.
+  for(const y of [-.052,.052]){
+    box(root,m,[0,y,0],[.180,.010,.022],T.steel);
+    box(root,m,[0,y,-.061],[.036,.014,.130],T.dark);
+    for(const side of [-1,1])box(root,m,[side*.083,y,0],[.018,.018,.033],T.bearing);
+  }
+  for(const side of [-1,1])bar(root,m,[side*.083,-.052,0],[side*.083,.052,0],.0045,T.bright);
+  const cradle=group(root,'Balance rotor / tilting cradle');
+  box(cradle,m,[0,0,0],[.012,.094,.012],T.dark);
+  for(const y of [-.043,.043])box(cradle,m,[0,y,0],[.050,.009,.029],T.steel);
+  const rotors=[];
+  for(const side of [-1,1]){
+    const rotor=group(cradle,side<0?'Balance rotor / lower drum':'Balance rotor / upper drum',[0,side*.023,0]);
+    const circle=r=>Array.from({length:16},(_,i)=>{const a=i*Math.PI/8;return [Math.cos(a)*r,Math.sin(a)*r];});
+    const rim=plate(rotor,m,circle(.069),0,.014,T.steel,circle(.051));rim.rotation.x=Math.PI/2;rim.position.set(0,.007,0);
+    part(rotor,m,new THREE.CylinderGeometry(.018,.018,.018,8),[0,0,0],T.bright);
+    // Three swept-looking spokes and opposed brass balance shoes make actual
+    // rotation legible; no transparent blur disc or blinking light is needed.
+    for(let i=0;i<3;i++){
+      const a=i*Math.PI*2/3;
+      bar(rotor,m,[Math.cos(a)*.013,0,Math.sin(a)*.013],[Math.cos(a+.32)*.057,0,Math.sin(a+.32)*.057],.0045,T.bright);
+    }
+    for(const sign of [-1,1])box(rotor,m,[sign*.060,0,0],[.012,.020,.026],T.brass);
+    rotors.push(rotor);
+  }
+  function update(time,{rest=0,walkAmount=0,lean=0}={}){
+    const running=1-THREE.MathUtils.clamp(rest,0,1),phase=time*Math.PI*1.5*running;
+    rotors[0].rotation.y=phase;rotors[1].rotation.y=-phase+Math.PI/3;
+    cradle.rotation.x=running?THREE.MathUtils.clamp(-lean*.35,-.07,.07)*running:0;
+    cradle.rotation.z=running?Math.sin(time*Math.PI*2/1.46)*.045*walkAmount*running:0;
+  }
+  update(0);return {root,cradle,rotors,update};
 }
 
 // All opaque parts share one atlas/material and one skinned draw. A vertex has

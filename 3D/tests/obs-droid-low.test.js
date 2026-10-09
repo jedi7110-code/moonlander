@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {createDroid,DROID_EXPRESSIONS} from '../src/obs/droid-model.js';
+import {OBB} from 'three/addons/math/OBB.js';
+import {createDroid,DROID_EXPRESSIONS,DROID_SPEC} from '../src/obs/droid-model.js';
+import {createDroidLowParts} from '../src/obs/droid-low.js';
 import {createCabinToon} from '../src/obs/cabin-toon.js';
 import {sampleDroidServicePose,droidLadderContact} from '../src/obs/droid-service.js';
 
@@ -10,6 +12,36 @@ function inventory(root){
   root.traverse(o=>{if(o.isMesh){meshes.push(o);triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;}});
   return {meshes,triangles};
 }
+
+test('moving head cover stays clear of the fixed neck during yaw, service nods and startup',()=>{
+  const droid=createDroid({detail:'obs'}),parts=createDroidLowParts(DROID_SPEC,{},()=>[]);
+  const post=parts.root.getObjectByName('Neck / fixed support');
+  const cover=parts.root.getObjectByName('Head / underside circuit cover');
+  const bounds=mesh=>{mesh.geometry.computeBoundingBox();return new OBB().fromBox3(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);};
+  try{
+    // Use production animation transforms, including the full service nod range
+    // and the folded charging/waking pose, not just an unposed construction box.
+    for(const mode of ['idle','walk','carry','charging','wake','service'])for(let i=0;i<=120;i++){
+      const time=i*.5;
+      const poses=mode==='service'?[-.20,0,.22,.40,.63].map(nod=>({nod})): [{}];
+      for(const pose of poses){
+        droid.update(time,mode,pose);
+        parts.chassis.quaternion.copy(droid.chassis.quaternion);
+        parts.neckPivot.quaternion.copy(droid.neckPivot.quaternion);
+        parts.head.quaternion.copy(droid.head.quaternion);
+        parts.root.updateMatrixWorld(true);
+        const support=bounds(post);support.halfSize.addScalar(.003);
+        assert.equal(support.intersectsOBB(bounds(cover)),false,`${mode} at ${time}s: head cover needs 3 mm clearance`);
+      }
+    }
+    const joint=parts.root.getObjectByName('Neck / rotating bearing');
+    assert.equal(joint?.parent,parts.head,'the bearing follows the moving cover');
+    assert.equal(joint.material,parts.m.body,'reuse the existing rigid skin material');
+  }finally{
+    droid.dispose();parts.root.traverse(o=>o.geometry?.dispose());
+    for(const resource of new Set(Object.values(parts.m)))resource.dispose?.();
+  }
+});
 
 test('lightweight model uses one body skin, one face image and one battery image, keeping the detailed default',()=>{
   const detailed=createDroid(),low=createDroid({detail:'obs'});

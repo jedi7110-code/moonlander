@@ -3,13 +3,15 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createCabinToon} from '../../src/obs/cabin-toon.js';
-import {createDroid,DROID_EXPRESSIONS} from '../../src/obs/droid-model.js';
+import {createDroid,DROID_EXPRESSIONS} from '../../src/obs/droid-model.js?v=balance-rotor-1';
 import {sampleDroidServicePose} from '../../src/obs/droid-service.js';
 import {DROID_STARTUP_SECONDS} from '../../src/obs/droid-startup.js';
 
 const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
 const VIEWS={three:{eye:[2.35,1.60,3.25],target:[0,.89,0],label:'THREE-QUARTER'},front:{eye:[0,1.19,4],target:[0,.89,0],label:'FRONT'},side:{eye:[4,1.23,0],target:[0,.89,0],label:'SIDE'},back:{eye:[0,1.35,-4],target:[0,.89,0],label:'BACK'},head:{eye:[.30,1.67,1.30],target:[0,1.56,.02],label:'NIXIE / EXPRESSIONS'},hands:{eye:[1.3,1.25,2],target:[0,1.05,.14],label:'HANDS / JOINTS'}};
 VIEWS.chest={eye:[.14,1.35,.88],target:[0,1.23,.11],label:'BATTERY / 4 LEVELS'};
+VIEWS.rotor={eye:[.26,1.23,.95],target:[0,1.06,.12],label:'BALANCE ROTOR / OBS'};
+const rotorStudy=params.get('rotor')!=='0';
 const choose=(name,values,fallback)=>values.includes(params.get(name))?params.get(name):fallback;
 function init(){
   const canvas=$('droid-canvas'),renderer=new THREE.WebGLRenderer({canvas,antialias:true});
@@ -23,7 +25,7 @@ function init(){
     const rim=new THREE.DirectionalLight(0xc9dfe7,2.6);rim.position.set(2,3,-3);scene.add(rim);
     const fill=new THREE.DirectionalLight(0xe5cfb1,.7);fill.position.set(4,2,3);scene.add(fill);
     const floor=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:0x303b30,roughness:.94,metalness:.15}));floor.rotation.x=-Math.PI/2;floor.position.y=-.002;floor.receiveShadow=true;scene.add(floor);
-    const droid=createDroid({detail});scene.add(droid.root);let triangles=0;
+    const droid=createDroid({detail,balanceRotor:rotorStudy&&detail==='obs'});scene.add(droid.root);let triangles=0;
     droid.root.traverse(o=>{if(o.isMesh)triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;});
     const toon=createCabinToon([droid.root]);
     // A merged ladder moves past the stationary comparison camera. Its rung
@@ -35,6 +37,7 @@ function init(){
     return {detail,scene,droid,toon,triangles,floor,key,ladder};
   });
   for(const m of models)$(`${m.detail}-triangles`).textContent=m.triangles.toLocaleString()+' triangles';
+  document.querySelector('.study-notice').textContent=rotorStudy?'腹部バランスローター / OBS採用済み':'ローターなし / 変更前の比較用';
   $('reduction').textContent='三角形数 '+(100-models[1].triangles/models[0].triangles*100).toFixed(1)+'% 削減';
   const camera=new THREE.PerspectiveCamera(32,1,.03,70),controls=new OrbitControls(camera,canvas);controls.minDistance=.55;controls.maxDistance=8;controls.minPolarAngle=.18;controls.maxPolarAngle=Math.PI*.70;
   let mode=choose('mode',['idle','walk','climb','carry','charging','wake'],'idle'),view=choose('view',Object.keys(VIEWS),'three'),style=choose('style',['current','cartoon','flat'],'cartoon'),expression=choose('face',Object.keys(DROID_EXPRESSIONS),'neutral'),layout=choose('layout',['both','study','obs'],'both');
@@ -42,7 +45,7 @@ function init(){
   const duration=()=>mode==='wake'?DROID_STARTUP_SECONDS:20;
   let time=Math.max(0,Math.min(duration(),Number(params.get('time'))||0)),speed=1,playing=false,dirty=true,width=1,height=1,last=performance.now(),frame,hud=0;
   function save(){const url=new URL(location.href);for(const [key,value]of Object.entries({mode,view,style,face:expression,layout,battery,time:time.toFixed(2)}))url.searchParams.set(key,value);history.replaceState(null,'',url);}
-  function setView(){const v=VIEWS[view];camera.position.set(...v.eye);controls.target.set(...v.target);if(!['head','hands','chest'].includes(view))camera.position.sub(controls.target).multiplyScalar(.88).add(controls.target);controls.update();$('view-label').textContent=v.label;dirty=true;}
+  function setView(){const v=VIEWS[view];camera.position.set(...v.eye);controls.target.set(...v.target);if(!['head','hands','chest','rotor'].includes(view))camera.position.sub(controls.target).multiplyScalar(.88).add(controls.target);controls.update();$('view-label').textContent=v.label;dirty=true;}
   function pose(){
     for(const m of models){
       m.ladder.visible=mode==='climb';m.floor.visible=mode!=='climb';

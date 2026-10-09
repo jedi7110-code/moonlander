@@ -186,7 +186,9 @@ export function createGalley(m={}, {cookware=true}={}){
   box(root,metal,0,1.071,-1.045,2.98,.076,.045).name='Galley / rear spill lip';
   // Keep the front edge low where Milo lifts the bowl and the droid chops.
   for(const x of [-1.47,1.47])box(root,metal,x,1.065,-.48,.02,.06,1.12);
-  box(root,metal,0,1.026,.194,2.98,.017,.023).name='Galley / low front spill edge';
+  // The continuous worktop already forms the low front edge. A second strip
+  // only 0.5 mm off its faces flickered at OBS distances; raising that strip
+  // instead would obstruct Milo's bowl pickup. Keep a single exposed surface.
 
   const hob=box(root,dark,-.75,1.052,-.36,1.02,.028,.72);hob.name='Galley / retained induction hob';
   for(const x of [-1.06,-.51])for(const z of [-.58,-.17]){

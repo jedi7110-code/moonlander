@@ -132,6 +132,10 @@ test('charging cable stays fixed on the stand through waking, work and return in
   const rig=createDroidServiceRig(bay,{cargo:[]});
   const routine=new DroidRoutine({care:new Supplies(),brain:{plants:new PlantBed(),actStation:null},actor:{x:1040},cat:{mode:'sleep'}});
   const modes=new Set(),cable=bay.cable,mesh=cable.children[0];
+  const balance=bay.droid.balance;
+  assert.ok(balance,'OBS enables the approved abdomen rotor');
+  assert.equal(balance.root.parent,bay.droid.chassis,'the rotor moves with the same serviced droid');
+  const parked=balance.rotors.map(r=>r.rotation.y);let rotated=false;
   const geometry=mesh.geometry,material=mesh.material;
   bay.root.updateMatrixWorld(true);const bounds=new Box3().setFromObject(cable);
   try{
@@ -142,13 +146,16 @@ test('charging cable stays fixed on the stand through waking, work and return in
     assert.deepEqual(path.at(-1).toArray(),[-.255,1.035,-.25],'upper end terminates inside the fixed support pad');
     const check=()=>{
       rig.update(routine);modes.add(routine.pose.mode);
+      const angles=balance.rotors.map(r=>r.rotation.y);
+      if(routine.pose.mode==='charging')assert.deepEqual(angles,parked,'rotors park at the dock');
+      if(routine.pose.mode==='walk'&&angles[0]!==parked[0])rotated=true;
       assert.equal(cable.visible,true);assert.equal(mesh.visible,true);
       assert.equal(mesh.geometry,geometry);assert.equal(mesh.material,material);
       assert.ok(new Box3().setFromObject(cable).equals(bounds),'cable does not move or follow the departing droid');
     };
     check();assert.ok(routine.request('laundry'));
     for(let i=0;i<5000&&!routine.docked;i++){routine.update(.1);check();}
-    assert.ok(routine.docked);check();
+    assert.ok(routine.docked);check();assert.ok(rotated,'rotors spin while the OBS service rig walks');
     for(const mode of ['charging','wake','walk','work','sleep'])assert.ok(modes.has(mode),mode);
     assert.ok(routine.request('feed'));routine.update(2);check();
   }finally{

@@ -87,3 +87,19 @@ test('the approved study and OBS use the same fixture without duplicating the dr
 test('galley panel seams, handles and trims have no coincident flickering faces',()=>{
   assert.deepEqual(coplanarSurfaces([fixture()]),[]);
 });
+
+test('worktop front has one exposed surface without sub-mm overlays or a raised pickup obstacle',()=>{
+  const root=fixture();
+  const worktop=root.getObjectByName('Galley / cutout stainless worktop');
+  // Half-millimetre offsets fight at the OBS camera's roughly 40 m distance.
+  const overlaps=coplanarSurfaces([root],{tolerance:.002}).filter(({a,b})=>a.mesh===worktop||b.mesh===worktop);
+  assert.deepEqual(overlaps.map(({a,b})=>[a.mesh.name,b.mesh.name,a.axis]),[]);
+  for(const x of [-1.2,-.3,.35,1.15]){
+    const top=down(root,x,GALLEY.front-.01)[0];
+    assert.equal(top.object,worktop,'no raised strip in the bowl pickup path');
+    assert.ok(Math.abs(top.point.y-GALLEY.top)<1e-6);
+    const front=new Raycaster(new Vector3(x,GALLEY.top-.01,1),new Vector3(0,0,-1)).intersectObject(root,true)[0];
+    assert.equal(front.object,worktop);
+    assert.ok(Math.abs(front.point.z-GALLEY.front)<1e-6);
+  }
+});
