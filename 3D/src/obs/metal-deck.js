@@ -1,6 +1,6 @@
 import {Group,CanvasTexture,MeshStandardMaterial,RepeatWrapping,SRGBColorSpace} from 'three';
 import {box,cylinder} from './materials.js';
-import {CABIN_AISLE} from './layout.js';
+import {CABIN_AISLE,ACCESS_LADDER} from './layout.js';
 import {addFootlightWash} from './viewing-footlights.js';
 
 export const DECK_TONES={
@@ -14,9 +14,10 @@ export function metalDeckPlan(level){
   const tiles=[],left=.565,right=12.88,back=CABIN_AISLE.deckBack,front=CABIN_AISLE.deckFront;
   const width=(right-left)/8,split=.38;
   for(const side of [-1,1])for(let i=0;i<8;i++)for(const [row,z0,z1]of [[0,back,split],[1,split,front]]){
-    tiles.push({x:side*(left+(i+.5)*width),z:(z0+z1)/2,w:width-.014,d:z1-z0-.014,grate:row===1&&i%2===0});
+    // Keep the ladder landing and its floor lettering on solid service plates.
+    tiles.push({x:side*(left+(i+.5)*width),z:(z0+z1)/2,w:width-.014,d:z1-z0-.014,grate:row===1&&i>0&&i%2===0});
   }
-  const bridgeBack=level===2?back:.94;
+  const bridgeBack=level===2?back:ACCESS_LADDER.wellEdge;
   tiles.push({x:0,z:(bridgeBack+front)/2,w:1.12,d:front-bridgeBack-.014,grate:false});
   return tiles;
 }
@@ -56,7 +57,7 @@ export function createMetalDeckStyle({tone='brown'}={}){
       const mesh=box(root,material,x,y+top-thickness/2,z,w,thickness,d);mesh.name=name;return mesh;
     };
     for(const side of [-1,1])plate('Deck structure',m.dark,side*6.73,(back+front)/2,12.37,depth,-.09,.24);
-    const bridgeBack=level===2?back:.94;
+    const bridgeBack=level===2?back:ACCESS_LADDER.wellEdge;
     plate('Bridge structure',m.dark,0,(front+bridgeBack)/2,1.12,front-bridgeBack,-.09,.24);
     plate('Deck front fascia',m.dark,0,front-.01,26.22,.20,-.025,.305);
     for(const tile of metalDeckPlan(level)){

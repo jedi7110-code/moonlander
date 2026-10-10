@@ -1,7 +1,7 @@
 import {FLOORS as sharedFloors,LADDER_X,STATIONS as sharedStations} from '../../../js/obs/layout.js?v=15';
 
 export const DECK={OPERATIONS:0,HABITATION:1,LIFE_SUPPORT:2};
-export const FLOORS=sharedFloors.map((floor,index)=>({...floor,name:['OPERATIONS','HABITATION','LIFE SUPPORT'][index]}));
+export const FLOORS=sharedFloors.map((floor,index)=>({...floor,name:`LEVEL ${index+1}`}));
 const cabinFloor=floor=>floor===0?DECK.HABITATION:floor===1?DECK.OPERATIONS:floor;
 
 export const GYM={id:'gym',floor:2,x:840,need:'exercise',dur:16000};
@@ -11,6 +11,9 @@ export const ASHTRAY={x:-11.89,y:1.13,z:-.99,standZ:-.50,standOffsetX:.14};
 export const SMOKING={id:'smoking',floor:DECK.HABITATION,x:700+(ASHTRAY.x+ASHTRAY.standOffsetX)/.022,need:null,dur:38200};
 export const MEDICAL={id:'medical',floor:DECK.OPERATIONS,x:912,need:null,dur:14000};
 export const CABIN_AISLE={crewZ:.78,catZ:2.20,deckBack:-1.81,deckFront:2.55,crossingClearance:48};
+// The rear panel stays in place; keep 25 cm behind the backs of the rungs.
+export const ACCESS_LADDER=Object.freeze({depth:-1.08,rearPanelZ:-1.46,wellEdge:-.17,offset:-1.11,droidClimbZ:-.77});
+export const ladderApproachDepth=(floor,droid=false)=>floor===2?(droid?-.77:-.33):.23;
 export const HYDRO_TRAY={depth:.40,z:-.40,cupZ:-.28,standZ:.10};
 export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,turnInset:.65,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66,doorSeconds:.7};
 export const CAT_SCALE=.8;
@@ -19,6 +22,8 @@ export const CAT_BOWL={floor:2,x:490,depth:.89,approachX:490+18*CAT_SCALE,foodHe
 export const WASTE_INCINERATOR={floor:2,x:-12.10,z:-.39,width:.80,height:.96,depth:.86,approachZ:1.02,depositAt:1.7,insertDuration:3.1,burnDuration:3};
 export const LOUNGE_SEAT={depth:.06,top:.48,centerDepth:-.10,cushionDepth:.60};
 export const LOUNGE_TABLE={x:8.25,z:1.03,width:1.51,depth:.80};
+// Directly in front of the pad on the seat side, close to the seated body.
+export const LOUNGE_ASHTRAY={x:-.07,y:.80,z:-.29,scale:.60,wellY:.0054};
 // Enter from the open left end, then sidestep between the cushion and table.
 export const LOUNGE_ACCESS={sideX:-1.45,gapZ:.43};
 export const CAT_SOFA={floor:DECK.HABITATION,floorX:1005,seatX:1035,approachZ:.89};

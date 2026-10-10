@@ -7,11 +7,12 @@ import {DROID_LADDER_LANDING,LADDER_ENTRY} from '../src/obs/pace.js';
 import {DroidRoutine,DROID_FLOORS} from '../src/obs/droid-routine.js';
 import {createDeckFloor} from '../src/obs/ship.js';
 import {Supplies} from '../src/obs/state.js';
+import {ACCESS_LADDER} from '../src/obs/layout.js';
 
 test('droid grips from the deck before transferring its feet, including upper-deck openings',()=>{
   const droid=createDroid({detail:'obs'});
   try{
-    for(const [start,end,depth]of [[0,3.392,.34],[3.392,0,1.34],[3.392,6.784,1.34],[6.784,0,1.34]])for(let i=0;i<150;i++){
+    for(const [start,end,depth]of [[0,3.392,-.77],[3.392,0,.23],[3.392,6.784,.23],[6.784,0,.23]])for(let i=0;i<150;i++){
       const u=i/150,y=start+Math.sign(end-start)*LADDER_ENTRY.droidHeight*u;
       const pose=sampleDroidServicePose({y,z:depth,climb:{from:start,to:end,startDepth:depth},age:u*3,duration:20,rest:0});
       const actual=droid.update(u*3,'service',pose);
@@ -33,23 +34,23 @@ test('droid grips from the deck before transferring its feet, including upper-de
 test('droid steps backwards onto either deck while holding the ladder until both feet land',()=>{
   const droid=createDroid({detail:'obs'});
   try{
-    for(const [end,depth]of [[0,.34],[3.392,1.34]]){
+    for(const [end,depth]of [[0,-.77],[3.392,.23]]){
     let planted;
     for(let i=0;i<=200;i++){
-      const u=i/200,y=end+DROID_LADDER_LANDING.height*(1-u),z=.34+(depth-.34)*u;
+      const u=i/200,y=end+DROID_LADDER_LANDING.height*(1-u),z=ACCESS_LADDER.droidClimbZ+(depth-ACCESS_LADDER.droidClimbZ)*u;
       const pose=sampleDroidServicePose({y,z,climb:{from:6.784,to:end,endDepth:depth},age:10+u,duration:20,rest:0});
       const actual=droid.update(u,'service',pose);
       if(u>=.21&&u<=.62)for(const [j,arm]of droid.arms.entries()){
         const grip=arm.palm.ladderGrip.getWorldPosition(new Vector3());
         assert.ok(grip.distanceTo(new Vector3(...pose.hands[j]))<.001,'hands support the descent');
-        assert.ok(Math.abs(z-grip.z-.03)<1e-6,'hands stay on the fixed rung plane');
+        assert.ok(Math.abs(z-grip.z-ACCESS_LADDER.depth)<1e-6,'hands stay on the fixed rung plane');
       }
       droid.root.position.set(0,y,z);droid.root.rotation.y=Math.PI;droid.root.updateMatrixWorld(true);
       const feet=droid.legs.map(r=>({side:r.side,p:r.foot.localToWorld(new Vector3(0,-.099,0))}));
       const first=feet.find(f=>f.side===1).p,second=feet.find(f=>f.side===-1).p;
       assert.ok(first.y>=end-1e-7&&second.y>=end-1e-7,'neither sole penetrates the deck');
       assert.ok(Math.abs(first.x+.137)<1e-7&&Math.abs(second.x-.137)<1e-7,'both steps move straight back');
-      if(u>=.14&&u<=.39)assert.ok(Math.abs(second.z-.03)<1e-7&&second.y>end+.1,'following foot stays on its rung');
+      if(u>=.14&&u<=.39)assert.ok(Math.abs(second.z-ACCESS_LADDER.depth)<1e-7&&second.y>end+.1,'following foot stays on its rung');
       if(u>=.38){planted??=first.clone();assert.ok(first.distanceTo(planted)<1e-7,'first sole stays fixed during weight transfer');}
       if(u>=.60)assert.ok(Math.abs(second.y-end)<1e-7,'second sole finishes on the floor');
       for(const f of actual.feet){
@@ -72,12 +73,12 @@ test('upper-deck arrivals keep a real support until both soles reach the bridge 
     ray.set(point.clone().addScaledVector(down,-.02),down);ray.far=.045;
     return ray.intersectObjects(decks,true).length>0;
   };
-  const onRung=(point,sole=false)=>Math.abs(point.x)<.3&&Math.hypot(point.z-.03,
+  const onRung=(point,sole=false)=>Math.abs(point.x)<.3&&Math.hypot(point.z-ACCESS_LADDER.depth,
     point.y-(.12+Math.round((point.y-.12-(sole?.028:0))/.28)*.28)-(sole?.028:0))<.005;
   try{
     for(const destination of [0,1]){
       const routine=new DroidRoutine({care:new Supplies()});
-      routine.position={x:0,y:0,z:.34,floor:2,yaw:Math.PI};routine.plan={...routine.position};
+      routine.position={x:0,y:0,z:ACCESS_LADDER.droidClimbZ,floor:2,yaw:Math.PI};routine.plan={...routine.position};
       routine.travel(destination,2,1.48);
       while(routine.step.kind!=='climb')routine.update(1/60);
       let landed=false,landingFrames=0,turnFrames=0;
@@ -98,7 +99,7 @@ test('upper-deck arrivals keep a real support until both soles reach the bridge 
             landed=true;
             assert.ok(soles.every(onDeck),'climbing cannot finish while standing over the shaft');
             for(const leg of droid.legs)for(const x of [-.073,.073])for(const z of [-.107,.181])
-              assert.ok(leg.foot.localToWorld(new Vector3(x,-.099,z)).z>.94,'the whole foot clears the bridge edge');
+              assert.ok(leg.foot.localToWorld(new Vector3(x,-.099,z)).z>ACCESS_LADDER.wellEdge,'the whole foot clears the bridge edge');
           }
           if(p.mode==='turn'){
             turnFrames++;

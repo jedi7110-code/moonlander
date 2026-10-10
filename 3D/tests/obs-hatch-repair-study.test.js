@@ -42,6 +42,34 @@ const model=()=>createMilo(new Proxy({},{get:(object,key)=>object[key]??=new Mes
 const joints=root=>root.userData.arms.flatMap(({arm,elbow,hand})=>[arm,elbow,hand]);
 const snapshot=root=>joints(root).map(joint=>({position:joint.getWorldPosition(new Vector3()),quaternion:joint.getWorldQuaternion(joint.quaternion.clone())}));
 
+test('approaching and leaving the hatch face the direction of travel, including the reported frames',()=>{
+  const root=model();
+  for(const phase of REPAIR_STUDY_PHASES.filter(p=>['approach','return'].includes(p.id))){
+    for(let t=phase.start+.01;t<phase.end-.01;t+=1/60){
+      const a=sampleRepairStudy(t-.001),b=sampleRepairStudy(t+.001),direction=Math.sign(b.pose.depth-a.pose.depth);
+      const {visit}=poseRepairStudy(root,t);
+      assert.ok(Math.cos(visit.pose.yaw)*direction>.999,'walking root faces its actual depth movement');
+      const forward=new Vector3(0,0,1).transformDirection(root.userData.head.matrixWorld);
+      assert.ok(forward.z*direction>.95,'rendered character faces forward while stepping');
+    }
+  }
+  for(const [time,direction]of [[1.917,1],[26.158,-1]]){
+    const {visit}=poseRepairStudy(root,time);assert.ok(visit.pose.moving);
+    assert.ok(new Vector3(0,0,1).transformDirection(root.userData.head.matrixWorld).z*direction>.95);
+  }
+  for(const yaw of [Math.PI/2,-Math.PI/2,0,Math.PI]){
+    const visit=new HatchRepairVisit(1);visit.startYaw=yaw;let previous=visit.pose;
+    for(let frame=1;frame<=28.8*60;frame++){
+      visit.update(1/60);const pose=visit.pose;
+      const delta=Math.atan2(Math.sin(pose.yaw-previous.yaw),Math.cos(pose.yaw-previous.yaw));
+      assert.ok(Math.abs(delta)<.09,'heading stays continuous at the walking and turning boundaries');
+      if(pose.moving&&Math.abs(pose.depth-previous.depth)>1e-8)assert.ok(Math.cos(pose.yaw)*(pose.depth-previous.depth)>0);
+      previous=pose;
+    }
+    assert.ok(Math.abs(Math.atan2(Math.sin(visit.pose.yaw-yaw),Math.cos(visit.pose.yaw-yaw)))<1e-8,'restore the original aisle heading');
+  }
+});
+
 test('seeking backward or repeating a paused frame gives the same hands as live OBS',()=>{
   const study=model(),obs=model(),station=getStation('innerHatch');
   const compare=(a,b)=>a.forEach((joint,i)=>{
@@ -68,20 +96,59 @@ test('the contact readout uses the actual tool tip, including tuned wrist rotati
   assert.equal(poseRepairStudy(root,8.9).contact,false);
 });
 
-test('the study candidate removes the IK-plane snap on reach and release without touching OBS',()=>{
+test('OBS and the study keep both arms and wrists continuous throughout inspection, repair and withdrawal',()=>{
   const root=model(),peak=tuning=>{
-    let previous,max=0;
+    let previous,velocity,max=0;
     for(let frame=0;frame<=1080;frame++){
       poseRepairStudy(root,4.8+frame/60,tuning);const values=snapshot(root);
-      if(previous)for(const index of [0,1,3,4])max=Math.max(max,values[index].quaternion.angleTo(previous[index].quaternion)*180/Math.PI);
-      previous=values;
+      if(previous)for(const index of [0,1,2,3,4,5]){
+        max=Math.max(max,values[index].quaternion.angleTo(previous[index].quaternion)*180/Math.PI);
+        // The elbow sweeps a wider arc to support a palm-in grip. Keep the
+        // wrist's tighter speed bound and check acceleration on both joints.
+        const step=values[index].position.clone().sub(previous[index].position);
+        assert.ok(step.length()<([1,4].includes(index)?.023:.012),`no joint teleport at ${4.8+frame/60}`);
+        if(velocity)assert.ok(step.distanceTo(velocity[index])<.002,`no abrupt velocity change at ${4.8+frame/60}`);
+      }
+      for(const rig of root.userData.arms){
+        const bend=new Vector3(0,-1,0).applyQuaternion(rig.hand.quaternion).angleTo(rig.hand.position.clone().normalize());
+        assert.ok(bend<=.721,'the wrist never folds back while lifting or withdrawing');
+      }
+      velocity=previous?values.map((j,i)=>j.position.clone().sub(previous[i].position)):null;previous=values;
     }
     return max;
   };
   const current=peak(null),candidate=peak(REPAIR_STUDY_GENTLE);
-  assert.ok(current>30,'the study reproduces the existing snap');
+  assert.ok(current<5,`OBS should not snap between frames: ${current} degrees`);
   assert.ok(candidate<5,`candidate should not snap between frames: ${candidate} degrees`);
   const time=9.1;poseRepairStudy(root,time,REPAIR_STUDY_GENTLE);const before=snapshot(root);
   poseRepairStudy(root,16);poseRepairStudy(root,time,REPAIR_STUDY_GENTLE);
   snapshot(root).forEach((joint,i)=>assert.ok(joint.position.distanceTo(before[i].position)<1e-8));
+});
+
+test('cancelling at any working phase preserves the arm orientation and grip before easing out',()=>{
+  const root=model(),station=getStation('innerHatch');
+  const animate=(visit,time)=>{
+    root.position.set((station.x-700)*.022,0,CABIN_AISLE.crewZ);root.rotation.set(0,Math.PI/2,0);
+    animateMilo(root,{moving:false,climbing:false,facing:1,action:'innerHatch',time,dt:0,hatchRepair:visit});root.updateMatrixWorld(true);
+    return snapshot(root);
+  };
+  for(const start of [5.2,8.65,9.2,11.8,18.6,18.95,21.8]){
+    const visit=new HatchRepairVisit(1);visit.startYaw=Math.PI/2;visit.update(start);
+    let before=animate(visit,start),grip=visit.pose.grip,velocity;visit.requestExit();
+    const same=animate(visit,start);
+    same.forEach((j,i)=>{assert.ok(j.quaternion.angleTo(before[i].quaternion)<1e-7);assert.ok(j.position.distanceTo(before[i].position)<1e-8);});
+    assert.equal(visit.pose.grip,grip,'cancellation does not instantly open a prepared or holding hand');
+    let digits=root.userData.arms[0].fingers.flatMap(f=>[f,...f.userData.links]).map(j=>j.quaternion.clone());
+    for(let frame=1;frame<=72;frame++){
+      visit.update(1/60);const now=animate(visit,start+frame/60);
+      now.forEach((j,i)=>{
+        assert.ok(j.quaternion.angleTo(before[i].quaternion)<.09,`no cancelled arm snap at ${start}, frame ${frame}`);
+        const step=j.position.clone().sub(before[i].position);
+        assert.ok(step.length()<([1,4].includes(i)?.023:.012),'no cancelled joint teleport');
+        if(velocity)assert.ok(step.distanceTo(velocity[i])<.002,'no cancelled velocity jump');
+      });velocity=now.map((j,i)=>j.position.clone().sub(before[i].position));before=now;
+      const next=root.userData.arms[0].fingers.flatMap(f=>[f,...f.userData.links]).map(j=>j.quaternion.clone());
+      next.forEach((q,i)=>assert.ok(q.angleTo(digits[i])<.09,'no cancelled finger snap'));digits=next;
+    }
+  }
 });

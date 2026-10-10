@@ -6,6 +6,7 @@ const smooth=t=>{t=clamp(t);return t*t*(3-2*t);};
 const mix=(a,b,t)=>a+(b-a)*t;
 const durations={turnIn:1.6,approach:2.8,settle:1.4,smoke:22,extinguish:3.8,turnOut:2.2,return:2.8,align:1.6};
 export const SMOKING_SECONDS=Object.values(durations).reduce((a,b)=>a+b,0);
+export const LOUNGE_SMOKING_SECONDS=durations.smoke+durations.extinguish;
 export const SMOKING_INTERVAL={min:8*60,max:15*60};
 const CIGARETTE_LIT_AT=3.45;
 
@@ -29,13 +30,13 @@ export function smokingGesture(time){
   }
   const lighter=smooth((time-1.2)/1.6)*(1-smooth((time-4.1)/1.3));
   const exhale=[[5.8,7.4],[12,13.1],[19.6,21.2]].some(([a,b])=>time>=a&&time<b);
-  return{hand,reach:smooth(time/.55),cigarette:time>=.45,lighter,flame:time>=3.1&&time<3.8,lit:time>=CIGARETTE_LIT_AT,
+  return{hand,reach:smooth(time/.55),cigarette:time>=.45,lighter,lid:smooth((time-1.8)/.7)*(1-smooth((time-4.1)/.25)),strike:smooth((time-3.0)/.12),flame:time>=3.1&&time<4.22,lit:time>=CIGARETTE_LIT_AT,
     inhale:time>=CIGARETTE_LIT_AT&&hand[2]>.99,exhale,tap:time>=13.3&&time<=14?Math.sin((time-13.3)*Math.PI*6)*.012:0,
     label:time<4.1?'煙草に火をつける':hand[3]>.5?'灰を落とす':'灰皿の前で一服している'};
 }
 
 export class SmokingVisit {
-  constructor(){this.phase='turnIn';this.age=0;this.startYaw=null;this.exitRequested=false;this.finishFrom=null;}
+  constructor({seated=false}={}){this.seated=seated;this.phase=seated?'smoke':'turnIn';this.age=0;this.startYaw=null;this.exitRequested=false;this.finishFrom=null;}
   requestExit(){
     this.exitRequested=true;
     if(this.phase==='smoke')this.finish();
@@ -50,6 +51,7 @@ export class SmokingVisit {
       this.age+=step;dt-=step;
       if(this.age<durations[this.phase]-1e-8)break;
       if(this.phase==='smoke'){this.finish();continue;}
+      if(this.seated&&this.phase==='extinguish'){this.phase='done';this.age=0;break;}
       const order=Object.keys(durations),index=order.indexOf(this.phase);
       this.phase=this.phase==='settle'&&this.exitRequested?'turnOut':order[index+1]??'done';this.age=0;
     }
@@ -68,8 +70,8 @@ export class SmokingVisit {
     if(phase==='extinguish'){
       const source=this.finishFrom,t=this.age,release=smooth((t-2.3)/1.5);
       gesture={...source,hand:blend(blend(source.hand,ash,t/1.4),rests,release),reach:1-release,
-        lighter:source.lighter*(1-smooth(t/.8)),flame:false,lit:source.lit&&t<1.8,inhale:false,exhale:false,
-        cigarette:source.cigarette&&t<2.3,tap:t>=1.4&&t<2.1?Math.sin(t*15)*.003:0,label:'灰皿で火を消す'};
+        lighter:source.lighter*(1-smooth(t/.8)),lid:(source.lid??0)*(1-smooth(t/.3)),flame:false,lit:source.lit&&t<1.8,inhale:false,exhale:false,
+        cigarette:source.cigarette&&t<2.3,extinguish:smooth(t/1.4),tap:t>=1.4&&t<2.1?Math.sin(t*15)*.003:0,label:'灰皿で火を消す'};
     }
     if(phase==='turnOut')turn={from:facing,to:out};
     if(phase==='return'){depth=mix(ASHTRAY.standZ,CABIN_AISLE.crewZ,smooth(u));yaw=out;}

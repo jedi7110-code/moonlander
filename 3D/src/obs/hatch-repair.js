@@ -36,7 +36,10 @@ export class HatchRepairVisit {
   get done(){return this.phase==='done';}
   get pose(){
     const phase=this.phase,duration=HATCH_REPAIR_PHASES[phase]??1,u=clamp(this.age/duration);
-    const start=this.startYaw??Math.PI/2,into=start+angleDelta(start,Math.PI),face=into+angleDelta(into,Math.PI/2),out=face+angleDelta(face,0),end=out+angleDelta(out,start);
+    // Milo faces local +Z. The approach moves toward greater depth; the return
+    // moves toward smaller depth, so each walking phase must face its travel.
+    const approachYaw=Math.atan2(0,HATCH_REPAIR_DEPTH-CABIN_AISLE.crewZ),returnYaw=Math.atan2(0,CABIN_AISLE.crewZ-HATCH_REPAIR_DEPTH);
+    const start=this.startYaw??Math.PI/2,into=start+angleDelta(start,approachYaw),face=into+angleDelta(into,Math.PI/2),out=face+angleDelta(face,returnYaw),end=out+angleDelta(out,start);
     let depth=HATCH_REPAIR_DEPTH,yaw=face,turn=null,reach=0,tool=false,twist=0;
     if(phase==='turnIn'){depth=CABIN_AISLE.crewZ;turn={from:start,to:into};}
     if(phase==='approach'){depth=mix(CABIN_AISLE.crewZ,HATCH_REPAIR_DEPTH,smooth(u));yaw=into;}
@@ -51,7 +54,9 @@ export class HatchRepairVisit {
     if(this.done){depth=CABIN_AISLE.crewZ;yaw=end;}
     if(turn){turn.progress=u;yaw=mix(turn.from,turn.to,headingEase(u));}
     const moving=['approach','return'].includes(phase);
-    return{phase,depth,yaw,turn,reach,tool,twist,moving,
+    let grip=phase==='repair'?1:phase==='inspect'?smooth((this.age-(HATCH_REPAIR_PHASES.inspect-.45))/.45):phase==='verify'?1-smooth(this.age/.45):0;
+    if(phase==='release'&&this.releaseFrom)grip=(this.releaseFrom.grip??0)*(1-smooth((this.age-.65)/.55));
+    return{phase,depth,yaw,turn,reach,tool,twist,grip,moving,
       walkDistance:Math.abs(CABIN_AISLE.crewZ-HATCH_REPAIR_DEPTH)*smooth(u),
       walkWeight:moving?smooth(this.age/.3)*smooth((duration-this.age)/.3):0};
   }

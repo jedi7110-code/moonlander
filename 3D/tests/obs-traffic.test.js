@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MeshStandardMaterial,Raycaster,Vector3} from 'three';
-import {CABIN_AISLE,CAT_PORT,CAT_SOFA,CAT_BOWL,LOUNGE_SEAT} from '../src/obs/layout.js';
+import {CABIN_AISLE,CAT_PORT,CAT_SOFA,CAT_BOWL,LOUNGE_SEAT,ACCESS_LADDER} from '../src/obs/layout.js';
 import {CrewMotion,CatMotion,CatRoutine,Supplies,advanceCabinTraffic} from '../src/obs/state.js';
 import {createDeckFloor} from '../src/obs/ship.js';
 
@@ -19,7 +19,10 @@ test('separate lanes are supported across all decks without filling the ladder w
     const root=createDeckFloor(m,0,level);root.updateMatrixWorld(true);
     const down=(x,z)=>new Raycaster(new Vector3(x,.3,z),new Vector3(0,-1,0)).intersectObject(root,true);
     for(const x of [-12,-6,-.4,0,.4,6,12])assert(down(x,CAT_PORT.walkZ).some(hit=>hit.point.y>-.03));
-    if(level<2)assert.equal(down(0,.1).length,0);
+    if(level<2){
+      assert.equal(down(0,(ACCESS_LADDER.rearPanelZ+ACCESS_LADDER.wellEdge)/2).length,0);
+      assert(down(0,.1).some(hit=>hit.point.y>-.03),'the vacated forward part of the old well is now solid floor');
+    }
     root.traverse(o=>o.geometry?.dispose());
   }
   material.dispose();

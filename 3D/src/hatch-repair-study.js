@@ -16,8 +16,8 @@ import {REPAIR_STUDY_DEFAULTS,REPAIR_STUDY_GENTLE,REPAIR_STUDY_PHASES,REPAIR_STU
 const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
 const number=(key,fallback,min,max)=>{const n=Number(params.get(key));return params.has(key)&&Number.isFinite(n)?THREE.MathUtils.clamp(n,min,max):fallback;};
 let time=number('time',11.8,0,REPAIR_STUDY_DURATION),mode=params.get('mode')==='tuned'?'tuned':'current';
-let view=['hands','side','front','wide'].includes(params.get('view'))?params.get('view'):'hands';
-let tuning={amplitude:number('amplitude',REPAIR_STUDY_DEFAULTS.amplitude,0,Math.PI/6),frequency:number('frequency',REPAIR_STUDY_DEFAULTS.frequency,.1,1),reachSeconds:number('reach',1.4,.5,3),stabilizeEntry:params.get('stabilize')!=='0'};
+let view=['hands','side','front','wide','gripBack','gripPalm'].includes(params.get('view'))?params.get('view'):'hands';
+let tuning={amplitude:number('amplitude',REPAIR_STUDY_DEFAULTS.amplitude,0,Math.PI/6),frequency:number('frequency',REPAIR_STUDY_DEFAULTS.frequency,.1,1),reachSeconds:number('reach',1.4,.5,3)};
 let playing=false,dirty=true,last=performance.now(),frame;
 
 async function init(){
@@ -50,7 +50,8 @@ async function init(){
   $('loop').checked=params.get('loop')!=='0';$('door').checked=params.get('door')!=='0';
   function saveURL(){
     const url=new URL(location.href);
-    const values={time:time.toFixed(3),mode,view,amplitude:tuning.amplitude.toFixed(6),frequency:tuning.frequency.toFixed(6),reach:tuning.reachSeconds,stabilize:Number(tuning.stabilizeEntry),speed:$('speed').value,range:$('range').value,loop:Number($('loop').checked),guides:Number(guides.visible),door:Number($('door').checked)};
+    const values={time:time.toFixed(3),mode,view,amplitude:tuning.amplitude.toFixed(6),frequency:tuning.frequency.toFixed(6),reach:tuning.reachSeconds,speed:$('speed').value,range:$('range').value,loop:Number($('loop').checked),guides:Number(guides.visible),door:Number($('door').checked)};
+    url.searchParams.delete('stabilize');
     values.eye=camera.position.toArray().map(value=>value.toFixed(4)).join(',');values.target=controls.target.toArray().map(value=>value.toFixed(4)).join(',');
     Object.entries(values).forEach(([key,value])=>url.searchParams.set(key,value));history.replaceState(null,'',url);
   }
@@ -73,12 +74,22 @@ async function init(){
   function showView(){
     const point=new THREE.Vector3(HATCH_SERVICE_POINT.x,HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z);
     const presets={hands:{target:point.clone().add(new THREE.Vector3(-.18,.08,0)),offset:[-1.25,.48,1.45]},side:{target:point.clone().add(new THREE.Vector3(-.25,.08,0)),offset:[0,.08,1.75]},front:{target:point.clone().add(new THREE.Vector3(-.20,.10,0)),offset:[1.55,.14,0]},wide:{target:new THREE.Vector3(6.6,1.35,0),offset:[-3.2,1.3,4.7]}};
-    const preset=presets[view];controls.target.copy(preset.target);camera.position.copy(preset.target).add(new THREE.Vector3(...preset.offset));controls.update();
-    hatch.visible=view!=='front'&&$('door').checked;$('door').disabled=view==='front';
+    const closeGrip=view==='gripBack'||view==='gripPalm';
+    if(closeGrip){
+      poseRepairStudy(milo,time,mode==='tuned'?tuning:null);
+      const hand=milo.userData.arms[0].hand;
+      controls.target.copy(hand.localToWorld(new THREE.Vector3(0,-.075,-.01)));
+      const offset=new THREE.Vector3(-.12,.045,view==='gripBack'?.34:-.34).applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
+      camera.position.copy(controls.target).add(offset);
+    }else{
+      const preset=presets[view];controls.target.copy(preset.target);camera.position.copy(preset.target).add(new THREE.Vector3(...preset.offset));
+    }
+    controls.update();
+    const hideDoor=view==='front'||closeGrip;
+    hatch.visible=!hideDoor&&$('door').checked;$('door').disabled=hideDoor;
     document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',button.dataset.view===view));dirty=true;
   }
   function tuningUI(){
-    $('stabilize').checked=tuning.stabilizeEntry;
     $('amplitude').value=THREE.MathUtils.radToDeg(tuning.amplitude);$('frequency').value=tuning.frequency;$('reach').value=tuning.reachSeconds;
     $('amplitude-value').textContent=`±${THREE.MathUtils.radToDeg(tuning.amplitude).toFixed(1)}°`;$('frequency-value').textContent=`${tuning.frequency.toFixed(2)} 回/秒`;$('reach-value').textContent=`${tuning.reachSeconds.toFixed(1)} 秒`;
   }
@@ -91,11 +102,10 @@ async function init(){
   for(const id of ['amplitude','frequency','reach'])$(id).oninput=()=>{
     tuning={...tuning,amplitude:THREE.MathUtils.degToRad(Number($('amplitude').value)),frequency:Number($('frequency').value),reachSeconds:Number($('reach').value)};mode='tuned';tuningUI();update();saveURL();
   };
-  $('stabilize').onchange=()=>{tuning.stabilizeEntry=$('stabilize').checked;mode='tuned';update();saveURL();};
   $('gentle').onclick=()=>{tuning={...REPAIR_STUDY_GENTLE};mode='tuned';tuningUI();update();saveURL();};
   $('reset-tuning').onclick=()=>{tuning={...REPAIR_STUDY_DEFAULTS};mode='current';tuningUI();update();saveURL();};
   $('guides').onchange=()=>{guides.visible=$('guides').checked;dirty=true;saveURL();};
-  $('door').onchange=()=>{hatch.visible=$('door').checked&&view!=='front';dirty=true;saveURL();};
+  $('door').onchange=()=>{hatch.visible=$('door').checked&&!['front','gripBack','gripPalm'].includes(view);dirty=true;saveURL();};
   document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{view=button.dataset.view;showView();saveURL();});
   const phaseNames=['方向転換','扉へ近づく','扉に正対','ロック点検','修理','復旧確認','手を戻す','向き直る','通路へ戻る','終了姿勢'];
   for(const [i,phase]of REPAIR_STUDY_PHASES.entries()){const button=document.createElement('button');button.dataset.phase=phase.id;button.textContent=phaseNames[i];button.title=`${phase.start.toFixed(1)}秒 / ${phase.label}`;button.onclick=()=>{$('range').value=['inspect','repair','verify'].includes(phase.id)?phase.id:'all';seek(phase.start);};document.querySelector('.phases').append(button);}

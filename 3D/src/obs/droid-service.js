@@ -5,7 +5,7 @@ import {box,cylinder,rod,ball,batchStatic} from './materials.js';
 import {DROID_SPEC,DROID_POSTURE} from './droid-model.js';
 import {LADDER} from './ladder-pose.js';
 import {CABIN_LADDER} from './cabin-ladder.js';
-import {CAT_BOWL,LADDER_X,WASTE_INCINERATOR as WASTE} from './layout.js';
+import {CAT_BOWL,LADDER_X,WASTE_INCINERATOR as WASTE,ACCESS_LADDER} from './layout.js';
 import {sampleDroidTurn} from './droid-turn.js';
 import {DROID_LADDER_LANDING,LADDER_ENTRY,DROID_WALK_CYCLE_DISTANCE} from './pace.js';
 import {fitLadderEntryBody} from './ladder-entry.js';
@@ -87,7 +87,7 @@ export function droidLadderContact(height,side,hand){
   const swing=clamp((f-.68)/.32,0,1),reach=smooth(swing);
   const rung=2*lap-2*sidePhase+(hand?6:1);
   const y=CABIN_LADDER.rungBase+(rung+2*reach)*spacing+(hand?0:.099+LADDER.radius);
-  return {point:[side*(hand?.23:.137),y-height,.34-CABIN_LADDER.depth-(hand?.065:.075)*Math.sin(Math.PI*swing)],held:f<=.68,rung,swing};
+  return {point:[side*(hand?.23:.137),y-height,ACCESS_LADDER.droidClimbZ-CABIN_LADDER.depth-(hand?.065:.075)*Math.sin(Math.PI*swing)],held:f<=.68,rung,swing};
 }
 
 // Hands are grip contacts in model coordinates. Each task eases into and out
@@ -128,21 +128,21 @@ export function sampleDroidServicePose(p,loads=LOADS){
       // step behind the ladder, and release only after both soles are down.
       const start=landing?p.climb.to:p.climb.from,anchor=start+(landing?(descending?1:0):Math.sign(p.climb.to-start))*LADDER_ENTRY.droidHeight;
       const u=landing&&p.climb.landingProgress!=null?1-p.climb.landingProgress:Math.abs(p.y-start)/LADDER_ENTRY.droidHeight,ease=THREE.MathUtils.smootherstep;
-      const reach=ease(u,.16,.38),transfer=ease(u,.4,.96),depth=landing?(p.climb.endDepth??(start>0?1.34:.34)):(p.climb.startDepth??.34),z=p.z??.34,upper=depth>1;
+      const reach=ease(u,.16,.38),transfer=ease(u,.4,.96),depth=landing?(p.climb.endDepth??(start>0?1.34+ACCESS_LADDER.offset:ACCESS_LADDER.droidClimbZ)):(p.climb.startDepth??ACCESS_LADDER.droidClimbZ),z=p.z??ACCESS_LADDER.droidClimbZ,upper=start>0;
       const rung=CABIN_LADDER.rungBase+Math.round((start+1.24-CABIN_LADDER.rungBase)/LADDER.spacing)*LADDER.spacing;
       out.hipHeight=mix(mix(start+.905,start+(upper?.66:.905),reach),anchor+.82,transfer)-p.y;
-      out.bodyZ=z-mix(mix(depth-DROID_POSTURE.bodyZ,upper?.80:.36,reach),.385,transfer);
+      out.bodyZ=z-mix(mix(depth-DROID_POSTURE.bodyZ,(upper?.80:.36)+ACCESS_LADDER.offset,reach),.385+ACCESS_LADDER.offset,transfer);
       out.lean=mix(mix(DROID_POSTURE.idleLean,upper?.55:.12,reach),.12,transfer);
       out.handWeight=reach;out.handGripWeights=[];
       out.hands=[-1,1].map(side=>{
         const c=droidLadderContact(anchor,side,true),shift=ease(u,side===-1?.79:.90,side===-1?.90:1);
         out.handGripWeights.push(ease(u,.29,.38)*mix(1,1-Math.sin(Math.PI*c.swing),shift));
-        return [c.point[0],mix(rung,anchor+c.point[1],shift)-p.y,z-mix(CABIN_LADDER.depth,.34-c.point[2],shift)];
+        return [c.point[0],mix(rung,anchor+c.point[1],shift)-p.y,z-mix(CABIN_LADDER.depth,ACCESS_LADDER.droidClimbZ-c.point[2],shift)];
       });
       out.feet=[-1,1].map(side=>{
         const c=droidLadderContact(anchor,side,false),step=ease(u,side===-1?.4:.62,side===-1?.61:.81);
         const rungY=CABIN_LADDER.rungBase+Math.floor((anchor+c.point[1]-.099-LADDER.radius-CABIN_LADDER.rungBase+1e-8)/LADDER.spacing)*LADDER.spacing;
-        const settle=ease(u,.86,1),footY=mix(rungY+.099+LADDER.radius,anchor+c.point[1],settle),footZ=mix(CABIN_LADDER.depth,.34-c.point[2],settle);
+        const settle=ease(u,.86,1),footY=mix(rungY+.099+LADDER.radius,anchor+c.point[1],settle),footZ=mix(CABIN_LADDER.depth,ACCESS_LADDER.droidClimbZ-c.point[2],settle);
         return [side*.137,mix(start+.099,footY,step)-p.y,z-mix(depth-.045,footZ,step)];
       });
       const supports=out.feet.map((point,i)=>({target:V(...point),offset:V((i?1:-1)*.125,0,0),length:.92}));

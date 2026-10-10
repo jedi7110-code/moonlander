@@ -35,7 +35,7 @@ import {attachMiloWatch,updateMiloWatch} from './milo-watch.js';
 import {attachMiloBioSensor,updateMiloBioSensor} from './milo-bio-sensor.js';
 import {attachMiloBandage,updateMiloBandage} from './milo-bandage.js';
 import {attachSmokingProps,updateSmokingSmoke} from './smoking-props.js';
-import {applySmokingPose} from './smoking-pose.js';
+import {applySmokingPose,applyLoungeSmokingPose} from './smoking-pose.js';
 import {attachHatchRepairTool,applyHatchRepairPose} from './hatch-repair-pose.js';
 
 function joint(parent,x,y,z){const group=new THREE.Group();group.position.set(x,y,z);parent.add(group);return group;}
@@ -238,7 +238,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   const dining=['galley','hydro'].includes(action)&&!moving;
   const calling=callingTime!==null&&!moving&&!action;
   const desired=bathroom?root.userData.bathroomStartYaw+angleDelta(root.userData.bathroomStartYaw,bathroom.yaw??0)*(bathroom.turn??1):dining||climbing||calling?Math.PI:walking||waiting?walkYaw??(facing||1)*Math.PI/2:['eva','plant'].includes(action)?Math.PI:['airlock','innerHatch'].includes(action)?Math.PI/2:action==='console'?Math.PI*.84:action ? .15 : root.rotation.y;
-  const authored=hatchRepair||smokingVisit||bathroom||bunkVisit||gymVisit||loungeEntry||loungeExit||(action==='medical'&&!moving)||reclineExit||(action==='bunk'&&!moving);
+  const authored=hatchRepair||(smokingVisit&&!smokingVisit.seated)||bathroom||bunkVisit||gymVisit||loungeEntry||loungeExit||(action==='medical'&&!moving)||reclineExit||(action==='bunk'&&!moving);
   if(authored){delete root.userData.headingTurn;delete root.userData.standingTurn;}
   else if(walking&&Number.isFinite(walkYaw)){
     // Follow a curved aisle continuously instead of restarting a finite turn
@@ -335,7 +335,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
     body.position.y=0;applyCurrentMiloTurn(root,{upperBody:false});
     applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
-  if(smokingVisit)applySmokingPose(root,smokingVisit);
+  if(smokingVisit){if(smokingVisit.seated&&loungeDocks)applyLoungeSmokingPose(root,smokingVisit,loungeDocks);else applySmokingPose(root,smokingVisit);}
   if(hatchRepair)applyHatchRepairPose(root,hatchRepair);
   root.userData.updateWristTwists?.();
   updateMiloSpine(root);

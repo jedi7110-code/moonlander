@@ -1,12 +1,14 @@
 import {AdditiveBlending,BufferGeometry,Float32BufferAttribute,Mesh,ShaderMaterial} from 'three';
 
-// Soft glass glow inside seven recessed apertures, not a full-screen bloom pass.
+// Soft glass glow inside nine recessed apertures, not a full-screen bloom pass.
 // One draw, depth-tested behind the bezels: never paint a halo over a front panel.
 export function createScreenGlow(){
   const positions=[],uvs=[],indices=[];
   const panels=[
     [-10.3,8.514,-.445,.9984,.61],[-8.67,8.514,-.445,.9984,.61],[-7.04,8.514,-.445,.9984,.61],
     ...Array.from({length:4},(_,i)=>[-4.57,7.574+i*.42,-1.295,1.16,.27]),
+    [3.75,8.654,-.670,1.16,.65], // Medical glass, 5 mm forward of its display.
+    [10.05,5.302,-.765,.453,.272], // Lounge coffee glass, inside its open bezel.
   ];
   for(const [x,y,z,w,h] of panels){
     const offset=positions.length/3;

@@ -7,7 +7,7 @@ import {LADDER,LADDER_WRIST_OFFSET} from '../src/obs/ladder-pose.js';
 import {positionY,FLOOR_Y} from '../src/obs/ship.js';
 import {CrewMotion} from '../src/obs/state.js';
 import {crewWalkway} from '../src/obs/cabin-walkway.js';
-import {FLOORS,LADDER_X} from '../src/obs/layout.js';
+import {FLOORS,LADDER_X,ACCESS_LADDER} from '../src/obs/layout.js';
 
 // Joint-level checks only: the skinned body is not loaded, so this runs quickly.
 const material=new MeshStandardMaterial(),create=()=>createMilo(new Proxy({},{get:()=>material}));
@@ -17,7 +17,7 @@ const EYE=(()=>{const root=create();animateMilo(root,{time:0,moving:false,dt:0})
 // Drive their transfers the way the cabin does and sample every rendered frame.
 const BOOT_OUTLINE=[[0,-.098],[.04,-.08],[.06,.02],[.068,.05],[.05,.13],[.01,.177],[-.03,.165],[-.063,.105],[-.065,.03],[-.048,-.047],[-.02,-.094]];
 const RUNG_HEIGHTS=Array.from({length:47},(_,k)=>CABIN_LADDER.rungBase+k*LADDER.spacing);
-const solidDeck=(level,x,z)=>level===2||Math.abs(x)>=.545||z>=.94;
+const solidDeck=(level,x,z)=>level===2||Math.abs(x)>=.545||z>=ACCESS_LADDER.wellEdge;
 function hullDistance(points,x,z){
   const p=points.map(q=>[q.x,q.z]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]),cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
   const lower=[],upper=[];
@@ -55,7 +55,7 @@ function wellDeckFrame(root,deck,transfer){
   let edgeClearance=Infinity;
   for(const {outline,low}of feet){
     const inWell=outline.filter(p=>Math.abs(p.x)<.545);
-    if(inWell.some(p=>p.z<.94)&&inWell.some(p=>p.z>=.94))edgeClearance=Math.min(edgeClearance,low-deck);
+    if(inWell.some(p=>p.z<ACCESS_LADDER.wellEdge)&&inWell.some(p=>p.z>=ACCESS_LADDER.wellEdge))edgeClearance=Math.min(edgeClearance,low-deck);
   }
   const hands=transfer.contacts.filter(c=>c.hand).map(c=>({grip:c.grip,
     miss:arms.find(a=>a.side===c.side).hand.getWorldPosition(new Vector3()).distanceTo(root.localToWorld(c.point.clone().add(LADDER_WRIST_OFFSET)))}));

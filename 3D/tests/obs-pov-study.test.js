@@ -6,12 +6,14 @@ import {StableFirstPersonCamera,maskSelfView} from '../studies/pov/comfort.js';
 import {createViewingWall,cabinWallMaterials} from '../studies/pov/front-wall.js';
 import {EVA_BAY,createEVAHatch,createEVAPartitions} from '../src/obs/eva.js';
 import {FLOOR_Y} from '../src/obs/ship.js';
-import {DECK} from '../src/obs/layout.js';
+import {DECK,LADDER_X} from '../src/obs/layout.js';
 import {BunkVisit,BUNK_PHASE_SECONDS} from '../src/obs/bunk-visit.js';
 import {sleepView} from '../studies/pov/sleep-view.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {applyCabinLadder,CABIN_LADDER} from '../src/obs/cabin-ladder.js';
 import {LADDER} from '../src/obs/ladder-pose.js';
+import {crewWalkway} from '../src/obs/cabin-walkway.js';
+import {CrewMotion} from '../src/obs/state.js';
 
 test('each viewer clamps mouse and touch input, recenters, and eases without frame-rate dependence',()=>{
   for(const id of Object.keys(LOOK_PROFILES)){
@@ -75,15 +77,20 @@ test('ladder eyes and their near plane stay on the crew side of the rungs throug
   const camera=new PerspectiveCamera(72,16/9,.025,150),neutral=new Vector3(0,1.73,.12);
   const rig=new HeadLookRig(root.userData.head,root.userData.body,root.userData.head.worldToLocal(neutral.clone()));
   const comfort=new StableFirstPersonCamera(root,neutral);
-  for(const [startHeight,endHeight]of [[0,3.392],[3.392,0]]){
+  for(const fps of [60,120])for(const [from,to]of [[2,1],[1,2],[2,0],[0,2],[1,0],[0,1]]){
+    const startHeight=FLOOR_Y[from],endHeight=FLOOR_Y[to];
+    const startDepth=crewWalkway(0,from).z,endDepth=crewWalkway(0,to).z;
+    const actor=new CrewMotion({floor:from,x:LADDER_X});actor.goTo({floor:to,x:LADDER_X});
     comfort.reset();let previous;
-    for(let i=0;i<=360;i++){
-      rig.restore();const height=startHeight+(endHeight-startHeight)*i/360;
-      root.position.set(0,height,.78);animateMilo(root,{time:0,moving:false});
-      applyCabinLadder(root,{height,startHeight,endHeight,startYaw:Math.PI/2,endYaw:-Math.PI/2});
+    // Use OBS's supported three-second deck transfers, rather than sweeping
+    // linearly through them several times faster than the running actor.
+    for(let i=0;i<fps*35;i++){
+      rig.restore();const height=(870-actor.y)*.016;
+      root.position.set(0,height,startDepth);animateMilo(root,{time:0,moving:false});
+      applyCabinLadder(root,{height,startHeight,endHeight,startYaw:Math.PI/2,endYaw:-Math.PI/2,startDepth,endDepth});
       const yaw=Math.sin(i/15)*75*Math.PI/180,pitch=Math.cos(i/17)*50*Math.PI/180;
       rig.apply(yaw,pitch);const eye=rig.eyePosition();
-      comfort.update(camera,{eye,yaw,pitch,dt:1/60,climbing:true});
+      comfort.update(camera,{eye,yaw,pitch,dt:1/fps,climbing:true});
       assert.ok(Math.abs(camera.position.x-eye.x)<1e-9&&Math.abs(camera.position.z-eye.z)<1e-9,'climbing uses the actual eye position without a forward offset');
       camera.updateMatrixWorld(true);
       for(const x of [-1,1])for(const y of [-1,1]){
@@ -92,7 +99,10 @@ test('ladder eyes and their near plane stay on the crew side of the rungs throug
       }
       if(previous)assert.ok(camera.position.distanceTo(previous)<.1,'deck transfers remain continuous');
       previous=camera.position.clone();
+      if(!actor.climbing)break;
+      actor.update(1/fps);
     }
+    assert.equal(actor.climbing,false,'every deck route completes');
   }
   root.traverse(mesh=>mesh.geometry?.dispose());material.dispose();
 });

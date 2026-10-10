@@ -144,7 +144,9 @@ test('rear furniture hides both ends, while the mouse follows a visible, support
     root.traverse(mesh=>{if(mesh.geometry)geometries.add(mesh.geometry);if(mesh.material)materials.add(mesh.material);});
   }
   const eye=new Vector3(0,HABITAT_VIEW.centerY+1.6,Math.sqrt(40**2-1.6**2)),ray=new Raycaster();
-  const boxes=meshes.map(mesh=>new Box3().setFromObject(mesh));
+  // The additive screen glow batches nine separate glass apertures across
+  // several decks. Its combined AABB includes empty space, not solid furniture.
+  const boxes=meshes.filter(mesh=>mesh.name!=='Telemetry screen halos').map(mesh=>new Box3().setFromObject(mesh));
   try{
     for(const [floor,route]of [...MOUSE_ROUTES.entries(),[DECK.HABITATION,OPENING_MOUSE_ROUTE]]){
       const y=FLOOR_Y[floor];let visible=0;

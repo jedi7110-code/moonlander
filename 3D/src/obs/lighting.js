@@ -1,4 +1,5 @@
 import {Vector3} from 'three';
+import {ACCESS_LADDER} from './layout.js';
 // Approximate sRGB tints; the display environment also affects perceived warmth.
 export const CABIN_LIGHT_COLOR=0xffcb9c; // Around 3800 K for general lighting.
 export const CABIN_WARM_LIGHT_COLOR=0xffa967; // Around 2800 K for living-area fixtures.
@@ -8,7 +9,7 @@ export const CABIN_DECK_LIGHT={color:0xffdfbb,fillColor:0xe9dfcf,power:40,living
 export const CABIN_PIXEL_RATIO=1.1;
 export const CABIN_SHADOW_SIZE=1024;
 // Shared by the visible ladder fixtures and their low-cost local light spill.
-export const LADDER_LIGHT_LAYOUT=Object.freeze({firstY:.54,spacing:1.12,count:12,sourceX:.46,sourceYOffset:-.01,sourceZ:.21});
+export const LADDER_LIGHT_LAYOUT=Object.freeze({firstY:.54,spacing:1.12,count:12,sourceX:.46,sourceYOffset:-.01,sourceZ:ACCESS_LADDER.depth+.18});
 export const EVA_SPOT_LAYOUT=Object.freeze({suitX:Object.freeze([7.85,9.05,10.25]),floorY:6.784,sourceY:2.91,sourceZ:-.05,targetY:1.95,targetZ:-.67,innerAngle:16,outerAngle:26,range:3.15});
 
 // Forward rendering evaluates every visible light on every lit surface.

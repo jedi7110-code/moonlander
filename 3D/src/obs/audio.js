@@ -116,10 +116,19 @@ export class CabinAudio {
     const source=this.context.createBufferSource(),gain=this.context.createGain(),pan=this.context.createStereoPanner?.();
     source.buffer=buffer;source.loop=loop;source.playbackRate.value=Math.max(.7,Math.min(1.3,(definition.rate??1)*rate));
     gain.gain.value=0;source.connect(gain);if(pan)gain.connect(pan).connect(this.master);else gain.connect(this.master);
-    const voice={id,source,gain,pan,position:position?{...position}:null,volume:definition.gain*volume,key,stopping:false};
+    const voice={id,source,gain,pan,position:position?{...position}:null,volume:definition.gain*volume,key,stopping:false,startedAt:this.context.currentTime};
     this.voices.add(voice);this.positionVoice(voice);
     source.onended=()=>{source.disconnect();gain.disconnect();pan?.disconnect();this.voices.delete(voice);if(key&&this.loops.get(key)===voice)this.loops.delete(key);this.onChange?.();};
-    source.start();return voice;
+    source.start(voice.startedAt);return voice;
+  }
+  // The running audio clock is authoritative for visuals that follow a loop.
+  // A new voice after mute/pause starts a fresh phase; stopped/locked audio
+  // cannot keep a stale clock driving the ship's emergency circuit.
+  loopTime(key){
+    const voice=this.loops.get(key),duration=voice?.source.buffer?.duration;
+    if(!this.audible||!voice||voice.stopping||!(duration>0))return null;
+    const elapsed=Math.max(0,this.context.currentTime-voice.startedAt)*voice.source.playbackRate.value;
+    return elapsed%duration;
   }
   setLoop(key,id,active,options={}){
     let voice=this.loops.get(key);

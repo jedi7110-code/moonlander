@@ -17,6 +17,7 @@ import {HATCH_TRAVEL} from './delivery.js';
 import {paintSupplyLedge} from './supply-ledge.js';
 import {createWasteIncinerator} from './waste-incinerator.js';
 import {createScreenGlow} from './screen-glow.js';
+import {createLoungeAshtray} from './lounge-ashtray.js';
 import {displayFrame} from './display-frame.js';
 import {createVanity} from './grooming.js';
 import {createLoungeTitanium,createMachinedMetals} from './machined-metals.js';
@@ -36,6 +37,8 @@ import {finishGateFrames} from './gate-frame-finish.js';
 import {createCatFoodCarton,createCatFoodMaterial} from './cat-food-package.js';
 import {createServicePartsPanel} from './service-parts.js';
 import {createGalley} from './galley.js';
+import {paintFloorLevel} from './floor-level-marking.js';
+import {ACCESS_LADDER} from './layout.js';
 
 export const FLOOR_Y=[6.784,3.392,0];
 // All rear rooms share the same full-width doorway and aligned centerline.
@@ -60,12 +63,12 @@ export function createDeckFloor(m,y,level){
     box(root,m.metal,side*6.73,y-.013,center,12.3,.025,depth-.13);
   }
   // Leave the ladder well open, but carry the cat's front aisle across it.
-  const bridgeBack=level===2?back:.94,bridgeDepth=front-bridgeBack,bridgeZ=(front+bridgeBack)/2;
+  const bridgeBack=level===2?back:ACCESS_LADDER.wellEdge,bridgeDepth=front-bridgeBack,bridgeZ=(front+bridgeBack)/2;
   box(root,m.dark,0,y-.17,bridgeZ,1.09,.32,bridgeDepth,.025);
   box(root,m.metal,0,y-.013,bridgeZ,1.16,.025,bridgeDepth-.13);
   box(root,m.dark,0,y-.18,front-.01,26.22,.38,.20,.02);
   for(let x=-12.8;x<12.8;x+=.42){
-    for(const z of [-.75,.1,.8,CABIN_AISLE.catZ])if(Math.abs(x)>.50||z>.94||level===2)box(root,m.rubber,x,y+.005,z,.18,.012,.021);
+    for(const z of [-.75,.1,.8,CABIN_AISLE.catZ])if(Math.abs(x)>.50||z>ACCESS_LADDER.wellEdge||level===2)box(root,m.rubber,x,y+.005,z,.18,.012,.021);
     box(root,m.rubber,x,y-.19,front+.11,.20,.105,.012,.009);
   }
   return root;
@@ -76,37 +79,39 @@ export function createAccessLadder(m){
   const lights=new THREE.Group();lights.name='Ladder work lights';root.add(lights);
   const diffuser=new THREE.MeshBasicMaterial({name:'Ladder light diffuser',color:CABIN_LIGHT_COLOR,toneMapped:false});
   diffuser.userData.cabinAlwaysPowered=true;
-  const bottom=.08,top=13.14;
-  panel(root,m,0,6.65,-1.46,1.12,13.3,m.dark);
+  const bottom=.08,top=13.14,z=ACCESS_LADDER.depth,sideBack=-1.225,sideFront=z+.195;
+  panel(root,m,0,6.65,ACCESS_LADDER.rearPanelZ,1.12,13.3,m.dark);
   for(const side of [-1,1]){
-    rod(root,m.yellow,[side*.36,bottom,.03],[side*.36,top,.03],.045);
-    box(root,m.dark,side*.56,6.7,-.5,.18,13.4,1.45,.02);
-    box(root,m.metal,side*.64,11.93,-.32,.10,2.75,1.83,.016);
+    rod(root,m.yellow,[side*.36,bottom,z],[side*.36,top,z],.045);
+    box(root,m.dark,side*.56,6.7,(sideBack+sideFront)/2,.18,13.4,sideFront-sideBack,.02);
+    // Join the upper flare ahead of the shaft panel instead of stacking their
+    // rear faces after moving the ladder against the wall.
+    const flareBack=sideFront+.008,flareFront=z+.565;
+    box(root,m.metal,side*.64,11.93,(flareBack+flareFront)/2,.10,2.75,flareFront-flareBack,.016);
     // A matched pair every four rungs lights hands and feet along the entire shaft.
     for(let i=0;i<LADDER_LIGHT_LAYOUT.count;i++){
       const y=LADDER_LIGHT_LAYOUT.firstY+i*LADDER_LIGHT_LAYOUT.spacing,sconce=new THREE.Group();sconce.name='Inward ladder light housing';
-      sconce.position.set(side*.53,y,.24);sconce.lookAt(0,y-.08,.03);root.add(sconce);
+      sconce.position.set(side*.53,y,z+.21);sconce.lookAt(0,y-.08,z);root.add(sconce);
       box(sconce,m.dark,0,0,0,.14,.28,.10,.012);
       box(sconce,m.metal,0,0,.054,.10,.23,.015);
       box(sconce,diffuser,0,0,.064,.065,.19,.012).name='Ladder light lens';
-      box(root,diffuser,side*.53,y,.33,.040,.16,.014).name='Ladder front light lens';
+      box(root,diffuser,side*.53,y,z+.30,.040,.16,.014).name='Ladder front light lens';
       for(const x of [-.063,.063])box(sconce,m.dark,x,0,.073,.018,.28,.065);
       const light=new THREE.SpotLight(CABIN_LIGHT_COLOR,2.4,1.8,1.06,.72,2);
       light.name='Ladder hand and foot light';light.position.set(side*LADDER_LIGHT_LAYOUT.sourceX,y+LADDER_LIGHT_LAYOUT.sourceYOffset,LADDER_LIGHT_LAYOUT.sourceZ);
-      light.target.position.set(0,y-.08,.03);lights.add(light,light.target);
+      light.target.position.set(0,y-.08,z);lights.add(light,light.target);
     }
   }
   // Four shared, shadow-free sources light all the paired fixtures along the shaft.
   for(let i=0;i<4;i++){
     const light=new THREE.PointLight(CABIN_LIGHT_COLOR,4,4.2,2);
-    light.name='Ladder shaft fill';light.position.set(0,1.66+i*3.36,.40);lights.add(light);
+    light.name='Ladder shaft fill';light.position.set(0,1.66+i*3.36,z+.37);lights.add(light);
   }
   // Keep rung spacing continuous through the opening toward the rotation axis.
   for(let i=0;i<=46;i++){
     const y=.12+i*.28;
-    const rung=rod(root,m.metal,[-.36,y,.03],[.36,y,.03],.028);rung.name='Ladder rung';
+    const rung=rod(root,m.metal,[-.36,y,z],[.36,y,z],.028);rung.name='Ladder rung';
   }
-  for(const y of [...FLOOR_Y,10.58])for(const side of [-1,1])box(root,m.yellow,side*.64,y+.026,.74,.06,.045,1.58);
   return root;
 }
 
@@ -156,9 +161,9 @@ function cupboard(parent,m,x,y,z,w=1.25,h=1.85) {
 }
 export function createLoungeTable(m,titanium=createLoungeTitanium()){
   const root=createLoungeTableFrame(titanium,m.enamel),top=LOUNGE_SEAT.top+.32;
-  box(root,m.red,-.45,top+.035/2,-.15,.38,.035,.24,.007).name='Table book';
-  const cup=createLoungeCoffee(m);cup.position.set(-.58,top+.035,-.20);cup.rotation.y=Math.PI+.58;root.add(cup);
+  const cup=createLoungeCoffee(m);cup.position.set(.40,top,-.295);cup.rotation.y=Math.PI+.58;root.add(cup);
   root.userData.loungeProps=createTableLeisureProps(root,m,top);
+  const ashtray=createLoungeAshtray();root.add(ashtray);root.userData.loungeProps.ashtray=ashtray;
   return root;
 }
 function sofaCushionGeometry(){
@@ -319,7 +324,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   // Interior faces sit in front of the hull's back surface; the viewing wall is removed.
   gateWall(staticRoot,m.enamel,{left:-13.15,right:13.15,bottom:-.10,top:10.10,z:-2.09,depth:.22,gates:REAR_ROOM_GATES,rectangles:wallOpenings});
   // Carry the roof over the full forward aisle, matching the deck below.
-  const roofFront=CABIN_AISLE.deckFront,roofBridgeBack=.94;
+  const roofFront=CABIN_AISLE.deckFront,roofBridgeBack=ACCESS_LADDER.wellEdge;
   for(const side of [-1,1]){
     box(staticRoot,m.dark,side*7,10.31,(roofFront-1.92)/2,12.9,.26,roofFront+1.92,.05);
     box(staticRoot,m.enamel,side*6.925,10.48,(roofFront-1.87)/2,12.75,.19,roofFront+1.87,.035);
@@ -340,10 +345,8 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     pipe(staticRoot,m.dark,[[side*13.63,.20,-.65],[side*13.65,1,-.65],[side*13.65,8.8,-.65],[side*13.15,10.1,-.65]],.115);
   }
   FLOOR_Y.forEach((y,level)=>{
-    staticRoot.add(floorBuilder(m,y,level));
-    const signX=REAR_ROOM_GATES[level].x,signY=y+2.79,signZ=1.40;
-    box(staticRoot,m.dark,signX,signY,signZ,1.36,.21,.045,.012);
-    label(staticRoot,`${String(level+1).padStart(2,'0')} / ${FLOORS[level].name}`,signX,signY,signZ+.03,1.30,.16,{fg:'#d4dbcc',size:48});
+    const floor=floorBuilder(m,y,level);
+    paintFloorLevel(floor,FLOORS[level].name,y);staticRoot.add(floor);
     for(let xx=-11.8;xx<12.5;xx+=1.52){
       const opening=RECESSED_OPENINGS.some(r=>r.floor===level&&xx+.74>r.left&&xx-.74<r.right);
       if(!opening&&!(xx> -3.0&&xx<-.8))panel(staticRoot,m,xx,y+1.44,-1.70,1.48,2.70,level===DECK.OPERATIONS?m.dark:m.enamel);

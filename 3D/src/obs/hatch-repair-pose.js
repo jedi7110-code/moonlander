@@ -1,26 +1,26 @@
 import * as THREE from 'three';
-import {placeHand} from './dining.js';
+import {solveHingeArm} from './arm-ik.js';
 import {relaxMiloHand} from './milo-hands.js';
 import {setRepairHandFit} from './cup-hand-fit.js';
 import {applyAuthoredMiloTurn} from './milo-turn.js';
 import {applyMocapWalk,miloWalkData} from './mocap-walk.js';
 import {HATCH_SERVICE_POINT} from './eva.js';
-import {HATCH_REPAIR_PHASES} from './hatch-repair.js';
 export {HATCH_SERVICE_POINT} from './eva.js';
 
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
-// The handle lies across the palm, with the shaft leaving beside the thumb.
-// A shaft parallel to the straight fingers cannot form a cylindrical grip.
+// Canonical cylinder coordinates; the tool group mounts it diagonally across
+// the palm, with the shaft leaving beside the thumb.
 export const REPAIR_TOOL_GRIP=Object.freeze({x:.009,y:-.080,z:-.020,radius:.012,length:.096});
-export const REPAIR_TOOL_TIP=new THREE.Vector3(.17,REPAIR_TOOL_GRIP.y,REPAIR_TOOL_GRIP.z);
+// A power grip lies diagonally across the palm. The old transverse mounting
+// forced a 70–98 degree wrist bend just to point the shaft at the lock.
+export const REPAIR_TOOL_ROLL=-.65;
+const toolRotation=new THREE.Quaternion().setFromAxisAngle(v(0,0,1),REPAIR_TOOL_ROLL);
+const gripCenter=v(REPAIR_TOOL_GRIP.x,REPAIR_TOOL_GRIP.y,REPAIR_TOOL_GRIP.z);
+export const REPAIR_TOOL_TIP=v(.17,REPAIR_TOOL_GRIP.y,REPAIR_TOOL_GRIP.z).sub(gripCenter).applyQuaternion(toolRotation).add(gripCenter);
 const smooth=t=>{t=THREE.MathUtils.clamp(t,0,1);return t*t*(3-2*t);};
 
 export function hatchRepairGripWeight(visit){
-  if(visit.pose.tool)return 1;
-  // Close before the tool is visible, and open only after it has been stowed.
-  if(visit.phase==='inspect')return smooth((visit.age-(HATCH_REPAIR_PHASES.inspect-.45))/.45);
-  if(visit.phase==='verify')return 1-smooth(visit.age/.45);
-  return 0;
+  return visit.pose.grip;
 }
 
 export function applyHatchRepairGrip(root,weight){
@@ -31,27 +31,59 @@ export function applyHatchRepairGrip(root,weight){
   for(const [i,finger]of rig.fingers.entries()){
     // Fit each imported finger's length: one uniform fist drives the shorter
     // index/little fingertips through the handle. Positive flexion is inward.
-    finger.rotation.set(mix(finger.rotation.x,[.20,.25,.25,.10][i]),0,0);
-    finger.userData.links[0].rotation.x=mix(finger.userData.links[0].rotation.x,[.30,.90,.90,.50][i]);
-    finger.userData.links[1].rotation.x=mix(finger.userData.links[1].rotation.x,[.40,.55,.55,.70][i]);
+    finger.rotation.set(mix(finger.rotation.x,[.69372,1.07734,.66226,.75798][i]),mix(finger.rotation.y,[-.22539,.23065,.25,.13728][i]),mix(finger.rotation.z,[-.08470,-.15,-.15,.09447][i]));
+    finger.userData.links[0].rotation.x=mix(finger.userData.links[0].rotation.x,[.55,.57905,.87286,1.55][i]);
+    finger.userData.links[1].rotation.x=mix(finger.userData.links[1].rotation.x,[.63902,.70,.70,.70][i]);
   }
   const {thumb,side}=rig;
-  // Oppose the thumb and lay its pad along the shaft-side end of the handle.
-  thumb.position.lerp(v(-side*.009,-.045,.033),weight);
-  thumb.rotation.set(mix(thumb.rotation.x,0),0,mix(thumb.rotation.z,-side*1.05));
-  thumb.userData.ip.rotation.x=mix(thumb.userData.ip.rotation.x,.55);
+  // Oppose at the CMC joint; moving the thumb base stretches its webbing.
+  thumb.rotation.set(mix(thumb.rotation.x,-.29669),mix(thumb.rotation.y,.01593),mix(thumb.rotation.z,-side*.71));
+  thumb.userData.ip.rotation.x=mix(thumb.userData.ip.rotation.x,.54022);
 }
 
 export function attachHatchRepairTool(root){
   const tool=new THREE.Group();tool.name='Hatch repair screwdriver';tool.visible=false;
+  tool.quaternion.copy(toolRotation);tool.position.copy(gripCenter).sub(gripCenter.clone().applyQuaternion(toolRotation));
   root.userData.arms[0].hand.add(tool);root.userData.repairTool=tool;
   const grip=new THREE.Mesh(new THREE.CylinderGeometry(REPAIR_TOOL_GRIP.radius,REPAIR_TOOL_GRIP.radius,REPAIR_TOOL_GRIP.length,12),new THREE.MeshStandardMaterial({color:0x966942,roughness:.78}));
   grip.name='Repair screwdriver handle';grip.rotation.z=-Math.PI/2;
   grip.position.set(REPAIR_TOOL_GRIP.x,REPAIR_TOOL_GRIP.y,REPAIR_TOOL_GRIP.z);tool.add(grip);
-  const shaftLength=REPAIR_TOOL_TIP.x-(REPAIR_TOOL_GRIP.x+REPAIR_TOOL_GRIP.length/2);
+  const shaftLength=.17-(REPAIR_TOOL_GRIP.x+REPAIR_TOOL_GRIP.length/2);
   const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.0035,.0035,shaftLength,8),new THREE.MeshStandardMaterial({color:0xa6aca6,metalness:.65,roughness:.4}));
   shaft.name='Repair screwdriver shaft';shaft.rotation.z=-Math.PI/2;
-  shaft.position.set(REPAIR_TOOL_TIP.x-shaftLength/2,REPAIR_TOOL_GRIP.y,REPAIR_TOOL_GRIP.z);tool.add(shaft);
+  shaft.position.set(.17-shaftLength/2,REPAIR_TOOL_GRIP.y,REPAIR_TOOL_GRIP.z);tool.add(shaft);
+}
+
+function placeRepairHand(rig,target,rotation,weight,tool){
+  const {arm,elbow,hand,side}=rig;
+  const restPole=elbow.position.clone().applyQuaternion(arm.quaternion);
+  // Keep the elbow below the shoulder and outside the ribs. The grip rolls
+  // with the forearm, so the hand can face inward without raising the shoulder.
+  const delta=target.clone().sub(arm.position),max=elbow.position.length()+hand.position.length()-.001;
+  if(delta.length()>max)target.copy(arm.position).add(delta.setLength(max));
+  const axis=target.clone().sub(arm.position).normalize();
+  let pole;
+  if(tool){
+    // Sweep the elbow around the shoulder-to-wrist axis on the outside. Blending
+    // two 3D poles can cross that axis and reverse the elbow in a single frame.
+    const from=restPole.clone().addScaledVector(axis,-restPole.dot(axis)).normalize();
+    const to=v(side*.80,-.10,-.10);to.addScaledVector(axis,-to.dot(axis)).normalize();
+    const across=axis.clone().cross(from).normalize();if(across.x*side<0)across.negate();
+    let angle=Math.atan2(to.dot(across),to.dot(from));if(angle<0)angle+=2*Math.PI;
+    pole=from.multiplyScalar(Math.cos(angle*weight)).addScaledVector(across,Math.sin(angle*weight));
+  }else pole=restPole.lerp(v(side*.10,-1,-.10),smooth(weight/.5));
+  if(pole.clone().addScaledVector(axis,-pole.dot(axis)).length()<.005)pole.x+=side*.1;
+  const solved=solveHingeArm(rig,target,pole);
+  arm.quaternion.copy(solved.upper);elbow.quaternion.copy(solved.lower);
+  hand.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(rotation);
+  // Preserve forearm roll, limiting only the bend while lifting/withdrawing.
+  const along=hand.position.clone().normalize(),direction=v(0,-1,0).applyQuaternion(hand.quaternion);
+  const bend=along.angleTo(direction),limit=.72;
+  if(bend>limit){
+    const correction=new THREE.Quaternion().setFromUnitVectors(direction,along);
+    correction.slerp(new THREE.Quaternion(),limit/bend);
+    hand.quaternion.premultiply(correction);
+  }
 }
 
 export function applyHatchRepairPose(root,visit){
@@ -68,21 +100,24 @@ export function applyHatchRepairPose(root,visit){
   if(pose.turn)applyAuthoredMiloTurn(root,pose.turn.from,pose.turn.to,pose.turn.progress,{upperBody:false});
   const weight=pose.reach;
   head.rotation.x=.17*weight;
-  repairTool.visible=pose.tool&&weight>.01;
+  repairTool.visible=pose.tool&&weight>.01&&pose.grip>.98;
   if(!weight){applyHatchRepairGrip(root,hatchRepairGripWeight(visit));return;}
   root.updateWorldMatrix(true,true);
-  const right=arms[0],left=arms[1];
+  const right=arms[0];
   const target=body.worldToLocal(v(HATCH_SERVICE_POINT.x,root.position.y+HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z));
-  // Approach from below with the knuckles above the wrist; keeping the idle
-  // palm upright here would fold the working wrist back against the forearm.
-  const rotation=new THREE.Quaternion().setFromAxisAngle(v(0,0,1),(pose.tool?Math.PI:0)+pose.twist).multiply(new THREE.Quaternion().setFromAxisAngle(pose.tool?v(0,1,0):v(1,0,0),-Math.PI/2));
+  // Lift on a fixed branch, with the knuckles following the forearm. Keep the
+  // shaft normal to the hatch while rolling the grip gently around its axis.
+  const rotation=new THREE.Quaternion().setFromAxisAngle(v(0,0,1),pose.tool ? 1.05 : 0).multiply(new THREE.Quaternion().setFromAxisAngle(pose.tool?v(0,1,0):v(1,0,0),-Math.PI/2));
+  if(pose.tool)rotation.multiply(toolRotation.clone().invert());
+  const workingRotation=rotation.clone().premultiply(new THREE.Quaternion().setFromAxisAngle(v(0,0,1),pose.twist));
   const tip=pose.tool?REPAIR_TOOL_TIP:v(0,-.15,.025);
-  const wrist=target.sub(tip.clone().multiply(right.hand.scale).applyQuaternion(rotation));
+  const wrist=target.sub(tip.clone().multiply(right.hand.scale).applyQuaternion(workingRotation));
   const rest=body.worldToLocal(right.hand.getWorldPosition(v())),restQ=right.hand.getWorldQuaternion(new THREE.Quaternion()).premultiply(body.getWorldQuaternion(new THREE.Quaternion()).invert());
-  placeHand(right,rest.lerp(wrist,weight),restQ.slerp(rotation,weight),0);
+  // Blend the fixed lifting branch first, then add the small tool roll. Slerping
+  // directly toward a moving half-turn can flip its path at zero twist.
+  const handRotation=restQ.slerp(rotation,weight).premultiply(new THREE.Quaternion().setFromAxisAngle(v(0,0,1),pose.twist*weight));
+  placeRepairHand(right,rest.lerp(wrist,weight),handRotation,weight,pose.tool);
   relaxMiloHand(right);applyHatchRepairGrip(root,hatchRepairGripWeight(visit));
-  const brace=body.worldToLocal(v(HATCH_SERVICE_POINT.x-.045,root.position.y+1.44,HATCH_SERVICE_POINT.z-.38));
-  const leftRest=body.worldToLocal(left.hand.getWorldPosition(v()));
-  const leftQ=left.hand.getWorldQuaternion(new THREE.Quaternion()).premultiply(body.getWorldQuaternion(new THREE.Quaternion()).invert());
-  placeHand(left,leftRest.lerp(brace,weight*.6),leftQ.slerp(new THREE.Quaternion().setFromAxisAngle(v(1,0,0),-1.1),weight*.6),.12*weight);
+  // The free hand rests beside the body. The old partial "brace" stopped short
+  // of the hatch and left its wrist hanging in midair throughout the repair.
 }

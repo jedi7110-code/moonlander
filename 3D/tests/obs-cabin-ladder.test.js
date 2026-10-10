@@ -9,7 +9,7 @@ import {LADDER,LADDER_WRIST_OFFSET} from '../src/obs/ladder-pose.js';
 import {createAccessLadder,positionY} from '../src/obs/ship.js';
 import {CrewMotion} from '../src/obs/state.js';
 import {LADDER_PACE,LADDER_ENTRY,LADDER_LANDING} from '../src/obs/pace.js';
-import {FLOORS,LADDER_X} from '../src/obs/layout.js';
+import {FLOORS,LADDER_X,ladderApproachDepth} from '../src/obs/layout.js';
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
 const create=()=>createMilo(new Proxy({},{get:()=>new MeshStandardMaterial()}));
 test('ascent and descent run twenty percent faster without speeding up walking',()=>{
@@ -28,7 +28,7 @@ test('ascent and descent run twenty percent faster without speeding up walking',
 
 test('mounting keeps soles on the deck until both hands grip, then transfers one foot at a time',()=>{
   const root=create();
-  for(const [start,end,depth]of [[0,3.392,.78],[3.392,0,1.34],[3.392,6.784,1.34],[6.784,0,1.34]]){
+  for(const [start,end,depth]of [[0,3.392,-.33],[3.392,0,.23],[3.392,6.784,.23],[6.784,0,.23]]){
     for(let i=0;i<120;i++){
       const u=i/120,height=start+Math.sign(end-start)*CABIN_LADDER.transfer*u;
       root.position.set(0,height,depth);animateMilo(root,{time:0,moving:false});
@@ -69,7 +69,7 @@ function mountFeet(root,deck){
 }
 test('turning from the aisle to face the ladder steps around planted soles instead of skating',()=>{
   const root=create(),loaded=.0005;
-  for(const [start,end,depth]of [[0,3.392,.78],[3.392,0,1.34]])for(const startYaw of [Math.PI/2,-Math.PI/2]){
+  for(const [start,end,depth]of [[0,3.392,-.33],[3.392,0,.23]])for(const startYaw of [Math.PI/2,-Math.PI/2]){
     const label=`${start}->${end}, from ${startYaw.toFixed(2)}`,drift={'-1':0,'1':0},spin={'-1':0,'1':0},lifted=new Set();let previous=null;
     // Sample the deck part of the mount, before the first foot is raised to a rung.
     for(let i=0;i<=240;i++){
@@ -160,7 +160,7 @@ test('deck transfers stay continuous and ladder mesh resets on seated, tablet an
       if(Math.abs(height-end)<1e-9)break;
       actor.update(1/120);
     }
-    assert.ok(Math.abs(root.position.z-.78)<1e-8);
+    assert.ok(Math.abs(root.position.z-ladderApproachDepth(end===0?2:1))<1e-8);
   }
   for(const action of ['lounge','medical',null]){
     pose(root,1.7);animateMilo(root,{action,time:12,moving:false});
@@ -172,7 +172,7 @@ test('deck transfers stay continuous and ladder mesh resets on seated, tablet an
 
 test('descending onto either deck steps straight backwards with planted feet and held hands',()=>{
   const root=create();
-  for(const [end,depth]of [[0,.78],[3.392,1.34]]){
+  for(const [end,depth]of [[0,-.33],[3.392,.23]]){
   let planted=null,firstAt=null,secondAt=null;
   for(let i=0;i<=200;i++){
     const u=i/200,height=end+CABIN_LADDER.transfer*(1-u);
@@ -192,7 +192,7 @@ test('descending onto either deck steps straight backwards with planted feet and
     }
     if(u>=.14&&u<=.39){
       const rung=(second.y-CABIN_LADDER.rungBase-LADDER.radius)/LADDER.spacing;
-      assert.ok(Math.abs(rung-Math.round(rung))<1e-6&&Math.abs(second.z-.03)<1e-6,'following foot supports weight on a real rung');
+      assert.ok(Math.abs(rung-Math.round(rung))<1e-6&&Math.abs(second.z-CABIN_LADDER.depth)<1e-6,'following foot supports weight on a real rung');
     }
     // Over a well the first foot stays planted at the edge until u=.69, then steps back to the aisle.
     if(u>=.38&&(aisle===edge||u<=.69)){planted??=first.clone();assert.ok(first.distanceTo(planted)<1e-6,'planted foot must not slide while the second descends');}

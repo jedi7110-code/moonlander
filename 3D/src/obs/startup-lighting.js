@@ -116,7 +116,7 @@ const fragmentHeader=`
       emergency *= smoothstep(0.7, 1.05, abs(p.x)) * (1.0 - smoothstep(12.6, 13.0, abs(p.x)));
       emergency *= 1.0 - smoothstep(2.52, 2.75, p.z);
       // The access shaft is on a separate, steady safety circuit.
-      float shaft = (1.0 - smoothstep(0.38, 0.95, abs(p.x))) * (1.0 - smoothstep(0.35, 1.6, abs(p.z - 0.15)));
+      float shaft = (1.0 - smoothstep(0.38, 0.95, abs(p.x))) * (1.0 - smoothstep(0.35, 1.6, abs(p.z - ${(LADDER_LIGHT_LAYOUT.sourceZ-.06).toFixed(2)})));
       shaft *= smoothstep(-0.08, 0.12, p.y) * (1.0 - smoothstep(13.1, 13.4, p.y));
       // Three console screens and the tall monitor stack immediately to their
       // right. Rounded falloff keeps the green glow off unrelated rooms.
@@ -129,6 +129,15 @@ const fragmentHeader=`
       float consoleFacing = max(0.0, dot(surfaceNormal, normalize(consoleSource - p + vec3(0.0, 0.00001, 0.0))));
       float monitorFacing = max(0.0, dot(surfaceNormal, normalize(monitorSource - p + vec3(0.0, 0.00001, 0.0))));
       float screens = max(cabinSoftPool(consoleOffset / vec3(1.35, 1.25, 1.75)) * consoleFacing, cabinSoftPool(monitorOffset / vec3(1.15, 1.10, 1.75)) * monitorFacing);
+      // Independent standby displays: small, surface-facing pools on each deck.
+      vec3 medicalSource = vec3(clamp(p.x, 3.17, 4.33), clamp(p.y, 8.329, 8.979), -0.675);
+      vec3 coffeeSource = vec3(clamp(p.x, 9.8235, 10.2765), clamp(p.y, 5.166, 5.438), -0.770);
+      vec3 medicalOffset = vec3(max(abs(p.x - 3.75) - 0.58, 0.0), max(abs(p.y - 8.654) - 0.325, 0.0), p.z + 0.675);
+      vec3 coffeeOffset = vec3(max(abs(p.x - 10.05) - 0.2265, 0.0), max(abs(p.y - 5.302) - 0.136, 0.0), p.z + 0.770);
+      float medicalFacing = max(0.0, dot(surfaceNormal, normalize(medicalSource - p + vec3(0.0, 0.00001, 0.0))));
+      float coffeeFacing = max(0.0, dot(surfaceNormal, normalize(coffeeSource - p + vec3(0.0, 0.00001, 0.0))));
+      screens = max(screens, cabinSoftPool(medicalOffset / vec3(0.85, 0.85, 1.10)) * medicalFacing);
+      screens = max(screens, cabinSoftPool(coffeeOffset / vec3(0.48, 0.48, 0.65)) * coffeeFacing);
       // Spill from the grow shelf reaches the near aisle floor, not just leaves.
       float growFloor = cabinSoftPool(vec3((p.x + 7.09) / 2.1, p.y / 0.30, (p.z - 0.75) / 2.0));
       growFloor *= max(0.0, surfaceNormal.y);
@@ -223,7 +232,7 @@ export class CabinStartupLighting {
           #include <tonemapping_fragment>`);
         if(spill)applyBathroomLightingShader(shader,bathrooms);
       };
-      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v10-'+Number(fixture)+'-'+Number(spill)+'-'+(lit?lights.length:0)+'-'+bathrooms.length;material.needsUpdate=true;
+      material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-boot-v11-'+Number(fixture)+'-'+Number(spill)+'-'+(lit?lights.length:0)+'-'+bathrooms.length;material.needsUpdate=true;
       this.materials.push({material,compile,key,wrapped});
     }
     if(!start)this.update(STARTUP_TOTAL_SECONDS);

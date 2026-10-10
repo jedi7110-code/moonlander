@@ -105,7 +105,7 @@ test('click standby keeps both asleep while ship time advances, and lighting act
   const step=dt=>{care.update(dt);advanceCabinTraffic(actor,cat,dt);brain.update(dt);lights.update(dt);};
   for(let i=0;i<60*60;i++)step(1/60);
   assert.ok(Math.abs(brain.clock-(clock+60000)%brain.dayMs)<.001,'ship clock keeps running');
-  assert.ok(brain.environment.clock>59);assert.ok(brain.plants.rows[0].growth>.9);
+  assert.equal(brain.environment.clock,0);assert.equal(brain.environment.fault,null);assert.ok(brain.plants.rows[0].growth>.9);
   assert.equal(brain.openingWake.age,0);assert.equal(brain.openingWake.waiting,true);
   assert.equal(brain.bunkVisit.phase,'sleeping');assert.deepEqual(brain.bunkVisit.pose,pose);
   assert.equal(cat.mode,'sleep');assert.equal(cat.motion.x,catX);assert.equal(actor.x,x);
@@ -113,12 +113,14 @@ test('click standby keeps both asleep while ship time advances, and lighting act
   assert.deepEqual(brain.statusNeeds,needs);assert.equal(lights.time,0);
   // Even a very long dark wait must not force either sleeper into an activity.
   step(3600);assert.equal(brain.bunkVisit.phase,'sleeping');assert.equal(cat.mode,'sleep');assert.deepEqual(brain.statusNeeds,needs);
+  assert.equal(brain.environment.clock,0);assert.equal(brain.environment.fault,null);
   assert.equal(lights.activate(),true);assert.equal(brain.releaseOpeningSleep(),true);
   assert.equal(brain.bunkVisit.phase,'waking');assert.equal(brain.bunkVisit.age,0);
   step(1);const age=brain.bunkVisit.age;
+  assert.equal(brain.environment.clock,1,'maintenance time starts after activating the lighting');
   assert.equal(lights.activate(),false);assert.equal(brain.releaseOpeningSleep(),false);assert.equal(brain.bunkVisit.age,age);
-  // Avoid an unrelated maintenance fault, accumulated during the long wait.
-  brain.environment.fault=null;brain.environment.nextFault=Infinity;
+  // Keep this wake-up test focused on returning both sleepers to the aisle.
+  brain.environment.nextFault=Infinity;
   for(let i=0;i<1800&&brain.bunkVisit;i++)step(1/60);
   assert.equal(brain.openingWake,null);assert.equal(brain.bunkVisit,null);assert.equal(cat.bunkWake,null);
   assert.equal(cat.mode,'walk');assert.equal(lights.done,true);lights.dispose();

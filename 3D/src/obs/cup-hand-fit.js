@@ -1,6 +1,7 @@
 import {MathUtils} from 'three';
 import {createGripHandGeometry} from './tablet-pose.js';
 import {cloneMiloSkinGeometry} from './milo-elbow.js';
+import {repairDigitLabels} from './repair-hand-fit.js';
 
 // Fit the imported fingers to their controllers before closing around the
 // small handle. Blend in while reaching, so the idle hand never changes shape
@@ -8,17 +9,18 @@ import {cloneMiloSkinGeometry} from './milo-elbow.js';
 export const setCupHandFit=(root,weight)=>setHandFit(root,weight,1);
 export const setMealHandFit=(root,weight)=>setHandFit(root,weight,0);
 export const setTeaserHandFit=(root,weight)=>setHandFit(root,weight,-1);
-export const setRepairHandFit=(root,weight)=>setHandFit(root,weight,-1);
-function setHandFit(root,weight,side){
+export const setRepairHandFit=(root,weight)=>setHandFit(root,weight,-1,true);
+function setHandFit(root,weight,side,repair=false){
   const skin=root.userData.bodySkin;if(!skin)return;
   let cache=root.userData.diningHandFit;
   if(!cache&&weight>0)cache=root.userData.diningHandFit={original:skin.geometry,variants:{}};
   if(!cache)return;
   if(weight===0){skin.geometry=cache.original;return;}
-  let fit=cache.variants[side];
+  const key=repair?'repair':side;
+  let fit=cache.variants[key];
   if(!fit){
     skin.geometry=cache.original;
-    const original=cache.original,target=createGripHandGeometry(skin,side),geometry=cloneMiloSkinGeometry(skin),vertices=[];
+    const original=cache.original,target=createGripHandGeometry(skin,side,repair?repairDigitLabels(original):null),geometry=cloneMiloSkinGeometry(skin),vertices=[];
     const a=original.attributes,b=target.attributes;
     for(let i=0;i<a.position.count;i++){
       if(a.armRegion.getX(i)<.95||a.position.getY(i)>.934||(side&&a.position.getX(i)*side<0))continue;
@@ -32,7 +34,7 @@ function setHandFit(root,weight,side){
       }
       vertices.push({i,influences:[...influences].map(([id,[a,b]])=>({id,a,b,w:0}))});
     }
-    fit=cache.variants[side]={original,target,geometry,vertices,weight:-1};
+    fit=cache.variants[key]={original,target,geometry,vertices,weight:-1};
   }
   if(!fit)return;
   skin.geometry=weight>0?fit.geometry:fit.original;

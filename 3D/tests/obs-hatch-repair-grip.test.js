@@ -11,6 +11,7 @@ import {poseRepairStudy,REPAIR_STUDY_GENTLE} from '../src/hatch-repair-study-mod
 import {createEVAHatch,animateAirlock} from '../src/obs/eva.js';
 import {getStation,CABIN_AISLE} from '../src/obs/layout.js';
 import {FLOOR_Y} from '../src/obs/ship.js';
+import {repairDigitLabels} from '../src/obs/repair-hand-fit.js';
 
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
 const model=()=>createMilo(new Proxy({},{get:(object,key)=>object[key]??=new MeshStandardMaterial()}));
@@ -27,8 +28,9 @@ test('8.968 seconds already grips the screwdriver, independently of arm reach an
     assert.equal(hatchRepairGripWeight(visit),1);
     assert.ok(root.userData.repairTool.visible);
     const grip=digits(root).map(joint=>joint.quaternion.clone());
-    assert.ok(root.userData.arms[0].fingers.every(f=>f.rotation.x>0&&f.userData.links.every(link=>link.rotation.x>.25)));
-    assert.ok(root.userData.arms[0].thumb.rotation.z>1,'thumb opposes and presses along the handle');
+    assert.ok(root.userData.arms[0].fingers.every(f=>f.userData.links[1].rotation.x>.25));
+    assert.ok(root.userData.arms[0].thumb.rotation.z>.7,'thumb opposes and presses along the handle');
+    assert.ok(root.userData.arms[0].thumb.position.distanceTo(new Vector3(.029,-.051,.025))<1e-8,'thumb base stays attached to the palm');
     for(const time of [9.2,11.8,14.2,18.6]){
       poseRepairStudy(root,time,tuning);
       digits(root).forEach((joint,i)=>assert.ok(joint.quaternion.angleTo(grip[i])<1e-7,'do not reopen or slip while lifting/turning/withdrawing'));
@@ -36,23 +38,48 @@ test('8.968 seconds already grips the screwdriver, independently of arm reach an
   }
 });
 
+test('repair grip keeps each connected fingertip on its own finger and bends the distal thumb',()=>{
+  const root=model();poseRepairStudy(root,13.918);
+  const skin=root.userData.bodySkin,original=root.userData.diningHandFit.original,labels=repairDigitLabels(original),a=skin.geometry.attributes;
+  assert.deepEqual([...new Set(labels.values())].sort(),[0,1,2,3,4]);
+  let thumbTipVertices=0;
+  for(const [i,label]of labels){
+    if(original.attributes.position.getY(i)>=.810)continue;
+    for(let k=0;k<4;k++){
+      if(a.skinWeight.array[i*4+k]<.01)continue;
+      const name=skin.skeleton.bones[a.skinIndex.array[i*4+k]].name;
+      const digit=name.match(/L_finger(\d)/);
+      if(digit)assert.equal(Number(digit[1]),label,'one fingertip must not be pulled by another finger');
+      if(name.endsWith('L_thumbIP'))thumbTipVertices++;
+    }
+  }
+  assert.ok(thumbTipVertices>20,'the thumb tip must follow its distal joint instead of staying straight');
+});
+
 test('the imported finger pads surround the handle without entering its core',()=>{
   const root=model();poseRepairStudy(root,8.968,REPAIR_STUDY_GENTLE);
-  const skin=root.userData.bodySkin,hand=root.userData.arms[0].hand,attributes=skin.geometry.attributes;
-  const nearest=new Map(),g=REPAIR_TOOL_GRIP;
+  const skin=root.userData.bodySkin,tool=root.userData.repairTool,attributes=skin.geometry.attributes;
+  const nearest=new Map(),contactDirections=new Map(),g=REPAIR_TOOL_GRIP;
   for(let i=0;i<attributes.position.count;i++){
     let dominant=0;
     for(let k=1;k<4;k++)if(attributes.skinWeight.array[i*4+k]>attributes.skinWeight.array[i*4+dominant])dominant=k;
     const name=skin.skeleton.bones[attributes.skinIndex.array[i*4+dominant]].name;
     const match=name.match(/L_(finger\d|thumb)/);if(!match)continue;
-    const point=hand.worldToLocal(skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(attributes.position,i)).applyMatrix4(skin.matrixWorld));
+    const point=tool.worldToLocal(skin.applyBoneTransform(i,new Vector3().fromBufferAttribute(attributes.position,i)).applyMatrix4(skin.matrixWorld));
     if(Math.abs(point.x-g.x)>g.length/2)continue;
     const radial=Math.hypot(point.y-g.y,point.z-g.z);
     assert.ok(radial>g.radius-.003,`${name} must not pass through the wooden handle`);
-    nearest.set(match[1],Math.min(nearest.get(match[1])??Infinity,Math.abs(radial-g.radius)));
+    const gap=Math.abs(radial-g.radius);
+    if(gap<(nearest.get(match[1])??Infinity)){
+      nearest.set(match[1],gap);
+      contactDirections.set(match[1],new Vector3(0,point.y-g.y,point.z-g.z).normalize());
+    }
   }
   assert.equal(nearest.size,5,'all four fingers and the thumb are checked');
   for(const [name,gap]of nearest)assert.ok(gap<.003,`${name} should touch the handle, not float (${gap})`);
+  const fingerSide=new Vector3();
+  for(let i=0;i<4;i++)fingerSide.add(contactDirections.get(`finger${i}`));
+  assert.ok(contactDirections.get('thumb').dot(fingerSide.normalize())<-.4,'thumb supports the opposite side of the wrapped fingers');
 });
 
 test('the real shaft endpoint stays on the service screw throughout the working twist',()=>{
@@ -64,6 +91,25 @@ test('the real shaft endpoint stays on the service screw throughout the working 
     assert.ok(contact&&endpoint.distanceTo(screw)<.008);
     assert.ok(root.userData.arms[0].hand.localToWorld(REPAIR_TOOL_TIP.clone()).distanceTo(endpoint)<1e-8);
   }
+});
+
+test('the screwdriver hand keeps its back outward and palm inward for the entire working twist',()=>{
+  const root=model(),{body,arms}=root.userData,rig=arms[0];
+  for(const tuning of [null,REPAIR_STUDY_GENTLE])for(let time=10.8;time<=16.8;time+=1/60){
+    const {tip,screw}=poseRepairStudy(root,time,tuning);
+    const back=new Vector3(0,0,1).transformDirection(rig.hand.matrixWorld).transformDirection(body.matrixWorld.clone().invert());
+    assert.ok(back.x*rig.side>.20,`back of the tool hand faces away from the torso at ${time}`);
+    const wrist=body.worldToLocal(rig.hand.getWorldPosition(new Vector3())),elbow=body.worldToLocal(rig.elbow.getWorldPosition(new Vector3()));
+    assert.ok(elbow.x*rig.side>.28,'elbow remains outside the shoulder and ribs');
+    assert.ok(elbow.y<rig.arm.position.y-.07,'working elbow stays below the shoulder');
+    assert.ok(wrist.x*rig.side>.14,'the hand stays on its own side');
+    assert.ok(tip.distanceTo(screw)<.008,'changing forearm roll preserves tool contact');
+    const bend=new Vector3(0,-1,0).applyQuaternion(rig.hand.quaternion).angleTo(rig.hand.position.clone().normalize());
+    assert.ok(bend<.72,'forearm supports the grip without a folded wrist');
+  }
+  poseRepairStudy(root,12.318);
+  const back=new Vector3(0,0,1).transformDirection(rig.hand.matrixWorld).transformDirection(body.matrixWorld.clone().invert());
+  assert.ok(back.x*rig.side>.65,'regression at the reported 12.318 second pose');
 });
 
 test('repair study and OBS tools touch the actual redesigned lock after deck placement and reparenting',()=>{

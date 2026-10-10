@@ -12,7 +12,7 @@ import {reclineProgress,RECLINE_EXIT_SECONDS} from './recline.js';
 import {GymVisit,GYM_TURN_SECONDS,GYM_TURN_DECAY} from './gym-visit.js';
 import {BunkVisit,BUNK_TRANSITION_DECAY} from './bunk-visit.js';
 import {HairGrowthClock,GroomingVisit} from './grooming-visit.js';
-import {SmokingClock,SmokingVisit} from './smoking-visit.js';
+import {SmokingClock,SmokingVisit,LOUNGE_SMOKING_SECONDS} from './smoking-visit.js';
 import {CabinEnvironment} from './environment.js';
 import {HatchRepairVisit} from './hatch-repair.js';
 
@@ -80,10 +80,10 @@ export class CabinBrain extends Brain {
   update(dt){
     if(this.state==='playingGame')return;
     if(this.openingWake?.waiting){
-      // Keep ship time and life support live without consuming the opening
-      // sleep, needs or health. Lucy follows this same sleeping bunk visit.
+      // Keep ship time and plants live, but start the maintenance clock only
+      // when the cabin lights are activated. Both sleepers stay in the bunk.
       this.clock=(this.clock+dt*1000)%this.dayMs;
-      this.environment.update(dt);this.plants.update(dt);
+      this.plants.update(dt);
       return;
     }
     const harvest=this.harvestDelivery;
@@ -91,7 +91,7 @@ export class CabinBrain extends Brain {
     const smoking=this.smokingVisit;
     const repair=this.hatchRepair;
     this.environment.update(dt);
-    this.smokingClock.update(dt,this.actStation==='smoking');
+    this.smokingClock.update(dt,Boolean(smoking)||this.actStation==='smoking');
     this.hairGrowth.update(dt,Boolean(grooming));
     const exit=this.loungeExit,stow=this.loungeStow;
     const gym=this.gymVisit;
@@ -134,7 +134,11 @@ export class CabinBrain extends Brain {
       if(grooming.done){this.hairGrowth.reset();this.grooming=null;super._endPerform();this.finishDeparture();}
     }
     if(smoking&&this.smokingVisit===smoking){
-      if(smoking.done){this.smokingVisit=null;this.smokingClock.reset();super._endPerform();this.finishDeparture();}
+      if(smoking.done){
+        this.smokingVisit=null;this.smokingClock.reset();
+        if(smoking.seated){this.leisure=null;this.beginLoungeExit();}
+        else{super._endPerform();this.finishDeparture();}
+      }
     }
     if(repair&&this.hatchRepair===repair){
       repair.update(dt);
@@ -152,7 +156,7 @@ export class CabinBrain extends Brain {
         this.actor.x=getStation('lounge').x;
         this.loungeEntry=null;
         if(this.gamePending&&!this.afterActivity)this._startPerform(this.cur,true);
-        else{this.state='performing';if(this.afterActivity)this.beginLoungeExit();else if(this.leisure==='cat')this.catRoutine?.inviteLounge(this);}
+        else{this.state='performing';if(this.afterActivity){this.leisure=this.leisure==='smoking'?null:this.leisure;this.beginLoungeExit();}else if(this.leisure==='smoking')this.smokingVisit=new SmokingVisit({seated:true});else if(this.leisure==='cat')this.catRoutine?.inviteLounge(this);}
       }
     }
     if(recline&&recline===this.reclineExit){
@@ -199,7 +203,9 @@ export class CabinBrain extends Brain {
     const ready=!this.health.needsCare&&this.needs.energy>30&&this.needs.thirst>25&&this.needs.hunger>25&&this.needs.hygiene>25&&this.needs.bladder>25;
     if(ready&&this.hairGrowth.due){this.requestGrooming();return;}
     if(ready&&this.exercise<48&&(this.exercise<25||this.exercise<=Math.min(...Object.values(this.needs)))){this._go(getStation('gym'));return;}
-    if(ready&&this.smokingClock.due&&Math.min(...Object.values(this.needs))>45&&this.exercise>=48){this._go(getStation('smoking'));return;}
+    if(ready&&this.smokingClock.due&&Math.min(...Object.values(this.needs))>45&&this.exercise>=48){
+      if(this.random()<.5){this.nextLeisure='smoking';this._go(getStation('lounge'));}else this._go(getStation('smoking'));return;
+    }
     if(Math.min(...Object.values(this.needs))>CABIN_PACE.autonomousNeedThreshold&&this.exercise>=48){this.idleT=0;return;}
     super._choose();
   }
@@ -262,9 +268,9 @@ export class CabinBrain extends Brain {
       });return;
     }
     if(station.id==='lounge'&&!this.gamePending){
-      const options=['tablet','music',...(this.catRoutine?.canPlayLounge()?['cat']:[])].filter(mode=>mode!==this.lastLeisure);
+      const options=['tablet','music',...(this.catRoutine?.canPlayLounge()?['cat']:[]),...(this.smokingClock.due&&!this.health.needsCare?['smoking']:[])].filter(mode=>mode!==this.lastLeisure);
       this.leisure=this.nextLeisure??options[Math.floor(this.random()*options.length)];this.nextLeisure=null;this.lastLeisure=this.leisure;
-      station={...station,dur:this.leisure==='cat'?40000:this.leisure==='tablet'?32000:36000};this.cur=station;
+      station={...station,dur:this.leisure==='smoking'?(LOUNGE_SMOKING_SECONDS+1)*1000:this.leisure==='cat'?40000:this.leisure==='tablet'?32000:36000};this.cur=station;
       if(Math.min(this.needs.hunger,this.needs.thirst,this.needs.energy,this.needs.hygiene,this.needs.bladder)<45)station.dur=8000;
     }
     if(['shower','toilet'].includes(station.id)&&!this.bathroom){
@@ -288,6 +294,7 @@ export class CabinBrain extends Brain {
     }
     super._startPerform(station.id==='gym'?{...station,need:null}:station);
     if(enteringLounge){this.cur=station;this.loungeEntry={age:0};this.state='enteringLounge';}
+    else if(station.id==='lounge'&&this.leisure==='smoking')this.smokingVisit=new SmokingVisit({seated:true});
     else if(station.id==='lounge'&&this.leisure==='cat')this.catRoutine.inviteLounge(this);
     if(['eva','airlock','innerHatch'].includes(station.id))this.scene.obsUI?.inspectEVA?.(station.id);
   }
@@ -400,6 +407,7 @@ export class CabinBrain extends Brain {
   }
   requestGame(kind=null){
     if(this.gamePending||this.state==='playingGame')return false;
+    if(this.smokingVisit){this.afterActivity=()=>this.requestGame(kind);this.smokingVisit.requestExit();return true;}
     if(!this.isSeatedInLounge()&&this.deferDeparture(()=>this.requestGame(kind)))return true;
     if(this.health.urgent){this.scene.obsUI?.healthEvent?.({type:'restricted',kind:this.health.condition.kind,stage:this.health.stage});this._go(getStation('medical'));return false;}
     this.gameKind=['chess','poker','reversi'].includes(kind)?kind:null;
@@ -441,6 +449,12 @@ export class CabinBrain extends Brain {
     }
     if(this.health.critical){this._go(getStation('medical'));return words('先に医療区画へ行く。もう作業を続けられない。','I need medical care first. I cannot keep working.');}
     if(/一服|喫煙|たばこ|タバコ|煙草|\bsmok(?:e|ing)\b|cigarette/i.test(text)){
+      if(/ラウンジ|lounge/i.test(text)||this.isSeatedInLounge()){
+        if(this.health.needsCare){this._go(getStation('medical'));return words('先に医療区画で手当てを受けてくる。','I will get treatment first.');}
+        if(this.smokingVisit?.seated)return words('ラウンジで一服している。','I am taking a smoke break in the lounge.');
+        this.nextLeisure='smoking';this._go(getStation('lounge'));
+        return words('ラウンジの灰皿で一服してくる。','I will take a smoke break at the lounge ashtray.');
+      }
       const accepted=this._go(getStation('smoking'));
       return accepted?words('シャワー左の灰皿で一服してくる。','I will take a smoke break by the ashtray beside the shower.'):words('先に医療区画で手当てを受けてくる。','I will get treatment first.');
     }

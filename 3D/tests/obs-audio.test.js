@@ -14,6 +14,7 @@ import {planDroidTurn} from '../src/obs/droid-turn.js';
 import {DroidRoutine,DROID_PACE} from '../src/obs/droid-routine.js';
 import {DROID_GAIT,DROID_WALK_CYCLE_DISTANCE,LADDER_PACE} from '../src/obs/pace.js';
 import {sampleDroidServicePose} from '../src/obs/droid-service.js';
+import {CabinEnvironment} from '../src/obs/environment.js';
 
 function context(){
   const parameter=()=>({value:0,setValueAtTime(v){this.value=v;},setTargetAtTime(v){this.value=v;},exponentialRampToValueAtTime(v){this.value=v;},cancelScheduledValues(){}});
@@ -24,6 +25,34 @@ function context(){
 }
 const response=()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)});
 const soundCount=Object.keys(CABIN_SOUNDS).length;
+test('warning follows the current hatch fault through repair, mute, pause, late loading and recovery',async()=>{
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  const h=harness();h.driver=new CabinSoundEvents(audio);
+  const environment=new CabinEnvironment();h.state.brain.environment=environment;
+  const tick=()=>h.driver.update(1/60,h.state),key='hatch-alarm';
+  try{
+    await audio.toggle();await audio.load();tick();assert.equal(audio.loops.has(key),false);
+    const buffer=audio.buffers.get('hatchAlarm');buffer.duration=CABIN_SOUNDS.hatchAlarm.duration;audio.buffers.delete('hatchAlarm');
+    environment.triggerFault();tick();assert.equal(audio.loops.has(key),false,'late loading queues no sources');
+    audio.buffers.set('hatchAlarm',buffer);tick();const voice=audio.loops.get(key);assert.ok(voice);
+    assert.equal(audio.loopTime(key),0);
+    ctx.currentTime=12.3;assert.ok(Math.abs(audio.loopTime(key)-.3)<1e-9,'the audio clock stays on the same phase after repeated cycles');
+    assert.equal(voice.source.loop,true);assert.equal(voice.source.playbackRate.value,1);assert.equal(voice.position,null,'alarm is heard throughout the cabin');
+    const nodes=ctx.created.length;
+    for(const stage of ['inspect','repair','verify']){environment.setStage(environment.fault.serial,stage);for(let i=0;i<120;i++)tick();}
+    assert.equal(audio.loops.get(key),voice);assert.equal(ctx.created.length,nodes,'one source for the entire fault');
+    audio.pause(true);tick();assert.equal(audio.loops.has(key),false);assert.equal(voice.stopping,true);
+    assert.equal(audio.loopTime(key),null,'paused audio supplies no stale timing');
+    voice.source.onended();audio.pause(false);tick();const resumed=audio.loops.get(key);assert.ok(resumed);
+    assert.equal(audio.loopTime(key),0,'resuming creates a fresh shared phase');
+    await audio.toggle();tick();assert.equal(audio.loops.has(key),false);assert.equal(resumed.stopping,true);resumed.source.onended();
+    await audio.toggle();tick();assert.ok(audio.loops.has(key));
+    assert.equal(environment.resolve(environment.fault.serial+1),false);tick();assert.ok(audio.loops.has(key),'an unverified recovery cannot silence the alarm');
+    const final=audio.loops.get(key);environment.resolve(environment.fault.serial);tick();assert.equal(audio.loops.has(key),false);assert.equal(final.stopping,true);
+    assert.equal(audio.loopTime(key),null,'recovery detaches the stopped alarm clock');
+    audio.pause(true);audio.pause(false);tick();assert.equal(audio.loops.has(key),false,'restored faults do not replay');
+  }finally{audio.dispose();}
+});
 test('default-on OBS may preload while locked, then a first gesture resumes and primes once',async()=>{
   const ctx=context();let resumes=0,starts=0;
   ctx.resume=async()=>{resumes++;ctx.state='running';};
@@ -81,7 +110,7 @@ test('local assets are compact mono PCM, finite, non-silent, bounded and loop se
     const peak=Math.max(...data.map(Math.abs));assert.ok(peak>.3&&peak<.36);
     if(definition.loop)assert.ok(Math.abs(data[0]-data.at(-1))<.15,`${definition.file} seam`);
   }
-  assert.ok(total<1540000,`ships ${total} bytes, including short mechanism, animal and 176 KB simmer edits, not entire source packs`);
+  assert.ok(total<1680000,`ships ${total} bytes, including the 132 KB warning and 176 KB simmer edits, not entire source packs`);
 });
 test('bed piston and slide are short faded recordings, without live loops or filters',async()=>{
   const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});

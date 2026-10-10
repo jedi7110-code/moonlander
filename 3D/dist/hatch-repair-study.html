@@ -3,19 +3,21 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>扉修理スタディー | TARAIRON</title>
-  <script type="module" crossorigin src="/3D/assets/hatchRepairStudy-CNglQw5F.js"></script>
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-QTzUF3zZ.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-DNfABVdX.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-HHpsELaM.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/materials-BSxp4dZ1.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/industrial-DVOaM0H9.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-BuRNhHGl.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/triangle-subset-CKQ6pqBA.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/head-aNF836UD.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/milo-body-ndtsaWvu.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/cat-rest-CR2Togz-.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/characters-BMZfPUrV.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/milo-toon-Ct7AdsW6.js">
+  <script type="module" crossorigin src="/3D/assets/hatchRepairStudy-BNXtCcHd.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-DEZM1chT.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-DZA0nm0S.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-BHsURhap.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/materials-ZnQ4bvBx.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/industrial-Dui0_yHQ.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-Bt3Rrj5x.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/triangle-subset-gaf9ScNe.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/head-rvJBNkwo.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/milo-body-DLiYgZ_m.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/cat-rest-B6q4Op9r.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/characters-yVN2kqRa.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/milo-toon-uweRfS-s.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/hatch-repair-D1OOfXl4.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/hatch-repair-study-model-B3DmjI8w.js">
   <link rel="stylesheet" crossorigin href="/3D/assets/hatchRepairStudy-C1brO8-7.css">
 </head>
 <body>
@@ -26,19 +28,19 @@
       <div class="stage-caption"><span id="mode-label">現行 / OBS</span><strong id="phase-label">読み込み中</strong><span id="contact-label"></span></div>
       <div id="loading" role="status">人物と船内ハッチを読み込み中…</div>
       <nav class="views" aria-label="確認する視点">
-        <button data-view="hands" aria-pressed="true" disabled>手元</button><button data-view="side" aria-pressed="false" disabled>真横</button><button data-view="front" aria-pressed="false" disabled>扉側</button><button data-view="wide" aria-pressed="false" disabled>全身</button>
+        <button data-view="hands" aria-pressed="true" disabled>手元</button><button data-view="side" aria-pressed="false" disabled>真横</button><button data-view="front" aria-pressed="false" disabled>扉側</button><button data-view="wide" aria-pressed="false" disabled>全身</button><button data-view="gripBack" aria-pressed="false" disabled>握り・甲側</button><button data-view="gripPalm" aria-pressed="false" disabled>握り・掌側</button>
       </nav>
     </section>
     <aside aria-label="修理動作の調整">
-      <fieldset><legend>比較する動作</legend><div class="pair"><button id="current" aria-pressed="true" disabled>現行 / OBS</button><button id="tuned" aria-pressed="false" disabled>調整案</button></div><p>調整はこのスタディー内だけ。OBSは変更しません。</p></fieldset>
+      <fieldset><legend>比較する動作</legend><div class="pair"><button id="current" aria-pressed="true" disabled>現行 / OBS</button><button id="tuned" aria-pressed="false" disabled>調整案</button></div><p>現行は修正済みのOBS共通動作。調整案の速度・振れ幅だけ、このページ内で比較できます。</p></fieldset>
       <fieldset><legend>手首の反復動作</legend>
-        <label class="check"><input id="stabilize" type="checkbox" checked disabled>肘の切り替わりを滑らかに</label>
+        <p>腕の連続動作と手首の折れすぎの補正は、OBS・スタディー共通です。</p>
         <label for="amplitude">振れ幅 <output id="amplitude-value"></output></label><input id="amplitude" type="range" min="0" max="30" step=".1" disabled>
         <label for="frequency">往復速度 <output id="frequency-value"></output></label><input id="frequency" type="range" min=".1" max="1" step=".01" disabled>
         <label for="reach">手を伸ばす・戻す時間 <output id="reach-value"></output></label><input id="reach" type="range" min=".5" max="3" step=".1" disabled>
         <div class="pair"><button id="gentle" disabled>小さく・ゆっくり</button><button id="reset-tuning" disabled>現行値に戻す</button></div>
       </fieldset>
-      <fieldset><legend>見え方</legend><label class="check"><input id="guides" type="checkbox" disabled>関節・接触ガイド</label><label class="check"><input id="door" type="checkbox" checked disabled>扉を表示</label><p>緑＝ネジ / 橙＝工具先端 / 青＝腕の関節。扉側は手が隠れないよう扉を自動で隠します。</p></fieldset>
+      <fieldset><legend>見え方</legend><label class="check"><input id="guides" type="checkbox" disabled>関節・接触ガイド</label><label class="check"><input id="door" type="checkbox" checked disabled>扉を表示</label><p>緑＝ネジ / 橙＝工具先端 / 青＝腕の関節。扉側と握りの拡大では、手が隠れないよう扉を自動で隠します。</p></fieldset>
       <button id="copy-link" disabled>この状態のURLをコピー</button><p id="copy-status" role="status"></p>
     </aside>
     <section class="transport" aria-label="再生操作">

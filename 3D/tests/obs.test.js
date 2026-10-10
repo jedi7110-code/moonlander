@@ -79,9 +79,9 @@ test('the lounge table clears the seat and its props rest on the top without a g
   assert.ok(Math.abs(base.min.y)<1e-7,'the mounting plate rests on the floor');
   assert.ok(Math.abs(pedestal.min.y-base.max.y)<1e-7,'the pedestal rests on the mounting plate');
   assert.ok(Math.abs(pedestal.max.y-top.min.y)<1e-7);
-  const book=bounds('Table book'),cup=bounds('Table cup');
-  assert.ok(Math.abs(book.min.y-top.max.y)<1e-7);
-  assert.ok(Math.abs(cup.min.y-book.max.y)<1e-7,'the unused cup rests on the red book');
+  assert.equal(table.getObjectByName('Table book'),undefined);
+  const cup=bounds('Table cup');
+  assert.ok(Math.abs(cup.min.y-top.max.y)<1e-7,'the unused cup rests directly on the tabletop');
   for(const name of ['Table pad terminal','Table headphones','Table cat teaser']){
     const item=bounds(name);
     assert.ok(Math.abs(item.min.y-top.max.y)<1e-7,`${name} rests on the tabletop`);

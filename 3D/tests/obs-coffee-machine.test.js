@@ -117,16 +117,18 @@ test('the empty mug parks on the left with its handle diagonally toward the aisl
   assert.ok(Math.abs(bottom.point.y-(center.y+.012*mug.scale.y))<1e-6,'ray reaches the ceramic bottom');
 });
 
-test('the table mug matches the vending mug size and rests casually angled on the book',t=>{
+test('the table mug matches the vending mug size and rests on the tabletop in front of the headphones',t=>{
   stub(t);const machine=createCoffeeMachine(),material=new MeshStandardMaterial();
   const table=createLoungeTable(new Proxy({},{get:()=>material}));
   t.after(()=>{dispose(machine);dispose(table);});table.updateMatrixWorld(true);machine.updateMatrixWorld(true);
   const cup=table.getObjectByName('Lounge coffee mug'),reference=machine.userData.coffee.mug;
   assert.ok(cup.getWorldScale(new Vector3()).distanceTo(reference.getWorldScale(new Vector3()))<1e-9);
-  const body=new Box3().setFromObject(cup.getObjectByName('Table cup'),true),book=bounds(table.getObjectByName('Table book'));
+  const body=new Box3().setFromObject(cup.getObjectByName('Table cup'),true),top=bounds(table.getObjectByName('Tabletop'));
   assert.ok(Math.abs(body.max.y-body.min.y-(bounds(reference).max.y-bounds(reference).min.y))<1e-7,'same cup height');
-  assert.ok(Math.abs(body.min.y-book.max.y)<1e-7,'larger mug still rests on the book');
-  assert.ok(body.min.x>book.min.x&&body.max.x<book.max.x&&body.min.z>book.min.z&&body.max.z<book.max.z,'cup body stays over the book');
+  assert.equal(table.getObjectByName('Table book'),undefined,'the removed red board stays absent');
+  assert.ok(Math.abs(body.min.y-top.max.y)<1e-7,'mug rests directly on the tabletop');
+  assert.ok(body.min.x>top.min.x&&body.max.x<top.max.x&&body.min.z>top.min.z&&body.max.z<top.max.z,'cup body stays inside the table edge');
+  assert.ok(Math.abs(cup.position.x-.40)<1e-7&&Math.abs(cup.position.z+.295)<1e-7,'cup occupies the approved former ashtray position');
   const handle=cup.getObjectByName('Table cup handle').getWorldPosition(new Vector3()).sub(cup.getWorldPosition(new Vector3()));
   assert.ok(handle.x<-.04&&handle.z>.03,'handle points diagonally left and toward the viewer');
   assert.ok(new Vector3(0,1,0).transformDirection(cup.matrixWorld).y>.999,'no unnatural tipping');

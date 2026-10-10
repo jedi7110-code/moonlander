@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>非常照明スタディー | TARAIRON</title>
+  <link rel="stylesheet" href="./emergency-lighting-study.css">
+</head>
+<body>
+  <header><div><p class="eyebrow">TARAIRON / LIGHTING STUDY</p><h1>非常照明</h1><p class="intro">船内ハッチの故障から復旧まで。船内全体と修理する手元を見比べる。</p></div><a href="./obs.html">OBSへ戻る ↗</a></header>
+  <main>
+    <section class="stage" aria-label="船内照明の3D確認">
+      <canvas id="scene" tabindex="0" aria-label="船内の3Dビュー。ドラッグで移動、ホイールで拡大。"></canvas>
+      <div class="stage-top"><span id="state" role="status">読み込み中</span><span id="view-name">全景</span></div>
+      <p class="hint">ドラッグで移動 · ホイールで拡大</p>
+      <div id="loading">船内を準備しています…</div>
+    </section>
+    <aside class="controls" aria-label="非常照明の操作">
+      <section><h2>故障と復旧</h2><div class="pair"><button id="fault" class="alert" disabled>故障を再現</button><button id="restore" disabled>復旧を確認</button></div><p>故障中は赤く明滅。復旧すると約1.2秒で暖色へ戻ります。</p></section>
+      <section><h2>明滅を見比べる</h2><button id="play" class="full" aria-pressed="true" disabled>一時停止</button><div class="pair"><button id="bright" disabled>明るい瞬間</button><button id="dim" disabled>暗い瞬間</button></div><label class="range-label" for="phase">明滅の位置 <output id="phase-value">0.00 / 3.00 秒</output></label><input id="phase" type="range" min="0" max="3" step="0.01" value="0" disabled><p id="play-state">警報音と同じ3秒周期で明滅します。</p></section>
+      <section><h2>視点</h2><div class="views"><button data-view="all" aria-pressed="true" disabled>全景</button><button data-view="hatch" aria-pressed="false" disabled>故障ハッチ</button><button data-view="hands" aria-pressed="false" disabled>手元</button></div><p>修理する手元だけは、通常色の明かりを保ちます。人物は修理姿勢で固定しています。</p></section>
+      <section><h2>非常警報</h2><button id="sound" class="full" aria-pressed="false" disabled>警報音をON</button><p id="sound-state" role="status">音声OFF</p><p><a href="https://freesound.org/people/qubodup/sounds/832414/" target="_blank" rel="noopener">Factory Warning Buzzer ↗</a><br>故障中だけ繰り返します。一時停止・復旧で止まります。</p></section>
+      <section class="options"><label><input id="steady" type="checkbox" disabled> 点滅を抑えて一定の赤にする</label></section>
+      <p class="note">OBS本編と同じ照明・船内・人物を使用。このページの操作は本編の進行には影響しません。</p>
+    </aside>
+  </main>
+  <script type="module" src="./emergency-lighting-study.js"></script>
+</body>
+</html>

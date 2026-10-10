@@ -35,8 +35,12 @@ const recipes=[
   ['cat-chase-chirp','cat-chirps.mp3',6.32,.64,false,true,'highpass=f=180,lowpass=f=7500'],
   ['chop','foley/sfx-cc0/apple-cut-01.wav',0,1.2],
   ['pot-simmer','pot-simmer.mp3',2,4.12,true,false,'highpass=f=90,lowpass=f=5000'],
+  // Preserve the complete three-second warning and its decay. Faded endpoints
+  // repeat cleanly without a shortened crossfade or a pitch/speed change.
+  ['factory-warning-buzzer','factory-warning-buzzer.mp3',0,3,false,true,'anull'],
 ];
 const sourceHashes={
+  'factory-warning-buzzer.mp3':'36b798f34ec06999ff8de1377055516f1ad4b7423733fdc1db2474f0ad7e69aa',
   'rat-squeaks.mp3':'2f6d2447616474a89617db231600ed1d3947da499cde8a2304ba127667491937',
   'cat-chirps.mp3':'be493a43c91b5078eeaf8d08010382e7dec64e2d96197132bf2c26af048c6ab4',
   'pot-simmer.mp3':'b7f11e07c5ab3e7f173556b3ac65365ce8a2d62bc93f0e7696f10195d1bfb3a5',

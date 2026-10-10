@@ -9,6 +9,7 @@ import {sampleDroidServicePose,droidLadderContact,createDroidServiceRig} from '.
 import {createAccessLadder} from '../src/obs/ship.js';
 import {DROID_STARTUP_SECONDS} from '../src/obs/droid-startup.js';
 import {DROID_LADDER_LANDING,LADDER_ENTRY} from '../src/obs/pace.js';
+import {ACCESS_LADDER,ladderApproachDepth} from '../src/obs/layout.js';
 
 function setup(job){
   const care=new Supplies(),brain={plants:new PlantBed(),actStation:null},actor={x:1040,climbing:false};
@@ -276,7 +277,7 @@ test('ascending and descending hands show their backs to the camera and grip the
         const y=direction>0?.55+step*.006:6.20-step*.006;
         const p={y,climb:{from:direction>0?0:6.784,to:direction>0?6.784:0},age:10,duration:100,rest:0};
         const sample=sampleDroidServicePose(p);droid.update(0,'service',sample);
-        droid.root.position.set(0,y,.34);droid.root.rotation.y=Math.PI;droid.root.updateMatrixWorld(true);
+        droid.root.position.set(0,y,ACCESS_LADDER.droidClimbZ);droid.root.rotation.y=Math.PI;droid.root.updateMatrixWorld(true);
         let held=0;
         for(const [i,arm]of droid.arms.entries()){
           const contact=droidLadderContact(y,arm.side,true),actual=arm.palm.ladderGrip.getWorldPosition(new Vector3());
@@ -316,7 +317,7 @@ test('ladder travel retains its pace with a slower supported landing on each des
     assert.ok(perDeck>5&&perDeck<5.5,'a single deck is 1.6 times faster than the former 8.5 seconds');
     assert.equal(climb.landingDuration,DROID_LADDER_LANDING.seconds,'both directions keep the ladder grip through landing');
     assert.equal(climb.landingHeight,climb.to.y<climb.from.y?DROID_LADDER_LANDING.height:0);
-    assert.equal(climb.to.z,climb.to.floor===2?.34:1.34,'destination is behind the opening');
+    assert.equal(climb.to.z,ladderApproachDepth(climb.to.floor,true),'destination is behind the opening');
   }
   while(routine.step.kind!=='climb')routine.update(.05);
   routine.update(LADDER_ENTRY.seconds-routine.age);

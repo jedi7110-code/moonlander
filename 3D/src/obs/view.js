@@ -14,7 +14,7 @@ import {animateBathroom} from './bathroom.js';
 import {animateCatPorts} from './cat-ports.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE,FLOORS,getStation} from './layout.js';
-import {animateAirlock,animateHatchFault} from './eva.js';
+import {animateAirlock,animateHatchFault,HATCH_SERVICE_POINT} from './eva.js';
 import {loadEVAGarment} from './eva-garment.js';
 import {loadMiloBody} from './milo-body.js';
 import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
@@ -37,6 +37,7 @@ import {updateMiloBandage} from './milo-bandage.js';
 import {createDroidChargingBay,DROID_DOCK} from './droid-charging.js';
 import {createDroidServiceRig} from './droid-service.js';
 import {CabinStartupLighting} from './startup-lighting.js';
+import {CabinEmergencyLighting} from './emergency-lighting.js';
 import {createCabinMirror,isMiloMirrorView} from './cabin-mirror.js';
 import {attachHairGrowth} from './hair-growth.js';
 import {createGroomingTools,prepareGroomingMotion} from './grooming.js';
@@ -60,6 +61,8 @@ export class ObservationView {
       view.cabinToon.setStyle(cabinStyle);
       // Practical lighting also exists in studies that don't replay startup.
       view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,start:false});
+      const workCenter=new THREE.Vector3(HATCH_SERVICE_POINT.x-.12,positionY(FLOORS[getStation('innerHatch').floor].y)+HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z);
+      view.emergencyLighting=new CabinEmergencyLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,workCenter});
       if(characterViews)view.characterCamera=new CharacterCamera(view);
       return view;
     }catch(error){view.dispose();throw error;}
@@ -281,6 +284,7 @@ export class ObservationView {
   }
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null,xrFrame=null){
     this.characterCamera?.restorePose();
+    this.emergencyLighting?.update(paused?0:dt,brain.environment,paused?null:this.audio?.loopTime('hatch-alarm'));
     this.ship.consoleScreens?.update({brain,care,airlock,droid:this.droidRoutine,clock:time});
     this.ship.aiSupervision?.update({actor,brain,catRoutine,care,airlock,droid:this.droidRoutine,clock:time});
     const action=brain.harvestDelivery&&!actor.busy?'plant':currentAction(brain),catMotion=catRoutine.motion;
@@ -385,5 +389,5 @@ export class ObservationView {
     try{this.renderer.render(this.scene,this.camera);}
     finally{quality?.endFrame();}
   }
-  dispose(){this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.emergencyLighting?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

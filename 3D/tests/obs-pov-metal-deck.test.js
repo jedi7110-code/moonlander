@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {Group,Box3,Vector3,Raycaster,MeshStandardMaterial} from 'three';
 import {createMetalDeckStyle,metalDeckPlan,DECK_TONES} from '../studies/pov/metal-deck.js';
 import {addIndustrialDeck} from '../src/obs/industrial.js';
+import {ACCESS_LADDER} from '../src/obs/layout.js';
 
 test('metal grilles are recessed, with flush frames and an unobstructed ladder well',()=>{
   const style=createMetalDeckStyle(),material=new MeshStandardMaterial(),m={dark:material};
@@ -11,7 +12,10 @@ test('metal grilles are recessed, with flush frames and an unobstructed ladder w
     const hit=(x,z)=>new Raycaster(new Vector3(x,y+1,z),new Vector3(0,-1,0)).intersectObject(floor,true)[0];
     assert.ok(Math.abs(hit(2,-.5).point.y-y)<1e-6,'panel top stays at the original walking height');
     assert.ok(Math.abs(hit(0,1.5).point.y-y)<1e-6,'forward crossing remains solid');
-    if(level!==2)assert.equal(hit(0,0),undefined,'do not cap the ladder well');
+    if(level!==2){
+      assert.equal(hit(0,ACCESS_LADDER.depth),undefined,'do not cap the ladder well');
+      assert.ok(Math.abs(hit(0,0).point.y-y)<1e-6,'the vacated part of the well is restored to solid floor');
+    }
     const tile=metalDeckPlan(level).find(t=>t.grate);
     for(const end of [-1,1]){
       const z=tile.z+end*tile.d/4;

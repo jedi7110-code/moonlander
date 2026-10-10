@@ -1,6 +1,7 @@
 // Cabin ambience and occasional maintenance use running seconds, so pause,
 // hidden tabs and lounge games cannot advance a warning off screen.
-export const HATCH_FAULT_INTERVAL={min:12*60,max:20*60};
+// Rare maintenance incidents: one random interval of 45–90 running minutes.
+export const HATCH_FAULT_INTERVAL={min:45*60,max:90*60};
 
 export class CabinEnvironment {
   constructor({random=Math.random,onEvent=()=>{}}={}){

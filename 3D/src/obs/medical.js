@@ -58,7 +58,8 @@ function monitor(parent,m,x,y){
   box(parent,m.rubber,x-.12,y+.06,-.71,1.24,.72,.055,.026);
   const canvas=document.createElement('canvas');canvas.width=600;canvas.height=330;
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  const face=new THREE.Mesh(new THREE.PlaneGeometry(1.16,.65),new THREE.MeshBasicMaterial({map:texture,toneMapped:false}));
+  const face=new THREE.Mesh(new THREE.PlaneGeometry(1.16,.65),new THREE.MeshBasicMaterial({name:'Medical / powered diagnostic display',map:texture,toneMapped:false,
+    userData:{cabinAlwaysPowered:true}}));
   face.position.set(x-.12,y+.06,-.675);parent.add(face);
   for(let i=0;i<3;i++)cylinder(parent,m.black,x+.65,y+.25-i*.22,-.68,.047,.045,.047,16).rotation.x=Math.PI/2;
   for(let i=0;i<4;i++)box(parent,i===3?m.teal:m.dark,x-.52+i*.26,y-.37,-.699,.17,.065,.026,.008);

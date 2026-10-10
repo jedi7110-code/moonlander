@@ -1,6 +1,7 @@
 // Local clips: CC0, one Pixabay gas strut, and a labelled user-supplied edit.
 // Provenance and edit recipes: assets/obs/audio/CREDITS.md.
 export const CABIN_SOUNDS=Object.freeze({
+  hatchAlarm:{file:'factory-warning-buzzer.wav',label:'非常警報 / ハッチ故障',description:'Factory Warning Buzzer / 工業用ブザー・原速3秒・故障中のみ',gain:.38,loop:true,duration:3},
   powerOn:{file:'power-on-glitch.wav',label:'船内照明 / 点灯',description:'グリッチの短い断片 / 2回のスターター＋減衰',license:'ユーザー提供素材（ライセンス未確認）',gain:.24},
   doorOpen:{file:'door-open-air-motor.wav',label:'ハッチ / 開く',description:'バシュッだけ / 短い空気圧・モーター音なし',gain:.65},
   doorClose:{file:'door-close-air-motor.wav',label:'ハッチ / 閉じる',description:'バシュッだけ / 短い空気圧・モーター音なし',gain:.58},

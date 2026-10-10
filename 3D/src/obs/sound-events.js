@@ -133,6 +133,9 @@ export class CabinSoundEvents {
   update(dt,{actor,brain,droid,airlock,care,cat}){
     if(!(dt>0))return;
     const audio=this.audio,bathroom=brain.bathroom,pose=bathroom?.pose;
+    // Cabin-wide safety alarm: no camera/deck attenuation. Repair must be
+    // verified before stopping; mute, pause and visibility use the same mixer.
+    audio.setLoop('hatch-alarm','hatchAlarm',Boolean(brain.environment?.fault));
     for(const id of ['shower','toilet'])this.door(id,bathroom?.id===id?(pose?.opening??0):droid?.door===id?droid.opening:0,locations[id],.75);
     this.door('inner',airlock?.opening??0,locations.inner);
     this.door('supply',care.phase==='unloading'?hatchOpening(care.delivery?.age??0):0,locations.hatch,1.1);

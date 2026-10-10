@@ -3,7 +3,7 @@ import {ASHTRAY} from './layout.js';
 import {mouthPosition} from './dining.js';
 
 export const CIGARETTE={length:.084,heldAt:.030,grip:new THREE.Vector3(.014,-.102,.017)};
-export const LIGHTER_TIP=new THREE.Vector3(0,-.153,.025);
+export const LIGHTER_TIP=new THREE.Vector3(-.003,-.140,-.040);
 const v=(x,y,z)=>new THREE.Vector3(x,y,z);
 const paint=(color,roughness=.8)=>new THREE.MeshStandardMaterial({color,roughness});
 function mesh(parent,geometry,material,name,position){
@@ -42,8 +42,16 @@ export function attachSmokingProps(root){
     const part=mesh(cigarette,new THREE.CylinderGeometry(.0044,.0044,length,8),material,name,v(0,0,z));part.rotation.x=Math.PI/2;
   }
   const lighter=new THREE.Group();lighter.name='Pocket lighter';left.hand.add(lighter);lighter.visible=false;
-  mesh(lighter,new THREE.BoxGeometry(.024,.050,.014),paint(0x4b5351,.45),'Lighter case',v(0,-.105,.025));
-  mesh(lighter,new THREE.BoxGeometry(.025,.013,.015),paint(0xaaa99d,.3),'Lighter cap',v(0,-.136,.025));
+  const steel=new THREE.MeshStandardMaterial({color:0xa5aaa7,metalness:.8,roughness:.38}),dark=paint(0x252923,.5);
+  mesh(lighter,new THREE.BoxGeometry(.034,.045,.014),steel,'Lighter case',v(0,-.075,-.040));
+  mesh(lighter,new THREE.BoxGeometry(.017,.024,.012),steel,'Lighter chimney',v(.001,-.109,-.040));
+  for(const z of [-.0462,-.0338])for(const x of [-.004,.003,.008])for(const y of [-.108,-.116]){
+    const hole=mesh(lighter,new THREE.CircleGeometry(.0015,8),dark,'Chimney ventilation hole',v(x,y,z));if(z<-.04)hole.rotation.y=Math.PI;
+  }
+  const wheel=mesh(lighter,new THREE.CylinderGeometry(.0048,.0048,.008,12),dark,'Lighter flint wheel',v(-.013,-.103,-.040));wheel.rotation.z=Math.PI/2;
+  mesh(lighter,new THREE.CylinderGeometry(.0014,.0014,.004,8),paint(0x302d23),'Lighter wick',v(.002,-.124,-.040));
+  const lid=new THREE.Group();lid.name='Lighter lid hinge';lid.position.set(.017,-.0975,-.040);lighter.add(lid);
+  mesh(lid,new THREE.BoxGeometry(.034,.019,.015),steel,'Lighter cap',v(-.017,-.0095,0));
   const flame=mesh(lighter,new THREE.ConeGeometry(.0035,.018,5),new THREE.MeshBasicMaterial({color:0xffc47b}),'Lighter flame',LIGHTER_TIP);
   flame.rotation.z=Math.PI;flame.visible=false;
   const smoke=new THREE.Group();smoke.name='Cigarette smoke';root.add(smoke);
@@ -52,7 +60,46 @@ export function attachSmokingProps(root){
     const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map,color:0xcbd4d5,transparent:true,depthWrite:false,opacity:0}));
     sprite.visible=false;smoke.add(sprite);return{sprite,age:Infinity,life:2.5,origin:v(0,0,0),velocity:v(0,0,0),exhale:false};
   });
-  const props={cigarette,lighter,flame,ember:cigarette.getObjectByName('Cigarette ember'),smoke,particles,emission:0,serial:0};root.userData.smokingProps=props;return props;
+  const props={cigarette,lighter,lid,wheel,flame,ember:cigarette.getObjectByName('Cigarette ember'),smoke,particles,emission:0,serial:0};root.userData.smokingProps=props;return props;
+}
+
+const smokeRate=signal=>signal?.lit||signal?.exhale?(signal.exhale?12:5):0;
+
+function emitSmokingParticle(root,serial,exhale){
+  const props=root.userData.smokingProps,particle=props.particles[serial%props.particles.length];
+  particle.exhale=exhale;particle.age=0;particle.life=exhale?2.1:2.8;
+  if(exhale){
+    particle.origin.copy(root.userData.body.localToWorld(mouthPosition(root.userData.head)));
+    // Follow the actual face, including seated head turns, rather than the root yaw.
+    particle.velocity.set(0,.04,.18).applyQuaternion(root.userData.head.getWorldQuaternion(new THREE.Quaternion()));
+  }else{
+    particle.origin.copy(props.cigarette.localToWorld(v(0,0,CIGARETTE.length)));
+    particle.velocity.set(.014*Math.sin(serial*2.4),.09,.016*Math.cos(serial*1.7));
+  }
+  particle.sprite.material.rotation=serial*2.4;
+  return particle;
+}
+
+// Reconstruct only surviving particles when a study seeks. Sample the real pose
+// at each birth so smoke remains in world space after the head or hand moves.
+export function seekSmokingSmoke(root,time,{signalAt,poseAt}){
+  const props=root.userData.smokingProps,events=new Array(props.particles.length);
+  for(const p of props.particles){p.age=Infinity;p.sprite.visible=false;p.sprite.material.opacity=0;}
+  let emission=0,serial=0,previous=0;
+  const end=Math.max(0,Number.isFinite(time)?time:0);
+  for(let frame=1;frame<=Math.ceil(end*60);frame++){
+    const at=Math.min(frame/60,end),signal=signalAt(at),rate=smokeRate(signal);
+    emission=rate?emission+(at-previous)*rate:0;previous=at;
+    while(emission>=1){
+      emission-=1;events[serial%events.length]={serial,time:at,exhale:Boolean(signal.exhale)};serial++;
+    }
+  }
+  props.serial=serial;props.emission=emission;
+  for(const event of events.filter(Boolean).sort((a,b)=>a.serial-b.serial)){
+    const age=end-event.time;if(age>=(event.exhale?2.1:2.8))continue;
+    poseAt(event.time);root.updateWorldMatrix(true,true);
+    emitSmokingParticle(root,event.serial,event.exhale).age=age;
+  }
 }
 
 export function updateSmokingSmoke(root,dt){
@@ -63,19 +110,10 @@ export function updateSmokingSmoke(root,dt){
   const step=Number.isFinite(dt)&&dt>0?Math.min(dt,.1):0;
   if(step>0){
     for(const particle of props.particles)particle.age+=step;
-    const emitting=signal?.lit||signal?.exhale;
-    props.emission=emitting?props.emission+step*(signal.exhale?12:5):0;
+    const rate=smokeRate(signal);
+    props.emission=rate?props.emission+step*rate:0;
     while(props.emission>=1){
-      props.emission-=1;const serial=props.serial++,particle=props.particles[serial%props.particles.length];
-      particle.exhale=Boolean(signal.exhale);particle.age=0;particle.life=particle.exhale?2.1:2.8;
-      if(particle.exhale){
-        particle.origin.copy(root.userData.body.localToWorld(mouthPosition(root.userData.head)));
-        particle.velocity.set(0,.04,.18).applyQuaternion(root.getWorldQuaternion(new THREE.Quaternion()));
-      }else{
-        particle.origin.copy(props.cigarette.localToWorld(v(0,0,CIGARETTE.length)));
-        particle.velocity.set(.014*Math.sin(serial*2.4),.09,.016*Math.cos(serial*1.7));
-      }
-      particle.sprite.material.rotation=serial*2.4;
+      props.emission-=1;emitSmokingParticle(root,props.serial++,Boolean(signal.exhale));
     }
   }
   for(const p of props.particles){

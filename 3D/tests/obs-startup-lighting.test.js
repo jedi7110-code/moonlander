@@ -12,6 +12,8 @@ import {displayFrame} from '../src/obs/display-frame.js';
 import {LADDER_LIGHT_LAYOUT,EVA_SPOT_LAYOUT} from '../src/obs/lighting.js';
 import {createEVASpotlights} from '../src/obs/eva.js';
 import {ObservationView} from '../src/obs/view.js';
+import {createMedicalBay} from '../src/obs/medical.js';
+import {createLoungeCoffeeStation} from '../src/obs/cabin-dressing.js';
 
 test('manual startup holds only ceiling power indefinitely, then ignites once and settles in 1.6 seconds',()=>{
   for(const reducedMotion of [false,true]){
@@ -113,12 +115,19 @@ test('vegetable grow lenses stay powered and rack surfaces keep independent grow
 
 test('each recessed screen has its own aperture-sized soft glow with no bloom over its panel',()=>{
   const glow=createScreenGlow();
-  assert.equal(glow.geometry.index.count/3,14);assert.equal(glow.children.length,0);
+  assert.equal(glow.geometry.index.count/3,18);assert.equal(glow.children.length,0);
   const p=glow.geometry.attributes.position;
   for(let i=0;i<7;i++){
     const width=p.getX(i*4+1)-p.getX(i*4),height=p.getY(i*4+2)-p.getY(i*4);
     assert.ok(width<=1.161&&height<=.611,'glow is inside the glass, not spread over the front panel');
     assert.ok(p.getZ(i*4)<(i<3?-.405:-1.2425),'glow sits behind the rim');
+  }
+  for(const [i,x,y,z,w,h]of [[7,3.75,8.654,-.670,1.16,.65],[8,10.05,5.302,-.765,.453,.272]]){
+    assert.ok(Math.abs((p.getX(i*4)+p.getX(i*4+1))/2-x)<1e-6);
+    assert.ok(Math.abs((p.getY(i*4)+p.getY(i*4+2))/2-y)<1e-6);
+    assert.ok(Math.abs(p.getZ(i*4)-z)<1e-6);
+    assert.ok(Math.abs(p.getX(i*4+1)-p.getX(i*4)-w)<1e-6);
+    assert.ok(Math.abs(p.getY(i*4+2)-p.getY(i*4)-h)<1e-6);
   }
   assert.equal(glow.material.blending,AdditiveBlending);assert.equal(glow.material.depthTest,true);assert.equal(glow.material.depthWrite,false);
   assert.equal(glow.castShadow,false);assert.equal(glow.receiveShadow,false);
@@ -127,6 +136,39 @@ test('each recessed screen has its own aperture-sized soft glow with no bloom ov
   assert.deepEqual(glow.material.uniforms,{});
   const effect=new CabinStartupLighting([glow]);assert.equal(effect.materials.length,0,'halo never flickers with ceiling power');
   effect.dispose();glow.geometry.dispose();glow.material.dispose();
+});
+
+test('medical and coffee glass stay powered after batching and match their local green glow apertures',()=>{
+  const previous=globalThis.document;
+  const ctx=new Proxy({measureText:t=>({width:t.length*8})},{get:(o,k)=>o[k]??(()=>{})});
+  globalThis.document={createElement:()=>({getContext:()=>ctx})};
+  const root=new Group(),m=new Proxy({},{get:(o,k)=>o[k]??=new MeshStandardMaterial({name:k})});
+  let batch,effect;
+  try{
+    root.add(createMedicalBay(m,6.784).root);
+    const station=createLoungeCoffeeStation(m,m.enamel);station.position.set(10.2,3.392,0);root.add(station);
+    root.updateMatrixWorld(true);
+    const glass=[];root.traverse(o=>{if(o.material?.name==='Medical / powered diagnostic display'||o.name==='Coffee / screen print')glass.push(o);});
+    assert.equal(glass.length,2);
+    const glow=createScreenGlow(),positions=glow.geometry.attributes.position;
+    glass.forEach((mesh,i)=>{
+      assert.equal(mesh.material.userData.cabinAlwaysPowered,true);
+      const center=mesh.getWorldPosition(new Vector3()),index=(7+i)*4;
+      assert.ok(Math.abs((positions.getX(index)+positions.getX(index+1))/2-center.x)<1e-6);
+      assert.ok(Math.abs((positions.getY(index)+positions.getY(index+2))/2-center.y)<1e-6);
+      assert.ok(Math.abs(positions.getZ(index)-center.z-.005)<1e-6);
+    });
+    glow.geometry.dispose();glow.material.dispose();
+    batch=batchStatic(root);effect=new CabinStartupLighting([batch],{waitForActivation:true});effect.update(3600);
+    for(const mesh of glass){
+      assert.ok(batch.children.some(o=>o.material===mesh.material),'screen material survives static batching');
+      assert.ok(!effect.materials.some(entry=>entry.material===mesh.material),'standby never dims the glass');
+    }
+  }finally{
+    effect?.dispose();const resources=new Set();
+    for(const group of [root,batch])group?.traverse(o=>{if(o.geometry)resources.add(o.geometry);if(o.material){resources.add(o.material);for(const value of Object.values(o.material))if(value?.isTexture)resources.add(value);}});
+    resources.forEach(r=>r.dispose());if(previous===undefined)delete globalThis.document;else globalThis.document=previous;
+  }
 });
 
 test('recessed bezels have real holes, a forward rim, and knobs can stand in front of the panel',()=>{
@@ -180,6 +222,8 @@ test('always-on spill remains outside the ceiling mask, respects surface texture
   assert.ok(shader.fragmentShader.indexOf('gl_FragColor.rgb +=')<shader.fragmentShader.indexOf('#include <tonemapping_fragment>'));
   assert.match(shader.fragmentShader,/p.z - 2.55/,'emergency spill is on the near-wall side');
   assert.match(shader.fragmentShader,/p.x \+ 4.57/,'monitor stack has its own green pool');
+  assert.match(shader.fragmentShader,/medicalOffset \/ vec3\(0.85, 0.85, 1.10\)/,'medical spill is finite and stays on the upper deck');
+  assert.match(shader.fragmentShader,/coffeeOffset \/ vec3\(0.48, 0.48, 0.65\)/,'small coffee display has a smaller local green pool');
   assert.match(shader.fragmentShader,/dot\(surfaceNormal, normalize\(consoleSource - p/,'front-facing bezels reject light from glass behind them');
   assert.match(shader.fragmentShader,/growFloor \*= max\(0.0, surfaceNormal.y\)/,'grow light reaches the aisle floor without lighting its underside');
   assert.match(shader.fragmentShader,/vec3\(0.85, 0.58, 0.25\) \* emergency/,'emergency illumination is a softer yellow amber, not red-orange');

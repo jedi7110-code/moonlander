@@ -3,17 +3,17 @@ import {LADDER,applyLadderPose,LADDER_WRIST_OFFSET,placeLadderHand,poseGrip} fro
 import {fitLadderGripContact,fitLadderWatch} from './ladder-hand-fit.js';
 import {fitLadderEntryBody} from './ladder-entry.js';
 import {planMiloTurn,sampleMiloTurn,miloTurnSway,placeMiloTurnLegs,applyMiloTurnLead} from './milo-turn.js';
-import {CABIN_AISLE} from './layout.js';
+import {ACCESS_LADDER,ladderApproachDepth} from './layout.js';
 import {LADDER_LANDING} from './pace.js';
 
-export const CABIN_LADDER={rungBase:.12,depth:.03,transfer:LADDER_LANDING.height};
+export const CABIN_LADDER={rungBase:.12,depth:ACCESS_LADDER.depth,transfer:LADDER_LANDING.height};
 export const ladderTimeAtHeight=height=>(height-CABIN_LADDER.rungBase)/(2*LADDER.spacing)*LADDER.duration;
 const SOLE=new THREE.Vector3(0,-.107,.12);
 // The top and middle decks leave the ladder well open up to their bridge at
-// z=.94, 0.91 m in front of the rungs. Mount and dismount there with the toes
+// 0.91 m in front of the rungs. Mount and dismount there with the toes
 // 4 cm behind that edge instead of reaching out over the well from the aisle.
-const WELL_EDGE=.94,WELL_STANCE=WELL_EDGE+.04+.188;
-export const ladderStanceDepth=depth=>depth>1?WELL_STANCE:depth;
+const WELL_EDGE=ACCESS_LADDER.wellEdge,WELL_STANCE=WELL_EDGE+.04+.188;
+export const ladderStanceDepth=depth=>depth>1+ACCESS_LADDER.offset?WELL_STANCE:depth;
 const phase=(u,[start,end])=>THREE.MathUtils.clamp((u-start)/(end-start),0,1);
 
 // Retarget the pose's deck bounds as well as the logical route. Keeping the old
@@ -92,7 +92,7 @@ function applyLadderEntry(root,sample,{height,startHeight,startYaw,startDepth,po
   // step of its own after the turn ended on the left foot, or when there is no
   // turn, once the weight is on the other foot. A left foot not carried there by
   // the turn waits at the aisle stance.
-  const upper=startDepth>1,stance=ladderStanceDepth(startDepth);
+  const upper=startHeight>0,stance=ladderStanceDepth(startDepth);
   const lastMover=turning?(stepping?.plan??planMiloTurn(startYaw,startYaw+angle,deck)).steps.at(-1).side:0;
   let merged=1;
   if(upper&&stepping){
@@ -113,7 +113,7 @@ function applyLadderEntry(root,sample,{height,startHeight,startYaw,startDepth,po
   soles.forEach((sole,i)=>sole.y=startHeight+.003+(legs[i].side===follower?.025*Math.sin(Math.PI*followT)**2:0));
   // Over a well, reach the rung in a crouch: bent knees, a moderate hip hinge and
   // the pelvis above the edge. It moves out over the opening once both hands hold.
-  const lean=upper?.8:.18,hipY=upper?.74:.94,hipZ=upper?stance-.17:.62;
+  const lean=upper?.8:.18,hipY=upper?.74:.94,hipZ=upper?stance-.17:.62+ACCESS_LADDER.offset;
   const standingBody=rest[0].position.clone().applyQuaternion(yaw).add(new THREE.Vector3(root.position.x,startHeight,startDepth));
   if(stepping){standingBody.add(miloTurnSway(stepping.plan,stepping.state));standingBody.y-=.010*stepping.state.envelope;}
   let shiftX=0;
@@ -138,7 +138,7 @@ function applyLadderEntry(root,sample,{height,startHeight,startYaw,startDepth,po
     // Once both hands hold, lean out over the well before the first foot leaves
     // the deck, so the stepping leg does not drag the pelvis after it.
     const out=ease(u,.38,.5);bend=mix(lean,.6,out)*ease(u,.1,.38);
-    const hip=standingBody.clone().add(new THREE.Vector3(0,.970,0)),target=new THREE.Vector3(root.position.x,startHeight+mix(hipY,.70,out),mix(hipZ,.78,out));
+    const hip=standingBody.clone().add(new THREE.Vector3(0,.970,0)),target=new THREE.Vector3(root.position.x,startHeight+mix(hipY,.70,out),mix(hipZ,.78+ACCESS_LADDER.offset,out));
     hip.x=mix(hip.x,target.x,reach)+shiftX;hip.y=mix(hip.y,target.y,reach);hip.z=mix(hip.z,target.z,ease(u,.24,.38));
     reachBody=hip.sub(new THREE.Vector3(0,.970*Math.cos(bend),.970*Math.sin(bend)).applyQuaternion(yaw));
   }
@@ -218,7 +218,7 @@ function applyLadderEntry(root,sample,{height,startHeight,startYaw,startDepth,po
 
 // Absolute height locks held hands/feet to the physical rungs in either direction,
 // including pause and mid-shaft retargeting. Only the deck transfers blend out.
-export function applyCabinLadder(root,{height,startHeight,endHeight,startYaw,endYaw,startDepth=CABIN_AISLE.crewZ,endDepth=CABIN_AISLE.crewZ,arrivalYaw}){
+export function applyCabinLadder(root,{height,startHeight,endHeight,startYaw,endYaw,startDepth=ladderApproachDepth(startHeight===0?2:1),endDepth=ladderApproachDepth(endHeight===0?2:1),arrivalYaw}){
   const from=Math.abs(height-startHeight),to=Math.abs(endHeight-height);
   const weight=THREE.MathUtils.smoothstep(Math.min(from,to),0,CABIN_LADDER.transfer);
   const descendingLanding=startHeight>endHeight&&to<=CABIN_LADDER.transfer&&from>=CABIN_LADDER.transfer;
@@ -237,7 +237,7 @@ export function applyCabinLadder(root,{height,startHeight,endHeight,startYaw,end
     const entry=applyLadderEntry(root,sample,{height,startHeight,startYaw,startDepth,poseHeight},rest,nodes,ladderBody);
     return {...sample,weight,entry,landing:null};
   }
-  if(startHeight<endHeight&&endDepth>1&&to<=CABIN_LADDER.transfer&&from>=CABIN_LADDER.transfer){
+  if(startHeight<endHeight&&endHeight>0&&to<=CABIN_LADDER.transfer&&from>=CABIN_LADDER.transfer){
     // Arriving upward on a deck with a well mirrors its mount: step each foot up
     // onto the edge while holding the rungs, bring the pelvis over the feet,
     // release, step back to the aisle and turn to face it on planted feet.

@@ -7,6 +7,23 @@ The user-supplied power-on edit below has an unverified license.
 No remotely streamed audio. Do not describe the complete library as CC0.
 Attribution is retained here voluntarily, including the exact source and edit recipe.
 
+## Factory Warning Buzzer — qubodup / Freesound, 2026-10-10
+
+- User-selected **Factory Warning Buzzer**, sound #832414, a recorded bridge-crane warning.
+- Source and explicit CC0 license, checked 2026-10-10:
+  https://freesound.org/people/qubodup/sounds/832414/
+- Public HQ preview: https://cdn.freesound.org/previews/832/832414_71257-hq.mp3
+- `factory-warning-buzzer.mp3` SHA-256: `36b798f34ec06999ff8de1377055516f1ad4b7423733fdc1db2474f0ad7e69aa`.
+- Full 0–3.000 s → `factory-warning-buzzer.wav`: 132,344 bytes.
+  Mono 22,050 Hz PCM16, 4 ms attack / 45 ms release, -9 dBFS peak.
+  Original speed and pitch, no added layer, filtering or time stretching.
+  Playback gain 0.38; one repeating voice heard throughout the cabin.
+- Active only while the interior-hatch fault exists; verified recovery stops it.
+  Existing mute, pause, hidden-tab and disposal controls stop the voice.
+  Late loading starts the current warning without replaying old events.
+- Rebuild: `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY factory-warning-buzzer`.
+- Preview: `/3D/emergency-lighting-study.html`, then enable the warning sound.
+
 ## Gentle pot simmer — Joseph SARDIN / BigSoundBank, 2026-10-09
 
 - **Small Broth in a Pot**, sound #0492: a real pot simmering gently.

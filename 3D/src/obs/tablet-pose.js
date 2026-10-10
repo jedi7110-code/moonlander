@@ -5,7 +5,7 @@ import {cloneMiloSkinGeometry} from './milo-elbow.js';
 export const TABLET_GRIP={x:.178,y:.006,z:-.115,thumbZ:-.007};
 export const tabletGripContact=side=>new THREE.Vector3(side*TABLET_GRIP.x,TABLET_GRIP.y,TABLET_GRIP.z);
 
-export function createGripHandGeometry(skin,side=0){
+export function createGripHandGeometry(skin,side=0,digitLabels=null){
     const geometry=cloneMiloSkinGeometry(skin);
     const {position,armRegion,skinIndex,skinWeight}=geometry.attributes;
     const bones=skin.skeleton.bones.map(b=>b.name.replace('Milo skin ','')),smooth=THREE.MathUtils.smoothstep;
@@ -18,12 +18,15 @@ export function createGripHandGeometry(skin,side=0){
       const nx=THREE.MathUtils.lerp(Math.abs(x),closed,1-smooth(y,.880,.934)),ny=.934+(y-.934)*.80;
       position.setXYZ(i,handSide*nx,ny,z);
       if(ny>.910)continue;
-      const thumb=(1-smooth(Math.abs(x),.173,.183))*(1-smooth(z,-.020,-.006));
-      const rank=THREE.MathUtils.clamp(Math.round((nx-.186)/.014),0,3),finger=handSide<0?3-rank:rank;
+      const label=digitLabels?.get(i);
+      const thumb=label===4?1:label!==undefined?0:(1-smooth(Math.abs(x),.173,.183))*(1-smooth(z,-.020,-.006));
+      const rank=THREE.MathUtils.clamp(Math.round((nx-.186)/.014),0,3),finger=label!==undefined&&label<4?label:handSide<0?3-rank:rank;
       const base=.934-.078+Math.abs(finger-1.5)*.009,curl=1-smooth(ny,base+.004,base+.024);
       const middle=1-smooth(ny,base-.038,base-.018),tip=1-smooth(ny,base-.062,base-.042);
+      const distalThumb=label===4?1-smooth(ny,.845,.873):0;
       const weights=[
-        [prefix+'_hand',(1-thumb)*(1-curl)],[prefix+'_thumb',thumb],
+        [prefix+'_hand',(1-thumb)*(1-curl)],[prefix+'_thumb',thumb*(1-distalThumb)],
+        ...(label===4?[[prefix+'_thumbIP',thumb*distalThumb]]:[]),
         [`${prefix}_finger${finger}_0`,(1-thumb)*curl*(1-middle)],
         [`${prefix}_finger${finger}_1`,(1-thumb)*curl*middle*(1-tip)],
         [`${prefix}_finger${finger}_2`,(1-thumb)*curl*middle*tip],

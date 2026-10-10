@@ -52,6 +52,17 @@ test('faults wait running minutes, persist until repaired and cannot immediately
   environment.update(1);assert.equal(environment.fault.serial,serial+1);
 });
 
+test('ordinary maintenance incidents are scheduled 45 to 90 running minutes apart',()=>{
+  for(const [random,minutes]of [[0,45],[.5,67.5],[1,90]]){
+    const environment=new CabinEnvironment({random:()=>random});
+    assert.equal(environment.nextFault,minutes*60);
+    environment.update(minutes*60-1);assert.equal(environment.fault,null);
+    environment.update(1);const serial=environment.fault.serial;
+    assert.equal(environment.resolve(serial),true);
+    assert.equal(environment.nextFault-environment.clock,minutes*60);
+  }
+});
+
 function setup(floor=2,x=700){
   const actor=new CrewMotion({floor,x}),care=new Supplies(),events=[];
   const brain=new CabinBrain({time:{delayedCall(){}},obsUI:{hideWant(){},environmentEvent:event=>events.push(event)}},actor,{care,random:()=>.5});
@@ -66,6 +77,20 @@ function advance(state,seconds,check=()=>{}){
     state.brain.update(1/60);check();
   }
 }
+
+test('dark startup never creates a fault, and the preview warning waits twelve seconds after lighting activation',()=>{
+  const {brain,events}=setup();
+  brain.beginWakeUp({waitForActivation:true});brain.environment.nextFault=12;
+  brain.update(HATCH_FAULT_INTERVAL.max*2);
+  assert.equal(brain.environment.clock,0);assert.equal(brain.environment.nextFault,12);
+  assert.equal(brain.environment.fault,null);assert.equal(environmentDisplay(brain.environment).state,'normal');
+  assert.equal(events.filter(event=>event.type==='fault').length,0);
+  assert.equal(brain.releaseOpeningSleep(),true);
+  brain.update(11);assert.equal(brain.environment.fault,null);assert.equal(brain.environment.clock,11);
+  brain.update(0);assert.equal(brain.environment.clock,11);
+  brain.update(1);assert.equal(brain.environment.fault.id,'innerHatch');
+  assert.equal(events.filter(event=>event.type==='fault').length,1);
+});
 
 test('Milo repairs the closed cabin-side hatch and verifies it before the alert clears',()=>{
   const state=setup(),{brain,actor,events}=state,phases=new Set();

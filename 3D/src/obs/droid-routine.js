@@ -1,4 +1,4 @@
-import {FLOORS,LADDER_X,CAT_BOWL,WASTE_INCINERATOR as WASTE} from './layout.js';
+import {FLOORS,LADDER_X,CAT_BOWL,WASTE_INCINERATOR as WASTE,ACCESS_LADDER,ladderApproachDepth} from './layout.js';
 import {planDroidTurn,sampleDroidTurn} from './droid-turn.js';
 import {DROID_STARTUP_SECONDS} from './droid-startup.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
@@ -149,9 +149,9 @@ export class DroidRoutine {
       const side=Math.sign(this.plan.x)||Math.sign(x)||-1;
       this.walk(side*DROID_LADDER_TRAFFIC.droidWaitX,LANE);
       this.add('ladder-wait',.1,null,{ladderEntry:true,ladderPath:{from:this.plan.y,to:DROID_FLOORS[floor]}});
-      this.walk(0,LANE);this.walk(0,this.plan.floor===2?.34:1.34);this.turn(Math.PI);
+      this.walk(0,LANE);this.walk(0,ladderApproachDepth(this.plan.floor,true));this.turn(Math.PI);
       const descending=DROID_FLOORS[floor]<this.plan.y;
-      const to={...this.plan,floor,y:DROID_FLOORS[floor],z:floor!==2?1.34:.34};
+      const to={...this.plan,floor,y:DROID_FLOORS[floor],z:ladderApproachDepth(floor,true)};
       // At an upper deck the rung plane is over an open well. Keep the climb
       // active until both feet have transferred backwards onto the bridge.
       const landingDuration=DROID_LADDER_LANDING.seconds,landingHeight=descending?DROID_LADDER_LANDING.height:0;
@@ -288,8 +288,8 @@ export class DroidRoutine {
           s.landingDuration&&this.age>=transferAt?s.to.y-direction*s.landingHeight*(1-(this.age-transferAt)/s.landingDuration):
           s.from.y+direction*(LADDER_ENTRY.droidHeight+(this.age-LADDER_ENTRY.seconds)*CLIMB_SPEED);
         this.position.z=s.landingDuration&&this.age>=transferAt?
-          mix(.34,s.to.z,smooth((this.age-transferAt)/s.landingDuration)):
-          mix(s.from.z,.34,smooth((entry-.4)/.6));
+          mix(ACCESS_LADDER.droidClimbZ,s.to.z,smooth((this.age-transferAt)/s.landingDuration)):
+          mix(s.from.z,ACCESS_LADDER.droidClimbZ,smooth((entry-.4)/.6));
       }
       if(s.turn)this.position.yaw=sampleDroidTurn(s.turn,this.age).yaw;
       if(s.kind==='walk')this.walkDistance+=SPEED*dt;

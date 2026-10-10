@@ -9,7 +9,7 @@ import {buildShip,FLOOR_Y,positionX,positionY,REAR_ROOM_GATES} from '../src/obs/
 import {EVA_HATCH_FIT} from '../src/obs/eva.js';
 
 test('missions occupy 01 and living facilities occupy 02 next to 03 without changing 2D',()=>{
-  assert.deepEqual(FLOORS.map(f=>f.name),['OPERATIONS','HABITATION','LIFE SUPPORT']);
+  assert.deepEqual(FLOORS.map(f=>f.name),['LEVEL 1','LEVEL 2','LEVEL 3']);
   assert.deepEqual(FLOORS.map(f=>f.y),originalFloors.map(f=>f.y));
   for(const id of ['console','medical','eva','innerHatch','airlock'])assert.equal(getStation(id).floor,DECK.OPERATIONS);
   for(const id of ['shower','toilet','bunk','lounge'])assert.equal(getStation(id).floor,DECK.HABITATION);
@@ -59,8 +59,13 @@ test('fixture geometry, pick targets, signs and lights use the same new deck hei
   assert(bedBounds.min.y>=FLOOR_Y[DECK.OPERATIONS]);
   assert.equal(ship.innerDoor.position.y,FLOOR_Y[DECK.OPERATIONS]+EVA_HATCH_FIT.centerY);
   for(const [i,floor]of FLOORS.entries()){
-    const sign=ship.staticMesh.getObjectByName(`Sign: ${String(i+1).padStart(2,'0')} / ${floor.name}`);
-    assert(sign);const b=new Box3().setFromObject(sign);assert(b.min.y>FLOOR_Y[i]+2);
+    assert.equal(ship.staticMesh.getObjectByName(`Sign: ${floor.name}`),undefined);
+    const painted=[];
+    ship.staticMesh.traverse(mesh=>{if(mesh.material?.userData.floorLevel===floor.name)painted.push(mesh);});
+    assert(painted.length>0,floor.name+' is painted onto its deck');
+    for(const mesh of painted){
+      const b=new Box3().setFromObject(mesh);assert(b.max.y<=FLOOR_Y[i]+.02&&b.min.y>=FLOOR_Y[i]-.4);
+    }
   }
   for(const root of [ship.staticMesh,ship.animated])root.traverse(o=>o.geometry?.dispose());material.dispose();
 });

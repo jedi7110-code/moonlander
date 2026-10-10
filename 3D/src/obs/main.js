@@ -24,6 +24,7 @@ import {updateCharacterCameraUI,updateFirstPersonOverlay} from './character-came
 import {updateFullscreenUI} from './fullscreen-ui.js';
 import {environmentDisplay} from './environment.js';
 import {HATCH_REPAIR_LABELS} from './hatch-repair.js';
+import {FLOORS} from './layout.js';
 
 const $=id=>document.getElementById(id);
 const CatFoodBowl=[
@@ -353,6 +354,7 @@ async function start(){
     // The mixer remains silent until a real input gesture unlocks it.
     if(audio.enabled){try{audio.prepare();void audio.load();}catch(error){console.warn('Cabin audio preparation failed.',error);}}
     view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true});
+    view.audio=audio;
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
@@ -375,12 +377,21 @@ async function start(){
     });
     view.immersive=immersive;
     brain.catRoutine=cat;
-    brain.beginWakeUp({waitForActivation:true});
+    const loungeSmokingPreview=new URLSearchParams(location.search).get('preview')==='lounge-smoking';
+    if(loungeSmokingPreview){
+      const station=getStation('lounge');actor.floor=station.floor;actor.x=station.x;actor.y=FLOORS[station.floor].y;
+      for(const key of Object.keys(brain.needs))brain.needs[key]=90;
+      brain.nextLeisure='smoking';brain._startPerform(station,true);
+    }else brain.beginWakeUp({waitForActivation:true});
     if(new URLSearchParams(location.search).get('preview')==='airlock')brain.environment.nextFault=12;
     view.setMode('all');
     if(new URLSearchParams(location.search).get('preview')==='supervisor'){
       view.setMode('manual');view.center.set(-4.57,8.22,-1.30);view.targetCenter.copy(view.center);
       view.viewHeight=view.targetHeight=3.1;view.zoom=view.fitHeight/3.1;
+    }
+    if(loungeSmokingPreview){
+      view.setMode('manual');view.center.set(8.30,4.45,.75);view.targetCenter.copy(view.center);
+      view.viewHeight=view.targetHeight=2.8;view.zoom=view.fitHeight/2.8;
     }
     view.startLighting({waitForActivation:true});
     // Compile every cabin program behind the connection screen. With
