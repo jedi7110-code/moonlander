@@ -3,8 +3,9 @@ import {CabinSoundEvents} from './obs/sound-events.js';
 import {CABIN_SOUNDS} from './obs/sound-library.js';
 import {BathroomVisit} from './obs/bathroom.js';
 import {BunkVisit} from './obs/bunk-visit.js';
+import {GroomingVisit} from './obs/grooming-visit.js';
 import {CatMotion,CatRoutine,CrewMotion,Supplies} from './obs/state.js';
-import {CAT_PORT,CAT_BOWL,FLOORS,LADDER_X} from './obs/layout.js';
+import {CAT_PORT,CAT_BOWL,FLOORS,LADDER_X,getStation} from './obs/layout.js';
 import {planDroidTurn} from './obs/droid-turn.js';
 import {DroidRoutine,DROID_PACE} from './obs/droid-routine.js';
 import {DROID_GAIT} from './obs/pace.js';
@@ -37,8 +38,17 @@ function start(){
   stop();audio.pause(false);audio.unlock();
   const kind=$('scenario').value,state={actor:{x:700,y:650,floor:1,walkDistance:0,queue:[],busy:false},brain:{},care:{phase:'idle'},airlock:{opening:0}};
   const driver=new CabinSoundEvents(audio);driver.update(1/60,state);
+  if(kind==='meal'){
+    const station=getStation('galley');state.actor=new CrewMotion({floor:station.floor,x:station.x});
+    Object.assign(state.brain,{state:'performing',cur:station,curDurSec:station.dur/1000,performT:station.dur/1000});
+    driver.update(1/60,state);
+  }
   if(['shower','toilet'].includes(kind))state.brain.bathroom=new BathroomVisit(kind);
   if(kind==='bed')state.brain.bunkVisit=new BunkVisit({startAsleep:true});
+  if(kind==='grooming'){
+    const station=getStation('grooming');state.actor=new CrewMotion({floor:station.floor,x:station.x});
+    state.brain.grooming=new GroomingVisit(1);driver.update(1/60,state);
+  }
   if(kind==='washerDoor'){
     const droid=state.droid=new DroidRoutine({care:state.care,brain:state.brain,actor:state.actor});
     droid.job='laundry';droid.add('hold',.5);
@@ -80,8 +90,10 @@ function start(){
 function tick(now){
   if(!running)return;const dt=Math.min(.05,(now-previous)/1000);previous=now;
   const r=running,s=r.state;r.time+=dt;const t=r.time;
+  if(r.kind==='meal'){s.brain.performT=Math.max(0,s.brain.curDurSec-t);if(t>=s.brain.curDurSec)s.brain.state='idle';}
   if(r.kind==='door')s.airlock.opening=t<.5?0:t<1.2?(t-.5)/.7:t<2?1:Math.max(0,1-(t-2)/.7);
   if(s.brain.bunkVisit){if(t>.5)s.brain.bunkVisit.requestExit();s.brain.bunkVisit.update(dt);}
+  if(s.brain.grooming)s.brain.grooming.update(dt);
   if(s.brain.bathroom){s.brain.bathroom.update(dt);if(t>9)s.brain.bathroom.requestExit();}
   if(r.kind==='walk'){s.actor.busy=t<4;if(s.actor.busy){s.actor.walkDistance+=dt*48;s.actor.x+=dt*48;}}
   if(r.kind.startsWith('miloClimb'))s.actor.update(dt);
@@ -91,9 +103,11 @@ function tick(now){
   if(r.kind==='mouseChase')s.cat.update(dt);
   else if(s.cat)s.cat.motion.update(dt);
   if(s.care.delivery){s.care.delivery.age=t;if(t>3.3)s.care.phase='idle';}
-  r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.cat?.mouseChase?.pose?.phase??s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.bathroom?.phase??s.droid?.step?.action??s.care.phase}`;
+  r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.cat?.mouseChase?.pose?.phase??s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.grooming?.pose.label??s.brain.bathroom?.phase??s.droid?.step?.action??(r.kind==='meal'?(s.brain.state==='performing'?'食事中':'食事終了'):s.care.phase)}`;
   if(['washerDoor','feed','simmer'].includes(r.kind)&&!s.droid.step){stop();return;}
   if(r.kind==='simmer'){frame=requestAnimationFrame(tick);return;}
+  if(r.kind==='meal'){if(t>s.brain.curDurSec+.5){stop();return;}frame=requestAnimationFrame(tick);return;}
+  if(r.kind==='grooming'){if(s.brain.grooming.done){stop();return;}frame=requestAnimationFrame(tick);return;}
   if(r.kind==='mouseChase'){
     if(!s.cat.mouseChase.sim.active||t>45){stop();return;}
     frame=requestAnimationFrame(tick);return;

@@ -26,6 +26,8 @@ const recipes=[
   ['shower','shower.mp3',30,4,true],
   ['flush','flush.mp3',0,5],
   ['washer','washer.mp3',2,4,true],
+  ['hair-clipper','hair-clipper.mp3',2,2.12,true,false,'highpass=f=100,lowpass=f=5000'],
+  ['electric-shaver','electric-shaver.mp3',3,2.12,true,false,'highpass=f=100,lowpass=f=5000'],
   ['bag','foley/sfx-cc0/plastic-bag-pickup-01.wav',0,1.5],
   ['kibble-pour','cat-biscuit-pour.mp3',.60,3.12,true,false,'highpass=f=140,lowpass=f=6000'],
   ['cat-meow','cat-meow.mp3',0,1.544,false,true,'highpass=f=100,lowpass=f=6500'],
@@ -34,12 +36,17 @@ const recipes=[
   ['mouse-squeak-2','rat-squeaks.mp3',7.78,.38,false,true,'highpass=f=1000,lowpass=f=9000'],
   ['cat-chase-chirp','cat-chirps.mp3',6.32,.64,false,true,'highpass=f=180,lowpass=f=7500'],
   ['chop','foley/sfx-cc0/apple-cut-01.wav',0,1.2],
+  // Three isolated spoon/bowl contacts; exclude the following clank in each take.
+  ...[[.480,.27],[3.580,.36],[7.645,.34]].map(([start,duration],n)=>[`meal-cutlery-${n+1}`,'spoon-bowl.mp3',start,duration,false,true,'highpass=f=180,lowpass=f=6000']),
   ['pot-simmer','pot-simmer.mp3',2,4.12,true,false,'highpass=f=90,lowpass=f=5000'],
   // Preserve the complete three-second warning and its decay. Faded endpoints
   // repeat cleanly without a shortened crossfade or a pitch/speed change.
   ['factory-warning-buzzer','factory-warning-buzzer.mp3',0,3,false,true,'anull'],
 ];
 const sourceHashes={
+  'hair-clipper.mp3':'529ea7aebaa7460c20f9dde1aff22629449eec4a9917bce29ae97b311ee21f20',
+  'electric-shaver.mp3':'2ab3e064ae79816fc0241554821edd572131f83463890b60a41b70b9770f167d',
+  'spoon-bowl.mp3':'7e3d57e4af1e71628bdb94389942ae5f8f364ccbf9243aeff8ca88a03e4b2a89',
   'factory-warning-buzzer.mp3':'36b798f34ec06999ff8de1377055516f1ad4b7423733fdc1db2474f0ad7e69aa',
   'rat-squeaks.mp3':'2f6d2447616474a89617db231600ed1d3947da499cde8a2304ba127667491937',
   'cat-chirps.mp3':'be493a43c91b5078eeaf8d08010382e7dec64e2d96197132bf2c26af048c6ab4',

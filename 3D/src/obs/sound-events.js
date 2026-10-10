@@ -1,10 +1,11 @@
-import {FLOORS,EVA_PASSAGE,CAT_PORT,CAT_BOWL,WASTE_INCINERATOR,getStation} from './layout.js';
+import {FLOORS,EVA_PASSAGE,CAT_PORT,CAT_BOWL,WASTE_INCINERATOR,CABIN_AISLE,getStation} from './layout.js';
 import {hatchOpening} from './delivery.js';
 import {catPortOpening} from './cat-ports.js';
 import {DROID_WALK_CYCLE_DISTANCE} from './pace.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {CABIN_SOUNDS} from './sound-library.js';
 import {KIBBLE_STREAM,KIBBLE_CONTACT_DELAY} from './kibble-timing.js';
+import {diningPhase,MEAL_SPOON_CONTACTS} from './dining-timing.js';
 import walkCycle from './milo-walk-cycle.json' with {type:'json'};
 
 const station=(id,z=-1.5)=>{const s=getStation(id);return{x:(s.x-700)*.022,y:(870-FLOORS[s.floor].y)*.016+1,z};};
@@ -23,6 +24,35 @@ const bedLocation={x:(getStation('bunk').x-700)*.022,y:(870-FLOORS[getStation('b
 // never replays a backlog. Rendering, mirrors and multiple XR eyes cannot emit.
 export class CabinSoundEvents {
   constructor(audio,{random=Math.random}={}){this.audio=audio;this.random=random;this.catVoiceTime=0;this.catVoice=null;this.doors=new Map();this.lids=new Map();this.steps=new Map();this.beats=new Map();this.previousBathroom=null;this.previousBathroomPhase=null;this.previousDroidStep=null;this.previousDelivery=null;this.deliveryAge=0;this.variant=0;}
+  meal(dt,actor,brain){
+    const duration=brain.curDurSec,age=duration-brain.performT;
+    const active=brain.state==='performing'&&brain.cur?.id==='galley'&&!actor.busy&&!actor.climbing&&
+      Number.isFinite(duration)&&duration>0&&Number.isFinite(age)&&age>=0&&age<=duration;
+    const progress=active?diningPhase(age,duration).progress:0,previous=this.previousMeal;
+    this.previousMeal={brain,station:brain.cur,duration,age,progress,active};
+    // First snapshots, seeks, interrupted visits and repeated frames are silent.
+    // Consume contacts while muted/unloaded; never replay them on resume.
+    if(!active||!previous?.active||previous.brain!==brain||previous.station!==brain.cur||previous.duration!==duration||
+      dt>.1||age<=previous.age||age-previous.age>dt+1e-6)return;
+    for(const contact of MEAL_SPOON_CONTACTS)if(previous.progress<contact&&progress>=contact){
+      const variant=this.cutleryVariant??0;this.cutleryVariant=(variant+1)%3;
+      // Bowl held in Milo's left hand while facing the counter (yaw PI).
+      const position={x:(actor.x-700)*.022+.095,y:(870-actor.y)*.016+1.243,z:CABIN_AISLE.crewZ-.32-.285};
+      this.audio.play(`cutlery${variant+1}`,{position});
+    }
+  }
+  grooming(actor,visit){
+    // Use the visible visit pose, including its entry turn and slowed tool
+    // return. The raw visit age is not the authored animation clock.
+    const pose=visit?.pose,active=Boolean(pose&&!visit.done&&!actor.busy&&!actor.climbing);
+    const clipping=active&&['cutRight','transfer','cutLeft'].includes(pose.phase);
+    const shaving=active&&pose.phase==='shave';
+    const station=getStation('grooming');
+    const position=pose?{x:(station.x-700)*.022+pose.x,y:(870-FLOORS[station.floor].y)*.016+pose.floor+1.55,z:pose.z}:null;
+    // One reused voice per motor; never a buzz per stroke or render frame.
+    this.audio.setLoop('grooming-clipper','clipper',Boolean(clipping),{position});
+    this.audio.setLoop('grooming-shaver','shaver',Boolean(shaving),{position});
+  }
   bunk(dt,visit){
     const previous=this.previousBunk,phase=visit?.phase,age=visit?.age??0;
     const changed=previous?.visit!==visit||previous?.phase!==phase;
@@ -145,6 +175,8 @@ export class CabinSoundEvents {
     this.hungryCat(dt,cat);
     this.chaseVocals(dt,cat);
     this.bunk(dt,brain.bunkVisit);
+    this.meal(dt,actor,brain);
+    this.grooming(actor,brain.grooming);
     const feedStep=droid?.step,feedRate=feedStep?.actionRate??1,feedAge=(droid?.age??0)*feedRate;
     const pouring=feedStep?.action==='food-pour'&&Boolean(droid.carriedFood)&&!droid.waiting&&
       feedAge>=KIBBLE_STREAM.start+KIBBLE_CONTACT_DELAY&&feedAge<feedStep.duration*feedRate-KIBBLE_STREAM.finishLead+KIBBLE_CONTACT_DELAY;

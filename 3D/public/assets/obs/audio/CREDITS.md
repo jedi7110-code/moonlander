@@ -322,6 +322,61 @@ Rebuild only these clips:
 - Rebuild only this new clip:
   `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY kibble-pour`.
 
+## simosco — spoon clanking in ceramic bowl.wav
+
+- Added 2026-10-11. Source and explicit CC0 license:
+  https://freesound.org/people/simosco/sounds/235573/
+- Public HQ preview: https://cdn.freesound.org/previews/235/235573_4258636-hq.mp3
+- Source SHA-256: `7e3d57e4af1e71628bdb94389942ae5f8f364ccbf9243aeff8ca88a03e4b2a89`.
+- Recorded spoon touching a ceramic bowl; this is not labelled a recording of
+  the metal bowl shown in OBS. Three short contacts without the adjacent clanks:
+  0.480–0.750 s → `meal-cutlery-1.wav` (0.27 s),
+  3.580–3.940 s → `meal-cutlery-2.wav` (0.36 s),
+  7.645–7.985 s → `meal-cutlery-3.wav` (0.34 s).
+- Mono 22,050 Hz PCM16, high-pass 180 Hz / low-pass 6,000 Hz, -9 dBFS peak,
+  4 ms attack / 45 ms release. Native speed/pitch, without added layers or reverb.
+  Quiet playback gains 0.13 / 0.12 / 0.11; alternate takes in sequence.
+- Contacts follow the same two-spoonful clock as the meal animation, at the
+  initial scoop and both returns to the bowl. The sound originates at the held
+  bowl, with the existing camera/deck attenuation and mute/pause behaviour.
+  Walking, drinking, cancelled meals, seeks and first snapshots never emit or
+  replay past contacts. Only the three edited clips ship (about 43 KB total).
+- Rebuild: `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY meal-cutlery-1 meal-cutlery-2 meal-cutlery-3`
+  with the verified preview named `spoon-bowl.mp3` in the scratch directory.
+
+## AdrianoAnjos — hair clipper trimmer / maquina cortar cabelo
+
+- Added 2026-10-11. Source and explicit CC0 license:
+  https://freesound.org/people/AdrianoAnjos/sounds/440997/
+- Actual hair clipper, recorded with a Zoom H1. Public HQ preview:
+  https://cdn.freesound.org/previews/440/440997_6801313-hq.mp3
+- Source SHA-256: `529ea7aebaa7460c20f9dde1aff22629449eec4a9917bce29ae97b311ee21f20`.
+- `hair-clipper.mp3` 2.000–4.120 s → `hair-clipper.wav`: 2-second motor loop
+  after a 120 ms seam crossfade. Playback gain 0.12; native speed and pitch.
+
+## vandale — electric razor shaver
+
+- Added 2026-10-11. Source and explicit CC0 license:
+  https://freesound.org/people/vandale/sounds/512289/
+- Actual electric shaver. Public HQ preview:
+  https://cdn.freesound.org/previews/512/512289_1934086-hq.mp3
+- Source SHA-256: `2ab3e064ae79816fc0241554821edd572131f83463890b60a41b70b9770f167d`.
+- `electric-shaver.mp3` 3.000–5.120 s → `electric-shaver.wav`: separate
+  2-second loop after a 120 ms seam crossfade. Playback gain 0.10, native speed/pitch.
+- Both grooming clips are mono 22,050 Hz PCM16, -9 dBFS peak, high-pass 100 Hz /
+  low-pass 5,000 Hz, with no added reverb, synthetic layers or time stretch.
+  Only the edited loops ship (176,488 bytes combined).
+- The real GroomingVisit pose controls the motors: the clipper runs through
+  cutRight, transfer and cutLeft; the shaver runs only during shave. Taking tools,
+  returning them, checking the mirror and leaving are silent. The entry turn and
+  slowed clipper return are already included in that animation clock.
+  One voice per motor, positioned near the head in the washbasin room; the existing
+  mixer handles camera/deck attenuation, mute, pause and late loading. Removal,
+  cancellation and completed visits stop both loops.
+- Rebuild only these clips:
+  `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY hair-clipper electric-shaver`
+  with the previews saved under the verified filenames above.
+
 ## Processing / reproduction
 
 `node studies/audio/pack-cabin-audio.mjs SOURCE_DIRECTORY` (Node 20+, ffmpeg).

@@ -15,6 +15,8 @@ import {DroidRoutine,DROID_PACE} from '../src/obs/droid-routine.js';
 import {DROID_GAIT,DROID_WALK_CYCLE_DISTANCE,LADDER_PACE} from '../src/obs/pace.js';
 import {sampleDroidServicePose} from '../src/obs/droid-service.js';
 import {CabinEnvironment} from '../src/obs/environment.js';
+import {diningPhase,mealSpoonPhase} from '../src/obs/dining-timing.js';
+import {GroomingVisit,GROOMING_VISIT_SECONDS} from '../src/obs/grooming-visit.js';
 
 function context(){
   const parameter=()=>({value:0,setValueAtTime(v){this.value=v;},setTargetAtTime(v){this.value=v;},exponentialRampToValueAtTime(v){this.value=v;},cancelScheduledValues(){}});
@@ -110,7 +112,7 @@ test('local assets are compact mono PCM, finite, non-silent, bounded and loop se
     const peak=Math.max(...data.map(Math.abs));assert.ok(peak>.3&&peak<.36);
     if(definition.loop)assert.ok(Math.abs(data[0]-data.at(-1))<.15,`${definition.file} seam`);
   }
-  assert.ok(total<1680000,`ships ${total} bytes, including the 132 KB warning and 176 KB simmer edits, not entire source packs`);
+  assert.ok(total<1800000,`ships ${total} bytes, including the compact cutlery and two 88 KB grooming loops, not entire source packs`);
 });
 test('bed piston and slide are short faded recordings, without live loops or filters',async()=>{
   const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
@@ -410,6 +412,148 @@ function bedHarness(){
   h.audio.stopVoice=voice=>h.stops.push(voice);
   return h;
 }
+function mealHarness(duration=10){
+  const h=harness(),station=getStation('galley');
+  Object.assign(h.state.actor,{x:station.x,y:FLOORS[station.floor].y,floor:station.floor});
+  Object.assign(h.state.brain,{state:'performing',cur:station,curDurSec:duration,performT:duration});
+  h.tick=(age,dt=1/60)=>{h.state.brain.performT=duration-age;h.driver.update(dt,h.state);};
+  return h;
+}
+test('real grooming visit runs each motor only in its visible phase at 30, 60 and 120 fps',()=>{
+  for(const fps of [30,60,120]){
+    const h=harness(),visit=h.state.brain.grooming=new GroomingVisit(1),dt=1/fps;
+    const phases=new Set(),changes=[],previous={clipper:false,shaver:false};
+    for(let frame=0;frame<=GROOMING_VISIT_SECONDS*fps;frame++){
+      if(frame)visit.update(dt);h.driver.update(dt,h.state);
+      const clipper=h.loops.get('grooming-clipper'),shaver=h.loops.get('grooming-shaver');
+      assert.equal(clipper.active,['cutRight','transfer','cutLeft'].includes(visit.pose.phase));
+      assert.equal(shaver.active,visit.pose.phase==='shave');assert.ok(!(clipper.active&&shaver.active));
+      if(clipper.active)phases.add(visit.pose.phase);
+      for(const [tool,loop]of [['clipper',clipper],['shaver',shaver]]){
+        if(previous[tool]!==loop.active)changes.push({tool,active:loop.active,age:visit.age});previous[tool]=loop.active;
+        if(loop.active){
+          const station=getStation('grooming'),pose=visit.pose;
+          assert.equal(loop.id,tool);assert.equal(loop.position.x,(station.x-700)*.022+pose.x);
+          assert.equal(loop.position.y,(870-FLOORS[station.floor].y)*.016+pose.floor+1.55);
+          assert.equal(loop.position.z,pose.z);
+        }
+      }
+    }
+    assert.deepEqual([...phases],['cutRight','transfer','cutLeft'],'motor continues through the hand transfer');
+    assert.deepEqual(changes.map(({tool,active})=>[tool,active]),[['clipper',true],['clipper',false],['shaver',true],['shaver',false]]);
+    for(const [i,expected]of [11,29,37,47].entries())assert.ok(Math.abs(changes[i].age-expected)<=dt+1e-7,'entry turn and slower tool return are reflected in timing');
+    assert.equal(h.events.length,0,'no one-shot buzz per stroke');
+  }
+});
+test('grooming interruption, removal, movement and completion stop both motors',()=>{
+  const h=harness(),visit=h.state.brain.grooming=new GroomingVisit(1);
+  const tick=()=>{h.driver.update(1/60,h.state);return[h.loops.get('grooming-clipper').active,h.loops.get('grooming-shaver').active];};
+  visit.age=13;assert.deepEqual(tick(),[true,false]);
+  h.state.actor.busy=true;assert.deepEqual(tick(),[false,false]);h.state.actor.busy=false;
+  assert.deepEqual(tick(),[true,false]);
+  h.state.actor.climbing=true;assert.deepEqual(tick(),[false,false]);h.state.actor.climbing=false;
+  h.state.brain.grooming=null;assert.deepEqual(tick(),[false,false]);
+  h.state.brain.grooming=visit;visit.age=39;assert.deepEqual(tick(),[false,true]);
+  visit.age=GROOMING_VISIT_SECONDS;assert.deepEqual(tick(),[false,false]);
+  h.state.brain.grooming=new GroomingVisit(1);assert.deepEqual(tick(),[false,false],'a new visit cannot inherit the last running motor');
+});
+test('grooming loops reuse voices and respect pause, mute, loading and cancellation',async()=>{
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  const h=harness(),visit=h.state.brain.grooming=new GroomingVisit(1);h.driver=new CabinSoundEvents(audio);
+  const tick=()=>h.driver.update(1/60,h.state);
+  try{
+    await audio.toggle();await audio.load();visit.age=13;tick();
+    const key='grooming-clipper',voice=audio.loops.get(key),nodes=ctx.created.length;assert.ok(voice);
+    assert.equal(voice.source.loop,true);assert.equal(voice.source.playbackRate.value,1);
+    for(let i=0;i<240;i++){visit.update(1/60);tick();}
+    assert.equal(audio.loops.get(key),voice);assert.equal(ctx.created.length,nodes,'one motor source through strokes and transfer');
+    audio.pause(true);tick();assert.equal(audio.loops.has(key),false);assert.ok(voice.stopping);voice.source.onended();
+    audio.pause(false);tick();const resumed=audio.loops.get(key);assert.ok(resumed);
+    await audio.toggle();tick();assert.equal(audio.loops.has(key),false);resumed.source.onended();
+    visit.age=31;await audio.toggle();tick();assert.equal(audio.loops.has(key),false,'unmute after tool return cannot restart the clipper');
+    const buffer=audio.buffers.get('shaver');audio.buffers.delete('shaver');visit.age=39;tick();
+    assert.equal(audio.loops.has('grooming-shaver'),false);audio.buffers.set('shaver',buffer);tick();
+    const shaving=audio.loops.get('grooming-shaver');assert.ok(shaving,'late loading can join the currently running motor');
+    for(let i=0;i<120;i++)tick();assert.equal(audio.loops.get('grooming-shaver'),shaving);
+    h.state.brain.grooming=null;tick();assert.equal(audio.loops.size,0);assert.ok(shaving.stopping);
+  }finally{audio.dispose();}
+});
+test('grooming recordings are distinct two-second native-speed loops with quiet gains',async()=>{
+  const hashes=new Set();let total=0;
+  for(const id of ['clipper','shaver']){
+    const definition=CABIN_SOUNDS[id],file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));
+    total+=file.length;hashes.add(createHash('sha256').update(file).digest('hex'));
+    assert.equal((file.length-44)/2/22050,2);assert.equal(definition.loop,true);assert.equal(definition.rate,undefined);
+    assert.ok(definition.gain<=.12&&definition.gain>=.10);
+    assert.ok(Math.abs(file.readInt16LE(44)-file.readInt16LE(file.length-2))/32768<.1,'no click at the loop join');
+  }
+  assert.equal(hashes.size,2);assert.equal(total,176488);
+});
+test('meal contacts follow the visible two-spoonful cycle at every frame rate and duration',()=>{
+  for(const fps of [30,60,120])for(const duration of [6,10,20]){
+    const h=mealHarness(duration),times=[],dt=1/fps;h.tick(0,dt);
+    for(let frame=1;frame<=duration*fps;frame++){
+      const age=frame/fps,before=h.events.length;h.tick(age,dt);
+      if(h.events.length>before){
+        times.push(age);const {phase}=mealSpoonPhase(diningPhase(age,duration).progress);
+        const phaseTolerance=2*dt/(duration*.46*.74)+1e-8;
+        assert.ok(phase<=phaseTolerance||phase>=1-phaseTolerance,'spoon is at the bowl within one frame, never at the mouth');
+      }
+      h.tick(age,dt);assert.equal(h.events.length,times.length,'repeated render/state snapshots are silent');
+    }
+    assert.deepEqual(h.events.map(e=>e.id),['cutlery1','cutlery2','cutlery3']);
+    for(const [i,progress]of [.13,.50,.87].entries()){
+      const expected=duration*(.27+.46*progress);
+      assert.ok(times[i]>=expected-1e-8&&times[i]-expected<=dt+1e-8,'contact matches the animation clock');
+    }
+    for(const event of h.events){
+      assert.ok(Math.abs(event.position.x-((h.state.actor.x-700)*.022+.095))<1e-9);
+      assert.ok(Math.abs(event.position.y-((870-h.state.actor.y)*.016+1.243))<1e-9);
+      assert.ok(Math.abs(event.position.z-.175)<1e-9,'sound is at the held bowl');
+    }
+    assert.ok(![...h.loops.values()].some(loop=>loop.id.startsWith('cutlery')),'no repeating dining loop');
+  }
+});
+test('joining, seeking, walking, drinking and interrupted meals never replay contacts',()=>{
+  const h=mealHarness(),first=10*(.27+.46*.13),second=10*(.27+.46*.50),last=10*(.27+.46*.87);
+  h.tick(second+.01);assert.equal(h.events.length,0,'first snapshot halfway through a meal is silent');
+  h.tick(last+.01,.5);assert.equal(h.events.length,0,'a long frame skips old contacts');
+  h.tick(0);h.tick(first-.01);h.tick(first+.01,.02);assert.equal(h.events.length,1,'normal motion resumes after seeking');
+  h.tick(first+.01,0);assert.equal(h.events.length,1,'pause does not advance contact history');
+  h.state.actor.busy=true;h.tick(second-.01);h.tick(second+.01,.02);
+  h.state.actor.busy=false;h.tick(second+.02);assert.equal(h.events.length,1,'walking and resuming add no delayed contact');
+  h.state.brain.state='idle';h.tick(last-.01);h.state.brain.state='performing';h.tick(last+.01,.02);
+  assert.equal(h.events.length,1,'cancelled/restarted meals cannot reuse an old phase');
+  h.state.brain.cur=getStation('hydro');h.tick(0);h.tick(first-.01);h.tick(first+.01,.02);
+  assert.equal(h.events.length,1,'drinking has no utensil sound');
+});
+test('muted or not-yet-loaded cutlery contacts are consumed and future contacts still work',async()=>{
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  const h=mealHarness();h.driver=new CabinSoundEvents(audio);
+  const cross=(progress)=>{const age=10*(.27+.46*progress);h.tick(age-.01);h.tick(age+.01,.02);};
+  try{
+    await audio.toggle();await audio.load();h.tick(0);
+    const buffer=audio.buffers.get('cutlery1');audio.buffers.delete('cutlery1');cross(.13);
+    const before=ctx.created.length;audio.buffers.set('cutlery1',buffer);h.tick(3.5);
+    assert.equal(ctx.created.length,before,'late loading cannot replay the scoop');
+    await audio.toggle();cross(.50);await audio.toggle();h.tick(5.2);
+    assert.equal(ctx.created.length,before,'unmuting cannot replay the return');
+    cross(.87);assert.ok(ctx.created.length>before,'the next visible contact is audible');
+    assert.equal(audio.voices.size,1);
+  }finally{audio.dispose();}
+});
+test('cutlery ships three distinct compact native-speed one-shots at restrained gains',async()=>{
+  const hashes=new Set();let total=0;
+  for(let i=1;i<=3;i++){
+    const definition=CABIN_SOUNDS[`cutlery${i}`],file=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));
+    total+=file.length;hashes.add(createHash('sha256').update(file).digest('hex'));
+    assert.equal(definition.loop,undefined);assert.equal(definition.rate,undefined);
+    assert.ok(definition.gain>=.10&&definition.gain<=.14);
+    const duration=(file.length-44)/2/22050;assert.ok(duration>=.26&&duration<=.37);
+    assert.equal(file.readInt16LE(44),0);assert.equal(file.readInt16LE(file.length-2),0);
+  }
+  assert.equal(hashes.size,3);assert.ok(total<45000);
+});
 test('lid playback stays at original speed for every phase and custom animation duration',()=>{
   for(const phase of ['opening','closing','waking','sealing']){
     for(const seconds of [1,2.4,2.7,5]){

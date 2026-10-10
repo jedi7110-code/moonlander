@@ -7,6 +7,8 @@ import {reachMeal} from './meal-pose.js';
 import {CABIN_AISLE,HYDRO_TRAY} from './layout.js';
 import {createCupWater,updateCupWater} from './cup-water.js';
 import {printMugLogo} from './cup-print.js';
+import {diningPhase,mealSpoonPhase} from './dining-timing.js';
+export {diningPhase} from './dining-timing.js';
 
 const clamp=THREE.MathUtils.clamp,lerp=THREE.MathUtils.lerp;
 const smooth=value=>{const t=clamp(value,0,1);return t*t*(3-2*t);};
@@ -85,11 +87,6 @@ function mixPoint(points,phase){
   return points.at(-1)[1].clone();
 }
 
-export function diningPhase(time,duration){
-  const p=clamp(time/Math.max(duration,.1),0,1);
-  return{progress:clamp((p-.27)/.46,0,1),hold:smooth((p-.15)/.12)*(1-smooth((p-.73)/.12)),reach:smooth(p/.15)*(1-smooth((p-.85)/.15)),approach:smooth(p/.10)*(1-smooth((p-.90)/.10))};
-}
-
 function dockProp(root,prop,dock,hold,defaultPosition){
   const position=defaultPosition.clone(),rotation=new THREE.Quaternion();
   if(dock){
@@ -162,7 +159,7 @@ export function applyDiningPose(root,action,time,duration=action==='galley'?6:5,
   }
   bowl.visible=true;spoon.visible=true;
   bowl.position.set(-.095,lerp(1.04,1.215,ready),lerp(.16,.285,ready));bowl.rotation.set(0,0,.025);
-  const cycle=clamp((progress-.13)/.74,0,1)*2,phase=cycle===2?1:cycle%1;
+  const {cycle,phase}=mealSpoonPhase(progress);
   const scoop=bowl.position.clone().add(v(.025,.028,.009));
   const lifted=scoop.clone().add(v(.038,.10,.035)),atMouth=mouth.clone().add(v(0,.002,.014)),withdrawn=atMouth.clone().add(v(.065,-.085,.15));
   const tip=mixPoint([[0,scoop],[.17,lifted],[.43,atMouth],[.54,atMouth],[.76,withdrawn],[1,scoop]],phase);
