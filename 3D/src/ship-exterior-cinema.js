@@ -53,7 +53,7 @@ try{
   }
   if(!freshOpening)document.body.classList.remove('waiting-for-film');
   const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,
-    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending'),revision:query.get('revision')};
+    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending'),docking:query.get('docking'),revision:query.get('revision')};
   const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal');
   function drawView(shot,renderTarget,gasTarget){
     ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);

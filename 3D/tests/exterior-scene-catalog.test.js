@@ -29,9 +29,14 @@ test('every scene catalog link samples its advertised scene, including all 05 al
     assert.equal(play.searchParams.has('paused'),false);assert.equal(Number(play.searchParams.get('time')),entry.start);
   }
 });
-test('the current B ending is five percent faster while all earlier scenes and saved takes stay unchanged',()=>{
+test('the current B ending is five percent faster and scene 07 adopts right-below, while other earlier scenes and saved takes stay unchanged',()=>{
   const options={opening:true,approach:'bow',ending:'underside'},saved={...options,revision:CAMERA_REVISION};
-  for(const time of [0,15,43,54,64.8,73.75,77.5])assert.deepEqual(sampleExteriorCinemaFrame(time,options),sampleExteriorCinemaFrame(time,saved));
+  for(const time of [0,15,43,54,73.75,77.5])assert.deepEqual(sampleExteriorCinemaFrame(time,options),sampleExteriorCinemaFrame(time,saved));
+  const right=sampleExteriorCinema(64.8,options),left=sampleExteriorCinema(64.8,saved);
+  assert.ok(right.eye[0]>right.target[0]);assert.ok(left.eye[0]<left.target[0]);
+  for(const key of ['probe','shipX','angle','target','fov','start','end'])assert.deepEqual(right[key],left[key]);
+  const approved=EXTERIOR_SCENE_CATALOG.find(entry=>entry.id==='07-docking-right');
+  assert.equal(approved.status,'採用・現行');assert.deepEqual(approved.options,{});
   const start=78.75;
   for(const time of [start,82.75,87,100,150,300]){
     const current=sampleExteriorCinema(time,options),before=sampleExteriorCinema(time,saved);

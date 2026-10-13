@@ -17,8 +17,8 @@ export const CINEMA_SHOTS=Object.freeze([
   {id:'distant',number:3,name:'固定カメラ / 下から接近する探査機',mode:'fixed',duration:8,probeStage:'approach',
     eye:[[235,72,255]],target:[[0,8,0]],fov:38,wide:true},
   // Start 4.5 seconds into the original capture; hold for 2.5 seconds after contact.
-  {id:'lander',number:7,name:'船体下 / 探査機のドッキング',mode:'follow',duration:10.75,sourceOffset:4.5,sourceDuration:14.75,captureDuration:12,probeStage:'dock',
-    eye:[[-16,-10,24]],target:[[0,1,0]],fov:40,zoomTo:32,lander:true,fitAspect:true,hideHabitats:true},
+  {id:'lander',number:7,name:'右下から / 探査機のドッキング',mode:'follow',duration:10.75,sourceOffset:4.5,sourceDuration:14.75,captureDuration:12,probeStage:'dock',
+    eye:[[16,-10,24]],target:[[0,1,0]],fov:40,zoomTo:32,lander:true,fitAspect:true,hideHabitats:true},
   {id:'crossing',number:4,name:'超望遠 / 大きな惑星を背景に横切る船',mode:'fixed',duration:10,
     eye:[[0,7,2100]],target:[[0,0,0]],fov:3.5,wide:true,planet:[1600,-200,-78000],near:10,far:150000},
   {id:'mounted',number:5,name:'船体固定カメラ / 回転する重力区画',mode:'mounted',duration:8,
@@ -60,7 +60,7 @@ export const exteriorCinemaShots=(options={})=>options.revision==='20261013-r1'?
 
 // Pure time sampling: playback and seeking agree without accumulated camera
 // state. Unequal holds replace the identical start/stop tweens.
-function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase=55*Math.PI/180,rpm=EXTERIOR.rpm,penultimate=null,approach=null,ending=null}={},forcedIndex=null){
+function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase=55*Math.PI/180,rpm=EXTERIOR.rpm,penultimate=null,approach=null,ending=null,docking:dockingView=null}={},forcedIndex=null){
   const shots=exteriorCinemaShots({ending});
   const duration=opening?OPENING_DURATION:EXTERIOR_VIEW_DURATION;
   const elapsed=Math.max(0,Number.isFinite(seconds)?seconds:0);
@@ -75,7 +75,9 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   const alternative=Object.hasOwn(penultimateViews,penultimate)?penultimateViews[penultimate]:null;
   const shot=definition.id==='mounted'&&alternative?{...definition,...alternative}:
     definition.id==='distant'&&approach==='bow'?{...definition,...bowView,fov:definition.fov,wide:false,
-      name:'船首斜め下 / 探査機の接近・03の画角'}:definition;
+      name:'船首斜め下 / 探査機の接近・03の画角'}:
+    definition.id==='lander'&&dockingView==='left'?{...definition,eye:[[-16,-10,24]],
+      name:'左下から / 探査機のドッキング'}:definition;
   const shotDuration=shot.duration*timingScale,end=start+shotDuration,sourceOffset=(shot.sourceOffset??0)*timingScale;
   const sourceDuration=shot.sourceDuration===undefined?shotDuration+sourceOffset:shot.sourceDuration*timingScale;
   const u=Math.max(0,Math.min(1,(time-start+sourceOffset)/sourceDuration));

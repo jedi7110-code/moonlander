@@ -316,6 +316,29 @@ test('planet transit slides past a stationary planet while the tiny ship crosses
   assert.ok(Math.abs(after.shipX-before.shipX)<.001,'flight position stays continuous at the cut');
   assert.equal(after.planet,null);assert.equal(after.shipSpeed,EXTERIOR_CRUISE_SPEED);
 });
+test('scene 07 adopts the right-below camera by default and retains the left-below option without changing docking or dissolves',()=>{
+  const start=shotStart('lander'),end=start+CINEMA_SHOTS.find(s=>s.id==='lander').duration;
+  for(const aspect of [.6,16/9,2.4]){
+    const original={opening:true,aspect,docking:'left'},options={opening:true,aspect};
+    for(const seconds of [start,start+3,64.8,end-.1]){
+      const left=sampleExteriorCinema(seconds,original),right=sampleExteriorCinema(seconds,options);
+      assert.equal(right.number,7);assert.equal(right.id,'lander');
+      assert.ok(right.eye[0]>right.target[0]);assert.deepEqual(right,sampleExteriorCinema(seconds,{...options,docking:'right'}));
+      for(const key of ['target','fov','probe','shipX','angle','near','far','habitatsVisible','start','end'])assert.deepEqual(right[key],left[key]);
+      assert.deepEqual(right.eye.slice(1),left.eye.slice(1));
+      assert.ok(Math.abs((right.eye[0]-right.target[0])+(left.eye[0]-left.target[0]))<1e-9,'only the left/right camera offset is mirrored');
+    }
+    for(const seconds of [start-.5,end-.5]){
+      const before=sampleExteriorCinemaFrame(seconds,original),after=sampleExteriorCinemaFrame(seconds,options);
+      assert.equal(before.mix,after.mix);
+      for(const layer of ['from','to']){
+        assert.deepEqual(before[layer].probe,after[layer].probe);assert.equal(before[layer].shipX,after[layer].shipX);
+        if(before[layer].number!==7)assert.deepEqual(before[layer],after[layer]);
+      }
+    }
+    for(const seconds of [0,54,70,100])assert.deepEqual(sampleExteriorCinemaFrame(seconds,original),sampleExteriorCinemaFrame(seconds,options));
+  }
+});
 test('space is visible immediately, and scene changes never fade to black',()=>{
   assert.equal(sampleExteriorCinema(0).fade,0);assert.equal(sampleExteriorCinema(EXTERIOR_VIEW_DURATION).fade,0);
   assert.equal(sampleExteriorCinema(1).fade,0);
