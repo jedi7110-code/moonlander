@@ -2,6 +2,7 @@ import {FLOORS as sharedFloors,LADDER_X,STATIONS as sharedStations} from '../../
 
 export const DECK={OPERATIONS:0,HABITATION:1,LIFE_SUPPORT:2};
 export const FLOORS=sharedFloors.map((floor,index)=>({...floor,name:`LEVEL ${index+1}`}));
+export const CABIN_FLOOR_Y=FLOORS.map(floor=>(870-floor.y)*.016);
 const cabinFloor=floor=>floor===0?DECK.HABITATION:floor===1?DECK.OPERATIONS:floor;
 
 export const GYM={id:'gym',floor:2,x:840,need:'exercise',dur:16000};

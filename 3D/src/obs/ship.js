@@ -3,7 +3,7 @@ import {CABIN_LIGHT_COLOR,LADDER_LIGHT_LAYOUT} from './lighting.js';
 import {createDiningProps} from './dining.js';
 import {box,ball,cylinder,pipe,rod,label,batchStatic} from './materials.js';
 import {createGym} from './gym.js';
-import {DECK,FLOORS,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,LOUNGE_TABLE,CABIN_AISLE,HYDRO_TRAY,ASHTRAY} from './layout.js';
+import {DECK,FLOORS,CABIN_FLOOR_Y,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,LOUNGE_TABLE,CABIN_AISLE,HYDRO_TRAY,ASHTRAY} from './layout.js';
 import {createPlantRack} from './plants.js';
 import {catPort} from './cat-ports.js';
 import {createEVABay} from './eva.js';
@@ -40,7 +40,7 @@ import {createGalley} from './galley.js';
 import {paintFloorLevel} from './floor-level-marking.js';
 import {ACCESS_LADDER} from './layout.js';
 
-export const FLOOR_Y=[6.784,3.392,0];
+export const FLOOR_Y=CABIN_FLOOR_Y;
 // All rear rooms share the same full-width doorway and aligned centerline.
 export const REAR_ROOM_GATES=FLOOR_Y.map((floor,level)=>({...BULKHEAD_GATE,floor,room:['operations','laundry','stores'][level]}));
 export const positionX=x=>(x-700)*.022;

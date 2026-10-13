@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {box,cylinder,pipe,rod} from './materials.js';
 import {CABIN_LIGHT_COLOR} from './lighting.js';
 import {createRearRoomFurnishings} from './rear-room-furnishings.js';
-import {addRearSpaceWindow} from './bathroom-window.js';
+import {addRearSpaceWindow,OPERATIONS_REAR_WINDOW} from './bathroom-window.js';
 import {createOperationsFurnishings} from './galley-storage.js';
 
 export const BULKHEAD_GATE={x:-1.88,floor:6.784,width:1.82,height:2.42,bottom:.10,front:-1.36,back:-5.65};
@@ -73,7 +73,7 @@ export function createBulkheadGate(m,g=BULKHEAD_GATE,wearMaterials=m){
   roomBounds.union(new THREE.Box3().setFromObject(ceiling));
   if(g.room==='laundry'||g.room==='stores')box(root,m.enamel,g.x,y+1.35,g.back,2.23,2.66,.16);
   else addRearSpaceWindow(root,m,g.x,y,'Operations room',{
-    width:1.20,height:.82,y:1.51,wallBack:g.back-.08,wallDepth:.16,
+    ...OPERATIONS_REAR_WINDOW,wallBack:g.back-.08,wallDepth:.16,
     wallWidth:2.23,wallHeight:2.66,wallY:1.35,wallCut:0,wallMaterial:m.enamel,
   });
   for(const side of [-1,1]){

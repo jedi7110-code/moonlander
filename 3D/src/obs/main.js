@@ -25,6 +25,7 @@ import {updateFullscreenUI} from './fullscreen-ui.js';
 import {environmentDisplay} from './environment.js';
 import {HATCH_REPAIR_LABELS} from './hatch-repair.js';
 import {FLOORS} from './layout.js';
+import {exteriorCinema} from './exterior-session.js';
 
 const $=id=>document.getElementById(id);
 const CatFoodBowl=[
@@ -104,6 +105,8 @@ const games=new CabinLoungeGames({parent:$('observation'),refreshIcons,
   onMove(){audio.tone(340,.07,.02);},
   onResult(){brain.needs.fun=Math.min(100,brain.needs.fun+25);brain.rapport=Math.min(100,brain.rapport+5);}
 });
+const exterior=exteriorCinema;
+exterior.words=words;exterior.onChange=()=>visibilityChanged();
 care.onPhase=phase=>{
   if(phase==='queued'){pendingHQ=false;feedback.accept('console');}
   if(phase==='inbound'){showMessage(words('配送を受け付けた。補給ハッチへ搬入する。','Order received. Cargo is inbound to the supply hatch.'),'LOGISTICS');audio.tone(620,.15,.025);}
@@ -220,6 +223,7 @@ function setNeedDetails(key,restoreFocus=false){
 function localize(){
   document.documentElement.lang=getLang();document.querySelectorAll('[data-ja]').forEach(el=>el.textContent=el.dataset[getLang()]);
   $('obs-lang').textContent=words('EN','JA');$('obs-lang').setAttribute('aria-label',words('Switch to English','日本語に切り替え'));
+  $('obs-exterior').setAttribute('aria-label',words('船体外観','Ship exterior'));
   $('obs-input').placeholder=words('マイロに話しかける','Talk to Milo');$('obs-input').setAttribute('aria-label',$('obs-input').placeholder);
   for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   updateFullscreenUI(document,words,refreshIcons);
@@ -291,7 +295,7 @@ $('obs-sound').addEventListener('click',async()=>{
 });
 const unbindAudioGestures=bindCabinAudioGestures(audio,{
   // Tapping an initially-on mute button must not briefly start the sound first.
-  ignore:event=>Boolean(event.target?.closest?.('#obs-sound')),
+  ignore:event=>exterior.open||Boolean(event.target?.closest?.('#obs-sound')),
   onError:()=>showMessage(words('音声を開始できませんでした。もう一度タップしてください。','Tap again to start cabin audio.'),'SYSTEM'),
 });
 $('obs-chat').addEventListener('submit',event=>{
@@ -332,9 +336,13 @@ for(const mode of ['all','milo','cat','droid'])$('view-'+mode).addEventListener(
 $('follow-angle').addEventListener('click',()=>view?.characterCamera?.cycleAngle());
 $('first-person').addEventListener('click',()=>view?.characterCamera?.toggleFirstPerson());
 $('zoom-in').addEventListener('click',()=>view?.changeZoom(1.3));$('zoom-out').addEventListener('click',()=>view?.changeZoom(1/1.3));
+$('obs-exterior').addEventListener('click',async()=>{
+  if(games.open||exterior.open)return;await immersive?.exit();dismissMessage();setNeedDetails(null);exterior.show();
+});
 document.addEventListener('fullscreenchange',()=>updateFullscreenUI(document,words,refreshIcons));
 $('obs-fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('observation').requestFullscreen();}catch{showMessage(words('全画面に切り替えられませんでした。','Fullscreen is unavailable.'),'SYSTEM');}});
 document.addEventListener('keydown',event=>{
+  if(exterior.open)return;
   if(event.key==='Escape'&&selectedNeed){event.preventDefault();setNeedDetails(null,true);return;}
   if(games.open)return;
   if(event.key==='Escape'){dismissMessage();view?.setMode('all');return;}
@@ -343,7 +351,7 @@ document.addEventListener('keydown',event=>{
   const supply={f:'food',w:'water',c:'catfood'}[event.key.toLowerCase()];
   if(supply){event.preventDefault();useSupply(supply);}else if(event.code==='Space'){event.preventDefault();setPause(!paused);}
 });
-function visibilityChanged(){previous=performance.now();accumulator=0;audio.pause((immersive?.active?!immersive.visible:document.hidden)||paused||games.open);}
+function visibilityChanged(){previous=performance.now();accumulator=0;audio.pause((immersive?.active?!immersive.visible:document.hidden)||paused||games.open||exterior.open);}
 document.addEventListener('visibilitychange',visibilityChanged);
 window.addEventListener('pageshow',visibilityChanged);
 refreshIcons();localize();
@@ -410,7 +418,7 @@ async function start(){
     let firstVisibleFrame=true;
     function tick(now,xrFrame){
       const frameDt=Math.max(0,(now-previous)/1000),dt=Math.min(frameDt,.05);previous=now;
-      const visible=immersive.active?immersive.visible:!document.hidden;
+      const visible=!exterior.open&&(immersive.active?immersive.visible:!document.hidden);
       idleCamera.update(now,{blocked:immersive.active||paused||!visible||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
       if(!paused&&visible&&!games.open){
         accumulator+=dt;
@@ -427,8 +435,10 @@ async function start(){
       hudTime+=dt;if(hudTime>.15){updateHUD();hudTime=0;}
     }
     view.renderer.setAnimationLoop(tick);
-  }catch(error){console.error(error);$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
+    document.documentElement.dataset.cabinReadyMs=performance.now().toFixed(1);
+    exterior.hostReady();
+  }catch(error){console.error(error);exterior.hostReady();$('space-boot').hidden=true;$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
 }
 $('ship-view').addEventListener('webglcontextlost',event=>{event.preventDefault();setPause(true);$('obs-error').hidden=false;$('obs-error').textContent=words('映像接続が中断されました。ページを再読み込みしてください。','Graphics connection interrupted. Please reload the page.');});
-window.addEventListener('pagehide',event=>{audio.pause(true);if(!event.persisted){unbindAudioGestures();unbindStartupLighting?.();unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
-start();
+window.addEventListener('pagehide',event=>{audio.pause(true);if(!event.persisted){unbindAudioGestures();exterior.dispose();unbindStartupLighting?.();unbindIdleCamera?.();games.dispose();view?.dispose();audio.dispose();}});
+visibilityChanged();void start();

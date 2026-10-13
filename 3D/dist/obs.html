@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0d1112">
   <title>TARAIRON | 遠心重力生活区画 3D</title>
+  <style>#space-boot{position:fixed;inset:0;z-index:1100;background:#030609;pointer-events:none}#space-boot-sky{display:block;width:100%;height:100%}#space-boot[hidden]{display:none}</style>
   <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船内猫ルーシーの暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/3D/assets/favi.ico">
   <!-- Start the cabin assets alongside the script bundle instead of after it. crossorigin matches three's fetch/image requests. -->
@@ -37,34 +38,17 @@
   <link rel="preload" href="/3D/assets/obs/paxcreation-sports-print.webp" as="image" crossorigin>
   <link rel="preload" href="/3D/assets/obs/steel.webp" as="image" crossorigin>
   <link rel="preload" href="/3D/assets/obs/enamel.webp" as="image" crossorigin>
-  <script type="module" crossorigin src="/3D/assets/obs-C0C8yMmb.js"></script>
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-Cd8_WpuG.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CbMcTHFE.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/lighting-DOoxJiDc.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/triangle-subset-COD8ifsg.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/milo-body-j6bW6zWM.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/eva-zWAMbtt8.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/characters-CVEbXyru.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/grooming-RljRh_dm.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/droid-startup-Bkq9zhQQ.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/plant-state-04NGcDSI.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/droid-routine-DZS3wArE.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/smoking-visit-B8dTYGGt.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/industrial-D17HmOer.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/rear-room-furnishings-C8mnxnfH.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/cabin-toon-Cg0sBIeK.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/cargo-bay-BCjQVLYV.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/bathroom-window-Dy5yQNjB.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/service-parts-EXvVC-t2.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/ship-C8stXfMO.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/head-Ddb-6Foa.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/milo-toon-ehGwDakH.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/metal-deck-CSkvM2TB.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/environment-BUAZzoB2.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/hatch-repair-CXOyqFIg.js">
-  <link rel="stylesheet" crossorigin href="/3D/assets/obs-B2g7pKKP.css">
+  <script type="module" crossorigin src="/3D/assets/obs-RHw6J5ZO.js"></script>
+  <link rel="modulepreload" crossorigin href="/3D/assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/preload-helper-BRmpjvBv.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-cinema-ui-BpUBtI6r.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-session-D-hUKQ_f.js">
+  <link rel="stylesheet" crossorigin href="/3D/assets/exterior-cinema-ui-CkXJ3Oq9.css">
+  <link rel="stylesheet" crossorigin href="/3D/assets/obs-BxihKScU.css">
 </head>
-<body>
+<body data-space-scene="cabin">
+  <div id="space-boot" aria-hidden="true"><canvas id="space-boot-sky"></canvas></div>
+  <script type="module" src="/3D/assets/obs/exterior-loading.js"></script>
   <main id="observation">
     <header class="masthead">
       <a href="./" class="ship-brand"><h1><img class="ship-logo" src="/3D/assets/obs/tarairon-logo.svg?v=2" alt="TARAIRON" width="1427" height="754"></h1></a>
@@ -102,6 +86,7 @@
         <span class="tool-divider"></span>
         <button id="zoom-out" class="icon-button" data-tip="縮小" aria-label="縮小"><i data-lucide="minus"></i></button>
         <button id="zoom-in" class="icon-button" data-tip="拡大" aria-label="拡大"><i data-lucide="plus"></i></button>
+        <button id="obs-exterior" type="button" class="icon-button vr-button" aria-haspopup="dialog" aria-label="船体外観"><span data-ja="外観" data-en="Exterior">外観</span></button>
         <button id="obs-vr" type="button" class="icon-button vr-button" data-tip="立体表示 / Meta Quest" aria-label="立体表示 / Meta Quest" aria-pressed="false" disabled>3D</button>
         <button id="obs-fullscreen" class="icon-button" data-tip="全画面" aria-label="全画面" aria-pressed="false"><i data-lucide="maximize-2" aria-hidden="true"></i></button>
       </div></div>

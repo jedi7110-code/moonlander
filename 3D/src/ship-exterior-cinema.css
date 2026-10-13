@@ -1,0 +1,16 @@
+*{box-sizing:border-box}html,body,main{width:100%;height:100%;margin:0;overflow:hidden;background:#030609;color:#e0e5df;font-family:system-ui,sans-serif}canvas{display:block;width:100%;height:100%}[hidden]{display:none!important}
+#cut{position:absolute;inset:0;background:#030609;pointer-events:none}.letterbox{position:absolute;left:0;width:100%;height:8%;background:#030609;pointer-events:none}.top{top:0}.bottom{bottom:0}
+#status{position:absolute;inset:0;z-index:13;display:grid;place-items:center;background:#030609e8;font-size:13px;letter-spacing:.08em}
+#scene-number{position:absolute;z-index:14;top:max(18px,env(safe-area-inset-top));left:4%;color:#becbc9;font:500 11px ui-monospace,monospace;letter-spacing:.12em;pointer-events:none}
+.identity{position:absolute;inset:0;z-index:12;display:grid;place-items:center;pointer-events:none;opacity:.88;animation:console-logo-hold 5.2s linear both}
+.logo-wordmark{position:relative;width:min(62vw,720px);aspect-ratio:1417/120;filter:drop-shadow(0 0 1.5px #88ffaa8c) drop-shadow(0 0 5px #88ffaa47) drop-shadow(0 0 11px #88ffaa26)}
+.logo-reveal{position:absolute;inset:0;animation:console-logo-on 1.2s steps(10,end) .8s both}
+.logo-image{display:block;width:100%;height:100%;image-rendering:pixelated;animation:console-logo-flicker 4.5s .8s infinite}
+.logo-reveal::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,transparent 0 2px,#03060933 2px 3px)}
+/* Same ten-step top-to-bottom loading and phosphor flicker as Moon's console title. */
+@keyframes console-logo-on{from{clip-path:inset(0 0 100%)}to{clip-path:inset(0)}}
+@keyframes console-logo-flicker{0%,72%,74%,100%{opacity:1}73%{opacity:.85}}
+@keyframes console-logo-hold{0%,80.7692307692%{opacity:.88}100%{opacity:0}}
+nav{position:absolute;z-index:14;left:4%;bottom:2%;display:flex;align-items:center;gap:12px;width:92%;font-size:11px;color:#95a4ad}button,a{background:transparent;color:#d6ddd8;border:1px solid #66777d66;padding:7px 10px;border-radius:3px;font:inherit;cursor:pointer;text-decoration:none}button:hover,a:hover{background:#253139}button:focus-visible,a:focus-visible{outline:2px solid #f3d77d;outline-offset:3px}#time{margin-left:auto;font-variant-numeric:tabular-nums}
+#timeline{flex:1;min-width:40px;max-width:150px;accent-color:#9fb6c3}#time{white-space:nowrap}
+@media(max-width:600px){nav{gap:7px}.letterbox{height:6%}.logo-wordmark{width:76vw}}

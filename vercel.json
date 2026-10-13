@@ -21,6 +21,14 @@
       "destination": "/3D/dist/obs.html"
     },
     {
+      "source": "/3D/ship-exterior-cinema.html",
+      "destination": "/3D/dist/ship-exterior-cinema.html"
+    },
+    {
+      "source": "/3D/ship-exterior-study.html",
+      "destination": "/3D/dist/ship-exterior-study.html"
+    },
+    {
       "source": "/3D/sofa-study.html",
       "destination": "/3D/dist/sofa-study.html"
     },

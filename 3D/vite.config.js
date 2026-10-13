@@ -14,6 +14,8 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./src/index.html', import.meta.url)),
         obs: fileURLToPath(new URL('./src/obs.html', import.meta.url)),
+        shipExteriorStudy: fileURLToPath(new URL('./src/ship-exterior-study.html', import.meta.url)),
+        shipExteriorCinema: fileURLToPath(new URL('./src/ship-exterior-cinema.html', import.meta.url)),
         cabinAudioStudy: fileURLToPath(new URL('./src/cabin-audio-study.html', import.meta.url)),
         emergencyLightingStudy: fileURLToPath(new URL('./src/emergency-lighting-study.html', import.meta.url)),
         ladderStructureStudy: fileURLToPath(new URL('./src/ladder-structure-study.html', import.meta.url)),
