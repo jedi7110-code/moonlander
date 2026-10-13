@@ -20,7 +20,7 @@ function fixture(t){
     remove(){if(this.parent)this.parent.children=this.parent.children.filter(element=>element!==this);}
   }
   const parent=new Element('main'),trigger=new Element('button'),alreadyInert=new Element('div');alreadyInert.inert=true;parent.append(trigger,alreadyInert);
-  document={body:parent,activeElement:trigger,createElement:tag=>new Element(tag),getElementById:()=>null,addEventListener(){},removeEventListener(){}};
+  document={body:parent,documentElement:{dataset:{}},activeElement:trigger,createElement:tag=>new Element(tag),getElementById:()=>null,addEventListener(){},removeEventListener(){}};
   Object.assign(globalThis,{document,window:{addEventListener(){},removeEventListener(){}},location:{origin:'http://localhost',href:'http://localhost/3D/obs.html'}});
   const changes=[],ui=new ExteriorCinemaUI({parent,onChange:open=>changes.push(open)});
   t.after(()=>{ui.dispose();for(const [key,value]of Object.entries(previous)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}});
@@ -36,6 +36,21 @@ test('loading completion reveals the entry cue while the opening remains open',t
   f.ui.hostReady();assert.equal(f.ui.open,true);assert.equal(f.ui.closeButton.hidden,false);
   assert.equal(f.ui.closeButton.textContent,'クリックして船内映像を表示');
   assert.deepEqual(f.changes,[true]);
+});
+test('the cabin boot gate waits for playback rather than the sky or shader readiness',async t=>{
+  const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
+  let released=false;const waiting=f.ui.whenPlaying().then(()=>{released=true;});
+  f.message('space');f.message('ready');await Promise.resolve();assert.equal(released,false);
+  f.ui.message({origin:location.origin,source:{},data:{type:'tara-exterior',action:'playing'}});
+  await Promise.resolve();assert.equal(released,false,'another frame cannot start cabin loading');
+  f.message('playing');await waiting;
+  assert.equal(released,true);assert.ok(Number(f.document.documentElement.dataset.openingStartedMs)>0);
+  assert.equal(f.ui.hostIsReady,false,'playback does not falsely mark the cabin ready');
+});
+test('opening startup failure rejects the cabin boot gate',async t=>{
+  const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
+  const rejected=assert.rejects(f.ui.whenPlaying(),/Opening renderer could not start/);
+  f.message('failed');await rejected;
 });
 test('an old end-of-movie message never enters the cabin, and a click restores the host',t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});f.ui.hostReady();

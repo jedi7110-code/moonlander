@@ -8,6 +8,10 @@ export class ExteriorCinemaUI{
     this.parent=parent;this.onChange=onChange;this.words=words;this.open=false;
     this.message=event=>{if(this.frame&&cinemaMessageAccepted(event,this.frame,location.origin)){
       if(event.data.action==='space'||event.data.action==='ready')document.getElementById('space-boot')?.setAttribute('hidden','');
+      if(event.data.action==='playing'){
+        this.playing=true;document.documentElement.dataset.openingStartedMs=performance.now().toFixed(1);this.resolvePlaying?.();
+      }
+      if(event.data.action==='failed'){this.rejectPlaying?.(new Error('Opening renderer could not start'));}
       if(event.data.action==='exit')this.close();
     }};
     this.key=event=>{if(!this.open)return;if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();this.close();}
@@ -22,6 +26,10 @@ export class ExteriorCinemaUI{
   show({opening=false,cinematic=false,core=2.6,phase=55,rpm,waitForHost=false}={}){
     if(this.open)return;this.open=true;this.opening=opening;this.cinematic=opening||cinematic;this.focus=document.activeElement;
     this.hostIsReady=!waitForHost;
+    this.playing=false;
+    this.playingPromise=new Promise((resolve,reject)=>{this.resolvePlaying=resolve;this.rejectPlaying=reject;});
+    // A free exterior view has no boot consumer waiting for this promise.
+    this.playingPromise.catch(()=>{});
     this.shell=document.createElement('section');this.shell.className=`exterior-cinema-modal${opening?' opening':''}`;this.shell.tabIndex=-1;
     this.shell.setAttribute('role','dialog');this.shell.setAttribute('aria-modal','true');this.shell.setAttribute('aria-label',this.words('船体外観','Ship exterior'));
     this.frame=document.createElement('iframe');this.frame.title=this.cinematic?this.words('宇宙船の自動画角','Cinematic ship exterior'):this.words('船体外観の自由視点','Free view of the ship exterior');this.frame.allow='fullscreen';
@@ -42,6 +50,7 @@ export class ExteriorCinemaUI{
     this.hostIsReady=true;
     if(this.open){this.closeButton.textContent=this.buttonText();this.closeButton.hidden=false;}
   }
+  whenPlaying(){return this.playingPromise;}
   close({force=false}={}){
     if(!this.open)return;
     if(!force&&!this.hostIsReady)return;

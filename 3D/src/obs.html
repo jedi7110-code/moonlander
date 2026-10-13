@@ -9,7 +9,8 @@
   <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船内猫ルーシーの暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/assets/favi.ico">
   <link rel="stylesheet" href="/obs.css">
-  <!-- Start the cabin assets alongside the script bundle instead of after it. crossorigin matches three's fetch/image requests. -->
+  <!-- Activated only once the opening has presented its first moving frames. -->
+  <template id="cabin-preloads">
   <link rel="preload" href="/assets/obs/lucy/lucy-cabin.glb?v=20260915-approved-2" as="fetch" crossorigin>
   <link rel="preload" href="/assets/obs/lucy/lucy-approved.json?v=20260915-approved-2" as="fetch" crossorigin>
   <link rel="preload" href="/assets/obs/head/LeePerrySmith.glb" as="fetch" crossorigin>
@@ -39,6 +40,7 @@
   <link rel="preload" href="/assets/obs/paxcreation-sports-print.webp" as="image" crossorigin>
   <link rel="preload" href="/assets/obs/steel.webp" as="image" crossorigin>
   <link rel="preload" href="/assets/obs/enamel.webp" as="image" crossorigin>
+  </template>
 </head>
 <body data-space-scene="cabin">
   <div id="space-boot" aria-hidden="true"><canvas id="space-boot-sky"></canvas></div>

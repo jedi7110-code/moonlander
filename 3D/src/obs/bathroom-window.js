@@ -1,9 +1,9 @@
+import {BATHROOM_WINDOW,OPERATIONS_REAR_WINDOW} from './bathroom-window-layout.js';
+export {BATHROOM_WINDOW,OPERATIONS_REAR_WINDOW} from './bathroom-window-layout.js';
 import {ExtrudeGeometry,Mesh,MeshBasicMaterial,Path,Shape,ShapeGeometry} from 'three';
 import {cylinder} from './materials.js';
 import {SPACE_COLOR} from './space-stars.js';
 
-export const BATHROOM_WINDOW={width:.98,height:1.08,y:1.61,wallBack:-3.86,wallDepth:.12};
-export const OPERATIONS_REAR_WINDOW=Object.freeze({width:1.20,height:.82,y:1.51});
 const finishes=new WeakMap();
 
 function octagon(Type,w,h,cut,cy=0){

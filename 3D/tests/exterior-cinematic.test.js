@@ -193,6 +193,24 @@ test('the camera mounted on the hull has a fixed attachment and orientation, wit
     assert.ok(Math.abs(localA-localB)<1e-10);
   }
 });
+test('the optional bow view changes only scene 05 and keeps its moving dissolve and flight timing',()=>{
+  const start=shotStart('mounted'),end=start+CINEMA_SHOTS.find(s=>s.id==='mounted').duration;
+  const options={opening:true,penultimate:'bow'};
+  for(const seconds of [0,37,64.8,start-1,end+1,110])
+    assert.deepEqual(sampleExteriorCinemaFrame(seconds,options),sampleExteriorCinemaFrame(seconds,{opening:true}));
+  const a=sampleExteriorCinema(start+1,options),b=sampleExteriorCinema(end-1,options);
+  assert.equal(a.id,'mounted');assert.equal(a.mode,'fixed');assert.deepEqual(a.eye,b.eye);assert.deepEqual(a.target,b.target);
+  assert.ok(b.shipX>a.shipX,'the external observer sees the ship advance');
+  for(const seconds of [start-.5,start+1,end-.5]){
+    const changed=sampleExteriorCinemaFrame(seconds,options),original=sampleExteriorCinemaFrame(seconds,{opening:true});
+    assert.equal(changed.mix,original.mix,'the existing edit points stay fixed');
+    for(const key of ['from','to'])if(changed[key]){
+      for(const field of ['shipX','angle','probe','start','end','duration'])assert.deepEqual(changed[key][field],original[key][field]);
+    }
+  }
+  const expected=sampleExteriorCinemaFrame(start-.3,options);
+  sampleExteriorCinemaFrame(120,options);assert.deepEqual(sampleExteriorCinemaFrame(start-.3,options),expected);
+});
 test('planet transit slides past a stationary planet while the tiny ship crosses the frame',()=>{
   const start=shotStart('planet'),duration=CINEMA_SHOTS.find(s=>s.id==='planet').duration;
   const a=sampleExteriorCinema(start+.5,{opening:true}),b=sampleExteriorCinema(start+duration-.5,{opening:true});

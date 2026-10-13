@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import {createExteriorShip,EXTERIOR} from './obs/ship-exterior.js';
+import {createExteriorMothership,EXTERIOR} from './obs/exterior-mothership.js';
 import {createExteriorOptics} from './obs/exterior-optics.js';
 import {createDistantStars} from './obs/exterior-stars.js';
 import {createExteriorPlanet} from './obs/exterior-planet.js';
-import {sampleExteriorCinemaFrame} from './obs/exterior-cinematic.js';
+import {sampleExteriorCinemaFrame,CINEMA_SHOTS,CINEMA_DISSOLVE_SECONDS} from './obs/exterior-cinematic.js';
 import {createExteriorDissolve} from './obs/exterior-dissolve.js';
 import {applyExteriorProbePose} from './obs/exterior-probe-flight.js';
 import {createExteriorShadow} from './obs/exterior-shadow.js';
@@ -23,8 +23,8 @@ try{
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   const dissolve=createExteriorDissolve(renderer);
-  const ship=createExteriorShip();ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
-  const gasPass=createExteriorGasPass(renderer,ship.probeThrusters.gas);
+  const ship=createExteriorMothership();ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
+  let gasPass=null;
   const optics=createExteriorOptics(ship),stars=createDistantStars();scene.add(stars.haze,stars.field,new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
   const planet=createExteriorPlanet();scene.add(planet.body);
   const sun=new THREE.DirectionalLight(0xfff2d4,3.15),shadows=createExteriorShadow(sun,ship);
@@ -32,8 +32,25 @@ try{
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),target=new THREE.Vector3(),size=new THREE.Vector2();
   let time=Math.max(0,Number(query.get('time'))||0),running=query.get('paused')!=='1',last=0,frame=0,disposed=false;
   const freshOpening=opening&&time===0&&running;
+  let probeReady=false,probeLoading=null,playingFrames=0;
+  // A fresh opening waits at the beginning of the probe's incoming dissolve
+  // if a very slow load hasn't finished, so it never appears midway through flight.
+  const probeDeadline=CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(shot=>shot.probeStage==='approach'))
+    .reduce((seconds,shot)=>seconds+shot.duration,0)-CINEMA_DISSOLVE_SECONDS/2;
+  async function prepareProbe(){
+    if(probeLoading)return probeLoading;
+    document.documentElement.dataset.probeLoadStartedMs=performance.now().toFixed(1);
+    return probeLoading=(async()=>{
+      await ship.prepareProbe();if(disposed)return;
+      ship.dockedLander.visible=false;
+      gasPass=createExteriorGasPass(renderer,ship.probeThrusters.gas);
+      await renderer.compileAsync(scene,camera);if(disposed)return;
+      probeReady=true;document.documentElement.dataset.probeReadyMs=performance.now().toFixed(1);
+    })();
+  }
   if(!freshOpening)document.body.classList.remove('waiting-for-film');
-  const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm};
+  const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,
+    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate')};
   const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal');
   function drawView(shot,renderTarget,gasTarget){
     ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
@@ -45,7 +62,8 @@ try{
     planet.show(shot.planet?.position);
     shadows.update(shot);bounce.position.set(shot.shipX-38,-15,-30);bounce.target.position.set(shot.shipX,0,0);
     stars.follow(camera);renderer.getDrawingBufferSize(size);optics.update(camera,size,shot.optics);
-    return gasPass.render(scene,camera,renderTarget,gasTarget);
+    if(gasPass)return gasPass.render(scene,camera,renderTarget,gasTarget);
+    renderer.render(scene,camera);return false;
   }
   function draw(){
     const film=sampleExteriorCinemaFrame(time,{...options,aspect:camera.aspect}),shot=film.shot;
@@ -72,7 +90,11 @@ try{
   $('play').onclick=()=>play(!running);$('restart').onclick=()=>{time=0;play(true);};play(running);
   $('timeline').oninput=()=>{time=Number($('timeline').value);play(false);};
   // Keep the lightweight sky over the renderer until the first real frames settle.
-  draw();ship.root.visible=true;await renderer.compileAsync(scene,camera);
+  // A seek into the probe shots needs the complete model before its first draw.
+  // A fresh opening starts with only the mother ship and the decoded logo.
+  if(!freshOpening)await prepareProbe();
+  draw();ship.root.visible=true;
+  await Promise.all([renderer.compileAsync(scene,camera),document.querySelector('.logo-image').decode()]);
   document.documentElement.dataset.shipReadyMs=performance.now().toFixed(1);
   if(freshOpening)await new Promise(resolve=>{
     let previous=0,steady=0;const start=performance.now();
@@ -91,12 +113,23 @@ try{
   function tick(now){
     if(disposed)return;frame=requestAnimationFrame(tick);
     if(document.hidden){last=0;return;}
-    if(running&&last)time+=Math.max(0,(now-last)/1000);last=now;
+    if(running&&last){
+      time+=Math.max(0,(now-last)/1000);
+      if(!probeReady)time=Math.min(time,probeDeadline);
+    }last=now;
     draw();
+    if(running&&++playingFrames===2){
+      document.documentElement.dataset.filmStartedMs=performance.now().toFixed(1);tell('playing');
+      // Start the probe after the film has actually presented moving frames.
+      if(freshOpening)void prepareProbe().catch(error=>{
+        if(disposed)return;console.error(error);play(false);
+        $('status').hidden=false;$('status').textContent='探査機の準備に失敗しました。再読み込みしてください。';
+      });
+    }
   }
   frame=requestAnimationFrame(tick);
   const visibility=()=>{last=performance.now();};document.addEventListener('visibilitychange',visibility);
   cleanup=()=>{disposed=true;cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();dissolve.dispose();optics.dispose();stars.dispose();planet.dispose();ship.dispose();renderer.dispose();renderer.forceContextLoss();};
   $('exterior-view').addEventListener('webglcontextlost',event=>{if(disposed)return;event.preventDefault();play(false);$('status').hidden=false;$('status').textContent='映像接続が中断されました。船内へ戻って再度お試しください。';});
-}catch(error){console.error(error);$('status').hidden=false;$('cinema-controls').hidden=false;$('status').textContent='船体映像を開けませんでした。船内へ戻って再度お試しください。';}
+}catch(error){console.error(error);tell('failed');$('status').hidden=false;$('cinema-controls').hidden=false;$('status').textContent='船体映像を開けませんでした。船内へ戻って再度お試しください。';}
 window.addEventListener('pagehide',event=>{if(!event.persisted)cleanup();});

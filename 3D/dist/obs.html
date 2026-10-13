@@ -8,7 +8,8 @@
   <style>#space-boot{position:fixed;inset:0;z-index:1100;background:#030609;pointer-events:none}#space-boot-sky{display:block;width:100%;height:100%}#space-boot[hidden]{display:none}</style>
   <meta name="description" content="母艦タライロンの遠心重力生活区画。マイロと船内猫ルーシーの暮らしを、三層の局所断面から見守る。バラマンディは母艦に所属する着陸船。">
   <link rel="icon" href="/3D/assets/favi.ico">
-  <!-- Start the cabin assets alongside the script bundle instead of after it. crossorigin matches three's fetch/image requests. -->
+  <!-- Activated only once the opening has presented its first moving frames. -->
+  <template id="cabin-preloads">
   <link rel="preload" href="/3D/assets/obs/lucy/lucy-cabin.glb?v=20260915-approved-2" as="fetch" crossorigin>
   <link rel="preload" href="/3D/assets/obs/lucy/lucy-approved.json?v=20260915-approved-2" as="fetch" crossorigin>
   <link rel="preload" href="/3D/assets/obs/head/LeePerrySmith.glb" as="fetch" crossorigin>
@@ -38,11 +39,11 @@
   <link rel="preload" href="/3D/assets/obs/paxcreation-sports-print.webp" as="image" crossorigin>
   <link rel="preload" href="/3D/assets/obs/steel.webp" as="image" crossorigin>
   <link rel="preload" href="/3D/assets/obs/enamel.webp" as="image" crossorigin>
-  <script type="module" crossorigin src="/3D/assets/obs-B2vm0pDN.js"></script>
+  </template>
+  <script type="module" crossorigin src="/3D/assets/obs-FEeg7fmL.js"></script>
   <link rel="modulepreload" crossorigin href="/3D/assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/preload-helper-BRmpjvBv.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-cinema-ui-BpUBtI6r.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-session-D-hUKQ_f.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-cinema-ui-DJwo_I31.js">
   <link rel="stylesheet" crossorigin href="/3D/assets/exterior-cinema-ui-CkXJ3Oq9.css">
   <link rel="stylesheet" crossorigin href="/3D/assets/obs-BxihKScU.css">
 </head>

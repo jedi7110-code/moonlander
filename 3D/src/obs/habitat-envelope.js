@@ -1,7 +1,7 @@
 import {CABIN_FLOOR_Y,getStation} from './layout.js';
 import {VIEWING_WALL,viewingWallWindow,viewingWallPanelX} from './viewing-wall-profile.js';
-import {BATHROOM_WINDOW,OPERATIONS_REAR_WINDOW} from './bathroom-window.js';
-import {BULKHEAD_GATE} from './bulkhead-gate.js';
+import {BATHROOM_WINDOW,OPERATIONS_REAR_WINDOW} from './bathroom-window-layout.js';
+import {BULKHEAD_GATE} from './bulkhead-gate-layout.js';
 
 // This is a one-to-one enclosure for the existing OBS cabin, in metres.
 // Cabin +Y points toward the rotation axis. Rotate it by PI about X so the

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_AMBIENCE,limitCabinLights,limitShadowCasters} from './lighting.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials,createStaticShadowProxy} from './materials.js';
-import {buildShip,positionX,positionY,HABITAT_VIEW} from './ship.js';
+import {buildShip,buildShipInBackground,positionX,positionY,HABITAT_VIEW} from './ship.js';
 import {createMilo,animateMilo} from './characters.js';
 import {loadCabinLucy as loadLucy,createCabinLucy as createLucy,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
 import {currentAction} from './state.js';
@@ -51,7 +51,9 @@ export class ObservationView {
     const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy({deferGroomCache}),loadEVAGarment(),loadMiloBody()]);
     head.userData.setAppearance({hair:'crop',beard:'none'});
     const deckStyle=floorBuilder?null:createMetalDeckStyle();
-    const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor});
+    Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
+    const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor});
+    const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip});
     view.deckStyle=deckStyle;
     try{
       finishCabinFixtures(view);
@@ -67,7 +69,7 @@ export class ObservationView {
       return view;
     }catch(error){view.dispose();throw error;}
   }
-  constructor(canvas,m,head,lucy,{floorBuilder}={}){
+  constructor(canvas,m,head,lucy,{floorBuilder,builtShip}={}){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,stencil:true,powerPreference:'high-performance'});
     this.renderer.localClippingEnabled=true;
@@ -79,7 +81,7 @@ export class ObservationView {
     this.scene.add(new THREE.HemisphereLight(CABIN_AMBIENCE.sky,CABIN_AMBIENCE.ground,CABIN_AMBIENCE.ambient));
     const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
-    this.ship=buildShip(m,{floorBuilder});limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
+    this.ship=builtShip??buildShip(m,{floorBuilder});limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
     this.shadowProxy=createStaticShadowProxy(this.ship.staticMesh);if(this.shadowProxy)this.scene.add(this.shadowProxy);
     this.droidBay=createDroidChargingBay(positionY(FLOORS[DROID_DOCK.floor].y));this.scene.add(this.droidBay.root);
     this.droidService=createDroidServiceRig(this.droidBay,this.ship);this.scene.add(this.droidService.root);

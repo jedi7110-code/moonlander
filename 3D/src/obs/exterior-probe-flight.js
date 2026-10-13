@@ -51,6 +51,7 @@ export function sampleExteriorProbeKinematics(seconds,{advance=0,...options}={})
 }
 
 export function applyExteriorProbePose(ship,pose){
+  if(!ship.dockedLander)return;
   ship.dockedLander.visible=pose.visible;
   ship.dockedLander.position.fromArray(pose.position);
   ship.dockedLander.rotation.fromArray(pose.rotation);

@@ -1,3 +1,5 @@
+import {BULKHEAD_GATE} from './bulkhead-gate-layout.js';
+export {BULKHEAD_GATE} from './bulkhead-gate-layout.js';
 import * as THREE from 'three';
 import {box,cylinder,pipe,rod} from './materials.js';
 import {CABIN_LIGHT_COLOR} from './lighting.js';
@@ -5,7 +7,6 @@ import {createRearRoomFurnishings} from './rear-room-furnishings.js';
 import {addRearSpaceWindow,OPERATIONS_REAR_WINDOW} from './bathroom-window.js';
 import {createOperationsFurnishings} from './galley-storage.js';
 
-export const BULKHEAD_GATE={x:-1.88,floor:6.784,width:1.82,height:2.42,bottom:.10,front:-1.36,back:-5.65};
 
 function gateOutline(width,height,bottom,g){
   const {x,floor}=g,cut=Math.min(width*.19,height*.18),lo=floor+bottom,hi=lo+height;

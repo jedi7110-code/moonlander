@@ -313,7 +313,7 @@ export function createDiningStation(m,action){
   return{root,propsRoot,docks,stationX};
 }
 
-export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createDeckFloor}={}) {
+function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDeckFloor}={}) {
   const m=industrialMaterials(sourceMaterials);
   const staticRoot=new THREE.Group(),animated=new THREE.Group(),targets=[];
   // Leave clearance behind the fitted jambs: aperture reveal faces must not
@@ -344,7 +344,8 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     for(let i=0;i<27;i++)if(side<0||.11+i*.37<airlockBottom||.11+i*.37>airlockTop)box(staticRoot,m.dark,side*13.40,.11+i*.37,-.25,.18,.1,1.73,.012);
     pipe(staticRoot,m.dark,[[side*13.63,.20,-.65],[side*13.65,1,-.65],[side*13.65,8.8,-.65],[side*13.15,10.1,-.65]],.115);
   }
-  FLOOR_Y.forEach((y,level)=>{
+  yield;
+  for(const [level,y]of FLOOR_Y.entries()){
     const floor=floorBuilder(m,y,level);
     paintFloorLevel(floor,FLOORS[level].name,y);staticRoot.add(floor);
     for(let xx=-11.8;xx<12.5;xx+=1.52){
@@ -364,12 +365,14 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     }
     addIndustrialDeck(staticRoot,m,y,level,{floorDetails:floorBuilder===createDeckFloor});
     addWorkLights(animated,y,level);
-  });
+    yield;
+  }
   let laundryMirrorRoom=null;
   for(const g of REAR_ROOM_GATES){
     gateWall(staticRoot,m.enamel,{left:-3.435,right:-.405,bottom:g.floor+.07,top:g.floor+2.81,z:-1.68,depth:.12,openingClearance:.02,gates:[g]});
     const gate=createBulkheadGate(m,g,sourceMaterials);staticRoot.add(gate.root);animated.add(gate.lights);
     if(gate.mirrorRoom)laundryMirrorRoom=gate.mirrorRoom;
+    yield;
   }
   const groomingStation=createVanity(m,createMachinedMetals()),groomingGate=REAR_ROOM_GATES[DECK.HABITATION];
   groomingStation.mirrorRoom=laundryMirrorRoom;
@@ -380,6 +383,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   for(const mount of [groomingStation.mirror,...Object.values(groomingStation.docks)])animated.attach(mount);
   const catPorts=FLOOR_Y.map((y,level)=>catPort(staticRoot,m,positionX(CAT_PORT.x),y,level,animated));
   // The upper shaft is a visible continuation, not an additional playable deck.
+  yield;
   const ladder=createAccessLadder(m);staticRoot.add(ladder);
   animated.attach(ladder.getObjectByName('Ladder work lights'));
 
@@ -387,6 +391,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   const bathrooms={shower:createBathroom(staticRoot,animated,m,positionX(240),habitation,'shower'),toilet:createBathroom(staticRoot,animated,m,positionX(380),habitation,'toilet')};
   const bunk=createBunk(m);bunk.root.position.set(positionX(510),habitation,0);animated.add(bunk.root);
   cupboard(staticRoot,m,2.1,habitation,-1.14,1.54,2.31);
+  yield;
   const lounge=createLounge(m);lounge.position.y=habitation;staticRoot.add(lounge);
   const loungeBounds=new THREE.Box3().setFromObject(lounge).expandByScalar(.06);
   const loungeProps=lounge.userData.loungeProps;
@@ -396,11 +401,13 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   const wallLogo=new THREE.Mesh(new THREE.PlaneGeometry(1.13,1.13*754/1427),m.taraironLogo);
   wallLogo.name='TARAIRON panel logo';wallLogo.position.set(4.06,habitation+1.5,-1.255);staticRoot.add(wallLogo);
 
+  yield;
   const consoleMaterials=createConsoleMaterials(),consoleScreens=new ConsoleScreens();
   for(let i=0;i<3;i++)consoleUnit(staticRoot,m,consoleMaterials,consoleScreens,-10.2+i*1.63,operations,1.56,i);
   chair(staticRoot,m,-8.8,operations,.82,Math.PI);
   const aiRack=createAIServiceRack(m);aiRack.root.position.set(-4.57,operations,-1.41);staticRoot.add(aiRack.root);
   animated.add(createScreenGlow());
+  yield;
   const medical=createMedicalBay(m,operations);staticRoot.add(medical.root);
   animated.attach(medical.bed);animated.attach(medical.rig.root);
   const evaBay=createEVABay(m,operations);staticRoot.add(evaBay.root);
@@ -408,10 +415,12 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   const outerSignal=evaBay.hatch.userData.signal;
   animated.attach(innerDoor);
 
+  yield;
   const diningStations=Object.fromEntries(['galley','hydro'].map(action=>[action,createDiningStation(m,action)]));
   for(const station of Object.values(diningStations)){staticRoot.add(station.root);animated.add(station.propsRoot);}
   const diningDocks=Object.fromEntries(Object.entries(diningStations).map(([action,station])=>[action,station.docks]));
   const incinerator=createWasteIncinerator(m);animated.add(incinerator.root);
+  yield;
   const plants=createPlantRack(m,positionX(PLANT.x));animated.add(plants.root);
   const gym=createGym(m,positionX(GYM.x));animated.add(gym.root);
   const gymServiceX=1.90;
@@ -424,6 +433,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     for(const side of [-1,1]){const weight=cylinder(staticRoot,m.black,x+side*.14,y,-1.1,.085,.08,.085,12);weight.rotation.z=Math.PI/2;weight.name='Gym dumbbell weight';}
   }
   engine(staticRoot,m,5.65,0);
+  yield;
   const supplyHatch=hatch(staticRoot,animated,m,positionX(1110),0);
   staticRoot.add(createCargoStowage(m));
   const bowlX=positionX(CAT_BOWL.x),bowlY=FLOOR_Y[CAT_BOWL.floor],bowlZ=CAT_BOWL.depth;
@@ -432,6 +442,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
   const foodGroup=new THREE.Group();foodGroup.position.set(bowlX,bowlY,bowlZ);animated.add(foodGroup);
   const catFood=new THREE.MeshStandardMaterial({name:'Cat food / brown kibble',color:CAT_BOWL.foodColor,roughness:.9});
   for(let i=0;i<18;i++){const a=i*2.4,r=.025+Math.sqrt(i/18)*.13;ball(foodGroup,catFood,Math.cos(a)*r,CAT_BOWL.foodHeight,Math.sin(a)*r,.025,.018,.022);}
+  yield;
   const ventilation=createCargoVentilation(m),fan=ventilation.rotor;
   staticRoot.add(ventilation.root);animated.add(fan);
   const cargo=[],catFoodPackage=m.catFoodPackage??createCatFoodMaterial();
@@ -462,6 +473,7 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     if(!['lounge','grooming','smoking'].includes(id))group.position.z=1.75;
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
+  yield;
   const dressing=addCabinDressing(staticRoot,m,FLOOR_Y);
   for(const {name,variant,x,floor,scale,height,z=-1.35,heightScale=scale} of [
     {name:'Bunk service parts / cassette',variant:'cassette',x:-4.2,floor:DECK.HABITATION,scale:.43,height:1.95},
@@ -473,13 +485,25 @@ export function buildShip(sourceMaterials,{mergeStatic=true,floorBuilder=createD
     panel.name=name;panel.position.set(x,FLOOR_Y[floor]+height,z);
     panel.scale.set(scale,heightScale,scale);staticRoot.add(panel);
   }
+  yield;
   const gateFinish=finishGateFrames(staticRoot,REAR_ROOM_GATES);
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
   animated.add(createRearWindowStars(staticRoot));
+  yield;
   const staticMesh=mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
   return {staticMesh,animated,targets,indicators,cargo,catFoodPackage,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
+}
+
+// Synchronous studies/tests and the paced startup share the exact same builder.
+export function buildShip(sourceMaterials,options){
+  const steps=buildShipSteps(sourceMaterials,options);
+  let step;do{step=steps.next();}while(!step.done);return step.value;
+}
+export async function buildShipInBackground(sourceMaterials,{nextFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))),...options}={}){
+  const steps=buildShipSteps(sourceMaterials,options);
+  for(;;){const step=steps.next();if(step.done)return step.value;await nextFrame();}
 }

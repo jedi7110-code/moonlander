@@ -1,4 +1,4 @@
-import {EXTERIOR,exteriorAngle} from './ship-exterior.js';
+import {EXTERIOR,exteriorAngle} from './exterior-mothership.js';
 import {EXTERIOR_CRUISE_SPEED} from './exterior-cruise.js';
 import {sampleExteriorLogo} from './exterior-logo.js';
 import {sampleExteriorProbeFlight} from './exterior-probe-flight.js';
@@ -30,10 +30,14 @@ export const EXTERIOR_VIEW_DURATION=OPENING_DURATION*4/3;
 export const CINEMA_DISSOLVE_SECONDS=1.5;
 const lerp=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
 const sample=(points,u)=>points.length===1?[...points[0]]:lerp(points[0],points[1],u);
+// Optional study of scene 05. Keep the approved film's timing and flight path;
+// this changes only the penultimate observer when the preview selects it.
+const bowView=Object.freeze({name:'船首斜め下 / 母艦とドッキング済み探査機',mode:'fixed',
+  eye:[[60,-18,50]],target:[[2,-1,0]],fov:44,core:true,fitAspect:true});
 
 // Pure time sampling: playback and seeking agree without accumulated camera
 // state. Unequal holds replace the identical start/stop tweens.
-function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase=55*Math.PI/180,rpm=EXTERIOR.rpm}={},forcedIndex=null){
+function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase=55*Math.PI/180,rpm=EXTERIOR.rpm,penultimate=null}={},forcedIndex=null){
   const duration=opening?OPENING_DURATION:EXTERIOR_VIEW_DURATION;
   const elapsed=Math.max(0,Number.isFinite(seconds)?seconds:0);
   const time=elapsed;
@@ -43,7 +47,8 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
     const previous=CINEMA_SHOTS[index],hold=previous.duration*timingScale;
     distance+=(hold-(previous.flightOrigin??0))*(previous.speed??EXTERIOR_CRUISE_SPEED);start+=hold;index++;
   }
-  const shot=CINEMA_SHOTS[index],shotDuration=shot.duration*timingScale,end=start+shotDuration,sourceOffset=(shot.sourceOffset??0)*timingScale;
+  const definition=CINEMA_SHOTS[index],shot=definition.id==='mounted'&&penultimate==='bow'?{...definition,...bowView}:definition;
+  const shotDuration=shot.duration*timingScale,end=start+shotDuration,sourceOffset=(shot.sourceOffset??0)*timingScale;
   const sourceDuration=shot.sourceDuration===undefined?shotDuration+sourceOffset:shot.sourceDuration*timingScale;
   const u=Math.max(0,Math.min(1,(time-start+sourceOffset)/sourceDuration));
   const fov=shot.zoomTo===undefined?shot.fov:shot.fov+(shot.zoomTo-shot.fov)*u;
