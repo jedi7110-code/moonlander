@@ -1,3 +1,5 @@
+import {BufferGeometry} from 'three';
+import {finishPreparationSteps} from '../../src/obs/background-preparation.js';
 import { Float32BufferAttribute, Matrix3, Vector3 } from 'three';
 import { createWhiskerRootOffsets } from './whisker-roots.js';
 
@@ -13,23 +15,27 @@ export function whiskerPadOffset(x,y,z) {
   return [Math.sign(x)*.0022*mask,(y-.1668)*.07*mask,.0044*mask];
 }
 
-export function addLucyWhiskerPads(root) {
+export function addLucyWhiskerPads(root){return finishPreparationSteps(addLucyWhiskerPadsSteps(root));}
+export function* addLucyWhiskerPadsSteps(root) {
   let coat;
   root.traverse(mesh=>{if(mesh.isSkinnedMesh&&mesh.material?.name==='Lucy calico coat')coat=mesh;});
-  root.traverse(mesh=>{
-    if(!['Lucy calico coat','Whiskers'].includes(mesh.material?.name)) return;
-    if(mesh.morphTargetDictionary?.WhiskerPads!==undefined) return;
+  const meshes=[];root.traverse(mesh=>{if(mesh.isMesh)meshes.push(mesh);});
+  for(const mesh of meshes){
+    if(!['Lucy calico coat','Whiskers'].includes(mesh.material?.name)) continue;
+    if(mesh.morphTargetDictionary?.WhiskerPads!==undefined) continue;
     const roots=mesh.material.name==='Whiskers'?createWhiskerRootOffsets(coat,mesh,whiskerPadOffset):null;
     const offset=roots?.offset??whiskerPadOffset;
     if(roots)mesh.userData.whiskerRoots=roots.anchors;
-    const geometry=mesh.geometry.clone(),a=geometry.attributes.position;
+    const geometry=new BufferGeometry().copy({...mesh.geometry,morphAttributes:{}}),a=geometry.attributes.position;
+    geometry.morphAttributes=Object.fromEntries(Object.entries(mesh.geometry.morphAttributes).map(([key,values])=>[key,[...values]]));
     const offsets=new Float32Array(a.count*3);
-    for(let i=0;i<a.count;i++) offsets.set(offset(a.getX(i),a.getY(i),a.getZ(i),i),i*3);
+    for(let i=0;i<a.count;i++){if(i%512===0)yield;offsets.set(offset(a.getX(i),a.getY(i),a.getZ(i),i),i*3);}
     const normals=new Float32Array(offsets.length);
     // Transform the existing smooth normals by the deformation's Jacobian.
     // Recomputing them on UV/color-split triangles creates hard muzzle seams.
     const normalMatrix=new Matrix3(),before=new Vector3(),after=new Vector3(),epsilon=.00001;
     for(let i=0;i<a.count;i++) {
+      if(i%512===0)yield;
       if(!offsets[i*3]&&!offsets[i*3+1]&&!offsets[i*3+2]) continue;
       const point=[a.getX(i),a.getY(i),a.getZ(i)];
       const derivatives=[0,1,2].map(axis=>{
@@ -53,5 +59,5 @@ export function addLucyWhiskerPads(root) {
     mesh.geometry=geometry;mesh.updateMorphTargets();
     mesh.morphTargetDictionary={...dictionary,WhiskerPads:oldCount};
     mesh.morphTargetInfluences=[...influences,1];
-  });
+  }
 }

@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import {CABIN_LIGHT_COLOR,LADDER_LIGHT_LAYOUT} from './lighting.js';
 import {createDiningProps} from './dining.js';
-import {box,ball,cylinder,pipe,rod,label,batchStatic} from './materials.js';
+import {box,ball,cylinder,pipe,rod,label,batchStaticSteps} from './materials.js';
 import {createGym} from './gym.js';
 import {DECK,FLOORS,CABIN_FLOOR_Y,GYM,PLANT,CAT_PORT,CAT_BOWL,STATIONS,getStation,LOUNGE_SEAT,LOUNGE_TABLE,CABIN_AISLE,HYDRO_TRAY,ASHTRAY} from './layout.js';
 import {createPlantRack} from './plants.js';
 import {catPort} from './cat-ports.js';
-import {createEVABay} from './eva.js';
+import {createEVABaySteps} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
 import {createBunk} from './bunk.js';
 import {industrialMaterials,addIndustrialDeck,addWorkLights} from './industrial.js';
 import {BULKHEAD_GATE,gateWall,createBulkheadGate} from './bulkhead-gate.js';
-import {addCabinDressing} from './cabin-dressing.js';
+import {addCabinDressingSteps} from './cabin-dressing.js';
 import {configurePocketShutter,addPocketShutterFrame} from './shutter.js';
 import {HATCH_TRAVEL} from './delivery.js';
 import {paintSupplyLedge} from './supply-ledge.js';
@@ -410,7 +410,8 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
   yield;
   const medical=createMedicalBay(m,operations);staticRoot.add(medical.root);
   animated.attach(medical.bed);animated.attach(medical.rig.root);
-  const evaBay=createEVABay(m,operations);staticRoot.add(evaBay.root);
+  yield;
+  const evaBay=yield* createEVABaySteps(m,operations);staticRoot.add(evaBay.root);
   const innerDoor=evaBay.innerHatch.userData.door,innerSignal=evaBay.innerHatch.userData.signal;
   const outerSignal=evaBay.hatch.userData.signal;
   animated.attach(innerDoor);
@@ -474,7 +475,7 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
     targets.push(mesh);animated.add(mesh,group);indicators[id]={group,material};
   });
   yield;
-  const dressing=addCabinDressing(staticRoot,m,FLOOR_Y);
+  const dressing=yield* addCabinDressingSteps(staticRoot,m,FLOOR_Y);
   for(const {name,variant,x,floor,scale,height,z=-1.35,heightScale=scale} of [
     {name:'Bunk service parts / cassette',variant:'cassette',x:-4.2,floor:DECK.HABITATION,scale:.43,height:1.95},
     {name:'Gym service parts / manifold',variant:'manifold',x:gymServiceX,floor:DECK.LIFE_SUPPORT,scale:.48,height:1.95},
@@ -492,7 +493,7 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
   animated.add(createRearWindowStars(staticRoot));
   yield;
-  const staticMesh=mergeStatic?batchStatic(staticRoot,{xrLOD:true}):staticRoot;
+  const staticMesh=mergeStatic?(yield* batchStaticSteps(staticRoot,{xrLOD:true})):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
   return {staticMesh,animated,targets,indicators,cargo,catFoodPackage,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
@@ -505,5 +506,10 @@ export function buildShip(sourceMaterials,options){
 }
 export async function buildShipInBackground(sourceMaterials,{nextFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))),...options}={}){
   const steps=buildShipSteps(sourceMaterials,options);
-  for(;;){const step=steps.next();if(step.done)return step.value;await nextFrame();}
+  const timings=[];
+  for(;;){
+    const start=performance.now(),step=steps.next();timings.push(Math.round(performance.now()-start));
+    if(globalThis.document?.documentElement)document.documentElement.dataset.cabinShipAssemblyMs=JSON.stringify(timings);
+    if(step.done)return step.value;await nextFrame();
+  }
 }

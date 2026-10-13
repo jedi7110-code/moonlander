@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import './bump-scale-compat.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -195,10 +196,15 @@ function indexedCopy(source){
 }
 
 // Ship fixtures are static; merge by material so rivets and switches stay inexpensive.
-export function batchStatic(root,{xrLOD=false}={}) {
+export function batchStatic(root,options){return finishPreparationSteps(batchStaticSteps(root,options));}
+export function* batchStaticSteps(root,{xrLOD=false}={}) {
   root.updateMatrixWorld(true);
   const grouped=new Map();
-  root.traverse(mesh=>{if(!mesh.isMesh || Array.isArray(mesh.material))return;const geometry=indexedCopy(mesh.geometry);geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
+  const sources=[];root.traverse(mesh=>{if(mesh.isMesh&&!Array.isArray(mesh.material))sources.push(mesh);});
+  let batchStart=performance.now();
+  for(const mesh of sources){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
+    const geometry=indexedCopy(mesh.geometry);geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
     if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[],wide:[]});
     const group=grouped.get(key);group.geometries.push(geometry);
     if(xrLOD){
@@ -207,8 +213,11 @@ export function batchStatic(root,{xrLOD=false}={}) {
       // little to the silhouette. Keep labels and thin but long structural parts.
       if(geometry.boundingBox.getSize(new THREE.Vector3()).length()>=.16||mesh.material.name.startsWith('Sign:'))group.wide.push({source:mesh.geometry,matrix:mesh.matrixWorld.clone()});
     }
-  });
-  const merged=new THREE.Group();for(const {mat,geometries,wide} of grouped.values()){const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;
+  }
+  yield;
+  batchStart=performance.now();
+  const merged=new THREE.Group();for(const {mat,geometries,wide} of grouped.values()){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;
     registerMirrorSections(geometry,geometries);
     if(xrLOD)deferXRWideGeometry(mesh,wide);
     merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
@@ -237,13 +246,19 @@ function deferXRWideGeometry(mesh,sources){
 // identical shadow in a single draw, while the batches keep receiving shadows.
 // Three (r158) calls onBeforeRender in every visible pass but not in its shadow pass,
 // so an empty draw range there keeps the proxy out of all visible views.
-export function createStaticShadowProxy(batches){
+export function createStaticShadowProxy(batches){return finishPreparationSteps(createStaticShadowProxySteps(batches));}
+export function* createStaticShadowProxySteps(batches){
   const casters=batches.children.filter(({isMesh,castShadow,material:mat})=>isMesh&&castShadow&&!Array.isArray(mat)&&
     mat.side===THREE.FrontSide&&mat.shadowSide==null&&!mat.transparent&&!(mat.alphaTest>0)&&!mat.alphaMap);
   if(!casters.length)return null;
   batches.updateMatrixWorld(true);
-  const geometry=mergeGeometries(casters.map(mesh=>new THREE.BufferGeometry()
-    .setAttribute('position',mesh.geometry.attributes.position.clone()).setIndex(mesh.geometry.index.clone()).applyMatrix4(mesh.matrixWorld)),false);
+  const parts=[];let batchStart=performance.now();
+  for(const mesh of casters){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
+    parts.push(new THREE.BufferGeometry().setAttribute('position',mesh.geometry.attributes.position.clone()).setIndex(mesh.geometry.index.clone()).applyMatrix4(mesh.matrixWorld));
+  }
+  yield;
+  const geometry=mergeGeometries(parts,false);parts.forEach(part=>part.dispose());
   for(const mesh of casters)mesh.castShadow=false;
   const proxy=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial());
   proxy.name='Cabin shadow proxy';proxy.castShadow=true;proxy.frustumCulled=false;

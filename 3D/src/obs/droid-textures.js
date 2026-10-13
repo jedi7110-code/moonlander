@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import {DataTexture,RGBAFormat,SRGBColorSpace,LinearFilter,LinearMipmapLinearFilter} from 'three';
 
 // Small deterministic bitmap atlases. Rivets, vents, scratches and tube glass
@@ -26,12 +27,14 @@ function bitmap(width,height){
 
 export const DROID_TILES=Object.freeze({paint:0,dark:1,steel:2,bright:3,copper:4,rubber:5,bearing:6,vent:7,circuit:8,panel:9,limb:10,neck:11,brass:12,cloth:13,headRear:14,foot:15});
 
-export function createDroidSurfaceAtlas(){
+export function createDroidSurfaceAtlas(){return finishPreparationSteps(createDroidSurfaceAtlasSteps());}
+export function* createDroidSurfaceAtlasSteps(){
   const b=bitmap(512,512),n=128;
   // Muted grey-green covers separate the droid from the pale cabin wall panels.
   const colors=[[128,136,126],[39,45,40],[96,106,103],[155,169,167],[116,70,47],[26,31,28],[74,82,76],[116,125,116],[48,57,48],[132,140,126],[119,130,120],[79,91,84],[165,137,69],[174,177,156],[128,136,126],[106,117,106]];
   let seed=3817;const random=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
   for(let tile=0;tile<16;tile++){
+    yield;
     const x0=tile%4*n,y0=Math.floor(tile/4)*n,c=colors[tile];
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){
       const edge=Math.min(x,y,127-x,127-y),grain=(random()-.5)*9,stain=Math.sin(x*.08+y*.03)*Math.sin(y*.07)*6;
@@ -91,9 +94,11 @@ export function createDroidBatteryAtlas(){
   return b.texture();
 }
 
-export function createDroidFaceAtlas(names,paths){
+export function createDroidFaceAtlas(names,paths){return finishPreparationSteps(createDroidFaceAtlasSteps(names,paths));}
+export function* createDroidFaceAtlasSteps(names,paths){
   const b=bitmap(1024,512),size=256;
-  names.forEach((name,index)=>{
+  for(const [index,name]of names.entries()){
+    yield;
     const ox=index%4*size,oy=Math.floor(index/4)*size;
     for(let y=0;y<size;y++)for(let x=0;x<size;x++){
       const light=Math.max(0,1-Math.hypot((x-128)/160,(y-123)/140));b.pixel(ox+x,oy+y,[10+light*10,13+light*4,12+light*1]);
@@ -118,6 +123,6 @@ export function createDroidFaceAtlas(names,paths){
       const a=convert(path[i-1]),c=convert(path[i]);
       b.line(...a,...c,9,[218,56,8],.07);b.line(...a,...c,5,[255,84,14],.16);b.line(...a,...c,2.7,[255,125,33],.65);b.line(...a,...c,1.1,[255,214,139]);
     }
-  });
+  }
   return b.texture();
 }

@@ -4,14 +4,33 @@ import {sampleExteriorLogo} from './exterior-logo.js';
 import {sampleExteriorProbeFlight} from './exterior-probe-flight.js';
 import {sampleExteriorCinema as sampleSavedCinema,sampleExteriorCinemaFrame as sampleSavedFrame,
   exteriorCinemaShots as savedShots} from './exterior-cinematic-20261013-r1.js';
+import {sampleExteriorCinema as samplePreviousCinema,sampleExteriorCinemaFrame as samplePreviousFrame,
+  exteriorCinemaShots as previousShots} from './exterior-cinematic-20261013-r2.js';
+
+import {sampleExteriorCinema as sampleLowCinema,sampleExteriorCinemaFrame as sampleLowFrame,
+  exteriorCinemaShots as lowShots} from './exterior-cinematic-20261013-r3.js';
+
+import {sampleExteriorCinema as sampleFastCinema,sampleExteriorCinemaFrame as sampleFastFrame,
+  exteriorCinemaShots as fastShots} from './exterior-cinematic-20261013-r4.js';
+
+import {sampleExteriorCinema as sampleFullCinema,sampleExteriorCinemaFrame as sampleFullFrame,
+  exteriorCinemaShots as fullShots} from './exterior-cinematic-20261013-r5.js';
+
+import {sampleExteriorCinema as sampleLevelCinema,sampleExteriorCinemaFrame as sampleLevelFrame,
+  exteriorCinemaShots as levelShots} from './exterior-cinematic-20261013-r6.js';
+
+import {sampleExteriorCinema as sampleEntryCinema,sampleExteriorCinemaFrame as sampleEntryFrame,
+  exteriorCinemaShots as entryShots} from './exterior-cinematic-20261013-r7.js';
 
 // Distinguish an observer in space from a camera bolted to the hull. The
 // second observer slides sideways; the other fixed shots stay in place. The opening approach
 // tilts at a fixed position; flight stays at 2 m/s apart from the two flyovers
 // and extreme-wide planet transit.
 export const CINEMA_SHOTS=Object.freeze([
-  {id:'overhead',number:1,name:'ティルト / 斜め上から・奥から手前へ接近',mode:'tilt',duration:38,speed:10.12*.97,flightOrigin:5.9,anchor:0,probeStage:'away',
-    eye:[[315,115,35]],target:[[0,0,0]],tilt:[44.1,60],fov:42,near:5},
+  // The 1.5s dissolve starts at 36s, centred on the 36.75s edit point.
+  // Trim the hold while retaining the original 38s tilt motion.
+  {id:'overhead',number:1,name:'ティルト / 斜め上から・奥から手前へ接近',mode:'tilt',duration:36.75,sourceDuration:38,speed:10.12*.97,flightOrigin:5.9,anchor:0,probeStage:'away',
+    eye:[[315,115,35]],target:[[0,0,0]],tilt:[44.1,60],tiltOffset:-1,tiltOffsetStart:11.4,tiltOffsetDuration:8,fov:42,near:5},
   {id:'planet',number:2,name:'横移動カメラ / 惑星を横切る遥かな船',mode:'lateral',duration:12,speed:48,probeStage:'away',cameraSlide:[-120,120],cameraOffset:260,
     eye:[[0,350,3900]],target:[[0,100,0]],fov:42,wide:true,planet:true,near:5,far:60000},
   {id:'distant',number:3,name:'固定カメラ / 下から接近する探査機',mode:'fixed',duration:8,probeStage:'approach',
@@ -52,10 +71,16 @@ const penultimateViews=Object.freeze({
 // when the eight-second slide eases out, before the ship starts receding again.
 const undersideEndingShots=Object.freeze([...CINEMA_SHOTS.slice(0,-2),{
   ...CINEMA_SHOTS.at(-2),...penultimateViews.underside,id:'underside-ending',mode:'tracking',
-  name:'船底から見送り / 彼方へエンドレス航行',duration:68,speed:EXTERIOR_CRUISE_SPEED*1.05,cameraDuration:8,near:1,far:1e8,
+  name:'船底から少し下の高さへ / 斜め下からエンドレス航行を見送る',duration:68,speed:EXTERIOR_CRUISE_SPEED*1.05,cameraDuration:8,cameraSourceOffset:4.5,compensateCameraEnd:true,flightScale:.95,settleDuration:16,settleEye:[-4,-10,14],settleTarget:[3,0,0],near:1,far:1e8,
   optics:{strength:.34,streakRatio:2.4,haloRatio:.14},
 }]);
 export const exteriorCinemaShots=(options={})=>options.revision==='20261013-r1'?savedShots(options):
+  options.revision==='20261013-r2'?previousShots(options):
+  options.revision==='20261013-r3'?lowShots(options):
+  options.revision==='20261013-r4'?fastShots(options):
+  options.revision==='20261013-r5'?fullShots(options):
+  options.revision==='20261013-r6'?levelShots(options):
+  options.revision==='20261013-r7'?entryShots(options):
   options.ending==='underside'?undersideEndingShots:CINEMA_SHOTS;
 
 // Pure time sampling: playback and seeking agree without accumulated camera
@@ -82,22 +107,35 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   const sourceDuration=shot.sourceDuration===undefined?shotDuration+sourceOffset:shot.sourceDuration*timingScale;
   const u=Math.max(0,Math.min(1,(time-start+sourceOffset)/sourceDuration));
   const fov=shot.zoomTo===undefined?shot.fov:shot.fov+(shot.zoomTo-shot.fov)*u;
-  const cameraU=shot.cameraDuration===undefined?u:Math.max(0,Math.min(1,(time-start)/(shot.cameraDuration*timingScale)));
+  // Scene 05 enters at the approved source angle while the film edit stays fixed.
+  const cameraElapsed=time-start+(shot.cameraSourceOffset??0)*timingScale;
+  const cameraU=shot.cameraDuration===undefined?u:Math.max(0,Math.min(1,cameraElapsed/(shot.cameraDuration*timingScale)));
   const cameraProgress=shot.cameraEase?cameraU*cameraU*(3-2*cameraU):cameraU;
   let eye=sample(shot.eye,cameraProgress),target=sample(shot.target,cameraProgress);
+  if(shot.settleEye){
+    // After the broad slide, rise smoothly, stopping below hull height. Keep world X fixed
+    // so the accelerated ship continues passing the observer without slowing.
+    const riseU=Math.max(0,Math.min(1,(cameraElapsed-shot.cameraDuration*timingScale)/(shot.settleDuration*timingScale)));
+    const rise=riseU*riseU*(3-2*riseU);
+    eye=lerp(eye,shot.settleEye,rise);target=lerp(target,shot.settleTarget,rise);
+  }
   if(shot.tilt){
     // A vertical tilt changes pitch only: position, horizontal bearing and
     // focal length stay fixed while the real ship grows as it approaches.
     // Ease into the tilt over empty space, then hold one speed through the
     // logo and hull arrival. Accelerate later to finish at the chosen pitch.
-    const elapsed=Math.max(0,Math.min(shotDuration,time-start));
+    const elapsed=Math.max(0,Math.min(sourceDuration,time-start));
     const reveal=shot.flightOrigin??0,rate=.3,ease=1.2,steadyUntil=15*timingScale;
     const advance=t=>t<ease?rate*ease*((t/ease)**3-(t/ease)**4/2):rate*(t-ease/2);
     const initialPitch=shot.tilt[0]-advance(reveal),steadyPitch=initialPitch+advance(steadyUntil);
-    const after=Math.max(0,elapsed-steadyUntil),remaining=shotDuration-steadyUntil;
+    const after=Math.max(0,elapsed-steadyUntil),remaining=sourceDuration-steadyUntil;
     const acceleration=(shot.tilt[1]-steadyPitch-rate*remaining)/(remaining*remaining);
     const pitchDegrees=elapsed<=steadyUntil?initialPitch+advance(elapsed):steadyPitch+rate*after+acceleration*after*after;
-    const pitch=pitchDegrees*Math.PI/180;
+    // Settle the new upward framing after the original logo/ship reveal.
+    // A gradual offset avoids an angle jump or an earlier hull appearance.
+    const offsetU=shot.tiltOffsetDuration?Math.max(0,Math.min(1,(elapsed-shot.tiltOffsetStart*timingScale)/(shot.tiltOffsetDuration*timingScale))):1;
+    const offset=(shot.tiltOffset??0)*offsetU*offsetU*(3-2*offsetU);
+    const pitch=(pitchDegrees+offset)*Math.PI/180;
     target[1]=eye[1]-Math.hypot(target[0]-eye[0],target[2]-eye[2])*Math.tan(pitch);
   }
   if(shot.core){eye=eye.map((v,i)=>i===0?(v-EXTERIOR.rotorX)*coreScale+EXTERIOR.rotorX:v*coreScale);target=target.map((v,i)=>i===0?(v-EXTERIOR.rotorX)*coreScale+EXTERIOR.rotorX:v*coreScale);}
@@ -109,12 +147,28 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
     const fit=Math.max(1,1/Math.max(.25,aspect)),size=shot.wide?Math.max(1,coreScale/2.6):1;
     eye=eye.map((v,i)=>target[i]+(v-target[i])*fit*size);
   }
-  const shipSpeed=shot.speed??EXTERIOR_CRUISE_SPEED;
+  let shipSpeed=shot.speed??EXTERIOR_CRUISE_SPEED;
   // Incoming shots already move during the overlap before their nominal start.
   // The first ship is already approaching outside the frame during the logo.
   // Negative flight time places it farther away instead of hiding a stopped hull.
-  const flightTime=time-start-(shot.flightOrigin??0);
-  const shipX=distance+flightTime*shipSpeed;
+  const flightTime=cameraElapsed-(shot.flightOrigin??0);
+  let flightDistance=flightTime*shipSpeed;
+  if(shot.compensateCameraEnd){
+    // In the second half of the smoothstep slide, camera speed falls from its
+    // peak to zero. Add exactly that lost speed to the hull's forward motion.
+    // Integrate the ramp analytically: seeking and playback share one path,
+    // and neither position nor velocity jumps when the camera settles.
+    const moveSeconds=shot.cameraDuration*timingScale,rampSeconds=moveSeconds/2;
+    const fit=shot.fitAspect?Math.max(1,1/Math.max(.25,aspect)):1;
+    const cameraTravel=(shot.eye[0][0]-shot.eye[1][0])*(shot.core?coreScale:1)*fit;
+    const gain=Math.max(0,cameraTravel)*1.5/moveSeconds;
+    const rampElapsed=Math.max(0,flightTime-rampSeconds),progress=Math.min(1,rampElapsed/rampSeconds);
+    shipSpeed+=gain*progress*progress;
+    flightDistance+=gain*(rampSeconds*progress**3/3+Math.max(0,rampElapsed-rampSeconds));
+  }
+  // Scale flight and its acceleration together without changing the camera path.
+  shipSpeed*=shot.flightScale??1;flightDistance*=shot.flightScale??1;
+  const shipX=distance+flightDistance;
   // Anchor the observer at the shot midpoint. Scene 02 then slides the
   // camera and its target together, keeping its bearing fixed as the ship passes.
   const cameraX=['fixed','tilt','lateral'].includes(shot.mode)?distance+(shot.anchor??shotDuration/2*shipSpeed)+(shot.cameraOffset??0):shipX;
@@ -147,12 +201,24 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
 }
 
 export function sampleExteriorCinema(seconds,options){return options?.revision==='20261013-r1'?
-  sampleSavedCinema(seconds,options):sampleCinemaShot(seconds,options);}
+  sampleSavedCinema(seconds,options):options?.revision==='20261013-r2'?
+  samplePreviousCinema(seconds,options):options?.revision==='20261013-r3'?
+  sampleLowCinema(seconds,options):options?.revision==='20261013-r4'?
+  sampleFastCinema(seconds,options):options?.revision==='20261013-r5'?
+  sampleFullCinema(seconds,options):options?.revision==='20261013-r6'?
+  sampleLevelCinema(seconds,options):options?.revision==='20261013-r7'?
+  sampleEntryCinema(seconds,options):sampleCinemaShot(seconds,options);}
 
 // Dissolves straddle each existing edit point. Both viewpoints advance on the
 // same film clock, so pausing, seeking and slow loading never freeze a layer.
 export function sampleExteriorCinemaFrame(seconds,options){
   if(options?.revision==='20261013-r1')return sampleSavedFrame(seconds,options);
+  if(options?.revision==='20261013-r2')return samplePreviousFrame(seconds,options);
+  if(options?.revision==='20261013-r3')return sampleLowFrame(seconds,options);
+  if(options?.revision==='20261013-r4')return sampleFastFrame(seconds,options);
+  if(options?.revision==='20261013-r5')return sampleFullFrame(seconds,options);
+  if(options?.revision==='20261013-r6')return sampleLevelFrame(seconds,options);
+  if(options?.revision==='20261013-r7')return sampleEntryFrame(seconds,options);
   const shot=sampleCinemaShot(seconds,options),half=CINEMA_DISSOLVE_SECONDS/2;
   let boundary,index;
   if(shot.index>0&&shot.time<shot.start+half){boundary=shot.start;index=shot.index-1;}

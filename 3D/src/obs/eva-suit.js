@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {box,ball,cylinder,pipe,label} from './materials.js';
 import {createEVAHelmet,EVA_HELMET,helmetHoseSocket} from './eva-helmet.js';
@@ -108,11 +109,13 @@ function chestPlate(parent,m,index){
   for(const [x,y,r]of [[-.043,1.432,.027],[.043,1.432,.027],[0,1.368,.028]])socket(parent,m,x,y,.117,r);
   label(parent,`EVA-${String(index+1).padStart(2,'0')}`,0,1.541,.117,.099,.024,{size:50,fg:'#d9dfd7',bg:'#283031'});
 }
-export function hangingSuit(materials,index){
+export function hangingSuit(materials,index){return finishPreparationSteps(hangingSuitSteps(materials,index));}
+export function* hangingSuitSteps(materials,index){
   const red=index===1,m=variant(materials,red),suit=new THREE.Group();
   suit.name=`EVA suit ${index+1}`;suit.userData={suitNumber:index+1,colorway:red?'red':'white',anatomy:'reference-reconstructed-v2',joints:EVA_BODY};
   buildTailoredBody(suit,m);lifeSupport(suit,m);cylinder(suit,m.evaPaint,0,1.151,-.054,.196,.018,.196,48).scale.z=.69;
   for(const side of [-1,1]){
+    yield;
     legEquipment(suit,m,side);glove(suit,m,side);
     const port=new THREE.Group();port.position.set(side*.354,1.407,-.064);port.rotation.y=side*Math.PI/2;suit.add(port);socket(port,m,0,0,0,.029);
     shoulderHarness(suit,m,[[side*.110,1.621,-.030],[side*.146,1.572,.035],[side*.160,1.496,.082],[side*.132,1.323,.110]]);
@@ -125,6 +128,7 @@ export function hangingSuit(materials,index){
   cylinder(collarRoot,m.dark,0,0,0,.140,.064,.133,48).name='Wide helmet locking collar';
   for(const y of [-.020,.014])ring(collarRoot,m.rubber,[0,y,0],.139,.0045,[0,1,0]);
   for(const side of [-1,1])box(collarRoot,m.metal,side*.039,-.004,.136,.018,.025,.009,.002);
+  yield;
   const helmet=createEVAHelmet(m,{red});suit.add(helmet);chestPlate(suit,m,index);finishEVAGarment(suit,m.evaCloth);
   pipe(suit,m.metal,[[.145,1.60,-.26],[.145,2.075,-.30],[0,2.115,-.31],[0,2.15,-.31]],.014).name='Suspension support';
   pipe(suit,m.metal,[[0,2.15,-.31],[0,2.24,-.31],[0,2.265,-.39],[0,2.18,-.43]],.014).name='Suspension hook';return suit;

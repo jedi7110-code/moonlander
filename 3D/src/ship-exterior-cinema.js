@@ -8,7 +8,7 @@ import {createExteriorDissolve} from './obs/exterior-dissolve.js';
 import {applyExteriorProbePose} from './obs/exterior-probe-flight.js';
 import {createExteriorShadow} from './obs/exterior-shadow.js';
 import {createExteriorGasPass} from './obs/exterior-gas-pass.js';
-import {EXTERIOR_LOGO} from './obs/exterior-logo.js';
+import {EXTERIOR_LOGO,LOGO_SETTLED} from './obs/exterior-logo.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),opening=query.get('mode')==='opening',embedded=query.get('embedded')==='1';
 const tell=action=>{if(embedded)parent.postMessage({type:'tara-exterior',action},location.origin);};
 if(embedded)$('cabin').hidden=true;
@@ -33,7 +33,8 @@ try{
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),target=new THREE.Vector3(),size=new THREE.Vector2();
   let time=Math.max(0,Number(query.get('time'))||0),running=query.get('paused')!=='1',last=0,frame=0,disposed=false;
   const freshOpening=opening&&time===0&&running;
-  let probeReady=false,probeLoading=null,playingFrames=0,introFinishedFrames=0;
+  let probeReady=false,probeLoading=null,playingFrames=0,logoResolvedFrames=0,introFinishedFrames=0;
+  const openingFrames={};
   const logoPlayback={maxFrameMs:0,skippedBands:0,frames:0,lastReveal:0};
   let logoMeasured=false;
   // A fresh opening waits at the beginning of the probe's incoming dissolve
@@ -128,12 +129,23 @@ try{
       if(freshOpening&&time<EXTERIOR_LOGO.end&&time+dt>=EXTERIOR_LOGO.start){
         logoPlayback.maxFrameMs=Math.max(logoPlayback.maxFrameMs,Math.round(dt*10000)/10);logoPlayback.frames++;
       }
+      if(freshOpening&&time<38){
+        const second=Math.floor(time),bucket=openingFrames[second]??={frames:0,maxFrameMs:0,slowFrames:0};
+        bucket.frames++;bucket.maxFrameMs=Math.max(bucket.maxFrameMs,Math.round(dt*10000)/10);
+        if(dt>.05)bucket.slowFrames++;
+        document.documentElement.dataset.openingFrames=JSON.stringify(openingFrames);
+      }
       time+=dt;
       if(!probeReady)time=Math.min(time,probeDeadline);
     }last=now;
     draw();
     if(running&&++playingFrames===2){
       document.documentElement.dataset.filmStartedMs=performance.now().toFixed(1);tell('playing');
+    }
+    // Let the ten-band reveal finish and reach the screen before beginning
+    // paced cabin assembly during the logo hold. Probe setup starts later.
+    if(running&&freshOpening&&time>=LOGO_SETTLED&&++logoResolvedFrames===2){
+      document.documentElement.dataset.logoResolvedMs=performance.now().toFixed(1);tell('logo-resolved');
     }
     // Present two frames with the logo fully faded before releasing expensive
     // CPU/GPU preparation. The network preloads already run in the parent.

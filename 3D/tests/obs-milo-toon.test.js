@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {MeshStandardMaterial,ShaderLib,Vector3} from 'three';
+import {Group,Mesh,MeshPhysicalMaterial,MeshStandardMaterial,ShaderLib,SphereGeometry,Texture,Vector3} from 'three';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {setLadderHandFit} from '../src/obs/ladder-hand-fit.js';
@@ -58,4 +58,21 @@ test('Milo study preserves garment, tattoo, injury and deformation shaders throu
   const restored=cloneMiloSkinGeometry(body);
   assert.deepEqual(restored.attributes.position.array,positions,'style toggles preserve the neutral skin beneath the elbow crease');restored.dispose();
   body.skeleton.dispose();
+});
+
+test('toon preparation shares live texture references without serializing their images',()=>{
+  const texture=new Texture();texture.toJSON=()=>{throw new Error('Image encoding must not run during preparation');};
+  const material=new MeshStandardMaterial();material.userData.fabricMap=texture;
+  const root=new Group(),mesh=new Mesh(new SphereGeometry(.1,8,4),material);root.add(mesh);
+  const toon=createMiloToon(root);
+  try{assert.equal(mesh.material.userData.fabricMap,texture);}
+  finally{toon.dispose();mesh.geometry.dispose();material.dispose();texture.dispose();}
+});
+
+test('paced material copying preserves physical eye getters and the wet cornea response',()=>{
+  const material=new MeshPhysicalMaterial({clearcoat:1,clearcoatRoughness:.08,ior:1.4,transmission:.15});
+  const root=new Group(),mesh=new Mesh(new SphereGeometry(.1,8,4),material);mesh.name='Fitted Milo eye surface';root.add(mesh);
+  const toon=createMiloToon(root);
+  try{for(const key of ['clearcoat','clearcoatRoughness','ior','transmission','reflectivity'])assert.equal(mesh.material[key],material[key],key);}
+  finally{toon.dispose();mesh.geometry.dispose();material.dispose();}
 });

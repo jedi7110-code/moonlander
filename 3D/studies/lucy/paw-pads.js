@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from '../../src/obs/background-preparation.js';
 import { BufferGeometry, Float32BufferAttribute, Uint16BufferAttribute,
   Mesh, MeshBasicMaterial, MeshStandardMaterial, DoubleSide, Raycaster,
   Vector3, Triangle, SkinnedMesh, Box3 } from 'three';
@@ -5,7 +6,8 @@ import { triangleSubset } from '../../src/obs/triangle-subset.js';
 
 // Small fitted skin patches, not spheres stuck through the feet. Sample both
 // the sole and its rig weights so the pads follow the same wrist/toe surface.
-export function addLucyPawPads(root) {
+export function addLucyPawPads(root){return finishPreparationSteps(addLucyPawPadsSteps(root));}
+export function* addLucyPawPadsSteps(root) {
   if(root.getObjectByName('Lucy paw pad front L central')) return;
   let source;
   root.traverse(m => {if(m.material?.name === 'Lucy calico coat') source = m;});
@@ -35,6 +37,7 @@ export function addLucyPawPads(root) {
       ['toe 4',.030,.1527,.0020,.0025],
     ];
     for(const [label,cx,cz,rx,rz] of layout) {
+      yield;
       // Samples reach radius 1 times the 1.105 contour; keep a small margin.
       const reach=1.11,footprint=new Box3(new Vector3(sign*cx-rx*reach-1e-4,-Infinity,cz+shiftZ-rz*reach-1e-4),new Vector3(sign*cx+rx*reach+1e-4,Infinity,cz+shiftZ+rz*reach+1e-4));
       const inspection=new Mesh(triangleSubset(source.geometry,footprint,soleIndices),inspectionMaterial);

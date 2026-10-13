@@ -11,11 +11,14 @@ export class ExteriorCinemaUI{
       if(event.data.action==='playing'){
         this.playing=true;document.documentElement.dataset.openingStartedMs=performance.now().toFixed(1);this.resolvePlaying?.();
       }
+      if(event.data.action==='logo-resolved'){
+        document.documentElement.dataset.openingLogoResolvedMs=performance.now().toFixed(1);this.resolveLogoResolved?.();
+      }
       if(event.data.action==='intro-finished'){
         document.documentElement.dataset.openingIntroFinishedMs=performance.now().toFixed(1);this.resolveIntroFinished?.();
       }
       if(event.data.action==='failed'){
-        const error=new Error('Opening renderer could not start');this.rejectPlaying?.(error);this.rejectIntroFinished?.(error);
+        const error=new Error('Opening renderer could not start');this.rejectPlaying?.(error);this.rejectLogoResolved?.(error);this.rejectIntroFinished?.(error);
       }
       if(event.data.action==='exit')this.close();
     }};
@@ -33,6 +36,8 @@ export class ExteriorCinemaUI{
     this.hostIsReady=!waitForHost;
     this.playing=false;
     this.playingPromise=new Promise((resolve,reject)=>{this.resolvePlaying=resolve;this.rejectPlaying=reject;});
+    this.logoResolvedPromise=new Promise((resolve,reject)=>{this.resolveLogoResolved=resolve;this.rejectLogoResolved=reject;});
+    this.logoResolvedPromise.catch(()=>{});
     this.introFinishedPromise=new Promise((resolve,reject)=>{this.resolveIntroFinished=resolve;this.rejectIntroFinished=reject;});
     // A free exterior view has no boot consumer waiting for this promise.
     this.playingPromise.catch(()=>{});
@@ -41,7 +46,11 @@ export class ExteriorCinemaUI{
     this.shell.setAttribute('role','dialog');this.shell.setAttribute('aria-modal','true');this.shell.setAttribute('aria-label',this.words('船体外観','Ship exterior'));
     this.frame=document.createElement('iframe');this.frame.title=this.cinematic?this.words('宇宙船の自動画角','Cinematic ship exterior'):this.words('船体外観の自由視点','Free view of the ship exterior');this.frame.allow='fullscreen';
     const query=new URLSearchParams({embedded:'1',core:String(core),phase:String(phase)});if(rpm!==undefined)query.set('rpm',String(rpm));
-    if(this.cinematic)query.set('mode',opening?'opening':'view');else query.set('viewer','free');
+    if(this.cinematic){
+      query.set('mode',opening?'opening':'view');
+      // Adopt the approved study take in OBS and the cabin's movie viewer.
+      query.set('approach','bow');query.set('ending','underside');
+    }else query.set('viewer','free');
     // Vite bundle locations differ from source modules. Resolve the HTML entry
     // relative to the current page rather than the hashed JS asset directory.
     const page=this.cinematic?'ship-exterior-cinema.html':'ship-exterior-study.html';
@@ -58,6 +67,7 @@ export class ExteriorCinemaUI{
     if(this.open){this.closeButton.textContent=this.buttonText();this.closeButton.hidden=false;}
   }
   whenPlaying(){return this.playingPromise;}
+  whenLogoResolved(){return this.logoResolvedPromise;}
   whenIntroFinished(){return this.introFinishedPromise;}
   close({force=false}={}){
     if(!this.open)return;

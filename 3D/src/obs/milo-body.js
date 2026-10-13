@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {armBruiseMask,handBruiseMask,armBruiseShader} from './injury-appearance.js';
 import {triangleSubset} from './triangle-subset.js';
@@ -41,7 +42,8 @@ vec2 miloFrontFolds(vec3 p){
 let bodyData=null,tattooMaps=null,tattooRightUpper=null,shirtBackPrint=null;
 // Pose changes only flag the skin bounds; the next raycast recomputes them.
 export function invalidateMiloSkinBounds(skin){if(skin)skin.userData.poseBoundsStale=true;}
-export function sampleMiloNeckline(geometry){
+export function sampleMiloNeckline(geometry){return finishPreparationSteps(sampleMiloNecklineSteps(geometry));}
+function* sampleMiloNecklineSteps(geometry){
   if(!geometry)return null;
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
   // The horizontal rays sit between the collar's lowest and highest edge, so
@@ -51,6 +53,7 @@ export function sampleMiloNeckline(geometry){
   const scan=new THREE.Mesh(triangleSubset(geometry,band),material),ray=new THREE.Raycaster(),radii=[];
   // Measure the actual scan at the sloping collar edge, in head-local space.
   for(let i=0;i<128;i++){
+    if(i%16===0)yield;
     const angle=i*Math.PI*2/128,c=Math.cos(angle),s=Math.sin(angle);
     ray.set(new THREE.Vector3(c*4,(1.563-.020*s-1.637)/.055,s*4),new THREE.Vector3(-c,0,-s));
     const hit=ray.intersectObject(scan,false)[0];
@@ -83,7 +86,8 @@ export async function loadMiloBody(url=`${import.meta.env?.BASE_URL??'/3D/'}asse
 
 // The animation controllers remain the authoritative joints. Bones live below
 // those controllers, so walking, IK, sitting and reaching deform the same skin.
-export function attachMiloBody(root,m,pants,legacy){
+export function attachMiloBody(root,m,pants,legacy){return finishPreparationSteps(attachMiloBodySteps(root,m,pants,legacy));}
+export function* attachMiloBodySteps(root,m,pants,legacy){
   if(!bodyData)return null;
   const {body,chest,head,arms,legs}=root.userData,data=bodyData;
   const wristLift=.274+arms[0].hand.position.y,wristHeight=.904+wristLift;
@@ -114,7 +118,7 @@ export function attachMiloBody(root,m,pants,legacy){
   geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(data.joints,4));geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(data.weights,4));
   // Shape the garment in bind space so normals and shadows follow its silhouette.
   const surface=geometry.attributes.position,smooth=THREE.MathUtils.smoothstep;
-  const necklineRadii=sampleMiloNeckline(head.getObjectByName('Milo scanned head')?.geometry);
+  const necklineRadii=yield* sampleMiloNecklineSteps(head.getObjectByName('Milo scanned head')?.geometry);
   const armTransforms=new Map();
   // Source and fitted half-widths keep the shirt, waistband and hips continuous.
   const waistHeights=[.96,1.025,1.075,1.10,1.125,1.175,1.225,1.275,1.325,1.36];
@@ -124,6 +128,7 @@ export function attachMiloBody(root,m,pants,legacy){
   const legSource=new THREE.CubicInterpolant(legHeights,[.069,.077,.078,.080,.087,.095,.098,.094,.074,.074,.076],1);
   const legFit=new THREE.CubicInterpolant(legHeights,[.069,.080,.081,.081,.080,.081,.081,.080,.078,.075,.076],1);
   for(let i=0;i<surface.count;i++){
+    if(i%1024===0)yield;
     const x=Math.abs(surface.getX(i)),y=surface.getY(i),z=surface.getZ(i);
     // Straight cargo legs: fit both edges around each leg, fading before the crotch joins.
     if(y>.17&&y<.94){
@@ -234,9 +239,11 @@ export function attachMiloBody(root,m,pants,legacy){
   // Compress the complete forearm in bind space; translating only the wrist
   // controllers would bunch up the skin where their weights begin.
   for(let i=0;i<surface.count;i++){
+    if(i%1024===0)yield;
     const y=surface.getY(i),weight=smooth(data.armRegions[i],.8,.95);
     surface.setY(i,y+wristLift*THREE.MathUtils.clamp((1.178-y)/.274,0,1)*weight);
   }
+  yield;
   geometry.setIndex(data.indices);geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
   // A changing twist has a spatial derivative that ordinary skinned normals
   // miss. Bake normals from the relaxed surface, then undo the joint blend.
@@ -245,7 +252,9 @@ export function attachMiloBody(root,m,pants,legacy){
     const x=surface.getX(i)-pivot,y=surface.getY(i),z=surface.getZ(i);
     relaxedPosition.setXYZ(i,pivot+m00*x+m02*z,wristHeight+(y-wristHeight)*sy,m20*x+m22*z+tz);
   }
+  yield;
   relaxed.computeVertexNormals();
+  yield;
   const normal=new THREE.Vector3(),originalNormal=new THREE.Vector3();
   for(const [i,{m00,m02,m20,m22,sy}] of armTransforms){
     const y=data.positions[i*3+1],blend=smooth(y,.855,.880)*(1-smooth(y,1.14,1.24));
@@ -272,6 +281,7 @@ export function attachMiloBody(root,m,pants,legacy){
   geometry.setAttribute('armRegion',new THREE.Float32BufferAttribute(data.armRegions,1));
   const bruiseMask=new Float32Array(surface.count),bruiseUv=new Float32Array(surface.count*2);
   for(let i=0;i<surface.count;i++){
+    if(i%1024===0)yield;
     const x=surface.getX(i),y=surface.getY(i),z=surface.getZ(i),region=data.armRegions[i];
     bruiseMask[i]=Math.max(armBruiseMask(x,y,z,region),handBruiseMask(x,y,z,region));
     // Store pigment coordinates independently of position: grip fitting can
@@ -452,6 +462,7 @@ export function attachMiloBody(root,m,pants,legacy){
   mesh.customDepthMaterial.customProgramCacheKey=()=> 'milo-shirt-neckline-shadow-v1';
   // Split only the distal thumb influence; the palm and thumb base keep their drivers.
   const indices=geometry.attributes.skinIndex,weights=geometry.attributes.skinWeight;
+  yield;
   for(const {thumb,side} of arms){
     const prefix=side<0?'L':'R',baseIndex=data.bones.findIndex(b=>b.name===prefix+'_thumb');
     const tipIndex=bones.length,bone=new THREE.Bone();bone.name=`Milo skin ${prefix}_thumbIP`;
@@ -459,6 +470,7 @@ export function attachMiloBody(root,m,pants,legacy){
     const target=new THREE.Vector3(...data.bones[baseIndex].target).add(thumb.userData.ip.position);target.y+=wristLift;
     inverses.push(new THREE.Matrix4().makeTranslation(-target.x,-target.y,-target.z));
     for(let i=0;i<surface.count;i++){
+      if(i%1024===0)yield;
       const influences=Array.from({length:4},(_,k)=>({id:indices.array[i*4+k],weight:weights.array[i*4+k]}));
       const base=influences.find(p=>p.id===baseIndex&&p.weight>0);
       if(!base)continue;

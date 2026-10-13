@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {angleDelta} from './heading.js';
 import {advanceMiloTurn,applyCurrentMiloTurn,applyAuthoredMiloTurn} from './milo-turn.js';
@@ -29,7 +30,7 @@ import {applySeatedLegSpread} from './seated-pose.js';
 import {attachMiloSpine,updateMiloSpine} from './milo-spine.js';
 import {attachMiloNeck,setMiloNeckProtraction,updateMiloNeck} from './milo-neck.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
-import {attachMiloBody,invalidateMiloSkinBounds} from './milo-body.js';
+import {attachMiloBodySteps,invalidateMiloSkinBounds} from './milo-body.js';
 import {attachMiloElbow} from './milo-elbow.js';
 import {attachMiloWatch,updateMiloWatch} from './milo-watch.js';
 import {attachMiloBioSensor,updateMiloBioSensor} from './milo-bio-sensor.js';
@@ -167,14 +168,17 @@ function torso(parent,m){
   return skin;
 }
 
-export function createMilo(m,headModel=new THREE.Group(),{elbowStyle='supported'}={}) {
+export function createMilo(m,headModel,options){return finishPreparationSteps(createMiloSteps(m,headModel,options));}
+export function* createMiloSteps(m,headModel=new THREE.Group(),{elbowStyle='supported'}={}) {
   const root=new THREE.Group(),body=joint(root,0,0,0);
   const pants=m.olive.clone();pants.userData.fabricMap=pants.map;pants.map=null;pants.bumpScale=.004;pants.color.setHex(0x4a5338);pants.roughness=.96;
   const hips=ball(body,pants,0,.988,0,.177,.134,.119);
   const chest=joint(body,0,0,0),neck=torso(chest,m);
   const head=headModel;head.position.set(0,1.637,-.009);body.add(head);
+  yield;
   const arms=[],legs=[];
   for(const side of [-1,1]){
+    yield;
     const arm=joint(body,side*.207,1.488,0);arm.rotation.z=side*.025;
     const upper=limb(arm,m.skin,.365,[[0,0],[.025,.028],[.09,.048],[.19,.060],[.35,.059],[.55,.051],[.8,.043],[1,.035]],.92);upper.position.y=.055;
     const sleeve=limb(arm,m.cloth,.215,[[0,.033],[.12,.056],[.35,.072],[.7,.068],[1,.062]],.96);sleeve.position.y=.025;sleeve.name='T-shirt short sleeve';
@@ -206,9 +210,12 @@ export function createMilo(m,headModel=new THREE.Group(),{elbowStyle='supported'
   const legacy=[];body.traverse(o=>{if(o.isMesh&&!headParts.has(o)&&[m.skin,m.cloth,pants].includes(o.material))legacy.push(o);});
   const dining=createDiningProps(body,m),{mug}=dining;
   const leisure=createLeisureProps(body,m);
-  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,leisure};root.name='Milo Jarvis';attachMiloBody(root,m,pants,legacy);
+  root.userData={body,chest,head,arms,legs,mug,dining,hips,neck,leisure};root.name='Milo Jarvis';yield* attachMiloBodySteps(root,m,pants,legacy);
+  yield;
   attachMiloSpine(root);
+  yield;
   attachMiloNeck(root);
+  yield;
   if(elbowStyle==='supported')attachMiloElbow(root);
   attachMiloBandage(root,m);
   for(const {hand} of arms)hand.scale.multiplyScalar(1.08);

@@ -3,6 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createHair,HAIRLINE_GLSL,MILO_HAIR_STYLES} from './hair.js';
 import {loadSuppliedHair} from './supplied-hair.js';
 import {triangleSubset} from './triangle-subset.js';
+import {runPreparationSteps,nextPreparationFrame} from './background-preparation.js';
 
 export const MILO_BEARD_STYLES={
   none:{label:'なし',strength:0},
@@ -17,14 +18,22 @@ function smoothstepSlope(value,low,high){
 // Metres at the character scale: advance the skull, not the neck joint.
 export const MILO_HEAD_FORWARD=.025;
 export function headGeometry(source,forward=0){
+  const steps=headGeometrySteps(source,forward);let step;
+  do{step=steps.next();}while(!step.done);return step.value;
+}
+function* headGeometrySteps(source,forward=0){
   const indexed=source.clone(),position=indexed.attributes.position,indices=indexed.index.array,kept=[];
   // Remove the scan's shoulders below the existing character's neck joint.
-  for(let i=0;i<indices.length;i+=3)if([indices[i],indices[i+1],indices[i+2]].every(v=>position.getY(v)>=-1.05))kept.push(indices[i],indices[i+1],indices[i+2]);
+  for(let i=0;i<indices.length;i+=3){
+    if(i%3072===0)yield;
+    if([indices[i],indices[i+1],indices[i+2]].every(v=>position.getY(v)>=-1.05))kept.push(indices[i],indices[i+1],indices[i+2]);
+  }
   // Keep a gentle nape transition without narrowing an adult neck into a stem.
   // The jaw/face is excluded by the front mask and stays unchanged.
   const neckWidthTaper=.12,neckDepthTaper=.38;
   const normal=indexed.attributes.normal;
   for(let i=0;i<position.count;i++){
+    if(i%1024===0)yield;
     const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
     const height=1-THREE.MathUtils.smoothstep(y,-1.05,.85),rear=1-THREE.MathUtils.smoothstep(z,.5,1.6),blend=height*rear;
     if(!blend)continue;
@@ -38,12 +47,15 @@ export function headGeometry(source,forward=0){
   }
   const filled=new Set(),savedNormals=normal.array.slice();
   for(let i=0;i<position.count;i++){
+    if(i%1024===0)yield;
     const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
     const front=THREE.MathUtils.smoothstep(z,.05,.55)*(1-THREE.MathUtils.smoothstep(y,-.85,-.45));
     const envelope=.14+1.28*Math.sqrt(Math.max(0,1-(x/1.20)**2));
     if(front&&envelope>z){position.setZ(i,THREE.MathUtils.lerp(z,envelope,front));filled.add(i);}
   }
+  yield;
   indexed.computeVertexNormals();
+  yield;
   for(let i=0;i<normal.count;i++)if(!filled.has(i))normal.setXYZ(i,...savedNormals.slice(i*3,i*3+3));
   indexed.setIndex(kept);const geometry=indexed.toNonIndexed();
   const attributes=['position','normal','uv'],arrays=Object.fromEntries(attributes.map(name=>[name,Array.from(geometry.attributes[name].array)]));
@@ -54,6 +66,7 @@ export function headGeometry(source,forward=0){
   // Clip crossing triangles at the plane instead of dropping whole faces.
   // The old crop left a saw-toothed edge immediately under the jaw.
   for(let i=0;i<indices.length;i+=3){
+    if(i%3072===0)yield;
     const triangle=[indices[i],indices[i+1],indices[i+2]].map(vertex);
     if(triangle.every(v=>v.position[1]>=cut)||triangle.every(v=>v.position[1]<cut))continue;
     const polygon=[];
@@ -90,14 +103,18 @@ export function headGeometry(source,forward=0){
     const n=new THREE.Vector3(...v.normal).lerp(new THREE.Vector3(Math.cos(angle),slope,Math.sin(angle)).normalize(),THREE.MathUtils.smoothstep(t,0,.25)).normalize();out.normal=n.toArray();
     return out;
   };
-  for(const [a,b]of segments)for(let row=0;row<16;row++){
+  let segmentIndex=0;
+  for(const [a,b]of segments){if(segmentIndex++%16===0)yield;for(let row=0;row<16;row++){
     const at=lower(a,row/16),bt=lower(b,row/16),ab=lower(a,(row+1)/16),bb=lower(b,(row+1)/16);
     emit(bt,at,ab);emit(bt,ab,bb);
   }
+  }
+  yield;
   for(const name of attributes)geometry.setAttribute(name,new THREE.Float32BufferAttribute(arrays[name],name==='uv'?2:3));
   if(forward){
     const p=geometry.attributes.position,n=geometry.attributes.normal;
     for(let i=0;i<p.count;i++){
+      if(i%1024===0)yield;
       const y=p.getY(i),z=p.getZ(i),front=THREE.MathUtils.smoothstep(z,.5,1.6);
       const backWeight=THREE.MathUtils.smoothstep(y,-1.25,.55),frontWeight=THREE.MathUtils.smoothstep(y,-1.25,-.55);
       const weight=THREE.MathUtils.lerp(backWeight,frontWeight,front);
@@ -295,8 +312,8 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
   material.customProgramCacheKey=()=> 'obs-milo-scan-v10-anchored-neck';
   const source=gltf.scene.getObjectByName('LeePerrySmith');
   if(!source?.isMesh)throw new Error('Milo head mesh is missing');
-  const forward=MILO_HEAD_FORWARD/.055,hairSource=headGeometry(source.geometry);
-  const group=new THREE.Group(),mesh=new THREE.Mesh(headGeometry(source.geometry,forward),material);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);
+  const forward=MILO_HEAD_FORWARD/.055,hairSource=await runPreparationSteps(headGeometrySteps(source.geometry));
+  const group=new THREE.Group(),mesh=new THREE.Mesh(await runPreparationSteps(headGeometrySteps(source.geometry,forward)),material);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);
   group.userData.faceForward=MILO_HEAD_FORWARD;
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});
   mesh.customDepthMaterial.onBeforeCompile=shader=>{
@@ -306,6 +323,7 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
     `);
   };
   mesh.customDepthMaterial.customProgramCacheKey=()=> 'milo-open-eyelid-shadow-v3-anchored-neck';
+  await nextPreparationFrame();
   let hair=createHair(hairSource);hair.position.z=forward;group.add(hair);
   const mouth=new THREE.Mesh(new THREE.SphereGeometry(1,24,12),new THREE.MeshStandardMaterial({color:0x25140f,roughness:1}));
   mouth.position.set(-.11,.405,2.285+forward);mouth.visible=false;group.add(mouth);
@@ -323,7 +341,7 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
     facialHairStrength.value=MILO_BEARD_STYLES[beard].strength;
     group.userData.appearance={hair:nextHair,beard};
   };
-  group.add(...MILO_EYE_OPENINGS.map(opening=>{const eye=createMiloEye(source.geometry,opening);eye.position.z=forward;return eye;}));
+  for(const opening of MILO_EYE_OPENINGS){await nextPreparationFrame();const eye=createMiloEye(source.geometry,opening);eye.position.z=forward;group.add(eye);}
   gltf.scene.traverse(object=>{object.geometry?.dispose();if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(m=>m.dispose());});
   return group;
 }

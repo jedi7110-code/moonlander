@@ -399,8 +399,6 @@ export function createExteriorMothership(){
     const logoX=-13.50,facet=Math.cos(Math.PI/8),slope=facet*(8.3-8.5)/3.7;
     const logoZ=facet*8.5+slope*(logoX+15.5),tilt=Math.atan(-slope);
     shipWordmark(core,[logoX,-.90,side*(logoZ+.006)],3.0,side>0?tilt:Math.PI-tilt);
-    const panel=box(machinery,m.dark,[-9.3,side*6.0,0],[4.4,.15,7.8],'Folded radiator panel');panel.rotation.x=side*.17;
-    for(let j=0;j<16;j++)box(machinery,m.pipe,[-9.3,side*6.12,-3.6+j*.48],[4.1,.06,.06],'Radiator channels').rotation.x=side*.17;
   }
   // Tanks and their saddles remain behind the rotor sweep.
   for(const side of [-1,1]){

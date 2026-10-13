@@ -1,13 +1,14 @@
-import {Group,Quaternion,Vector3} from 'three';
+import {finishPreparationSteps} from './background-preparation.js';
+import {BufferGeometry,Group,Quaternion,Vector3} from 'three';
 import {loadLucy,createLucy,animateLucy,disposeLucy} from './lucy.js';
 import {restWeight} from './cat-rest.js';
-import {addLucyWhiskerPads} from '../../studies/lucy/whisker-pads.js';
+import {addLucyWhiskerPadsSteps} from '../../studies/lucy/whisker-pads.js';
 import {addLucyPupilShape} from '../../studies/lucy/pupil-study.js';
-import {addLucyPawPads} from '../../studies/lucy/paw-pads.js';
+import {addLucyPawPadsSteps} from '../../studies/lucy/paw-pads.js';
 import {addSleepingEyelids} from '../../studies/lucy/sleep-eyelids.js';
 import {addSideSleepBreathing} from '../../studies/lucy/side-sleep.js';
 import {sleepTailLift} from '../../studies/lucy/sleep-tail-tap.js';
-import {createGroomSurface} from '../../studies/lucy/groom-surface.js';
+import {createGroomSurfaceSteps} from '../../studies/lucy/groom-surface.js';
 import {createGroomPlayback} from '../../studies/lucy/groom-playback.js';
 import {createLucyTurnRig} from './lucy-turn.js';
 import {approvedRestTime} from './cat-approved-rest.js';
@@ -36,9 +37,18 @@ export async function loadCabinLucyGroomCache(root){
   const cache=decodeGroomCache(await readLucyAsset('lucy-groom.bin','arrayBuffer'),c.poses.groom);
   c.groom.setCache(cache);return cache;
 }
-export function createCabinLucy({gltf,poses,cache=null},options){
+export function createCabinLucy(data,options){return finishPreparationSteps(createCabinLucySteps(data,options));}
+export function* createCabinLucySteps({gltf,poses,cache=null},options){
   const root=createLucy(gltf,options),s=root.userData;
-  addLucyWhiskerPads(root);addLucyPupilShape(root);addLucyPawPads(root);addSleepingEyelids(root);
+  yield;
+  yield* addLucyWhiskerPadsSteps(root);
+  yield;
+  addLucyPupilShape(root);
+  yield;
+  yield* addLucyPawPadsSteps(root);
+  yield;
+  addSleepingEyelids(root);
+  yield 'lucy-eyelids';
   const breathe=addSideSleepBreathing(root);
   const poseRoot=new Group();poseRoot.name='Lucy approved pose';root.add(poseRoot);poseRoot.add(s.model);
   const sourceMeshes=[];root.traverse(m=>{if(m.isMesh)sourceMeshes.push(m);});
@@ -49,9 +59,13 @@ export function createCabinLucy({gltf,poses,cache=null},options){
   if(coat.geometry.attributes.position.count!==poses.groom.vertices)throw new Error('Lucy surface/cache mismatch');
   const clip=coat.material.clippingPlanes;
   for(const m of sourceMeshes){m.material.clippingPlanes=clip;m.material.clipShadows=true;m.castShadow=true;m.receiveShadow=true;}
-  const surface=createGroomSurface(root),groom=createGroomPlayback(surface,cache);
+  const surface=yield* createGroomSurfaceSteps(root);
+  const groom=createGroomPlayback(surface,cache);
   const bones=[];root.traverse(b=>{if(b.isBone&&!b.name.startsWith('Lucy contact'))bones.push({b,p:b.position.clone(),q:b.quaternion.clone()});});
-  const baseGeometry=coat.geometry,proneGeometry=baseGeometry.clone();
+  const baseGeometry=coat.geometry,proneGeometry=new BufferGeometry().copy({...baseGeometry,morphAttributes:{}});
+  // Only the prone joint weights differ; the immutable morph bank is shared.
+  proneGeometry.morphAttributes=baseGeometry.morphAttributes;
+  yield 'lucy-prone';
   if(poses.rests?.prone?.skin){proneGeometry.attributes.skinIndex.array.set(poses.rests.prone.skin.indices);proneGeometry.attributes.skinWeight.array.set(poses.rests.prone.skin.weights);}
   const lidGeometry=lids.map(mesh=>{const base=mesh.geometry,stretch=base.clone(),data=poses.rests?.stretch?.lids[mesh.name];
     if(data){stretch.attributes.position.array.set(data.positions);stretch.attributes.normal.array.set(data.normals);}

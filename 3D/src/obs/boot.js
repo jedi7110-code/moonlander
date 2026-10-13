@@ -12,9 +12,9 @@ async function boot(){
   document.documentElement.dataset.cabinLoadStartedMs=performance.now().toFixed(1);
   const preloads=document.getElementById('cabin-preloads');
   if(preloads)document.head.append(preloads.content.cloneNode(true));
-  // Fetch the data during the logo, but defer module evaluation, GLTF parsing,
-  // model construction and GPU preparation until the logo has faded away.
-  if(opening)await exteriorCinema.whenIntroFinished();
+  // Fetch during the reveal; begin cooperative assembly once the complete
+  // logo has reached the screen. CPU and GPU batches yield to moving film.
+  if(opening)await exteriorCinema.whenLogoResolved();
   document.documentElement.dataset.cabinBuildStartedMs=performance.now().toFixed(1);
   await import('./main.js');
 }

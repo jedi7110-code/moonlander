@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import {BackSide,Color,DoubleSide,Mesh,MeshBasicMaterial,NotEqualStencilFunc,ReplaceStencilOp,ShaderChunk,ShaderLib,SkinnedMesh,Vector2} from 'three';
 
 const INK_MESHES=new Set(['Continuous sample-based human body','Milo scanned head',
@@ -6,7 +7,10 @@ const isHair=mesh=>/^(Supplied |Milo hair |Milo groom )/.test(mesh.name);
 const outlineMesh=mesh=>INK_MESHES.has(mesh.name)||isHair(mesh);
 
 function copyMaterial(source){
-  const material=source.clone();
+  // userData contains live Texture references. Material.clone JSON-serializes
+  // them (including image PNG encoding); these uniforms are shared below.
+  const copySource=Object.create(source);copySource.userData={};
+  const material=new source.constructor().copy(copySource);
   // These uniforms are driven by the live rig (bruises, mouth and appearance).
   material.userData={...source.userData};
   material.onBeforeCompile=(shader,renderer)=>source.onBeforeCompile(shader,renderer);
@@ -100,10 +104,13 @@ function inkMaterial(source,mesh,viewport){
 }
 
 // Shared by the cabin and study; preserve the original materials, rig and geometry.
-export function createMiloToon(root){
+export function createMiloToon(root){return finishPreparationSteps(createMiloToonSteps(root));}
+export function* createMiloToonSteps(root){
   const originals=[];root.traverse(mesh=>{if(mesh.isMesh)originals.push(mesh);});
   const replaced=[],outlines=[],viewport={value:new Vector2(1,1)};
+  let batchStart=performance.now();
   for(const mesh of originals){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
     if(Array.isArray(mesh.material))continue;
     const source=mesh.material,material=toonMaterial(source,mesh);
     mesh.material=material;replaced.push({mesh,source,material});

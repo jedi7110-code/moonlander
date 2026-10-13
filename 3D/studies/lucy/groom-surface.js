@@ -1,17 +1,23 @@
+import {finishPreparationSteps} from '../../src/obs/background-preparation.js';
 // Reference posed-space solver. The accepted cabin version uses its baked
 // correction cache; this iterative solve does not run during OBS playback.
-import {Mesh,Vector3,Matrix3,Matrix4} from 'three';
+import {BufferGeometry,Mesh,Vector3,Matrix3,Matrix4} from 'three';
 
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
-export function createGroomSurface(root){
+export function createGroomSurface(root){return finishPreparationSteps(createGroomSurfaceSteps(root));}
+export function* createGroomSurfaceSteps(root){
   let source;root.traverse(m=>{if(m.isSkinnedMesh&&m.material.name==='Lucy calico coat')source=m;});
   if(!source)throw new Error('Lucy coat not found');
-  const geometry=source.geometry.clone();geometry.morphAttributes={};
+  // This display uses CPU-deformed vertices, never morph targets. Avoid
+  // copying the entire animation bank only to discard it immediately.
+  const geometry=new BufferGeometry().copy({...source.geometry,morphAttributes:{}});
+  yield 'groom-clone';
   const display=new Mesh(geometry,source.material);display.name='Groom surface study';
   display.frustumCulled=false;display.visible=false;display.castShadow=source.castShadow;display.receiveShadow=source.receiveShadow;
   source.parent.add(display);
   const a=source.geometry.attributes,ids=[],representatives=[],neighbors=[],lookup=new Map(),masks=[],underChest=[],sides=[];
   for(let i=0;i<a.position.count;i++){
+    if(i%512===0)yield;
     const v=new Vector3().fromBufferAttribute(a.position,i),key=v.toArray().map(x=>x.toFixed(7)).join(',');
     let id=lookup.get(key);
     if(id===undefined){
@@ -28,7 +34,8 @@ export function createGroomSurface(root){
     ids.push(id);
   }
   const index=geometry.index;
-  for(let i=0;i<index.count;i+=3){const tri=[0,1,2].map(k=>ids[index.getX(i+k)]);for(const x of tri)for(const y of tri)if(x!==y)neighbors[x].add(y);}
+  for(let i=0;i<index.count;i+=3){if(i%3072===0)yield;const tri=[0,1,2].map(k=>ids[index.getX(i+k)]);for(const x of tri)for(const y of tri)if(x!==y)neighbors[x].add(y);}
+  yield 'groom-neighbors';
   const original=representatives.map(()=>new Vector3()),work=original.map(()=>new Vector3()),next=original.map(()=>new Vector3());
   const sums=original.map(()=>new Vector3()),normal=new Vector3(),edge=new Vector3(),cross=new Vector3(),delta=new Vector3();
   const skin=new Matrix4(),bone=new Matrix4(),normalSkin=new Matrix3();

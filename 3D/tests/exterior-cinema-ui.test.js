@@ -31,6 +31,8 @@ function fixture(t){
 test('loading completion reveals the entry cue while the opening remains open',t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
   assert.equal(new URL(f.ui.frame.src).pathname,'/3D/ship-exterior-cinema.html');
+  const query=new URL(f.ui.frame.src).searchParams;
+  assert.equal(query.get('approach'),'bow');assert.equal(query.get('ending'),'underside');
   assert.equal(f.ui.closeButton.hidden,true);assert.equal(f.trigger.inert,true);
   f.message('ready');assert.equal(f.ui.closeButton.hidden,true,'exterior shaders being ready is not cabin readiness');
   f.ui.hostReady();assert.equal(f.ui.open,true);assert.equal(f.ui.closeButton.hidden,false);
@@ -50,8 +52,9 @@ test('the cabin boot gate waits for playback rather than the sky or shader readi
 test('opening startup failure rejects the cabin boot gate',async t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
   const rejected=assert.rejects(f.ui.whenPlaying(),/Opening renderer could not start/);
+  const rejectedLogo=assert.rejects(f.ui.whenLogoResolved(),/Opening renderer could not start/);
   const rejectedIntro=assert.rejects(f.ui.whenIntroFinished(),/Opening renderer could not start/);
-  f.message('failed');await Promise.all([rejected,rejectedIntro]);
+  f.message('failed');await Promise.all([rejected,rejectedLogo,rejectedIntro]);
 });
 test('playback starts fetches without releasing heavy preparation during the logo',async t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
@@ -86,5 +89,17 @@ test('the explicit study movie still opens the numbered cinematic viewer',t=>{
   const f=fixture(t);f.ui.show({cinematic:true,core:2.4,phase:70,rpm:5.3});
   const url=new URL(f.ui.frame.src);assert.equal(url.pathname,'/3D/ship-exterior-cinema.html');
   assert.equal(url.searchParams.get('mode'),'view');assert.equal(url.searchParams.get('core'),'2.4');assert.equal(url.searchParams.get('phase'),'70');assert.equal(url.searchParams.get('rpm'),'5.3');
+  assert.equal(url.searchParams.get('approach'),'bow');assert.equal(url.searchParams.get('ending'),'underside');
   assert.equal(f.ui.closeButton.textContent,'戻る');
+});
+
+test('paced cabin assembly begins after the full logo is presented while probe preparation stays behind the fade',async t=>{
+  const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
+  let released=false;const waiting=f.ui.whenLogoResolved().then(()=>{released=true;});
+  f.message('playing');await f.ui.whenPlaying();assert.equal(released,false);
+  f.ui.message({origin:location.origin,source:{},data:{type:'tara-exterior',action:'logo-resolved'}});
+  await Promise.resolve();assert.equal(released,false);
+  f.message('logo-resolved');await waiting;
+  assert.equal(released,true);assert.equal(f.ui.hostIsReady,false);
+  assert.ok(Number(f.document.documentElement.dataset.openingLogoResolvedMs)>0);
 });

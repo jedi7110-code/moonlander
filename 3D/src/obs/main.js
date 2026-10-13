@@ -406,6 +406,8 @@ async function start(){
     // KHR_parallel_shader_compile the driver links them on worker threads and
     // the page stays responsive, instead of the first draw stalling on each one.
     await view.compilePrograms();
+    view.render(0,elapsed,actor,brain,cat,care,true,airlock,null,true);
+    await view.warmDraws();
     await revealStartupScene({
       draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),
       reveal:()=>{$('loading').hidden=true;},

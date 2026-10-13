@@ -1,9 +1,12 @@
+import {finishPreparationSteps} from './background-preparation.js';
+import {BufferGeometry} from 'three';
 import {Vector3,Quaternion,MathUtils} from 'three';
 import {runCycle,RUN_STRIDE} from './lucy-run-motion.js';
 
 const v=(x=0,y=0,z=0)=>new Vector3(x,y,z),q=()=>new Quaternion();
-function createRunCoat(coat){
-  const geometry=coat.geometry.clone(),a=geometry.attributes;
+function* createRunCoatSteps(coat){
+  const geometry=new BufferGeometry().copy({...coat.geometry,morphAttributes:{}}),a=geometry.attributes;
+  geometry.morphAttributes=coat.geometry.morphAttributes;
   const smooth=(lo,hi,value)=>MathUtils.smoothstep(value,lo,hi);
   const index=name=>coat.skeleton.bones.findIndex(b=>b.name===name);
   const pelvis=index('pelvis'),spine=index('Bone001');
@@ -11,6 +14,7 @@ function createRunCoat(coat){
   // reach, it drags a sheet of abdomen down with the upper arms. Keep this soft
   // underside on the trunk; retain the actual one-sided legs and their shape.
   for(let i=0;i<a.position.count;i++){
+    if(i%512===0)yield;
     const x=a.position.getX(i),y=a.position.getY(i),z=a.position.getZ(i);
     let left=0,right=0,trunk=0;
     for(let k=0;k<4;k++){
@@ -32,10 +36,11 @@ function createRunCoat(coat){
   }
   return geometry;
 }
-export function createLucyRunRig(root){
+export function createLucyRunRig(root){return finishPreparationSteps(createLucyRunRigSteps(root));}
+export function* createLucyRunRigSteps(root){
   root.updateMatrixWorld(true);
   const scale=root.scale.x,rest=[],get=name=>root.getObjectByName(name);
-  const coat=root.userData.cabin.coat,baseGeometry=coat.geometry,runGeometry=createRunCoat(coat);
+  const coat=root.userData.cabin.coat,baseGeometry=coat.geometry,runGeometry=yield* createRunCoatSteps(coat);
   root.traverse(b=>{if(b.isBone)rest.push({b,p:b.position.clone(),q:b.quaternion.clone()});});
   const feet=root.userData.cabin.turnRig.feet;
   const basePoint=name=>root.worldToLocal(get(name).getWorldPosition(v())).multiplyScalar(scale);

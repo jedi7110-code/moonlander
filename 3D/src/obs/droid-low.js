@@ -1,6 +1,7 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {createDroidSurfaceAtlas,createDroidFaceAtlas,DROID_TILES as T} from './droid-textures.js';
+import {createDroidSurfaceAtlasSteps,createDroidFaceAtlasSteps,DROID_TILES as T} from './droid-textures.js';
 
 const V=(...v)=>new THREE.Vector3(...v),UP=V(0,1,0);
 function atlasUV(geometry,tile,columns=4,rows=4){
@@ -164,8 +165,10 @@ function foot(parent,m){
   for(const x of [-.038,.038])toeCap(g,m,x);return g;
 }
 
-export function createDroidLowParts(spec,expressions,expressionPaths){
-  const texture=createDroidSurfaceAtlas(),faceTexture=createDroidFaceAtlas(Object.keys(expressions),expressionPaths);
+export function createDroidLowParts(spec,expressions,expressionPaths){return finishPreparationSteps(createDroidLowPartsSteps(spec,expressions,expressionPaths));}
+export function* createDroidLowPartsSteps(spec,expressions,expressionPaths){
+  const texture=yield* createDroidSurfaceAtlasSteps();
+  const faceTexture=yield* createDroidFaceAtlasSteps(Object.keys(expressions),expressionPaths);
   const body=new THREE.MeshStandardMaterial({name:'Droid OBS / textured machined frame',map:texture,color:0xffffff,metalness:.65,roughness:.62,flatShading:true});body.userData.cabinKeepSurface=true;
   const amber=new THREE.MeshBasicMaterial({name:'Droid OBS / nixie cathode bitmap',map:faceTexture,toneMapped:false});
   const m={body,amber,texture,faceTexture},root=new THREE.Group();root.name='OBS lightweight household droid 3817';root.userData.droidDetail='obs';
@@ -178,6 +181,7 @@ export function createDroidLowParts(spec,expressions,expressionPaths){
     [.022,-.055],[-.017,-.055],[-.051,-.027],[-.051,-.011],[.018,-.011],
   ],T.paint).name='Pelvis / folded center cover';
   for(const side of [-1,1]){
+    yield;
     hub(chassis,m,[side*.125,0,0],.047,.065);
     box(chassis,m,[side*.084,.064,.065],[.074,.104,.024],T.panel);
     bar(chassis,m,[side*.09,.035,-.034],[side*.146,.46,-.039],.016,T.dark);
@@ -201,13 +205,17 @@ export function createDroidLowParts(spec,expressions,expressionPaths){
   // Stop below the moving underside cover, including service/charging nods.
   box(chassis,m,[0,.4945,-.027],[.064,.051,.052],T.neck).name='Neck / fixed support';
   for(const side of [-1,1]){
+    yield;
     bar(chassis,m,[side*.062,.469,-.012],[side*.055,.551,-.034],.008,T.bright);
     cable(chassis,m,[[side*.08,side>0?.418:.441,.06],[side*.087,.506,.045],[side*.060,.544,.023],[side*.07,.603,-.07]],.006,T.copper);
   }
+  yield;
   const neckPivot=group(chassis,'Head support pivot',[0,.542,-.015]);
   const {head,face}=headAssembly(neckPivot,m,Object.keys(expressions));head.position.set(0,.125,.040);
+  yield;
   const arms=[],legs=[],actuators=[];
   for(const side of [-1,1]){
+    yield;
     arms.push({side,upper:limb(root,m,spec.upperArm,'Upper arm',side),lower:limb(root,m,spec.forearm,'Forearm',side),palm:hand(root,m,side)});
     legs.push({side,upper:limb(root,m,spec.upperLeg,'Upper leg / forward thigh',side),middle:knee(root,m,spec.middleLeg,side),lower:limb(root,m,spec.lowerLeg,'Lower leg / reverse hock',side),foot:foot(root,m)});
   }
@@ -265,7 +273,8 @@ export function addDroidBalanceRotor(chassis,m){
 
 // All opaque parts share one atlas/material and one skinned draw. A vertex has
 // exactly one joint weight: hinges and square pistons remain rigid, never rubbery.
-export function batchDroidLow(root,material){
+export function batchDroidLow(root,material){return finishPreparationSteps(batchDroidLowSteps(root,material));}
+export function* batchDroidLowSteps(root,material){
   root.updateMatrixWorld(true);const inverse=root.matrixWorld.clone().invert(),sources=[];
   root.traverse(mesh=>{
     if(!mesh.isMesh||mesh.material!==material)return;
@@ -273,7 +282,9 @@ export function batchDroidLow(root,material){
     sources.push(mesh);
   });
   const joints=new Map(),bones=[],parts=[];
+  let batchStart=performance.now();
   for(const source of sources){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
     const owner=source.parent;
     if(!joints.has(owner)){const bone=new THREE.Bone();bone.name='Rigid skin / '+owner.name;owner.add(bone);joints.set(owner,bones.length);bones.push(bone);}
     const geometry=source.geometry.index?source.geometry.toNonIndexed():source.geometry.clone();
@@ -283,7 +294,9 @@ export function batchDroidLow(root,material){
     geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(indices,4));geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(weights,4));
     parts.push(geometry);source.removeFromParent();source.geometry.dispose();
   }
+  yield;
   const geometry=mergeGeometries(parts,false);parts.forEach(g=>g.dispose());root.updateMatrixWorld(true);
+  yield 'droid-merged';
   const skeleton=new THREE.Skeleton(bones),mesh=new THREE.SkinnedMesh(geometry,material);mesh.name='OBS droid / rigid textured skin';mesh.userData.cabinRigidSkin=true;
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;root.add(mesh);mesh.bind(skeleton);
   // A conservative sphere avoids rebuilding a bounds volume for every joint.

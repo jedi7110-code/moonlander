@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_AMBIENCE,limitCabinLights,limitShadowCasters} from './lighting.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {materials,createStaticShadowProxy} from './materials.js';
+import {materials,createStaticShadowProxySteps} from './materials.js';
 import {buildShip,buildShipInBackground,positionX,positionY,HABITAT_VIEW} from './ship.js';
-import {createMilo,animateMilo} from './characters.js';
-import {loadCabinLucy as loadLucy,createCabinLucy as createLucy,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
+import {createMiloSteps,animateMilo} from './characters.js';
+import {loadCabinLucy as loadLucy,createCabinLucySteps as createLucySteps,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
 import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
 import {createHarvestDelivery} from './harvest-delivery.js';
@@ -27,24 +27,25 @@ import {applyCabinLadder,updateCabinClimb} from './cabin-ladder.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {updateTableLeisureProps} from './lounge-table-props.js';
 import {createLucyToon} from './lucy-toon.js';
-import {createLucyRunRig} from './lucy-run-rig.js';
+import {createLucyRunRigSteps} from './lucy-run-rig.js';
 import {createCabinMouse} from './mouse.js';
-import {createMiloToon} from './milo-toon.js';
+import {createMiloToonSteps} from './milo-toon.js';
 import {createCabinToon} from './cabin-toon.js';
 import {createCabinSignage} from './cabin-signage.js';
 import {finishCabinFixtures} from './cabin-fixtures.js';
 import {updateMiloBandage} from './milo-bandage.js';
-import {createDroidChargingBay,DROID_DOCK} from './droid-charging.js';
+import {createDroidChargingBaySteps,DROID_DOCK} from './droid-charging.js';
 import {createDroidServiceRig} from './droid-service.js';
 import {CabinStartupLighting} from './startup-lighting.js';
 import {CabinEmergencyLighting} from './emergency-lighting.js';
 import {createCabinMirror,isMiloMirrorView} from './cabin-mirror.js';
-import {attachHairGrowth} from './hair-growth.js';
+import {attachHairGrowthSteps} from './hair-growth.js';
 import {createGroomingTools,prepareGroomingMotion} from './grooming.js';
 import {createMachinedMetals} from './machined-metals.js';
 import {CharacterCamera} from './character-camera.js';
 import {createMetalDeckStyle} from './metal-deck.js';
 import {createCutawayStars} from './space-stars.js';
+import {nextPreparationFrame,runPreparationSteps} from './background-preparation.js';
 
 export class ObservationView {
   static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false}={}){
@@ -53,47 +54,76 @@ export class ObservationView {
     const deckStyle=floorBuilder?null:createMetalDeckStyle();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
     const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor});
-    const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip});
+    const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip,deferSetup:true});
+    const preparation=[];
+    await runPreparationSteps(view.preparationSteps,{onStep:(label,ms)=>{preparation.push({name:typeof label==='string'?label:'batch',ms:Math.round(ms)});document.documentElement.dataset.cabinAssemblyMs=JSON.stringify(preparation);}});
+    delete view.preparationSteps;
     view.deckStyle=deckStyle;
     try{
+      await nextPreparationFrame();
       finishCabinFixtures(view);
+      await nextPreparationFrame();
       const roots=[view.ship.staticMesh,view.ship.animated,view.droidBay.root,view.droidService.root,view.harvestDelivery.root];
       view.cabinSignage=await createCabinSignage(roots);
+      await nextPreparationFrame();
       view.cabinToon=createCabinToon(roots);
       view.cabinToon.setStyle(cabinStyle);
+      await nextPreparationFrame();
       // Practical lighting also exists in studies that don't replay startup.
       view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,start:false});
       const workCenter=new THREE.Vector3(HATCH_SERVICE_POINT.x-.12,positionY(FLOORS[getStation('innerHatch').floor].y)+HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z);
+      await nextPreparationFrame();
       view.emergencyLighting=new CabinEmergencyLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,workCenter});
+      await nextPreparationFrame();
       if(characterViews)view.characterCamera=new CharacterCamera(view);
       return view;
     }catch(error){view.dispose();throw error;}
   }
-  constructor(canvas,m,head,lucy,{floorBuilder,builtShip}={}){
+  constructor(canvas,m,head,lucy,{deferSetup=false,...options}={}){
+    const steps=this.setupSteps(canvas,m,head,lucy,options);
+    if(deferSetup)this.preparationSteps=steps;
+    else while(!steps.next().done){};
+  }
+  *setupSteps(canvas,m,head,lucy,{floorBuilder,builtShip}={}){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,stencil:true,powerPreference:'high-performance'});
     this.renderer.localClippingEnabled=true;
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,CABIN_PIXEL_RATIO));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=CABIN_AMBIENCE.exposure;
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    yield;
     const pmrem=new THREE.PMREMGenerator(this.renderer),environment=new RoomEnvironment();
     this.envTarget=pmrem.fromScene(environment,.04);this.scene.environment=this.envTarget.texture;environment.dispose();pmrem.dispose();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
     this.scene.add(new THREE.HemisphereLight(CABIN_AMBIENCE.sky,CABIN_AMBIENCE.ground,CABIN_AMBIENCE.ambient));
     const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
+    yield;
     this.ship=builtShip??buildShip(m,{floorBuilder});limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
-    this.shadowProxy=createStaticShadowProxy(this.ship.staticMesh);if(this.shadowProxy)this.scene.add(this.shadowProxy);
-    this.droidBay=createDroidChargingBay(positionY(FLOORS[DROID_DOCK.floor].y));this.scene.add(this.droidBay.root);
+    this.shadowProxy=yield* createStaticShadowProxySteps(this.ship.staticMesh);if(this.shadowProxy)this.scene.add(this.shadowProxy);
+    yield;
+    this.droidBay=yield* createDroidChargingBaySteps(positionY(FLOORS[DROID_DOCK.floor].y));this.scene.add(this.droidBay.root);
+    yield;
     this.droidService=createDroidServiceRig(this.droidBay,this.ship);this.scene.add(this.droidService.root);
     // Preserve the powered-down pose until the live routine is attached.
     this.droidService.actorRoot.position.copy(this.droidBay.root.position);
-    this.hairGrowth=attachHairGrowth(head);this.hairGrowth.setGrowth(0);
-    this.milo=createMilo(m,head);this.cat=createLucy(lucy);this.scene.add(this.milo,this.cat);
-    this.catRun=createLucyRunRig(this.cat);this.mouse=createCabinMouse({clipAtStudyWalls:false});this.mouse.root.visible=false;this.scene.add(this.mouse.root);
+    yield;
+    this.hairGrowth=yield* attachHairGrowthSteps(head);this.hairGrowth.setGrowth(0);
+    this.milo=yield* createMiloSteps(m,head);this.scene.add(this.milo);
+    yield;
+    this.cat=yield* createLucySteps(lucy);this.scene.add(this.cat);
+    yield;
+    this.catRun=yield* createLucyRunRigSteps(this.cat);this.mouse=createCabinMouse({clipAtStudyWalls:false});this.mouse.root.visible=false;this.scene.add(this.mouse.root);
+    yield;
     this.harvestDelivery=createHarvestDelivery(m,this.scene);
+    yield;
     this.groomingTools=createGroomingTools(this.milo.userData.body,m,createMachinedMetals());
+    yield;
     this.groomingMotion=prepareGroomingMotion(this.milo,this.ship.groomingStation,this.groomingTools,{origin:this.ship.groomingStation.origin});
-    this.characterToon=[createMiloToon(this.milo),createLucyToon(this.cat)];
+    yield;
+    this.characterToon=[yield* createMiloToonSteps(this.milo)];
+    yield;
+    this.characterToon.push(createLucyToon(this.cat));
+    yield;
     for(const tool of Object.values(this.groomingTools)){
       tool.visible=false;
       tool.traverse(part=>{if(part.material?.anisotropy>0)part.material.defines.USE_UV='';});
@@ -112,13 +142,8 @@ export class ObservationView {
     limitShadowCasters(this.scene);
   }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
-  // Compile every program in parallel behind the loading screen; three's
-  // compileAsync polls KHR_parallel_shader_compile so the page stays live.
-  // compile() has two gaps covered here: it uses whatever clipping state the
-  // last draw left, and it never prepares the shadow pass. A throwaway 1x1
-  // draw sets the clipping state for each plane count before the materials
-  // with that count compile, and probe meshes prepare the shadow-pass depth
-  // variants. Every compile starts synchronously; all are awaited together.
+  // Shader submission is synchronous even with compileAsync. Pace submission
+  // as well as assembly; keep clipping and shadow program variants intact.
   async compilePrograms(){
     const {renderer,scene,camera}=this;
     const planeCount=material=>Math.max(...(Array.isArray(material)?material:[material]).map(m=>m?.clipIntersection?0:(m?.clippingPlanes?.length||0)));
@@ -132,23 +157,78 @@ export class ObservationView {
     const casting=object=>{if(underCharacter(object))return true;for(let o=object;o;o=o.parent)if(!o.visible)return false;return true;};
     for(const probe of this.shadowDepthProbes(casting))group(depth,probe.userData.clippingCount,probe);
     const target=new THREE.WebGLRenderTarget(1,1),pending=[];
+    let batchStart=performance.now();
+    const submit=async object=>{
+      pending.push(renderer.compileAsync(object,camera,scene));
+      if(performance.now()-batchStart>=4){await nextPreparationFrame();batchStart=performance.now();}
+    };
     for(const count of new Set([0,...clipped.keys(),...depth.keys()])){
       this.primeClipping(count,target);
       // The shadow pass renders into a target, which is part of the program key.
-      for(const probe of depth.get(count)??[])pending.push(renderer.compileAsync(probe,camera,scene));
+      for(const probe of depth.get(count)??[])await submit(probe);
       renderer.setRenderTarget(null);
-      if(count){for(const object of clipped.get(count)??[])pending.push(renderer.compileAsync(object,camera,scene));continue;}
-      // Clipped materials would compile here with no planes; leave them to their own pass.
-      const stash=new Map();
-      for(const object of [...clipped.values()].flat()){stash.set(object,object.material);object.material=undefined;}
-      try{pending.push(renderer.compileAsync(scene,camera));}
-      finally{for(const [object,material] of stash)object.material=material;}
+      if(count){for(const object of clipped.get(count)??[])await submit(object);continue;}
+      // Compile leaves, using the real scene for lights and environment. Passing
+      // the whole scene submits hundreds of programs in one uninterrupted task.
+      const objects=[];
+      scene.traverse(object=>{if(object.material&&!planeCount(object.material))objects.push(object);});
+      for(const object of objects)await submit(object);
+
     }
     target.dispose();
     // Keep the probes' depth materials until dispose(): they hold the programs
     // for casters that only appear later (eyelids, grooming tools).
     this.depthProbeMaterials=[...depth.values()].flat().filter(probe=>probe.userData.ownsMaterial).map(probe=>probe.material);
     await Promise.all(pending);
+    // Upload textures individually; leaving them for the first cabin draw makes
+    // that single frame block the movie even after shader compilation finishes.
+    const textures=new Set();
+    scene.traverse(object=>{
+      for(const material of (Array.isArray(object.material)?object.material:[object.material]).filter(Boolean)){
+        for(const value of Object.values(material))if(value?.isTexture&&!value.isRenderTargetTexture)textures.add(value);
+        for(const uniform of Object.values(material.uniforms??{}))if(uniform.value?.isTexture&&!uniform.value.isRenderTargetTexture)textures.add(uniform.value);
+      }
+    });
+    const uploads=[],decoded=new WeakMap();
+    for(const texture of textures){
+      const image=texture.image;
+      if(typeof createImageBitmap==='function'&&['IMG','CANVAS'].includes(image?.tagName)){
+        let variants=decoded.get(texture.source);if(!variants)decoded.set(texture.source,variants=new Map());
+        const key=`${texture.flipY}|${texture.premultiplyAlpha}`;
+        if(!variants.has(key)){
+          // Decode/convert off the main thread instead of paying for it inside
+          // texImage2D. ImageBitmap owns orientation and premultiplication.
+          const bitmap=await createImageBitmap(image,{imageOrientation:texture.flipY?'flipY':'none',premultiplyAlpha:texture.premultiplyAlpha?'premultiply':'none',colorSpaceConversion:'none'});
+          variants.set(key,new THREE.Source(bitmap));
+        }
+        texture.source=variants.get(key);texture.needsUpdate=true;
+      }
+      const start=performance.now();renderer.initTexture(texture);
+      uploads.push(Math.round(performance.now()-start));await nextPreparationFrame();
+    }
+    document.documentElement.dataset.cabinTextureUploadMs=JSON.stringify(uploads);
+  }
+  async warmDraws(){
+    const {scene,camera,renderer}=this,objects=[];
+    scene.traverse(object=>{if(object.material)objects.push({object,mask:object.layers.mask,culled:object.frustumCulled});});
+    const autoUpdate=renderer.shadowMap.autoUpdate;
+    renderer.shadowMap.autoUpdate=false;
+    for(const {object}of objects){object.layers.mask=0;object.frustumCulled=false;}
+    try{
+      // Warm real geometry/VAOs and program uniforms in small draws. Lights,
+      // environment, canvas and camera are the actual cabin's, so the first
+      // complete draw reuses these programs rather than recompiling variants.
+      for(let i=0;i<objects.length;i+=8){
+        const batch=objects.slice(i,i+8);
+        for(const {object,mask}of batch)object.layers.mask=mask;
+        renderer.render(scene,camera);
+        for(const {object}of batch)object.layers.mask=0;
+        await nextPreparationFrame();
+      }
+    }finally{
+      for(const {object,mask,culled}of objects){object.layers.mask=mask;object.frustumCulled=culled;}
+      renderer.shadowMap.autoUpdate=autoUpdate;
+    }
   }
   primeClipping(count,target){
     const planes=count?Array.from({length:count},()=>new THREE.Plane()):null;
@@ -284,7 +364,7 @@ export class ObservationView {
     }
     this.targetCenter.copy(this.center);
   }
-  render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null,xrFrame=null){
+  render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null,xrFrame=null,prepareOnly=false){
     this.characterCamera?.restorePose();
     this.emergencyLighting?.update(paused?0:dt,brain.environment,paused?null:this.audio?.loopTime('hatch-alarm'));
     this.ship.consoleScreens?.update({brain,care,airlock,droid:this.droidRoutine,clock:time});
@@ -386,6 +466,7 @@ export class ObservationView {
     const width=eye?.z||this.width,height=eye?.w||this.height;
     this.characterToon.forEach(toon=>toon.update(width,height));
     this.cabinToon?.update(width,height,this.viewHeight,this.fitHeight);
+    if(prepareOnly)return;
     const quality=this.immersive?.active?this.immersive.quality:null;
     quality?.beginFrame(this.mode);
     try{this.renderer.render(this.scene,this.camera);}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {createExteriorShadow} from '../src/obs/exterior-shadow.js';
-import {sampleExteriorCinema,sampleExteriorCinemaFrame} from '../src/obs/exterior-cinematic.js';
+import {sampleExteriorCinema,sampleExteriorCinemaFrame,exteriorCinemaShots} from '../src/obs/exterior-cinematic.js';
 
 test('docking shadows resolve ladder rungs and preserve the shallow cover clearance',()=>{
   const ship=createExteriorShip(),sun=new THREE.DirectionalLight(),shadows=createExteriorShadow(sun,ship);
@@ -37,7 +37,8 @@ test('translating the approaching probe leaves its surface on the same shadow te
 test('the real approach dissolve activates the close shadow only for the docking camera',()=>{
   const ship=createExteriorShip(),sun=new THREE.DirectionalLight(),shadows=createExteriorShadow(sun,ship);
   try{
-    const frame=sampleExteriorCinemaFrame(57.8,{opening:true});
+    const shots=exteriorCinemaShots(),dockingStart=shots.slice(0,shots.findIndex(shot=>shot.id==='lander')).reduce((time,shot)=>time+shot.duration,0);
+    const frame=sampleExteriorCinemaFrame(dockingStart-.2,{opening:true});
     assert.equal(frame.from.id,'distant');assert.equal(frame.to.id,'lander');
     for(const shot of [frame.from,frame.to,frame.from]){
       shadows.update(shot);

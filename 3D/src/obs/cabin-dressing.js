@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {DECK} from './layout.js';
 import {box,cylinder,rod,pipe} from './materials.js';
@@ -143,18 +144,24 @@ function arrangeConsoleChairs(parent,floor,metals){
   });
 }
 
-export function addCabinDressing(parent,m,floors){
+export function addCabinDressing(parent,m,floors){return finishPreparationSteps(addCabinDressingSteps(parent,m,floors));}
+export function* addCabinDressingSteps(parent,m,floors){
   const root=new THREE.Group();root.name='Cabin dressing';parent.add(root);
   const [habitation,operations,bottom]=[floors[DECK.HABITATION],floors[DECK.OPERATIONS],floors[DECK.LIFE_SUPPORT]];
   const casePaint=new THREE.MeshStandardMaterial({name:'Industrial / graphite polymer cases',color:0x62695b,roughness:.86,metalness:0,bumpMap:m.enamel.bumpMap,bumpScale:.0008});
   const metals=createMachinedMetals();
   arrangeConsoleChairs(parent,operations,metals);
+  yield;
   finishMachinedFixtures(parent,m,metals);
+  yield;
   finishWallPrints(parent,m,habitation);
-  floors.forEach(y=>heavyServices(root,m,y));underdeck(root,m);
+  yield;
+  for(const y of floors){heavyServices(root,m,y);yield;}underdeck(root,m);
+  yield;
   const extinguishers=addFireExtinguishers(root,m,floors);
   const switches=addWallSwitchPanels(root,floors);
 
+  yield;
   const coffeeStation=createLoungeCoffeeStation(m,casePaint,parent.getObjectByName('Sofa floor-reaching arm')?.material);
   coffeeStation.position.set(10.20,habitation,0);root.add(coffeeStation);
   const controlMaterials=createWallControlMaterials();
@@ -164,6 +171,7 @@ export function addCabinDressing(parent,m,floors){
     const cabinet=createWallControlPanel(controlMaterials,w),rear=new THREE.Box3().setFromObject(cabinet).min.z;
     cabinet.position.set(x,y,wallZ-rear);root.add(cabinet);
   }
+  yield;
   const toiletCasePaint=casePaint.clone();
   toiletCasePaint.name='Industrial / warm yellow toilet case';toiletCasePaint.color.setHex(0xe2ae35);
   equipmentCase(root,m,toiletCasePaint,-8.56,habitation+.42,-1.69,.66,.46,-1.87);
@@ -171,6 +179,7 @@ export function addCabinDressing(parent,m,floors){
   addSmokingAshtray(root,m,habitation);
 
   // Keep the kitchen worktop props, without an overhead provision shelf.
+  yield;
   const worktop=bottom+1.0+.07/2; // Counter centre and half its thickness.
   tin(root,m,-10.03,worktop,-.26,.33,.13,m.metal);
   const handle=new THREE.Mesh(new THREE.TorusGeometry(.15,.024,6,16,Math.PI),m.dark);handle.position.set(-10.03,worktop+.345,-.26);root.add(handle);
@@ -188,6 +197,7 @@ export function addCabinDressing(parent,m,floors){
   gymCase.position.y+=bottom-caseBounds.min.y;
   // Keep the EVA preparation aisle clear; the former case at x=10.02 sat
   // directly in front of the third hanging suit.
+  yield;
   finishStaticCups(parent);
   // Detached templates share the actual geometry and atlases, without retaining
   // the entire unbatched ship through a parent reference.

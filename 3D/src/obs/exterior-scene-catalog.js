@@ -1,17 +1,33 @@
 // Catalog labels and stable links only: browsing the list does not build ships.
 export const CAMERA_REVISION='20261013-r1';
+export const ENTRY_CAMERA_REVISION='20261013-r7';
+export const LEVEL_CAMERA_REVISION='20261013-r6';
+export const FULL_CAMERA_REVISION='20261013-r5';
+export const FAST_CAMERA_REVISION='20261013-r4';
+export const LOW_CAMERA_REVISION='20261013-r3';
+export const PREVIOUS_CAMERA_REVISION='20261013-r2';
 const saved={revision:CAMERA_REVISION};
 const bow={approach:'bow'};
 const ending={...bow,ending:'underside'};
 export const EXTERIOR_SCENE_CATALOG=Object.freeze([
+  {id:'01-tilt-current',number:1,label:'上向き1°・36秒から02へ',status:'採用・現行',start:0,time:15,options:ending},
+  {id:'01-tilt-r2',number:1,label:'上向き調整前のティルト',status:'直前保存版',start:0,time:15,options:{...ending,revision:PREVIOUS_CAMERA_REVISION}},
   {id:'01-tilt',number:1,label:'ティルト・母艦の接近',status:'保存版',start:0,time:15,options:saved},
+  {id:'02-planet-current',number:2,label:'惑星背景・横移動',status:'採用・現行',start:36.75,time:41.75,options:ending},
   {id:'02-planet',number:2,label:'惑星背景・横移動',status:'保存版',start:38,time:43,options:saved},
-  {id:'03-bow',number:3,label:'船首斜め下・03の画角',status:'現行案',start:50,time:54,options:bow},
+  {id:'03-bow',number:3,label:'船首斜め下・03の画角',status:'採用・現行',start:48.75,time:52.75,options:ending},
   {id:'03-original',number:3,label:'元の遠景カメラ',status:'旧案・保存版',start:50,time:54,options:saved},
   {id:'07-docking',number:7,label:'左下・小型船のドッキング',status:'保存版',start:58,time:64.8,options:saved},
-  {id:'07-docking-right',number:7,label:'右下・小型船のドッキング',status:'採用・現行',start:58,time:64.8,options:{}},
+  {id:'07-docking-right',number:7,label:'右下・小型船のドッキング',status:'採用・現行',start:56.75,time:63.55,options:ending},
+  {id:'04-crossing-current',number:4,label:'超望遠・惑星を横切る母艦',status:'採用・現行',start:67.5,time:72.5,options:ending},
   {id:'04-crossing',number:4,label:'超望遠・惑星を横切る母艦',status:'保存版',start:68.75,time:73.75,options:saved},
-  {id:'05-b-ending-current',number:5,label:'Bをラストに・09なし',status:'現行案・速度＋5%',start:78.75,time:82.75,options:ending},
+  {id:'05-b-ending-current',number:5,label:'80秒のアングルから・船体より少し下で停止',status:'採用・現行・船の速度を5%調整',start:77.5,time:81.5,options:ending},
+  {id:'05-b-ending-r7',number:5,label:'開始アングル変更前・80秒の構図',status:'直前保存版',start:77.5,time:80,options:{...ending,revision:ENTRY_CAMERA_REVISION}},
+  {id:'05-b-ending-r6',number:5,label:'停止位置変更前・船体と同じ高さから見送り',status:'直前保存版',start:77.5,time:99.5,options:{...ending,revision:LEVEL_CAMERA_REVISION}},
+  {id:'05-b-ending-r5',number:5,label:'開始アングル変更前・5%減速した05',status:'直前保存版',start:77.5,time:79.5,options:{...ending,revision:FULL_CAMERA_REVISION}},
+  {id:'05-b-ending-r4',number:5,label:'5%減速前・船体の高さから見送り',status:'直前保存版',start:77.5,time:96,options:{...ending,revision:FAST_CAMERA_REVISION}},
+  {id:'05-b-ending-r3',number:5,label:'上昇前・船底から加速して見送り',status:'直前保存版',start:77.5,time:96,options:{...ending,revision:LOW_CAMERA_REVISION}},
+  {id:'05-b-ending-r2',number:5,label:'加速前・2.1 m/s一定のBラスト',status:'直前保存版',start:76.5,time:80.5,options:{...ending,revision:PREVIOUS_CAMERA_REVISION}},
   {id:'05-b-ending-r1',number:5,label:'Bラスト・速度変更前',status:'直近保存版・元の速度',start:78.75,time:82.75,options:{...ending,...saved}},
   {id:'05-mounted',number:5,label:'元の船体固定カメラ',status:'旧案・保存版',start:78.75,time:82.75,options:saved},
   {id:'05-bow',number:5,label:'船首斜め下の全体像',status:'旧案・保存版',start:78.75,time:82.75,options:{...saved,penultimate:'bow'}},

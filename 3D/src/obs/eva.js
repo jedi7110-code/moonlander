@@ -1,7 +1,8 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {box,cylinder,rod} from './materials.js';
 import {EVA_PASSAGE,CABIN_AISLE} from './layout.js';
-import {hangingSuit} from './eva-suit.js';
+import {hangingSuitSteps} from './eva-suit.js';
 import {createEquipmentRack} from './eva-equipment.js';
 import {EVA_SPOT_LAYOUT} from './lighting.js';
 import {createPressureHatch,animatePressureHatch,PRESSURE_HATCH,PRESSURE_LOCK_SERVICE,REFERENCE_HATCH_CASSETTE,pressureCassetteOutline} from './pressure-hatch.js';
@@ -43,7 +44,8 @@ export function createEVAHatch(m,y,inner=false){
   return root;
 }
 
-export function createEVABay(m,y){
+export function createEVABay(m,y){return finishPreparationSteps(createEVABaySteps(m,y));}
+export function* createEVABaySteps(m,y){
   const root=new THREE.Group();root.name='EVA preparation bay';const suits=[];
   for(const x of [7.25,10.88]){
     box(root,m.dark,x,y+1.36,-1.25,.085,2.66,.19,.015);
@@ -52,12 +54,17 @@ export function createEVABay(m,y){
   rod(root,m.metal,[7.25,y+EVA_BAY.railY,-1.04],[10.88,y+EVA_BAY.railY,-1.04],.046);
   box(root,m.dark,9.05,y+.12,-.69,3.71,.12,1.25,.025);
   for(let i=0;i<25;i++)box(root,m.metal,7.34+i*.141,y+.186,-.68,.075,.013,1.06);
-  EVA_BAY.suitX.forEach((x,index)=>{
-    const suit=hangingSuit(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.rotation.y=(index-1)*.16;root.add(suit);suits.push(suit);
-  });
+  for(const [index,x]of EVA_BAY.suitX.entries()){
+    const suit=yield* hangingSuitSteps(m,index);suit.position.set(x,y+.35,EVA_BAY.suitZ);suit.rotation.y=(index-1)*.16;root.add(suit);suits.push(suit);
+    yield;
+  }
   root.add(createEVASpotlights(m,y));
-  const hatch=createEVAHatch(m,y),innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
+  yield;
+  const hatch=createEVAHatch(m,y);
+  yield;
+  const innerHatch=createEVAHatch(m,y,true);root.add(hatch,innerHatch);
   root.add(createEVAPartitions(m,y));
+  yield;
   const equipmentRack=createEquipmentRack(m,y);root.add(equipmentRack);
   return{root,suits,hatch,innerHatch,equipmentRack};
 }

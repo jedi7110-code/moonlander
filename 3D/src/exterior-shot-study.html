@@ -14,7 +14,7 @@ iframe{display:block;width:100%;aspect-ratio:16/9;border:1px solid #263335;backg
 </style></head>
 <body><main>
 <h1 id="heading">SCENE 05 / カメラ3案</h1>
-<p id="description">同じ82.75秒の構図で比較。前後を再生すると、04 → 05 → 09のつながりを見られます。</p>
+<p id="description">同じ81.5秒の構図で比較。前後を再生すると、04 → 05 → 09のつながりを見られます。</p>
 <nav aria-label="カメラ案">
 <button type="button" data-shot="bow-slide" aria-pressed="true">A · 船首越しの横移動</button>
 <button type="button" data-shot="underside" aria-pressed="false">B · 船底から抜ける移動</button>
@@ -22,7 +22,7 @@ iframe{display:block;width:100%;aspect-ratio:16/9;border:1px solid #263335;backg
 </nav>
 <iframe id="film" title="選択した05のプレビュー" allow="autoplay"></iframe>
 <p id="caption" class="caption" aria-live="polite"></p>
-<div class="actions"><button id="replay" type="button">前後を再生 · 77.5秒から</button><button id="compare" type="button">82.75秒で比較</button><button id="ending" type="button" aria-pressed="false">Bをラストに · 09なし</button><button id="distant" type="button" hidden>遠ざかった姿 · 150秒</button><a id="full" target="_blank" rel="noopener">大きく見る</a><a href="./exterior-scene-catalog.html">シーン一覧・保存版</a></div>
+<div class="actions"><button id="replay" type="button">前後を再生 · 76.25秒から</button><button id="compare" type="button">81.5秒で比較</button><button id="ending" type="button" aria-pressed="false">Bをラストに · 09なし</button><button id="distant" type="button" hidden>遠ざかった姿 · 150秒</button><a id="full" target="_blank" rel="noopener">大きく見る</a><a href="./exterior-scene-catalog.html">シーン一覧・保存版</a></div>
 </main>
 <script type="module">
 const choices={
@@ -35,22 +35,22 @@ let selected=Object.hasOwn(choices,initial)?initial:'bow-slide';
 let ending=query.get('ending')==='underside';
 if(ending)selected='underside';
 const film=document.getElementById('film');
-function show(time=82.75,paused=true){
+function show(time=81.5,paused=true){
  const url=new URL('./ship-exterior-cinema.html',location.href);
  url.search=new URLSearchParams({mode:'opening',approach:'bow',penultimate:selected,time:time.toFixed(3),...(ending?{ending:'underside'}:{}),...(paused?{paused:'1'}:{})});
  film.src=url.href;document.getElementById('full').href=url.href;
- document.getElementById('caption').textContent=ending?'B · 母艦を見送り続ける。カメラの位置が落ち着いた後も、遠ざかる母艦を追って航行が続きます。':choices[selected];
+ document.getElementById('caption').textContent=ending?'B · 母艦を見送り続ける。大きな回り込みの後、ゆっくり上がって船体より少し下で止まり、遠ざかる母艦を後方から見送ります。':choices[selected];
  document.getElementById('heading').textContent=ending?'SCENE 05 / Bをラストに・09なし':'SCENE 05 / カメラ3案';
- document.getElementById('description').textContent=ending?'04 → B。そのまま遠ざかる母艦をエンドレスで見送るバージョン。':'同じ82.75秒の構図で比較。前後を再生すると、04 → 05 → 09のつながりを見られます。';
+ document.getElementById('description').textContent=ending?'04 → B。そのまま遠ざかる母艦をエンドレスで見送るバージョン。':'同じ81.5秒の構図で比較。前後を再生すると、04 → 05 → 09のつながりを見られます。';
  document.getElementById('ending').setAttribute('aria-pressed',String(ending));
  document.getElementById('distant').hidden=!ending;
  for(const button of document.querySelectorAll('[data-shot]'))button.setAttribute('aria-pressed',String(button.dataset.shot===selected));
  const page=new URL(location.href);page.searchParams.set('shot',selected);if(ending)page.searchParams.set('ending','underside');else page.searchParams.delete('ending');history.replaceState(null,'',page);
 }
 for(const button of document.querySelectorAll('[data-shot]'))button.onclick=()=>{selected=button.dataset.shot;ending=false;show();};
-document.getElementById('replay').onclick=()=>show(77.5,false);
+document.getElementById('replay').onclick=()=>show(76.25,false);
 document.getElementById('compare').onclick=()=>show();
-document.getElementById('ending').onclick=()=>{ending=!ending;if(ending)selected='underside';show(77.5,false);};
+document.getElementById('ending').onclick=()=>{ending=!ending;if(ending)selected='underside';show(76.25,false);};
 document.getElementById('distant').onclick=()=>show(150,true);
 show();
 </script></body></html>

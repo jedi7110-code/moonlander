@@ -1,3 +1,4 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {applyStudyCropHairline} from './crop-hairline.js';
 
@@ -34,7 +35,8 @@ export const HAIR_LENGTH_STEPS=[.14,.30,.50,.70,.86,1];
 // Its highest V edge is the root. Sample shorter distances along the card's
 // existing UV flow, keeping its roots fixed and retaining the original DAY 15
 // positions, normals and textures. No head/cap scaling or outward inflation.
-export function addHairGrowthTargets(geometry){
+export function addHairGrowthTargets(geometry){return finishPreparationSteps(addHairGrowthTargetsSteps(geometry));}
+function* addHairGrowthTargetsSteps(geometry){
   const position=geometry.attributes.position,uv=geometry.attributes.uv,index=geometry.index;
   const parents=Array.from({length:position.count},(_,i)=>i);
   const find=i=>parents[i]===i?i:parents[i]=find(parents[i]);
@@ -50,7 +52,9 @@ export function addHairGrowthTargets(geometry){
   }
   const positions=HAIR_LENGTH_STEPS.slice(0,-1).map(()=>position.clone());
   const query=new THREE.Vector3(),closest=new THREE.Vector3(),bary=new THREE.Vector3(),point=new THREE.Vector3(),vertex=new THREE.Vector3();
+  let batchStart=performance.now();
   for(const {vertices,triangles} of cards.values())for(const i of vertices){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
     const u=uv.getX(i),v=uv.getY(i);let rootV=v;
     // Follow the actual root edge, including unequal UVs from simplification.
     for(const {triangle} of triangles){
@@ -162,7 +166,8 @@ export function createGrowingBeard(face,headScale=.055,forward=0){
   return{mesh,setProgress(value){growth.value=THREE.MathUtils.clamp(value,0,1);mesh.visible=growth.value>0;}};
 }
 
-export function attachHairGrowth(head){
+export function attachHairGrowth(head){return finishPreparationSteps(attachHairGrowthSteps(head));}
+export function* attachHairGrowthSteps(head){
   // Use the already loaded approved hairstyle; setAppearance retains it when
   // switching back to A. Keep the approved roots, hairline and final length.
   head.userData.setAppearance({hair:'reference',beard:'none'});
@@ -170,7 +175,8 @@ export function attachHairGrowth(head){
   head.userData.setAppearance({hair:'crop',beard:'none'});
   head.add(supplied);
   const crop=applyStudyCropHairline(head),face=head.getObjectByName('Milo scanned head'),cards=supplied.getObjectByName('Supplied hair cards');
-  addHairGrowthTargets(cards.geometry);cards.updateMorphTargets();
+  yield* addHairGrowthTargetsSteps(cards.geometry);cards.updateMorphTargets();
+  yield 'hair-growth-targets';
   const cropCoverage={value:1},cardCoverage={value:0},scalpCoverage={value:0},proceduralHair={value:1};
   studyCoverage(crop.material,cropCoverage);studyCoverage(cards.material,cardCoverage);
   studyCoverage(supplied.getObjectByName('Supplied scalp').material,scalpCoverage);

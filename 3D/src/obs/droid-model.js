@@ -1,7 +1,8 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {createDroidLowParts,batchDroidLow,addDroidBalanceRotor} from './droid-low.js?v=balance-rotor-1';
+import {createDroidLowPartsSteps,batchDroidLowSteps,addDroidBalanceRotor} from './droid-low.js?v=balance-rotor-1';
 import {DROID_STARTUP_SECONDS,droidStartupLight} from './droid-startup.js';
 import {createDroidBatteryAtlas} from './droid-textures.js';
 import {DROID_GAIT} from './pace.js';
@@ -550,9 +551,10 @@ function buildDroidDetailed(){
   return {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators};
 }
 
-export function createDroid({detail='study',balanceRotor=false}={}){
+export function createDroid(options){return finishPreparationSteps(createDroidSteps(options));}
+export function* createDroidSteps({detail='study',balanceRotor=false}={}){
   const low=detail==='obs';
-  const {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators}=low?createDroidLowParts(DROID_SPEC,DROID_EXPRESSIONS,expressionPaths):buildDroidDetailed();
+  const {root,m,chassis,neckPivot,head,face,arms,legs,tray,actuators}=low?(yield* createDroidLowPartsSteps(DROID_SPEC,DROID_EXPRESSIONS,expressionPaths)):buildDroidDetailed();
   // OBS opts into the approved mechanism; keep the original for study comparison.
   const balance=low&&balanceRotor?addDroidBalanceRotor(chassis,m):null;
   m.batteryTexture=createDroidBatteryAtlas();
@@ -657,7 +659,8 @@ export function createDroid({detail='study',balanceRotor=false}={}){
     root.updateMatrixWorld(true);return {mode,powered:facePower>0,facePower,feet,hands};
   }
   update(0);
-  const skin=low?batchDroidLow(root,m.body):null;
+  yield;
+  const skin=low?(yield* batchDroidLowSteps(root,m.body)):null;
   function dispose(){
     const geometries=new Set();root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);});geometries.forEach(g=>g.dispose());
     Object.values(m).forEach(v=>v.dispose?.());

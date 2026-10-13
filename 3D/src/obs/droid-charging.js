@@ -1,5 +1,6 @@
+import {finishPreparationSteps} from './background-preparation.js';
 import * as THREE from 'three';
-import {createDroid} from './droid-model.js';
+import {createDroidSteps} from './droid-model.js';
 import {box,rod,pipe,batchStatic} from './materials.js';
 import {DECK} from './layout.js';
 
@@ -7,7 +8,8 @@ export const DROID_DOCK=Object.freeze({x:-11.92,z:-.52,floor:DECK.OPERATIONS,bas
 
 // A supported, powered-down pose. The charger stays live; the droid's face and
 // actuators rest, so no idle animation or per-frame IK is needed at the dock.
-export function createDroidChargingBay(floorY){
+export function createDroidChargingBay(floorY){return finishPreparationSteps(createDroidChargingBaySteps(floorY));}
+export function* createDroidChargingBaySteps(floorY){
   const root=new THREE.Group();root.name='Droid charging bay / console left';
   const dark=new THREE.MeshStandardMaterial({name:'Droid dock / graphite',color:0x252b28,metalness:.68,roughness:.56});
   const metal=new THREE.MeshStandardMaterial({name:'Droid dock / machined steel',color:0x737c75,metalness:.84,roughness:.43});
@@ -33,7 +35,7 @@ export function createDroidChargingBay(floorY){
   for(let i=0;i<4;i++)box(fixture,rubber,-.435,.80+i*.025,-.545,.13,.008,.006);
   box(fixture,rubber,-.435,.973,-.541,.088,.031,.01,.004);
   box(fixture,lamp,-.435,.973,-.533,.031,.009,.005,.002);
-  const droid=createDroid({detail:'obs',balanceRotor:true});root.add(droid.root);droid.update(0,'charging');
+  const droid=yield* createDroidSteps({detail:'obs',balanceRotor:true});root.add(droid.root);droid.update(0,'charging');
   const cable=new THREE.Group();cable.name='Fixed charging stand cable';root.add(cable);
   // Both ends are attached to the stand: power unit below, contact support above.
   // It stays in place and visible through waking, departure and return.

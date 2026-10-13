@@ -7,7 +7,7 @@ async function bootFixture(t,opening){
   const previous={document:globalThis.document,location:globalThis.location,testOpeningBoot:globalThis.testOpeningBoot};
   const events=[];let play,intro,loaded;
   const playing=new Promise(resolve=>{play=resolve;}),finished=new Promise(resolve=>{intro=resolve;}),mainLoaded=new Promise(resolve=>{loaded=resolve;});
-  const ui={show(){events.push('opening');},whenPlaying(){return playing;},whenIntroFinished(){return finished;}};
+  const ui={show(){events.push('opening');},whenPlaying(){return playing;},whenLogoResolved(){return finished;}};
   globalThis.testOpeningBoot={exteriorCinema:ui,shouldPlayExteriorOpening:()=>opening,loadCabin(){events.push('cabin module');loaded();}};
   globalThis.location={search:''};globalThis.document={documentElement:{dataset:{}},
     head:{append(){events.push('network preload');}},getElementById:id=>id==='cabin-preloads'?{content:{cloneNode(){return{};}}}:{hidden:false}};
@@ -19,7 +19,7 @@ async function bootFixture(t,opening){
   await import(`data:text/javascript,${encodeURIComponent(source+`\n// opening=${opening}`)}`);
   return{events,play,intro,mainLoaded};
 }
-test('real boot starts network preloads after playback and delays cabin module evaluation until the logo finishes',async t=>{
+test('real boot starts network preloads after playback and delays cabin module evaluation until the full logo is presented',async t=>{
   const f=await bootFixture(t,true);assert.deepEqual(f.events,['opening']);
   f.play();await Promise.resolve();await Promise.resolve();assert.deepEqual(f.events,['opening','network preload']);
   assert.equal(document.documentElement.dataset.cabinBuildStartedMs,undefined);
