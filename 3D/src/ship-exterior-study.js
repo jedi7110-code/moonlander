@@ -4,6 +4,8 @@ import {createExteriorShip,EXTERIOR,rotationGravity,exteriorAngle} from './obs/s
 import {createExteriorOptics} from './obs/exterior-optics.js';
 import {createExteriorCruise} from './obs/exterior-cruise.js';
 import {createDistantStars} from './obs/exterior-stars.js';
+import {createExteriorDissolve} from './obs/exterior-dissolve.js';
+import {createExteriorCameraLimit} from './obs/exterior-camera-limit.js';
 import {ExteriorCinemaUI} from './obs/exterior-cinema-ui.js';
 const $=id=>document.getElementById(id),canvas=$('ship-view');
 const entryQuery=new URLSearchParams(location.search),embedded=entryQuery.get('embedded')==='1',freeView=entryQuery.get('viewer')==='free';
@@ -17,6 +19,9 @@ try{
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  // Use the cinema's linear star blending and final color conversion. Direct
+  // canvas rendering converts each point before blending, changing the sky.
+  const presentation=createExteriorDissolve(renderer);
   const ship=createExteriorShip();ship.setCoreScale(Number(new URLSearchParams(location.search).get('core'))||2.6);scene.add(ship.root);
   const optics=createExteriorOptics(ship),bufferSize=new THREE.Vector2();
   scene.add(new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
@@ -27,7 +32,8 @@ try{
   const bounce=new THREE.DirectionalLight(0x8ca7bd,.65);bounce.position.set(-38,-15,-30);scene.add(bounce,sun.target,bounce.target);
   const stars=createDistantStars();scene.add(stars.haze,stars.field);
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),controls=new OrbitControls(camera,canvas);
-  controls.enableDamping=true;controls.dampingFactor=.10;controls.minDistance=3;controls.maxDistance=260;controls.screenSpacePanning=true;controls.rotateSpeed=.6;
+  controls.enableDamping=true;controls.dampingFactor=.10;controls.maxDistance=260;controls.screenSpacePanning=true;controls.rotateSpeed=.6;
+  const cameraLimit=createExteriorCameraLimit({ship,camera,controls});
   const cruise=createExteriorCruise({ship,camera,controls,lights:[sun,bounce]});
   let currentView='whole',running=true,angle=55*Math.PI/180,rpm=EXTERIOR.rpm,disposed=false,last=0,frame=0,visible=true,measureFrames=0,measureTime=0;
   const habitatTarget=new THREE.Vector3(),followDelta=new THREE.Vector3(),rotorAxis=new THREE.Vector3(1,0,0);let trackingAngle=angle;
@@ -66,7 +72,7 @@ try{
     }
     const offset=camera.position.clone().sub(controls.target),minDistance=view.extent/(2*Math.tan(camera.fov*Math.PI/360)*Math.min(1,camera.aspect));
     if(offset.length()<minDistance)camera.position.copy(controls.target).add(offset.setLength(minDistance));
-    controls.update();$('view-name').textContent=view.name;document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===key)));
+    controls.update();cameraLimit.update();$('view-name').textContent=view.name;document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===key)));
     const query=new URLSearchParams(location.search);query.set('view',key);history.replaceState(null,'',`?${query}`);
   }
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
@@ -100,7 +106,7 @@ try{
   if(cinema)$('cinema').onclick=()=>cinema.show({cinematic:true,core:ship.coreScale,phase:angle*180/Math.PI,rpm});
   const visibility=()=>{visible=!document.hidden;last=0;};
   // A free-view visit can be closed while the shaders are still compiling.
-  cleanup=()=>{if(disposed)return;disposed=true;cinema?.dispose();cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();controls.dispose();optics.dispose();ship.dispose();stars.dispose();renderer.dispose();renderer.forceContextLoss();};
+  cleanup=()=>{if(disposed)return;disposed=true;cinema?.dispose();cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();controls.dispose();cameraLimit.dispose();presentation.dispose();optics.dispose();ship.dispose();stars.dispose();renderer.dispose();renderer.forceContextLoss();};
   await renderer.compileAsync(scene,camera);
   function render(now){
     if(disposed)return;frame=requestAnimationFrame(render);if(!visible||cinema?.open){last=0;return;}
@@ -112,8 +118,11 @@ try{
       followDelta.copy(camera.position).sub(controls.target).applyAxisAngle(rotorAxis,angle-trackingAngle);
       camera.position.copy(habitatTarget).add(followDelta);controls.target.copy(habitatTarget);trackingAngle=angle;
     }
-    controls.update();stars.follow(camera);renderer.getDrawingBufferSize(bufferSize);optics.update(camera,bufferSize);renderer.render(scene,camera);if(rawDt>0){measureFrames++;measureTime+=rawDt;}
-    if(measureTime>=1.2){$('performance').textContent=`${Math.round(measureFrames/measureTime)} FPS · ${renderer.info.render.calls} DRAWS`;measureFrames=0;measureTime=0;}
+    controls.update();cameraLimit.update();stars.follow(camera);renderer.getDrawingBufferSize(bufferSize);optics.update(camera,bufferSize);
+    let viewDraws=0;
+    presentation.render({from:camera,to:null,mix:0},()=>{renderer.render(scene,camera);viewDraws=renderer.info.render.calls;return false;});
+    if(rawDt>0){measureFrames++;measureTime+=rawDt;}
+    if(measureTime>=1.2){$('performance').textContent=`${Math.round(measureFrames/measureTime)} FPS · ${viewDraws+renderer.info.render.calls} DRAWS`;measureFrames=0;measureTime=0;}
   }
   if(!disposed){$('status').hidden=true;tell('ready');frame=requestAnimationFrame(render);document.addEventListener('visibilitychange',visibility);}
 }catch(error){if(!closed){$('status').hidden=false;$('status').textContent=`表示できません: ${error.message}`;console.error(error);}}
