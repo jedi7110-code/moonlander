@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {sampleExteriorCinema,sampleExteriorCinemaFrame,CINEMA_SHOTS,OPENING_DURATION,EXTERIOR_VIEW_DURATION,CINEMA_DISSOLVE_SECONDS} from '../src/obs/exterior-cinematic.js';
+import {sampleExteriorCinema,sampleExteriorCinemaFrame,exteriorCinemaShots,CINEMA_SHOTS,OPENING_DURATION,EXTERIOR_VIEW_DURATION,CINEMA_DISSOLVE_SECONDS} from '../src/obs/exterior-cinematic.js';
 import {cinemaMessageAccepted,shouldPlayExteriorOpening} from '../src/obs/exterior-cinema-policy.js';
 import {EXTERIOR,createExteriorShip} from '../src/obs/ship-exterior.js';
 import {EXTERIOR_LOGO,LOGO_SETTLED,sampleExteriorLogo} from '../src/obs/exterior-logo.js';
@@ -210,6 +210,91 @@ test('the optional bow view changes only scene 05 and keeps its moving dissolve 
   }
   const expected=sampleExteriorCinemaFrame(start-.3,options);
   sampleExteriorCinemaFrame(120,options);assert.deepEqual(sampleExteriorCinemaFrame(start-.3,options),expected);
+});
+test('scene 03 can preview scene 05 camera placement while keeping its own field of view and probe approach',()=>{
+  const start=shotStart('distant'),bowStart=shotStart('mounted');
+  for(const aspect of [.6,1,16/9])for(const offset of [1,4,7]){
+    const options={opening:true,aspect,penultimate:'bow',approach:'bow'};
+    const scene3=sampleExteriorCinema(start+offset,options),scene5=sampleExteriorCinema(bowStart+offset,options);
+    const original=sampleExteriorCinema(start+offset,{opening:true,aspect});
+    assert.equal(scene3.number,3);assert.equal(scene3.fov,original.fov);assert.equal(scene3.fov,38);
+    for(const key of ['eye','target'])for(let axis=0;axis<3;axis++)
+      assert.ok(Math.abs(scene3[key][axis]-(axis===0?scene3.shipX:0)-scene5[key][axis]+(axis===0?scene5.shipX:0))<1e-9);
+    for(const key of ['shipX','probe','angle','start','end'])assert.deepEqual(scene3[key],original[key]);
+  }
+  for(const seconds of [0,37,48,59,83,110])
+    assert.deepEqual(sampleExteriorCinemaFrame(seconds,{opening:true,penultimate:'bow',approach:'bow'}),
+      sampleExteriorCinemaFrame(seconds,{opening:true,penultimate:'bow'}));
+});
+test('three scene 05 studies preserve all edit times and craft motion and seek to the same moving camera',()=>{
+  const start=shotStart('mounted'),end=start+CINEMA_SHOTS.find(s=>s.id==='mounted').duration;
+  for(const penultimate of ['bow-slide','underside','probe-wide']){
+    const options={opening:true,approach:'bow',penultimate};
+    const baseline={opening:true,approach:'bow'};
+    for(const seconds of [0,37,54,64.8,start-1,end+1,110])
+      assert.deepEqual(sampleExteriorCinemaFrame(seconds,options),sampleExteriorCinemaFrame(seconds,baseline));
+    const a=sampleExteriorCinema(start+1,options),b=sampleExteriorCinema(end-1,options);
+    assert.equal(a.number,5);assert.equal(a.mode,'follow');assert.ok(a.probe.latched);
+    assert.notDeepEqual(a.eye.map((v,i)=>v-(i===0?a.shipX:0)),b.eye.map((v,i)=>v-(i===0?b.shipX:0)));
+    for(const seconds of [start-.5,start+4,end-.5]){
+      const preview=sampleExteriorCinemaFrame(seconds,options),original=sampleExteriorCinemaFrame(seconds,baseline);
+      assert.equal(preview.mix,original.mix);
+      for(const layer of ['from','to'])if(preview[layer])for(const key of ['shipX','angle','probe','start','end','duration'])
+        assert.deepEqual(preview[layer][key],original[layer][key]);
+    }
+    const expected=sampleExteriorCinemaFrame(start+4,options);
+    sampleExteriorCinemaFrame(120,options);assert.deepEqual(sampleExteriorCinemaFrame(start+4,options),expected);
+  }
+  assert.deepEqual(sampleExteriorCinema(start+4,{opening:true,penultimate:'unknown'}),sampleExteriorCinema(start+4,{opening:true}));
+});
+test('the B ending replaces 09, keeps its initial camera path, and tracks a ship receding forever',()=>{
+  const options={opening:true,approach:'bow',ending:'underside'},start=shotStart('mounted');
+  assert.deepEqual(exteriorCinemaShots(options).map(s=>s.number),[1,2,3,7,4,5]);
+  assert.equal(exteriorCinemaShots(options).reduce((sum,s)=>sum+s.duration,0),OPENING_DURATION);
+  for(const seconds of [0,37,54,64.8,start-1])
+    assert.deepEqual(sampleExteriorCinemaFrame(seconds,options),sampleExteriorCinemaFrame(seconds,{opening:true,approach:'bow'}));
+  for(const offset of [0,1,4,7.9,8]){
+    const baseline={opening:true,approach:'bow',penultimate:'underside'};
+    const b=offset===8?sampleExteriorCinemaFrame(start+offset,baseline).from:sampleExteriorCinema(start+offset,baseline);
+    const ending=sampleExteriorCinema(start+offset,options);
+    for(const key of ['target','fov','shipX','angle','probe'])assert.deepEqual(ending[key],b[key]);
+    assert.deepEqual(ending.eye.slice(1),b.eye.slice(1));
+    assert.ok(Math.abs(ending.eye[0]-b.eye[0]+offset*EXTERIOR_CRUISE_SPEED)<1e-9,'the observer slides in space instead of advancing with the hull');
+  }
+  for(const aspect of [.6,16/9,2.4]){
+    const samples=[start+8,150,300,10000].map(seconds=>sampleExteriorCinema(seconds,{...options,aspect}));
+    let previousSpan=Infinity;
+    for(const shot of samples){
+      assert.equal(shot.number,5);assert.equal(shot.id,'underside-ending');assert.equal(shot.done,false);assert.equal(shot.fade,0);
+      assert.deepEqual(shot.eye,samples[0].eye,'the observer remains in space after settling');
+      assert.ok(Math.abs(shot.target[0]-shot.shipX-((3-EXTERIOR.rotorX)*2.6+EXTERIOR.rotorX))<1e-9);
+      const camera=cameraFor(shot,aspect),center=new THREE.Vector3(shot.shipX,0,0).project(camera);
+      assert.ok(Math.abs(center.x)<1&&Math.abs(center.y)<1&&center.z<1,'the camera keeps the distant ship in view');
+      const top=new THREE.Vector3(shot.shipX,32,0).project(camera),bottom=new THREE.Vector3(shot.shipX,-32,0).project(camera);
+      const span=Math.abs(top.y-bottom.y);assert.ok(span<previousSpan);previousSpan=span;
+      assert.equal(sampleExteriorCinemaFrame(shot.time,{...options,aspect}).to,null,'there is no final dissolve or restart');
+    }
+  }
+  const epsilon=.0001;
+  for(const boundary of [start+8]){
+    const before=sampleExteriorCinema(boundary-epsilon,options),at=sampleExteriorCinema(boundary,options),after=sampleExteriorCinema(boundary+epsilon,options);
+    for(let axis=0;axis<3;axis++)assert.ok(Math.abs((at.eye[axis]-before.eye[axis])/epsilon-(after.eye[axis]-at.eye[axis])/epsilon)<.002,'camera velocity settles without a jump');
+  }
+  const before=sampleExteriorCinemaFrame(86.75,options),later=sampleExteriorCinema(10000,options);
+  assert.equal(later.shipSpeed,EXTERIOR_CRUISE_SPEED);assert.ok(later.shipX>before.shot.shipX);assert.equal(later.cruising,true);
+  assert.deepEqual(sampleExteriorCinemaFrame(86.75,options),before,'seeking remains independent of history');
+});
+test('the B ending never stalls relative ship motion when its camera slide ends around 87 seconds',()=>{
+  for(const aspect of [.6,16/9,2.4]){
+    const options={opening:true,ending:'underside',aspect},dt=.01;
+    for(let seconds=79.5;seconds<=96;seconds+=.25){
+      const a=sampleExteriorCinema(seconds,options),b=sampleExteriorCinema(seconds+dt,options);
+      const relativeSpeed=((b.shipX-b.eye[0])-(a.shipX-a.eye[0]))/dt;
+      assert.ok(relativeSpeed>=EXTERIOR_CRUISE_SPEED-1e-8,`the ship keeps receding at ${seconds}s (${aspect} aspect)`);
+      assert.ok(Math.abs((b.shipX-a.shipX)/dt-EXTERIOR_CRUISE_SPEED)<1e-8,'ship speed stays constant');
+      assert.equal(sampleExteriorCinemaFrame(seconds,options).to,null);
+    }
+  }
 });
 test('planet transit slides past a stationary planet while the tiny ship crosses the frame',()=>{
   const start=shotStart('planet'),duration=CINEMA_SHOTS.find(s=>s.id==='planet').duration;

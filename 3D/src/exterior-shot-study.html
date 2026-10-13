@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SCENE 05 / 3カメラ比較</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080d12;color:#e4e8e5;font:15px/1.6 system-ui,sans-serif}
+main{max-width:1440px;margin:auto;padding:24px}h1{font-size:20px;margin:0 0 6px;font-weight:500;letter-spacing:.08em}
+p{color:#9caaa8;margin:0 0 18px}nav{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+button,a{font:inherit;color:inherit;border:1px solid #354447;background:#111b22;padding:10px 16px;border-radius:4px;cursor:pointer;text-decoration:none}
+button[aria-pressed="true"]{color:#c9f2db;background:#15312b;border-color:#6cb493}button:hover,a:hover{border-color:#93aeaa}
+iframe{display:block;width:100%;aspect-ratio:16/9;border:1px solid #263335;background:#030609}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.caption{margin-top:12px;min-height:26px}
+@media(max-width:640px){main{padding:14px}button,a{padding:8px 10px;font-size:13px}}
+</style></head>
+<body><main>
+<h1 id="heading">SCENE 05 / カメラ3案</h1>
+<p id="description">同じ82.75秒の構図で比較。前後を再生すると、04 → 05 → 09のつながりを見られます。</p>
+<nav aria-label="カメラ案">
+<button type="button" data-shot="bow-slide" aria-pressed="true">A · 船首越しの横移動</button>
+<button type="button" data-shot="underside" aria-pressed="false">B · 船底から抜ける移動</button>
+<button type="button" data-shot="probe-wide" aria-pressed="false">C · 小型船越しの母艦</button>
+</nav>
+<iframe id="film" title="選択した05のプレビュー" allow="autoplay"></iframe>
+<p id="caption" class="caption" aria-live="polite"></p>
+<div class="actions"><button id="replay" type="button">前後を再生 · 77.5秒から</button><button id="compare" type="button">82.75秒で比較</button><button id="ending" type="button" aria-pressed="false">Bをラストに · 09なし</button><button id="distant" type="button" hidden>遠ざかった姿 · 150秒</button><a id="full" target="_blank" rel="noopener">大きく見る</a></div>
+</main>
+<script type="module">
+const choices={
+ 'bow-slide':'A · 手前の船首を大きく切り取り、奥の回転区画と小型船を見せる。',
+ underside:'B · 船底を斜めに見上げながら後方へ移動。船体の陰から宇宙が開ける。',
+ 'probe-wide':'C · ドッキング済みの小型船を手前に置き、奥へ続く母艦の巨大さを見せる。',
+};
+const query=new URLSearchParams(location.search),initial=query.get('shot');
+let selected=Object.hasOwn(choices,initial)?initial:'bow-slide';
+let ending=query.get('ending')==='underside';
+if(ending)selected='underside';
+const film=document.getElementById('film');
+function show(time=82.75,paused=true){
+ const url=new URL('./ship-exterior-cinema.html',location.href);
+ url.search=new URLSearchParams({mode:'opening',approach:'bow',penultimate:selected,time:time.toFixed(3),...(ending?{ending:'underside'}:{}),...(paused?{paused:'1'}:{})});
+ film.src=url.href;document.getElementById('full').href=url.href;
+ document.getElementById('caption').textContent=ending?'B · 母艦を見送り続ける。カメラの位置が落ち着いた後も、遠ざかる母艦を追って航行が続きます。':choices[selected];
+ document.getElementById('heading').textContent=ending?'SCENE 05 / Bをラストに・09なし':'SCENE 05 / カメラ3案';
+ document.getElementById('description').textContent=ending?'04 → B。そのまま遠ざかる母艦をエンドレスで見送るバージョン。':'同じ82.75秒の構図で比較。前後を再生すると、04 → 05 → 09のつながりを見られます。';
+ document.getElementById('ending').setAttribute('aria-pressed',String(ending));
+ document.getElementById('distant').hidden=!ending;
+ for(const button of document.querySelectorAll('[data-shot]'))button.setAttribute('aria-pressed',String(button.dataset.shot===selected));
+ const page=new URL(location.href);page.searchParams.set('shot',selected);if(ending)page.searchParams.set('ending','underside');else page.searchParams.delete('ending');history.replaceState(null,'',page);
+}
+for(const button of document.querySelectorAll('[data-shot]'))button.onclick=()=>{selected=button.dataset.shot;ending=false;show();};
+document.getElementById('replay').onclick=()=>show(77.5,false);
+document.getElementById('compare').onclick=()=>show();
+document.getElementById('ending').onclick=()=>{ending=!ending;if(ending)selected='underside';show(77.5,false);};
+document.getElementById('distant').onclick=()=>show(150,true);
+show();
+</script></body></html>

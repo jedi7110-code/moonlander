@@ -50,7 +50,17 @@ test('the cabin boot gate waits for playback rather than the sky or shader readi
 test('opening startup failure rejects the cabin boot gate',async t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
   const rejected=assert.rejects(f.ui.whenPlaying(),/Opening renderer could not start/);
-  f.message('failed');await rejected;
+  const rejectedIntro=assert.rejects(f.ui.whenIntroFinished(),/Opening renderer could not start/);
+  f.message('failed');await Promise.all([rejected,rejectedIntro]);
+});
+test('playback starts fetches without releasing heavy preparation during the logo',async t=>{
+  const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
+  let released=false;const waiting=f.ui.whenIntroFinished().then(()=>{released=true;});
+  f.message('playing');await f.ui.whenPlaying();assert.equal(released,false);
+  f.ui.message({origin:location.origin,source:{},data:{type:'tara-exterior',action:'intro-finished'}});
+  await Promise.resolve();assert.equal(released,false);
+  f.message('intro-finished');await waiting;
+  assert.equal(released,true);assert.equal(f.ui.hostIsReady,false);
 });
 test('an old end-of-movie message never enters the cabin, and a click restores the host',t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});f.ui.hostReady();

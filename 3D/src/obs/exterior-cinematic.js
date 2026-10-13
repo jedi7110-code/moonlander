@@ -34,25 +34,52 @@ const sample=(points,u)=>points.length===1?[...points[0]]:lerp(points[0],points[
 // this changes only the penultimate observer when the preview selects it.
 const bowView=Object.freeze({name:'船首斜め下 / 母艦とドッキング済み探査機',mode:'fixed',
   eye:[[60,-18,50]],target:[[2,-1,0]],fov:44,core:true,fitAspect:true});
+// Alternatives for scene 05 only. Track the cruising hull while translating
+// through a short, continuous camera path; geometry and edit times are shared.
+const penultimateViews=Object.freeze({
+  bow:bowView,
+  'bow-slide':{name:'船首越し / 奥行きを見せる横移動',mode:'follow',core:true,fitAspect:true,cameraEase:true,
+    eye:[[22,-4,10],[22,-4,15]],target:[[-1.6,-3,0]],fov:52},
+  underside:{name:'船底すれすれ / 宇宙へ抜ける移動',mode:'follow',core:true,fitAspect:true,cameraEase:true,
+    eye:[[8,-18,4],[-4,-20,9]],target:[[3,-1,0]],fov:58},
+  'probe-wide':{name:'探査機越し / 母艦のスケール',mode:'follow',core:false,fitAspect:true,cameraEase:true,
+    eye:[[39,-22,13],[35,-21,17]],target:[[4,4,-3]],fov:62},
+});
+// Alternate ending: the B camera slides in space while aiming at the cruising
+// ship. Never carry the observer with the hull: that would halt relative motion
+// when the eight-second slide eases out, before the ship starts receding again.
+const undersideEndingShots=Object.freeze([...CINEMA_SHOTS.slice(0,-2),{
+  ...CINEMA_SHOTS.at(-2),...penultimateViews.underside,id:'underside-ending',mode:'tracking',
+  name:'船底から見送り / 彼方へエンドレス航行',duration:68,cameraDuration:8,near:1,far:1e8,
+  optics:{strength:.34,streakRatio:2.4,haloRatio:.14},
+}]);
+export const exteriorCinemaShots=({ending}={})=>ending==='underside'?undersideEndingShots:CINEMA_SHOTS;
 
 // Pure time sampling: playback and seeking agree without accumulated camera
 // state. Unequal holds replace the identical start/stop tweens.
-function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase=55*Math.PI/180,rpm=EXTERIOR.rpm,penultimate=null}={},forcedIndex=null){
+function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase=55*Math.PI/180,rpm=EXTERIOR.rpm,penultimate=null,approach=null,ending=null}={},forcedIndex=null){
+  const shots=exteriorCinemaShots({ending});
   const duration=opening?OPENING_DURATION:EXTERIOR_VIEW_DURATION;
   const elapsed=Math.max(0,Number.isFinite(seconds)?seconds:0);
   const time=elapsed;
   const timingScale=duration/OPENING_DURATION;
   let index=0,start=0,distance=0;
-  while(index<CINEMA_SHOTS.length-1&&(forcedIndex===null?time>=start+CINEMA_SHOTS[index].duration*timingScale:index<forcedIndex)){
-    const previous=CINEMA_SHOTS[index],hold=previous.duration*timingScale;
+  while(index<shots.length-1&&(forcedIndex===null?time>=start+shots[index].duration*timingScale:index<forcedIndex)){
+    const previous=shots[index],hold=previous.duration*timingScale;
     distance+=(hold-(previous.flightOrigin??0))*(previous.speed??EXTERIOR_CRUISE_SPEED);start+=hold;index++;
   }
-  const definition=CINEMA_SHOTS[index],shot=definition.id==='mounted'&&penultimate==='bow'?{...definition,...bowView}:definition;
+  const definition=shots[index];
+  const alternative=Object.hasOwn(penultimateViews,penultimate)?penultimateViews[penultimate]:null;
+  const shot=definition.id==='mounted'&&alternative?{...definition,...alternative}:
+    definition.id==='distant'&&approach==='bow'?{...definition,...bowView,fov:definition.fov,wide:false,
+      name:'船首斜め下 / 探査機の接近・03の画角'}:definition;
   const shotDuration=shot.duration*timingScale,end=start+shotDuration,sourceOffset=(shot.sourceOffset??0)*timingScale;
   const sourceDuration=shot.sourceDuration===undefined?shotDuration+sourceOffset:shot.sourceDuration*timingScale;
   const u=Math.max(0,Math.min(1,(time-start+sourceOffset)/sourceDuration));
   const fov=shot.zoomTo===undefined?shot.fov:shot.fov+(shot.zoomTo-shot.fov)*u;
-  let eye=sample(shot.eye,u),target=sample(shot.target,u);
+  const cameraU=shot.cameraDuration===undefined?u:Math.max(0,Math.min(1,(time-start)/(shot.cameraDuration*timingScale)));
+  const cameraProgress=shot.cameraEase?cameraU*cameraU*(3-2*cameraU):cameraU;
+  let eye=sample(shot.eye,cameraProgress),target=sample(shot.target,cameraProgress);
   if(shot.tilt){
     // A vertical tilt changes pitch only: position, horizontal bearing and
     // focal length stay fixed while the real ship grows as it approaches.
@@ -87,7 +114,8 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   // camera and its target together, keeping its bearing fixed as the ship passes.
   const cameraX=['fixed','tilt','lateral'].includes(shot.mode)?distance+(shot.anchor??shotDuration/2*shipSpeed)+(shot.cameraOffset??0):shipX;
   const slide=shot.cameraSlide?shot.cameraSlide[0]+(shot.cameraSlide[1]-shot.cameraSlide[0])*u*u*(3-2*u):0;
-  eye[0]+=cameraX+slide;target[0]+=cameraX+slide;
+  const observerX=shot.mode==='tracking'?distance:cameraX;
+  eye[0]+=observerX+slide;target[0]+=cameraX+slide;
   // The last fixed observer remains in place indefinitely. There is no
   // reset, closing fade, or automatic entry into the cabin.
   const fade=0;
@@ -121,7 +149,7 @@ export function sampleExteriorCinemaFrame(seconds,options){
   const shot=sampleCinemaShot(seconds,options),half=CINEMA_DISSOLVE_SECONDS/2;
   let boundary,index;
   if(shot.index>0&&shot.time<shot.start+half){boundary=shot.start;index=shot.index-1;}
-  else if(shot.index<CINEMA_SHOTS.length-1&&shot.time>=shot.end-half){boundary=shot.end;index=shot.index;}
+  else if(shot.index<exteriorCinemaShots(options).length-1&&shot.time>=shot.end-half){boundary=shot.end;index=shot.index;}
   else return{shot,from:shot,to:null,mix:0};
   const progress=Math.max(0,Math.min(1,(shot.time-boundary+half)/CINEMA_DISSOLVE_SECONDS));
   return{shot,from:sampleCinemaShot(seconds,options,index),to:sampleCinemaShot(seconds,options,index+1),mix:progress*progress*(3-2*progress)};

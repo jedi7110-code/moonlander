@@ -8,6 +8,7 @@ import {createExteriorDissolve} from './obs/exterior-dissolve.js';
 import {applyExteriorProbePose} from './obs/exterior-probe-flight.js';
 import {createExteriorShadow} from './obs/exterior-shadow.js';
 import {createExteriorGasPass} from './obs/exterior-gas-pass.js';
+import {EXTERIOR_LOGO} from './obs/exterior-logo.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),opening=query.get('mode')==='opening',embedded=query.get('embedded')==='1';
 const tell=action=>{if(embedded)parent.postMessage({type:'tara-exterior',action},location.origin);};
 if(embedded)$('cabin').hidden=true;
@@ -32,7 +33,9 @@ try{
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),target=new THREE.Vector3(),size=new THREE.Vector2();
   let time=Math.max(0,Number(query.get('time'))||0),running=query.get('paused')!=='1',last=0,frame=0,disposed=false;
   const freshOpening=opening&&time===0&&running;
-  let probeReady=false,probeLoading=null,playingFrames=0;
+  let probeReady=false,probeLoading=null,playingFrames=0,introFinishedFrames=0;
+  const logoPlayback={maxFrameMs:0,skippedBands:0,frames:0,lastReveal:0};
+  let logoMeasured=false;
   // A fresh opening waits at the beginning of the probe's incoming dissolve
   // if a very slow load hasn't finished, so it never appears midway through flight.
   const probeDeadline=CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(shot=>shot.probeStage==='approach'))
@@ -50,7 +53,7 @@ try{
   }
   if(!freshOpening)document.body.classList.remove('waiting-for-film');
   const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,
-    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate')};
+    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending')};
   const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal');
   function drawView(shot,renderTarget,gasTarget){
     ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
@@ -73,6 +76,13 @@ try{
     // that band exists, and sample every band from the film's own clock.
     logoReveal.style.visibility=shot.logoReveal>0?'visible':'hidden';
     logoReveal.style.clipPath=shot.logoClip;
+    if(freshOpening&&!logoMeasured){
+      const difference=Math.round((shot.logoReveal-logoPlayback.lastReveal)*EXTERIOR_LOGO.steps);
+      logoPlayback.skippedBands+=Math.max(0,difference-1);logoPlayback.lastReveal=shot.logoReveal;
+      if(time>=EXTERIOR_LOGO.end){
+        logoMeasured=true;document.documentElement.dataset.logoPlayback=JSON.stringify(logoPlayback);
+      }
+    }
     $('cut').style.opacity=String(shot.fade);
     const number=shot=>String(shot.number).padStart(2,'0');
     $('scene-number').textContent=film.to?`SCENE ${number(film.from)} → ${number(film.to)}`:`SCENE ${number(shot)}`;
@@ -114,14 +124,22 @@ try{
     if(disposed)return;frame=requestAnimationFrame(tick);
     if(document.hidden){last=0;return;}
     if(running&&last){
-      time+=Math.max(0,(now-last)/1000);
+      const dt=Math.max(0,(now-last)/1000);
+      if(freshOpening&&time<EXTERIOR_LOGO.end&&time+dt>=EXTERIOR_LOGO.start){
+        logoPlayback.maxFrameMs=Math.max(logoPlayback.maxFrameMs,Math.round(dt*10000)/10);logoPlayback.frames++;
+      }
+      time+=dt;
       if(!probeReady)time=Math.min(time,probeDeadline);
     }last=now;
     draw();
     if(running&&++playingFrames===2){
       document.documentElement.dataset.filmStartedMs=performance.now().toFixed(1);tell('playing');
-      // Start the probe after the film has actually presented moving frames.
-      if(freshOpening)void prepareProbe().catch(error=>{
+    }
+    // Present two frames with the logo fully faded before releasing expensive
+    // CPU/GPU preparation. The network preloads already run in the parent.
+    if(running&&freshOpening&&time>=EXTERIOR_LOGO.end&&++introFinishedFrames===2){
+      document.documentElement.dataset.introFinishedMs=performance.now().toFixed(1);tell('intro-finished');
+      void prepareProbe().catch(error=>{
         if(disposed)return;console.error(error);play(false);
         $('status').hidden=false;$('status').textContent='探査機の準備に失敗しました。再読み込みしてください。';
       });

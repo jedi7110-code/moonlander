@@ -2,7 +2,8 @@ import {exteriorCinema} from './exterior-session.js';
 import {shouldPlayExteriorOpening} from './exterior-cinema-policy.js';
 
 async function boot(){
-  if(shouldPlayExteriorOpening(location.search)){
+  const opening=shouldPlayExteriorOpening(location.search);
+  if(opening){
     exteriorCinema.show({opening:true,waitForHost:true});
     // The lightweight sky and shader-ready signal precede actual playback.
     // Cabin preloads and its module graph must wait for moving film frames.
@@ -11,6 +12,10 @@ async function boot(){
   document.documentElement.dataset.cabinLoadStartedMs=performance.now().toFixed(1);
   const preloads=document.getElementById('cabin-preloads');
   if(preloads)document.head.append(preloads.content.cloneNode(true));
+  // Fetch the data during the logo, but defer module evaluation, GLTF parsing,
+  // model construction and GPU preparation until the logo has faded away.
+  if(opening)await exteriorCinema.whenIntroFinished();
+  document.documentElement.dataset.cabinBuildStartedMs=performance.now().toFixed(1);
   await import('./main.js');
 }
 void boot().catch(error=>{
