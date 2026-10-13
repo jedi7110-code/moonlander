@@ -44,9 +44,16 @@ test('editing numbers stay stable, scene 03 leads straight into 07, and scenes 0
   assert.deepEqual(frame.from.probe,frame.to.probe,'03 approaches the trimmed opening pose without a jump during the dissolve');
   assert.ok(Math.abs(frame.from.shipX-frame.to.shipX)<1e-9);
 });
-test('scene 02 travels at half its previous speed, and 04 uses a fixed ultra-telephoto view with a huge planet',()=>{
-  const a=sampleExteriorCinema(shotStart('planet')+1,{opening:true}),b=sampleExteriorCinema(shotStart('planet')+2,{opening:true});
+test('scene 01 ship is three percent slower, scene 02 camera slides right, and 04 keeps its fixed planet view',()=>{
+  assert.equal(CINEMA_SHOTS[0].speed,10.12*.97);
+  const planetStart=shotStart('planet');
+  const a=sampleExteriorCinema(planetStart+1,{opening:true}),b=sampleExteriorCinema(planetStart+2,{opening:true});
   assert.equal(b.shipX-a.shipX,48);
+  const left=sampleExteriorCinema(planetStart,{opening:true}),right=sampleExteriorCinema(planetStart+12-.001,{opening:true});
+  assert.equal(left.mode,'lateral');assert.ok(Math.abs(right.eye[0]-left.eye[0]-240)<.001);
+  assert.ok(Math.abs(right.target[0]-left.target[0]-240)<.001);
+  assert.deepEqual(left.eye.slice(1),right.eye.slice(1));assert.deepEqual(left.target.slice(1),right.target.slice(1));
+  assert.deepEqual(left.planet,right.planet,'the distant planet stays in world space as the camera slides');
   const start=shotStart('crossing'),mid=sampleExteriorCinema(start+5,{opening:true}),end=sampleExteriorCinema(start+9,{opening:true});
   assert.equal(mid.number,4);assert.ok(mid.fov<5);
   const camera=cameraFor(mid);assert.ok(camera.position.distanceTo(new THREE.Vector3(...mid.target))>2000);
@@ -62,7 +69,7 @@ test('scene 01 approaches from depth while its stationary oblique camera tilts d
   assert.equal(a.number,1);assert.equal(a.mode,'tilt');assert.equal(a.titleOpacity,0);assert.deepEqual(a.up,[0,1,0]);
   assert.deepEqual(a.eye,b.eye);assert.equal(a.fov,b.fov);
   const cameras=[cameraFor(a),cameraFor(b)],directions=cameras.map(camera=>camera.getWorldDirection(new THREE.Vector3()));
-  assert.ok(directions[0].x<-.6&&directions[0].y>-.75,'the bow approaches an oblique observer, rather than a straight-down camera');
+  assert.ok(directions[0].x<-.6&&directions[0].y>-.76,'the bow approaches an oblique observer, rather than a straight-down camera');
   assert.ok(directions[1].y<directions[0].y&&directions[1].y>-.9,'only the downward tilt increases');
   assert.ok(Math.abs(directions[0].z/directions[0].x-directions[1].z/directions[1].x)<1e-10,'horizontal bearing stays fixed');
   const distance=shot=>new THREE.Vector3(...shot.eye).distanceTo(new THREE.Vector3(shot.shipX,0,0));
@@ -75,40 +82,62 @@ test('scene 01 approaches from depth while its stationary oblique camera tilts d
   });
   assert.ok(spans[1]>spans[0]*1.25,'perspective makes the approaching ship larger without a zoom');
   assert.ok(Math.abs((b.shipX-a.shipX)/(b.time-a.time)-definition.speed)<1e-10);
-  assert.equal(sampleExteriorCinema(EXTERIOR_LOGO.end,{opening:true}).shipX,0);
-  assert.deepEqual(sampleExteriorCinema(0,{opening:true}).target,sampleExteriorCinema(EXTERIOR_LOGO.end,{opening:true}).target,'the logo holds the initial tilt');
+  assert.equal(sampleExteriorCinema(definition.flightOrigin,{opening:true}).shipX,0);
+  const pitchAt=seconds=>-Math.asin(cameraFor(sampleExteriorCinema(seconds,{opening:true})).getWorldDirection(new THREE.Vector3()).y)*180/Math.PI;
+  const startup=(pitchAt(.3)-pitchAt(0))/.3;
+  const beforeLogo=(pitchAt(EXTERIOR_LOGO.start)-pitchAt(1.2))/(EXTERIOR_LOGO.start-1.2);
+  const atReveal=(pitchAt(EXTERIOR_LOGO.end)-pitchAt(EXTERIOR_LOGO.end-.2))/.2;
+  const withShip=(pitchAt(EXTERIOR_LOGO.end+4)-pitchAt(EXTERIOR_LOGO.end+2))/2;
+  assert.ok(startup<beforeLogo/2,'the tilt eases in without jumping to full speed');
+  assert.ok(Math.abs(beforeLogo-.3)<1e-9,'the empty sky reaches the steady tilt speed before the logo');
+  assert.ok(Math.abs(beforeLogo-atReveal)<1e-9&&Math.abs(beforeLogo-withShip)<1e-9,'the same tilt speed carries through the ship reveal');
 });
-test('the logo shows empty space, then a continuous tilt reveals the ship through the upper edge',()=>{
+test('the camera tilts before the logo and the ship enters during the title fade',()=>{
   const definition=CINEMA_SHOTS[0],initial=sampleExteriorCinema(0,{opening:true});
-  for(const seconds of [0,.8,2,4.2,4.7,EXTERIOR_LOGO.end-.001]){
+  for(const seconds of [0,1,EXTERIOR_LOGO.start,4.2,EXTERIOR_LOGO.hold]){
     const shot=sampleExteriorCinema(seconds,{opening:true});
-    assert.equal(shot.shipVisible,false,'no ship is rendered while the logo appears or fades');
-    assert.deepEqual(shot.eye,initial.eye);assert.deepEqual(shot.target,initial.target,'the camera also waits for the logo');
+    assert.equal(shot.shipVisible,true,'the ship stays rendered while approaching outside the frame');
+    assert.deepEqual(shot.eye,initial.eye,'the camera stays at its fixed position');
+    if(seconds>0)assert.ok(shot.target[1]<initial.target[1],'the tilt is already moving before the ship appears');
   }
-  const ship=createExteriorShip(),point=new THREE.Vector3();ship.setCoreScale(2.6);
+  const ship=createExteriorShip(),point=new THREE.Vector3();ship.setCoreScale(2.6);ship.dockedLander.visible=false;
   function lowestPoint(seconds){
     const shot=sampleExteriorCinema(seconds,{opening:true}),camera=cameraFor(shot);let lowest=Infinity;
     ship.root.position.x=shot.shipX;ship.setAngle(shot.angle);ship.root.updateMatrixWorld(true);
-    ship.root.traverse(mesh=>{const positions=mesh.geometry?.attributes.position;if(!positions)return;for(let i=0;i<positions.count;i++){
+    ship.root.traverseVisible(mesh=>{const positions=mesh.geometry?.attributes.position;if(!positions)return;for(let i=0;i<positions.count;i++){
       point.fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld).project(camera);lowest=Math.min(lowest,point.y);
     }});
     return lowest;
   }
   try{
-    assert.ok(lowestPoint(EXTERIOR_LOGO.end)>.88,'the entire real hull stays above the visible frame, including the smaller mobile letterbox, when rendering begins');
-    const entry=lowestPoint(EXTERIOR_LOGO.end+2);
-    assert.ok(entry<.84&&entry>0,'the bow appears through the upper edge after the logo clears');
-    assert.ok(lowestPoint(EXTERIOR_LOGO.end+8)<entry,'the ship continues down into the composition');
+    for(let time=0;time<=EXTERIOR_LOGO.hold;time+=.1){
+      assert.ok(lowestPoint(time)>.88,'the entire moving hull remains outside the image until the logo fades, including mobile letterboxing');
+    }
+    const entry=lowestPoint(EXTERIOR_LOGO.end-.3);
+    assert.ok(entry<.84&&entry>0,'the hull enters through the upper edge while the title fades');
+    assert.ok(lowestPoint(EXTERIOR_LOGO.end+4)<entry,'the ship continues down into the composition');
+    assert.ok(Math.abs(lowestPoint(definition.flightOrigin+.001)-lowestPoint(definition.flightOrigin-.001))<.001,'the entry trajectory has no position jump');
   }finally{ship.dispose();}
-  const before=sampleExteriorCinema(EXTERIOR_LOGO.end,{opening:true}),after=sampleExteriorCinema(EXTERIOR_LOGO.end+.1,{opening:true});
+  const before=sampleExteriorCinema(EXTERIOR_LOGO.hold-.1,{opening:true}),during=sampleExteriorCinema(EXTERIOR_LOGO.end-.3,{opening:true}),after=sampleExteriorCinema(EXTERIOR_LOGO.end+.1,{opening:true});
+  assert.equal(before.shipVisible,true);assert.ok(during.shipVisible&&during.titleOpacity>0&&during.titleOpacity<1);
   assert.equal(after.titleOpacity,0);assert.equal(after.shipVisible,true);
-  assert.ok(after.target[1]<before.target[1],'the downward tilt begins only after the logo has gone');
+  assert.ok(after.target[1]<before.target[1],'the downward tilt continues through the overlapping reveal');
   let previousY=0;
   for(const seconds of [0,4.2,5.2,6,7,10,14,20,28,definition.duration-.001]){
     const direction=cameraFor(sampleExteriorCinema(seconds,{opening:true})).getWorldDirection(new THREE.Vector3());
     assert.ok(direction.y<=previousY+1e-12,'the camera never tilts upward, including during entry');previousY=direction.y;
   }
   sampleExteriorCinema(40,{opening:true});assert.deepEqual(sampleExteriorCinema(0,{opening:true}),initial,'restarting restores the empty logo sky');
+});
+test('the first approach has enough depth precision for the habitat end hatch',()=>{
+  const shot=sampleExteriorCinema(12,{opening:true}),ship=createExteriorShip();ship.setCoreScale(2.6);
+  try{
+    ship.root.position.x=shot.shipX;ship.setAngle(shot.angle);ship.root.updateMatrixWorld(true);
+    const hatch=ship.pods[1].localToWorld(new THREE.Vector3(EXTERIOR.podLength/2+1.84,-.5,1.28));
+    const distance=hatch.distanceTo(new THREE.Vector3(...shot.eye));
+    const depthStep=distance*distance*(shot.far-shot.near)/(shot.far*shot.near*(2**24-1));
+    assert.ok(depthStep<.005,'the depth buffer separates the hatch face from its 0.02-unit raised label');
+  }finally{ship.dispose();}
 });
 test('distant engine flares shrink and fade while all near engines retain their blue streaks',()=>{
   const camera=new THREE.Vector3(),near=new THREE.Vector3(100,0,0),far=new THREE.Vector3(2000,0,0);
@@ -147,7 +176,7 @@ test('fixed cameras stay in world space while the ship alone advances at its sho
   let start=0;
   for(const definition of CINEMA_SHOTS){
     if(definition.mode==='fixed'){
-      const from=(definition.delay??0)+.1;
+      const from=(definition.flightOrigin??0)+.1;
       const a=sampleExteriorCinema(start+from,{opening:true}),b=sampleExteriorCinema(start+definition.duration-.1,{opening:true});
       assert.deepEqual(a.eye,b.eye);assert.deepEqual(a.target,b.target);assert.equal(a.fov,b.fov);
       assert.ok(b.shipX>a.shipX);assert.ok(Math.abs((b.shipX-a.shipX)/(definition.duration-.1-from)-(definition.speed??EXTERIOR_CRUISE_SPEED))<1e-10);
@@ -164,13 +193,13 @@ test('the camera mounted on the hull has a fixed attachment and orientation, wit
     assert.ok(Math.abs(localA-localB)<1e-10);
   }
 });
-test('planet transit keeps a tiny ship, stationary backdrop and a faster apparent pass',()=>{
+test('planet transit slides past a stationary planet while the tiny ship crosses the frame',()=>{
   const start=shotStart('planet'),duration=CINEMA_SHOTS.find(s=>s.id==='planet').duration;
   const a=sampleExteriorCinema(start+.5,{opening:true}),b=sampleExteriorCinema(start+duration-.5,{opening:true});
-  assert.deepEqual(a.eye,b.eye);assert.deepEqual(a.target,b.target);assert.deepEqual(a.planet,b.planet);
+  assert.ok(b.eye[0]>a.eye[0]&&b.target[0]>a.target[0]);assert.deepEqual(a.planet,b.planet);
   assert.ok(a.planet.position[2]+4200<0,'even the near surface of the planet stays behind the foreground ship');
-  const camera=cameraFor(a),centerA=new THREE.Vector3(a.shipX,0,0).project(camera),centerB=new THREE.Vector3(b.shipX,0,0).project(camera);
-  assert.ok(centerA.x<0&&centerB.x>0,'small ship crosses the fixed composition');
+  const camera=cameraFor(a),centerA=new THREE.Vector3(a.shipX,0,0).project(camera),centerB=new THREE.Vector3(b.shipX,0,0).project(cameraFor(b));
+  assert.ok(centerA.x<0&&centerB.x>centerA.x,'small ship moves right from just left of the planet');
   const width=Math.abs(new THREE.Vector3(a.shipX+55,0,0).project(camera).x-new THREE.Vector3(a.shipX-55,0,0).project(camera).x)/2;
   assert.ok(width<.035,'110 m hull occupies under 3.5 percent of the frame width');
   const normal=sampleExteriorCinema(shotStart('crossing')+1,{opening:true}),normalCamera=cameraFor(normal);
@@ -251,19 +280,24 @@ test('the final slow flyover keeps clear of the rotating hull and continues away
   }finally{ship.dispose();}
   assert.equal(sampleExteriorCinema(shotStart('planet')+1,{opening:true}).titleOpacity,0);
 });
-test('console logo loads in ten horizontal bands, holds and samples identically after seeking',()=>{
+test('console logo uses Moonlander dial-up bands without leaking glow before its first band',()=>{
   assert.equal(sampleExteriorLogo(0).reveal,0);assert.equal(sampleExteriorLogo(0).opacity,0);
-  for(let step=0;step<=10;step++){
-    const time=EXTERIOR_LOGO.start+(step+.001)*EXTERIOR_LOGO.resolve/10;
-    assert.equal(sampleExteriorLogo(time).reveal,Math.min(1,step/10));
+  assert.equal(EXTERIOR_LOGO.resolve,1.2);assert.equal(EXTERIOR_LOGO.steps,10);
+  assert.equal(sampleExteriorLogo(EXTERIOR_LOGO.start+.119).reveal,0);
+  for(let step=1;step<=10;step++){
+    const boundary=EXTERIOR_LOGO.start+step*EXTERIOR_LOGO.resolve/10;
+    assert.equal(sampleExteriorLogo(boundary-.001).reveal,(step-1)/10);
+    assert.equal(sampleExteriorLogo(boundary).reveal,step/10);
   }
+  assert.equal(sampleExteriorLogo(LOGO_SETTLED).clipPath,'inset(-40px -40px calc(0% - 40px) -40px)');
   assert.equal(sampleExteriorLogo(LOGO_SETTLED).reveal,1);
   assert.ok(EXTERIOR_LOGO.hold-LOGO_SETTLED>=2,'completed logo remains legible');
-  assert.ok(EXTERIOR_LOGO.end<6,'the logo clears promptly while loading proceeds independently');
+  assert.ok(Math.abs(EXTERIOR_LOGO.end-EXTERIOR_LOGO.hold-1.6)<1e-10,'the logo now takes 1.6 seconds to fade');
   assert.equal(sampleExteriorLogo(EXTERIOR_LOGO.hold).opacity,1);
   assert.equal(sampleExteriorLogo(EXTERIOR_LOGO.end).opacity,0);
-  assert.ok(Math.abs(sampleExteriorLogo(EXTERIOR_LOGO.start+.73*4.5).flicker-.85)<1e-10);
-  assert.equal(sampleExteriorLogo(EXTERIOR_LOGO.start+.74*4.5).flicker,1);
+  for(let time=LOGO_SETTLED;time<=EXTERIOR_LOGO.hold;time+=.05)assert.equal(sampleExteriorLogo(time).opacity,1,'the completed logo holds a constant brightness');
+  let previous=1;
+  for(let time=EXTERIOR_LOGO.hold;time<=EXTERIOR_LOGO.end;time+=.05){const opacity=sampleExteriorLogo(time).opacity;assert.ok(opacity<=previous,'the exit fades without flicker');previous=opacity;}
   const expected=sampleExteriorLogo(4.1);sampleExteriorLogo(14);assert.deepEqual(sampleExteriorLogo(4.1),expected);
 });
 test('opening skips inspection links and only accepts messages from its own origin and iframe',()=>{

@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {sampleExteriorCinema,sampleExteriorCinemaFrame,CINEMA_SHOTS} from '../src/obs/exterior-cinematic.js';
-import {sampleExteriorProbeFlight,applyExteriorProbePose} from '../src/obs/exterior-probe-flight.js';
+import {sampleExteriorProbeFlight,applyExteriorProbePose,PROBE_EXHAUST_TAIL} from '../src/obs/exterior-probe-flight.js';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
+import {PROBE_JETS,PROBE_GAS,sampleExteriorProbeControl,sampleExteriorProbeGas} from '../src/obs/exterior-probe-thrusters.js';
 const startOf=id=>CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(shot=>shot.id===id)).reduce((time,shot)=>time+shot.duration,0);
 const cameraFor=shot=>{
   const camera=new THREE.PerspectiveCamera(shot.fov,16/9,shot.near,shot.far);
@@ -34,12 +35,16 @@ test('the adjusted approach connects to the trimmed close-up, decelerates to con
     const pose=sampleExteriorProbeFlight(seconds);assert.ok(pose.position[1]>=previous-1e-9&&pose.position[1]<=0);previous=pose.position[1];
   }
   const contact=sampleExteriorProbeFlight(20),held=sampleExteriorProbeFlight(100);
-  assert.equal(contact.latched,true);assert.deepEqual(contact.position,[0,0,0]);assert.deepEqual(contact.rotation,[0,0,0]);assert.deepEqual(contact,held);
+  assert.equal(contact.latched,true);assert.deepEqual(contact.position,[0,0,0]);assert.deepEqual(contact.rotation,[0,0,0]);
+  const {thrusterClock,...contactPose}=contact;assert.deepEqual(contactPose,held);
+  assert.ok(thrusterClock,'capture retains the clock briefly for gas emitted before contact');
   const endVelocity=(position(20)[1]-position(20-epsilon)[1])/epsilon;
   assert.ok(endVelocity<.001,'the probe reaches contact with zero speed');
   const boundary=startOf('lander');
   const openingPose=sampleExteriorCinema(boundary,{opening:true});
-  assert.deepEqual(openingPose.probe,sampleExteriorProbeFlight(12.5),'07 starts on the former 62.5-second docking pose');
+  const originalPose=sampleExteriorProbeFlight(12.5);
+  assert.deepEqual(openingPose.probe.position,originalPose.position,'07 starts on the former 62.5-second docking pose');
+  assert.deepEqual(openingPose.probe.rotation,originalPose.rotation);
   assert.ok(Math.abs(openingPose.fov-(40-8*4.5/14.75))<1e-10,'the zoom also starts on the requested frame');
   const contactTime=boundary+7.5;
   assert.equal(sampleExteriorCinema(contactTime-.001,{opening:true}).probe.latched,false);
@@ -55,6 +60,93 @@ test('the adjusted approach connects to the trimmed close-up, decelerates to con
     }
   }
   const expected=sampleExteriorCinema(boundary+5,{opening:true});sampleExteriorCinema(500,{opening:true});assert.deepEqual(sampleExteriorCinema(boundary+5,{opening:true}),expected);
+});
+
+test('control gas pushes opposite deceleration and reverses sides when correcting lateral drift',()=>{
+  const strength=(control,kind,side)=>control.strengths.reduce((total,value,index)=>total+(PROBE_JETS[index].kind===kind&&(side===undefined||PROBE_JETS[index].side===side)?value:0),0);
+  const slowing=sampleExteriorProbeControl(6);
+  assert.ok(slowing.velocity[1]>0&&slowing.acceleration[1]<0);
+  assert.ok(strength(slowing,'brake')>3,'upward gas brakes the rising probe');
+  assert.equal(strength(slowing,'ascent'),0);
+  const movingLeft=sampleExteriorProbeControl(9.5),brakingLeft=sampleExteriorProbeControl(14);
+  assert.ok(movingLeft.acceleration[0]<0&&strength(movingLeft,'lateral',1)>strength(movingLeft,'lateral',-1),'right-side gas starts the leftward correction');
+  assert.ok(brakingLeft.velocity[0]<0&&brakingLeft.acceleration[0]>0&&strength(brakingLeft,'lateral',-1)>strength(brakingLeft,'lateral',1),'left-side gas arrests that drift');
+  const start=startOf('distant');
+  for(const offset of [1,3,6,9]){
+    const shot=sampleExteriorCinema(start+offset,{opening:true}),{seconds,...options}=shot.probe.thrusterClock;
+    const control=sampleExteriorProbeControl(seconds,options);
+    const before=sampleExteriorCinema(start+offset-.01,{opening:true}).probe.position,after=sampleExteriorCinema(start+offset+.01,{opening:true}).probe.position;
+    const actual=(after[1]-2*shot.probe.position[1]+before[1])/.0001;
+    assert.ok(Math.abs(control.acceleration[1]-actual)<1e-6,'thrust follows the actual retimed approach, including acceleration before braking');
+  }
+});
+
+test('vacuum gas has retarded 3D emission, deterministic valve pulses and no round sprites',()=>{
+  const expected=sampleExteriorProbeGas(14.017);
+  assert.ok(expected.length>0);
+  for(const plume of expected){
+    assert.equal(plume.slices.length,PROBE_GAS.slices);
+    assert.equal(plume.slices[0].distance,0);
+    assert.ok(Math.abs(plume.slices.at(-1).distance-PROBE_GAS.length)<1e-12);
+    assert.ok(plume.slices.every(slice=>slice.strength>=0&&slice.strength<=1&&slice.offset.every(Number.isFinite)));
+    assert.ok(plume.slices[0].offset.every(value=>Math.abs(value)<1e-12),'fresh gas originates at its nozzle in the current body frame');
+    assert.ok(plume.slices.at(-1).offset.some(value=>Math.abs(value)>1e-8),'emitted gas travels inertially as the craft steers');
+  }
+  sampleExteriorProbeGas(100);assert.deepEqual(sampleExteriorProbeGas(14.017),expected,'seeking does not retain old exhaust');
+  assert.deepEqual(sampleExteriorProbeGas(20+PROBE_EXHAUST_TAIL),[],'the short exhaust tail clears completely');
+  const lateral=PROBE_JETS.findIndex(jet=>jet.kind==='lateral'&&jet.side===-1),pulses=[];
+  for(let time=14;time<14+PROBE_GAS.pulsePeriod;time+=.004)
+    pulses.push(sampleExteriorProbeGas(time).find(plume=>plume.index===lateral)?.slices[0].strength??0);
+  assert.ok(Math.min(...pulses)===0&&Math.max(...pulses)>.5,'fine control has both valve-off and valve-on intervals');
+  const ship=createExteriorShip();
+  try{
+    applyExteriorProbePose(ship,sampleExteriorProbeFlight(14.017));
+    const gas=ship.probeThrusters.gas,data=gas.material.uniforms.history.value.image.data;
+    const snapshot=data.slice();
+    assert.equal(gas.visible,true);assert.equal(gas.isInstancedMesh,true);
+    assert.equal(gas.count,PROBE_JETS.length);
+    assert.ok(snapshot.some(value=>value>0));
+    assert.equal(gas.isPoints,undefined,'the renderer uses spatial volumes instead of screen-facing particle dots');
+    for(const [index,jet]of PROBE_JETS.entries()){
+      const matrix=new THREE.Matrix4();gas.getMatrixAt(index,matrix);
+      const source=new THREE.Vector3(0,-.5,0).applyMatrix4(matrix);
+      const end=new THREE.Vector3(0,.5,0).applyMatrix4(matrix);
+      assert.ok(source.distanceTo(new THREE.Vector3(...jet.position))<1e-6,'volume begins on the nozzle lip');
+      assert.ok(end.sub(source).normalize().distanceTo(new THREE.Vector3(...jet.direction))<1e-6,'exhaust expands along the nozzle axis');
+    }
+    applyExteriorProbePose(ship,sampleExteriorProbeFlight(20+PROBE_EXHAUST_TAIL));assert.equal(gas.visible,false);
+    applyExteriorProbePose(ship,sampleExteriorProbeFlight(14.017));
+    assert.deepEqual(data,snapshot,'the rendered density restores exactly after capture');
+    let disposed=false;gas.material.uniforms.history.value.addEventListener('dispose',()=>{disposed=true;});
+    ship.probeThrusters.dispose();assert.equal(disposed,true,'the plume texture is released with the probe');
+  }finally{ship.dispose();}
+});
+
+test('capture cuts gas at the nozzle while previously emitted gas moves outward and thins',()=>{
+  const ship=createExteriorShip();
+  try{
+    const gas=ship.probeThrusters.gas,geometry=gas.geometry,texture=gas.material.uniforms.history.value;
+    const samples=[20,20.025,20.05,20.09,20.12].map(time=>{
+      const plumes=sampleExteriorProbeGas(time);
+      assert.ok(plumes.length>0);
+      assert.ok(plumes.every(plume=>plume.slices[0].strength===0),'no new gas leaves the nozzle after capture');
+      const active=plumes.flatMap(plume=>plume.slices.filter(slice=>slice.strength>.001));
+      return{nearest:Math.min(...active.map(slice=>slice.distance)),density:active.reduce((sum,slice)=>sum+slice.strength,0)};
+    });
+    for(let i=1;i<samples.length;i++){
+      assert.ok(samples[i].nearest>samples[i-1].nearest,'the trailing edge clears from the nozzle outward');
+      assert.ok(samples[i].density<samples[i-1].density,'remaining gas grows fainter while moving away');
+    }
+    const capture=startOf('lander')+7.5;
+    const pose=sampleExteriorCinema(capture+.04,{opening:true}).probe;
+    assert.equal(pose.latched,true);applyExteriorProbePose(ship,pose);
+    assert.equal(gas.visible,true,'the real opening retains already emitted gas after docking');
+    assert.equal(gas.geometry,geometry);assert.equal(gas.material.uniforms.history.value,texture);
+    assert.equal(gas.count,PROBE_JETS.length,'residual gas reuses the same instances and texture');
+    const density=texture.image.data.slice();
+    applyExteriorProbePose(ship,sampleExteriorCinema(capture+1,{opening:true}).probe);assert.equal(gas.visible,false);
+    applyExteriorProbePose(ship,pose);assert.deepEqual(texture.image.data,density,'rewinding restores the same exhaust tail');
+  }finally{ship.dispose();}
 });
 
 test('the real probe clears the hull and rotating habitats through approach and docking',()=>{

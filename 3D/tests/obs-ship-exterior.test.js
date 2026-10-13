@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Box3,Vector3,Quaternion,Raycaster} from 'three';
+import {Box3,Vector3,Quaternion,Raycaster,Matrix4} from 'three';
 import {createExteriorShip,EXTERIOR,exteriorAngle,rotationGravity} from '../src/obs/ship-exterior.js';
 import {HABITAT_ENVELOPE,HABITAT_FLOORS,HABITAT_WINDOWS,cabinToHabitat,habitatToCabin} from '../src/obs/habitat-envelope.js';
 import {VIEWING_WALL,viewingWallPanelX} from '../src/obs/viewing-wall-profile.js';
@@ -8,6 +8,32 @@ import {FLOOR_Y} from '../src/obs/ship.js';
 import {createViewingWall,cabinWallMaterials} from '../src/obs/viewing-wall.js';
 import {buildSurfaceFixture,disposeSurfaceFixture} from './helpers/cabin-surface-fixture.js';
 import {engineFacingGain} from '../src/obs/exterior-optics.js';
+
+test('all four probe legs terminate above the landing pad soles',()=>{
+  const ship=createExteriorShip();
+  try{
+    ship.root.updateMatrixWorld(true);
+    const inverse=ship.dockedLander.matrixWorld.clone().invert(),point=new Vector3(),transform=new Matrix4();
+    const feet=[-1,1].flatMap(x=>[-1,1].map(z=>({x:x*2.95,z:z*2.65,count:0,min:Infinity})));
+    ship.dockedLander.traverse(mesh=>{
+      if(!mesh.isMesh||mesh.material.transparent||mesh.isInstancedMesh)return;
+      transform.multiplyMatrices(inverse,mesh.matrixWorld);
+      const positions=mesh.geometry.attributes.position;
+      for(let i=0;i<positions.count;i++){
+        point.fromBufferAttribute(positions,i).applyMatrix4(transform);
+        if(point.y>.30)continue;
+        for(const foot of feet)if(Math.hypot(point.x-foot.x,point.z-foot.z)<.55){
+          foot.count++;foot.min=Math.min(foot.min,point.y);
+        }
+      }
+    });
+    for(const foot of feet){
+      assert.ok(foot.count>0,'the real pad geometry is included');
+      assert.ok(foot.min>=.11-1e-6,`no angled strut protrudes through the pad at ${foot.x}, ${foot.z}: ${foot.min}`);
+      assert.ok(Math.abs(foot.min-.11)<1e-6,'the original sole height stays fixed');
+    }
+  }finally{ship.dispose();}
+});
 
 test('three equally spaced gravity sections rotate as one rigid assembly with a fixed hull',()=>{
   const ship=createExteriorShip();

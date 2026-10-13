@@ -47,7 +47,7 @@ function panelText(text,width=512,height=128,color='#d7e8da',bg=null) {
 }
 
 /** Reference: assets/spaceship.png — white octagonal cabin, gold insulation, four piston legs. */
-export function createLander({labels=true}={}) {
+export function createLander({labels=true,footJointHeight=.18}={}) {
   const g=new THREE.Group();
   box(g,gold,0,1.85,0,3.8,1.25,3.5);
   box(g,dark,0,1.05,0,2.5,.5,2.8);
@@ -55,8 +55,8 @@ export function createLander({labels=true}={}) {
   for(const x of [-1,1]) for(const z of [-1,1]){
     sphere(g,gold,x*1.48,1.95,z*1.42,.7,.75,.66);
     const blanket=mesh(g,foilGeo,gold,x*1.52,1.85,z*.6,.45,.64,.6);blanket.rotation.z=x*.16;
-    const foot=[x*2.95,.18,z*2.65],hip=[x*1.7,2.3,z*1.5];
-    rod(g,hip,foot,.16,gold);rod(g,[x*.9,1.05,z*1.2],foot,.08,dark);
+    const foot=[x*2.95,.18,z*2.65],joint=[foot[0],footJointHeight,foot[2]],hip=[x*1.7,2.3,z*1.5];
+    rod(g,hip,joint,.16,gold);rod(g,[x*.9,1.05,z*1.2],joint,.08,dark);
     rod(g,[x*2.55,.3,z*2.3],[x*2.72,1.18,z*2.45],.19,silver);
     mesh(g,cylinderGeo,dark,...foot,.5,.14,.5);
     for(let i=0;i<5;i++)mesh(g,cylinderGeo,silver,x*2.66,.4+i*.11,z*2.4,.21,.027,.21);

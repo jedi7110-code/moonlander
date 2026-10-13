@@ -6,9 +6,12 @@ import {createExteriorPlanet} from './obs/exterior-planet.js';
 import {sampleExteriorCinemaFrame} from './obs/exterior-cinematic.js';
 import {createExteriorDissolve} from './obs/exterior-dissolve.js';
 import {applyExteriorProbePose} from './obs/exterior-probe-flight.js';
+import {createExteriorShadow} from './obs/exterior-shadow.js';
+import {createExteriorGasPass} from './obs/exterior-gas-pass.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),opening=query.get('mode')==='opening',embedded=query.get('embedded')==='1';
 const tell=action=>{if(embedded)parent.postMessage({type:'tara-exterior',action},location.origin);};
 if(embedded)$('cabin').hidden=true;
+$('scene-number').hidden=embedded;
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();tell('exit');}});
 let cleanup=()=>{};
 // The inline lightweight sky must reach the screen before model construction.
@@ -21,23 +24,18 @@ try{
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   const dissolve=createExteriorDissolve(renderer);
   const ship=createExteriorShip();ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
+  const gasPass=createExteriorGasPass(renderer,ship.probeThrusters.gas);
   const optics=createExteriorOptics(ship),stars=createDistantStars();scene.add(stars.haze,stars.field,new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
   const planet=createExteriorPlanet();scene.add(planet.body);
-  const sun=new THREE.DirectionalLight(0xfff2d4,3.15);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
-  Object.assign(sun.shadow.camera,{left:-80,right:80,top:80,bottom:-80,near:1,far:320});sun.shadow.bias=-.00012;sun.shadow.normalBias=.05;
+  const sun=new THREE.DirectionalLight(0xfff2d4,3.15),shadows=createExteriorShadow(sun,ship);
   const bounce=new THREE.DirectionalLight(0x8ca7bd,.65);scene.add(sun,bounce,sun.target,bounce.target);
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),target=new THREE.Vector3(),size=new THREE.Vector2();
   let time=Math.max(0,Number(query.get('time'))||0),running=query.get('paused')!=='1',last=0,frame=0,disposed=false;
+  const freshOpening=opening&&time===0&&running;
+  if(!freshOpening)document.body.classList.remove('waiting-for-film');
   const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm};
-  const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal'),logoImage=identity.querySelector('.logo-image');
-  let logoAnimations=[];
-  // Native CSS animations keep the logo moving while the cabin's JavaScript
-  // builds its models. Pause/restart/seek set the same clock deterministically.
-  function syncLogo(){for(const animation of logoAnimations){
-    animation.pause();animation.currentTime=time*1000;
-    if(running&&!document.hidden&&time*1000<animation.effect.getComputedTiming().endTime)animation.play();
-  }}
-  function drawView(shot){
+  const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal');
+  function drawView(shot,renderTarget,gasTarget){
     ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
     applyExteriorProbePose(ship,shot.probe);
     // Set this for every view, so the other dissolve layer and later shots
@@ -45,12 +43,18 @@ try{
     for(const pod of ship.pods)pod.visible=shot.habitatsVisible;
     camera.fov=shot.fov;camera.near=shot.near;camera.far=shot.far;camera.up.fromArray(shot.up);camera.updateProjectionMatrix();camera.lookAt(target);
     planet.show(shot.planet?.position);
-    sun.position.set(shot.shipX+64,-110,92);bounce.position.set(shot.shipX-38,-15,-30);sun.target.position.set(shot.shipX,0,0);bounce.target.position.set(shot.shipX,0,0);
-    stars.follow(camera);renderer.getDrawingBufferSize(size);optics.update(camera,size.x);renderer.render(scene,camera);
+    shadows.update(shot);bounce.position.set(shot.shipX-38,-15,-30);bounce.target.position.set(shot.shipX,0,0);
+    stars.follow(camera);renderer.getDrawingBufferSize(size);optics.update(camera,size,shot.optics);
+    return gasPass.render(scene,camera,renderTarget,gasTarget);
   }
   function draw(){
     const film=sampleExteriorCinemaFrame(time,{...options,aspect:camera.aspect}),shot=film.shot;
     dissolve.render(film,drawView);
+    identity.style.opacity=String(shot.titleOpacity*.88);
+    // The first dial-up band starts after 120ms. Keep the glow hidden until
+    // that band exists, and sample every band from the film's own clock.
+    logoReveal.style.visibility=shot.logoReveal>0?'visible':'hidden';
+    logoReveal.style.clipPath=shot.logoClip;
     $('cut').style.opacity=String(shot.fade);
     const number=shot=>String(shot.number).padStart(2,'0');
     $('scene-number').textContent=film.to?`SCENE ${number(film.from)} → ${number(film.to)}`:`SCENE ${number(shot)}`;
@@ -61,22 +65,29 @@ try{
   const resize=new ResizeObserver(()=>{const r=$('exterior-view').getBoundingClientRect();renderer.setSize(Math.max(1,r.width),Math.max(1,r.height),false);camera.aspect=r.width/Math.max(1,r.height);camera.updateProjectionMatrix();});resize.observe($('exterior-view'));
   const rect=$('exterior-view').getBoundingClientRect();renderer.setSize(rect.width,rect.height,false);camera.aspect=rect.width/rect.height;
   function play(next){
-    running=next;last=performance.now();syncLogo();$('play').textContent=next?'一時停止':'再開';$('play').setAttribute('aria-pressed',String(next));
+    running=next;last=performance.now();$('play').textContent=next?'一時停止':'再開';$('play').setAttribute('aria-pressed',String(next));
     const current=new URLSearchParams(location.search);current.set('time',time.toFixed(3));
     if(next)current.delete('paused');else current.set('paused','1');history.replaceState(null,'',`?${current}`);
   }
   $('play').onclick=()=>play(!running);$('restart').onclick=()=>{time=0;play(true);};play(running);
   $('timeline').oninput=()=>{time=Number($('timeline').value);play(false);};
-  // Compile even while the ship is off-screen beneath the introductory logo.
+  // Keep the lightweight sky over the renderer until the first real frames settle.
   draw();ship.root.visible=true;await renderer.compileAsync(scene,camera);
   document.documentElement.dataset.shipReadyMs=performance.now().toFixed(1);
-  // Use the actual elapsed loading time: a slow load must never restart the logo.
-  if(time===0&&query.get('paused')!=='1')time=(performance.now()-Number(document.documentElement.dataset.spaceStartedMs||0))/1000;
-  for(const element of [identity,logoReveal,logoImage]){
-    element.style.animationDelay='';element.style.animationPlayState='';logoAnimations.push(...element.getAnimations());
-  }
-  syncLogo();last=performance.now();draw();
+  if(freshOpening)await new Promise(resolve=>{
+    let previous=0,steady=0;const start=performance.now();
+    function warm(now){
+      draw();steady=previous&&now-previous<=50?steady+1:0;previous=now;
+      if((now-start>=550&&steady>=4)||now-start>=3000)resolve();
+      else requestAnimationFrame(warm);
+    }
+    requestAnimationFrame(warm);
+  });
+  else if(time===0&&running)time=(performance.now()-Number(document.documentElement.dataset.spaceStartedMs||0))/1000;
+  draw();
   $('space-boot').hidden=true;$('status').hidden=true;$('cinema-controls').hidden=embedded&&opening;tell('ready');
+  if(freshOpening)await new Promise(resolve=>requestAnimationFrame(resolve));
+  document.body.classList.remove('waiting-for-film');last=performance.now();
   function tick(now){
     if(disposed)return;frame=requestAnimationFrame(tick);
     if(document.hidden){last=0;return;}
@@ -84,7 +95,7 @@ try{
     draw();
   }
   frame=requestAnimationFrame(tick);
-  const visibility=()=>{syncLogo();last=performance.now();};document.addEventListener('visibilitychange',visibility);
+  const visibility=()=>{last=performance.now();};document.addEventListener('visibilitychange',visibility);
   cleanup=()=>{disposed=true;cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();dissolve.dispose();optics.dispose();stars.dispose();planet.dispose();ship.dispose();renderer.dispose();renderer.forceContextLoss();};
   $('exterior-view').addEventListener('webglcontextlost',event=>{if(disposed)return;event.preventDefault();play(false);$('status').hidden=false;$('status').textContent='映像接続が中断されました。船内へ戻って再度お試しください。';});
 }catch(error){console.error(error);$('status').hidden=false;$('cinema-controls').hidden=false;$('status').textContent='船体映像を開けませんでした。船内へ戻って再度お試しください。';}

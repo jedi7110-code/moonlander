@@ -29,6 +29,35 @@ export function engineDistanceGain(cameraPosition,sourcePosition){
   return Math.min(1,(200/Math.max(200,distance))**2);
 }
 
+// Measure the fixed propulsion section on screen. Rotating habitats are
+// excluded so their changing silhouette cannot pulse the lens response.
+// Projection includes zoom/FOV, core scale and actual depth; pixel width
+// and height cancel the projection's aspect correction independently.
+export function projectedShipSize(ship,camera,viewport){
+  camera.updateMatrixWorld(true);
+  const point=new THREE.Vector3();
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const engine of ship.engines)for(const y of [-1,1])for(const z of [-1,1]){
+    const radius=engine.userData.throatRadius/.24;
+    point.set(engine.userData.glowPoint[0],y*radius,z*radius);
+    engine.localToWorld(point).applyMatrix4(camera.matrixWorldInverse);
+    if(point.z>=-camera.near)continue;
+    point.applyMatrix4(camera.projectionMatrix);
+    minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);
+    minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);
+  }
+  return Number.isFinite(minX)?Math.max((maxX-minX)*viewport.x/2,(maxY-minY)*viewport.y/2):0;
+}
+
+export function sampleExteriorOptics(ship,camera,viewport,{strength=.65,streakRatio=2.4,haloRatio=.16}={}){
+  const size=projectedShipSize(ship,camera,viewport),position=new THREE.Vector3();
+  return ship.engines.map(engine=>{
+    position.fromArray(engine.userData.glowPoint);engine.localToWorld(position);
+    const gain=engineFacingGain(camera.position,position)*engineDistanceGain(camera.position,position);
+    return{strength:strength*gain,visible:size>0&&gain>.002,streakSize:size*streakRatio,haloSize:size*haloRatio};
+  });
+}
+
 export function createExteriorOptics(ship){
   const maps={streak:opticalTexture('streak'),halo:opticalTexture('halo')};
   const sources=ship.engines.map((engine,index)=>{
@@ -42,16 +71,14 @@ export function createExteriorOptics(ship){
   let enabled=true;
   return{
     setEnabled(value){enabled=Boolean(value);},
-    update(camera,width){
-      for(const source of sources){
-        source.flare.getWorldPosition(source.position);
-        const distanceGain=engineDistanceGain(camera.position,source.position),scale=Math.sqrt(distanceGain);
-        const gain=engineFacingGain(camera.position,source.position)*distanceGain;
-        source.flare.visible=enabled&&gain>.002;
+    update(camera,viewport,settings){
+      const samples=sampleExteriorOptics(ship,camera,viewport,settings);
+      for(const [index,source]of sources.entries()){
+        const sample=samples[index];
+        source.flare.visible=enabled&&sample.visible;
         source.elements.forEach((element,i)=>{
-          const strength=.65*gain;
-          element.color.copy(source.colors[i]).multiplyScalar(strength);
-          element.size=(i===0?width*.82:54)*scale;
+          element.color.copy(source.colors[i]).multiplyScalar(sample.strength);
+          element.size=i===0?sample.streakSize:sample.haloSize;
         });
       }
     },

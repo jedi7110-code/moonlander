@@ -112,7 +112,7 @@ try{
       followDelta.copy(camera.position).sub(controls.target).applyAxisAngle(rotorAxis,angle-trackingAngle);
       camera.position.copy(habitatTarget).add(followDelta);controls.target.copy(habitatTarget);trackingAngle=angle;
     }
-    controls.update();stars.follow(camera);renderer.getDrawingBufferSize(bufferSize);optics.update(camera,bufferSize.x);renderer.render(scene,camera);if(rawDt>0){measureFrames++;measureTime+=rawDt;}
+    controls.update();stars.follow(camera);renderer.getDrawingBufferSize(bufferSize);optics.update(camera,bufferSize);renderer.render(scene,camera);if(rawDt>0){measureFrames++;measureTime+=rawDt;}
     if(measureTime>=1.2){$('performance').textContent=`${Math.round(measureFrames/measureTime)} FPS · ${renderer.info.render.calls} DRAWS`;measureFrames=0;measureTime=0;}
   }
   if(!disposed){$('status').hidden=true;tell('ready');frame=requestAnimationFrame(render);document.addEventListener('visibilitychange',visibility);}

@@ -1,16 +1,16 @@
 import {EXTERIOR,exteriorAngle} from './ship-exterior.js';
 import {EXTERIOR_CRUISE_SPEED} from './exterior-cruise.js';
-import {EXTERIOR_LOGO,sampleExteriorLogo} from './exterior-logo.js';
+import {sampleExteriorLogo} from './exterior-logo.js';
 import {sampleExteriorProbeFlight} from './exterior-probe-flight.js';
 
-// Distinguish an observer in space from a camera bolted to the hull. Fixed
-// shots never pan/translate to keep the ship centered. The opening approach
+// Distinguish an observer in space from a camera bolted to the hull. The
+// second observer slides sideways; the other fixed shots stay in place. The opening approach
 // tilts at a fixed position; flight stays at 2 m/s apart from the two flyovers
 // and extreme-wide planet transit.
 export const CINEMA_SHOTS=Object.freeze([
-  {id:'overhead',number:1,name:'ティルト / 斜め上から・奥から手前へ接近',mode:'tilt',duration:38,speed:9.2,delay:EXTERIOR_LOGO.end,anchor:0,probeStage:'away',
-    eye:[[315,115,35]],target:[[0,0,0]],tilt:[44.5,60],fov:42},
-  {id:'planet',number:2,name:'固定カメラ / 惑星を横切る遥かな船',mode:'fixed',duration:12,speed:48,probeStage:'away',
+  {id:'overhead',number:1,name:'ティルト / 斜め上から・奥から手前へ接近',mode:'tilt',duration:38,speed:10.12*.97,flightOrigin:5.9,anchor:0,probeStage:'away',
+    eye:[[315,115,35]],target:[[0,0,0]],tilt:[44.1,60],fov:42,near:5},
+  {id:'planet',number:2,name:'横移動カメラ / 惑星を横切る遥かな船',mode:'lateral',duration:12,speed:48,probeStage:'away',cameraSlide:[-120,120],cameraOffset:260,
     eye:[[0,350,3900]],target:[[0,100,0]],fov:42,wide:true,planet:true,near:5,far:60000},
   {id:'distant',number:3,name:'固定カメラ / 下から接近する探査機',mode:'fixed',duration:8,probeStage:'approach',
     eye:[[235,72,255]],target:[[0,8,0]],fov:38,wide:true},
@@ -22,6 +22,7 @@ export const CINEMA_SHOTS=Object.freeze([
   {id:'mounted',number:5,name:'船体固定カメラ / 回転する重力区画',mode:'mounted',duration:8,
     eye:[[12.8,3.85,1.8]],target:[[-1.6,6,0]],fov:58,core:true},
   {id:'flyby',number:9,name:'固定カメラ / 背後から通過・彼方へ航行',mode:'fixed',duration:60,speed:6,anchor:0,
+    optics:{strength:.34,streakRatio:2.4,haloRatio:.14},
     eye:[[18,-31,20.5]],target:[[338,-1,0]],fov:56,near:.25,far:1e8},
 ]);
 export const OPENING_DURATION=CINEMA_SHOTS.reduce((sum,shot)=>sum+shot.duration,0);
@@ -40,7 +41,7 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   let index=0,start=0,distance=0;
   while(index<CINEMA_SHOTS.length-1&&(forcedIndex===null?time>=start+CINEMA_SHOTS[index].duration*timingScale:index<forcedIndex)){
     const previous=CINEMA_SHOTS[index],hold=previous.duration*timingScale;
-    distance+=Math.max(0,hold-(previous.delay??0))*(previous.speed??EXTERIOR_CRUISE_SPEED);start+=hold;index++;
+    distance+=(hold-(previous.flightOrigin??0))*(previous.speed??EXTERIOR_CRUISE_SPEED);start+=hold;index++;
   }
   const shot=CINEMA_SHOTS[index],shotDuration=shot.duration*timingScale,end=start+shotDuration,sourceOffset=(shot.sourceOffset??0)*timingScale;
   const sourceDuration=shot.sourceDuration===undefined?shotDuration+sourceOffset:shot.sourceDuration*timingScale;
@@ -50,10 +51,16 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   if(shot.tilt){
     // A vertical tilt changes pitch only: position, horizontal bearing and
     // focal length stay fixed while the real ship grows as it approaches.
-    // The approaching ship crosses the upper edge through its own forward
-    // motion. The camera begins tilting down only after the logo has gone.
-    const flight=Math.max(0,Math.min(1,(time-start-(shot.delay??0))/(shotDuration-(shot.delay??0))));
-    const pitch=(shot.tilt[0]+(shot.tilt[1]-shot.tilt[0])*flight*flight)*Math.PI/180;
+    // Ease into the tilt over empty space, then hold one speed through the
+    // logo and hull arrival. Accelerate later to finish at the chosen pitch.
+    const elapsed=Math.max(0,Math.min(shotDuration,time-start));
+    const reveal=shot.flightOrigin??0,rate=.3,ease=1.2,steadyUntil=15*timingScale;
+    const advance=t=>t<ease?rate*ease*((t/ease)**3-(t/ease)**4/2):rate*(t-ease/2);
+    const initialPitch=shot.tilt[0]-advance(reveal),steadyPitch=initialPitch+advance(steadyUntil);
+    const after=Math.max(0,elapsed-steadyUntil),remaining=shotDuration-steadyUntil;
+    const acceleration=(shot.tilt[1]-steadyPitch-rate*remaining)/(remaining*remaining);
+    const pitchDegrees=elapsed<=steadyUntil?initialPitch+advance(elapsed):steadyPitch+rate*after+acceleration*after*after;
+    const pitch=pitchDegrees*Math.PI/180;
     target[1]=eye[1]-Math.hypot(target[0]-eye[0],target[2]-eye[2])*Math.tan(pitch);
   }
   if(shot.core){eye=eye.map((v,i)=>i===0?(v-EXTERIOR.rotorX)*coreScale+EXTERIOR.rotorX:v*coreScale);target=target.map((v,i)=>i===0?(v-EXTERIOR.rotorX)*coreScale+EXTERIOR.rotorX:v*coreScale);}
@@ -67,13 +74,15 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   }
   const shipSpeed=shot.speed??EXTERIOR_CRUISE_SPEED;
   // Incoming shots already move during the overlap before their nominal start.
-  // Only scene 01 waits for the introductory logo.
-  const flightTime=shot.delay?Math.max(0,time-start-shot.delay):time-start;
+  // The first ship is already approaching outside the frame during the logo.
+  // Negative flight time places it farther away instead of hiding a stopped hull.
+  const flightTime=time-start-(shot.flightOrigin??0);
   const shipX=distance+flightTime*shipSpeed;
-  // Place a fixed camera once at the shot midpoint. Only the ship advances
-  // after that; copying shipX into eye and target would fake a pass-by.
-  const cameraX=shot.mode==='fixed'||shot.mode==='tilt'?distance+(shot.anchor??shotDuration/2*shipSpeed):shipX;
-  eye[0]+=cameraX;target[0]+=cameraX;
+  // Anchor the observer at the shot midpoint. Scene 02 then slides the
+  // camera and its target together, keeping its bearing fixed as the ship passes.
+  const cameraX=['fixed','tilt','lateral'].includes(shot.mode)?distance+(shot.anchor??shotDuration/2*shipSpeed)+(shot.cameraOffset??0):shipX;
+  const slide=shot.cameraSlide?shot.cameraSlide[0]+(shot.cameraSlide[1]-shot.cameraSlide[0])*u*u*(3-2*u):0;
+  eye[0]+=cameraX+slide;target[0]+=cameraX+slide;
   // The last fixed observer remains in place indefinitely. There is no
   // reset, closing fade, or automatic entry into the cabin.
   const fade=0;
@@ -87,12 +96,13 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   const approachProgress=Math.max(0,Math.min(1,(time-approachStart)/approachDuration));
   const advance=approachProgress**3*(approachProgress*(approachProgress*6-15)+10)*(docking.sourceOffset??0)*timingScale;
   const probe=shot.probeStage==='approach'||shot.probeStage==='dock'?
-    sampleExteriorProbeFlight(time-approachStart+advance,{approachDuration,captureDuration,coreScale}):
+    sampleExteriorProbeFlight(time-approachStart+advance,{approachDuration,captureDuration,coreScale,
+      controlTime:time-approachStart,controlAdvance:(docking.sourceOffset??0)*timingScale}):
     {visible:shot.probeStage!=='away',position:[0,0,0],rotation:[0,0,0],latched:shot.probeStage!=='away'};
   const planet=Array.isArray(shot.planet)?shot.planet:[2200,900,-11000];
-  return{index,number:shot.number,id:shot.id,name:shot.name,mode:shot.mode,eye,target,up:shot.up??[0,1,0],fov,shipX,shipSpeed,probe,
-    logoReveal:logo.reveal,logoFlicker:logo.flicker,
-    shipVisible:time>=EXTERIOR_LOGO.end,
+  return{index,number:shot.number,id:shot.id,name:shot.name,mode:shot.mode,eye,target,up:shot.up??[0,1,0],fov,shipX,shipSpeed,probe,optics:shot.optics,
+    logoReveal:logo.reveal,logoClip:logo.clipPath,
+    shipVisible:true,
     habitatsVisible:shot.hideHabitats!==true,
     planet:shot.planet?{position:[cameraX+planet[0],planet[1],planet[2]]}:null,near:shot.near??.1,far:shot.far??2400,
     angle:phase+exteriorAngle(elapsed,rpm),fade,titleOpacity,done:false,cruising:time>=duration,duration,time,start,end};

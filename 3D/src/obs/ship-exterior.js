@@ -4,6 +4,7 @@ import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import taraironWordmark from './tarairon-wordmark.js';
 import {HABITAT_ENVELOPE,HABITAT_FLOORS,HABITAT_WINDOWS,cabinToHabitat} from './habitat-envelope.js';
 import {createLander} from '../js/models.js';
+import {createExteriorProbeThrusters} from './exterior-probe-thrusters.js';
 
 const referenceCircumference=200,referenceRadius=referenceCircumference/(2*Math.PI);
 export const EXTERIOR=Object.freeze({radius:referenceRadius-HABITAT_ENVELOPE.centerY,
@@ -280,6 +281,11 @@ function probeFoilMaps(){
 
 function detailDockedProbe(lander,m){
   const foil=probeFoilMaps(),paintedMaterials=[],handled=new Set();
+  // The exterior's raised hatch and service cover extend farther forward
+  // than the game model. Stand the ladder off those faces instead of
+  // letting the upper rungs cut through them and their contact shadows.
+  lander.userData.ladder.position.z=.16;
+  for(const x of [-.55,.55])rod(lander,m.steel,[x,2.61,1.79],[x,2.61,1.93],.05,'Probe ladder stand-off mount');
   lander.traverse(object=>{
     if(!object.isMesh)return;
     for(const material of [].concat(object.material)){
@@ -332,22 +338,25 @@ function detailDockedProbe(lander,m){
   for(const x of [-.63,.63])for(const y of [-.27,.27])box(bay,m.pipe,[x,y,.13],[.046,.046,.035],'Descent cover fastener');
   label(bay,'SERVICE / 02',[0,.13,.13],.85,.10,{size:45});
   for(const x of [-1,1])for(const z of [-1,1]){
-    const hip=[x*1.70,2.30,z*1.50],knee=[x*2.37,1.16,z*2.12],foot=[x*2.95,.18,z*2.65];
+    // Attach on top of the pad: an angled cylinder ending at its center
+    // extends below its endpoint by its radius and used to pierce the sole.
+    const hip=[x*1.70,2.30,z*1.50],knee=[x*2.37,1.16,z*2.12],foot=[x*2.95,.30,z*2.65];
     rod(lander,m.steel,hip,knee,.205,'Probe upper landing strut');
     rod(lander,m.pipe,knee,foot,.172,'Probe telescopic landing piston');
     rod(lander,m.dark,[x*2.30,1.30,z*2.05],[x*2.45,1.04,z*2.20],.245,'Probe piston gland');
     box(lander,m.steel,hip,[.43,.32,.40],'Probe leg pivot bracket');
     rod(lander,m.pipe,[x*1.05,1.2,z*1.22],[x*2.63,.43,z*2.35],.052,'Probe secondary leg brace');
-    const pad=addMesh(lander,new THREE.CylinderGeometry(.50,.50,.06,20),m.steel,'Probe landing pad rim',[...foot]);
-    pad.position.y=.13;
-    for(let j=0;j<5;j++)box(lander,m.pipe,[foot[0]-.32+j*.16,.257,foot[2]],[.055,.018,.60],'Landing pad traction rib');
+    // The game pad is radius .50 and spans y=.11-.25. Keep the added
+    // metal rim outside that cylinder rather than sharing its side faces.
+    const pad=addMesh(lander,new THREE.CylinderGeometry(.54,.54,.08,20),m.steel,'Probe landing pad rim',[foot[0],.23,foot[2]]);
+    for(let j=0;j<5;j++)box(lander,m.pipe,[foot[0]-.32+j*.16,.277,foot[2]],[.055,.018,.60],'Landing pad traction rib');
   }
   return paintedMaterials;
 }
 
 function dockedProbe(root,m){
   const dock=new THREE.Group();dock.name='BARRAMUNDI / underside docking cradle';root.add(dock);
-  const lander=createLander({labels:typeof document!=='undefined'});lander.name='Moonlander game / BARRAMUNDI';dock.add(lander);
+  const lander=createLander({labels:typeof document!=='undefined',footJointHeight:.30});lander.name='Moonlander game / BARRAMUNDI';dock.add(lander);
   lander.userData.flame.visible=false;lander.userData.flame.removeFromParent();
   // Game geometry/materials are module-wide caches. Give this study its own
   // resources so baking and disposal cannot alter a second game instance.
@@ -360,6 +369,7 @@ function dockedProbe(root,m){
     object.material=Array.isArray(object.material)?object.material.map(isolate):isolate(object.material);
   });
   const paintedMaterials=detailDockedProbe(lander,m);bake(lander);
+  const thrusters=createExteriorProbeThrusters(lander,{nozzleMaterial:m.dark,rimMaterial:m.pipe});
   const cradle=new THREE.Group();cradle.name='Probe docking hardpoints';dock.add(cradle);
   chamferBox(cradle,m.steel,[0,7.25,0],[2.8,.22,2.2],'Underside docking plate');
   const collar=axisRing(cradle,m.pipe,0,.36,.05,'Probe docking collar');collar.rotation.set(Math.PI/2,0,0);collar.position.set(0,5.43,0);
@@ -369,7 +379,7 @@ function dockedProbe(root,m){
     box(cradle,m.patch,[x*.68,5.33,z*.53],[.38,.14,.32],'Probe roof clamp');
   }
   label(cradle,'PROBE / 01',[0,7.06,1.12],1.6,.22,{size:44});
-  bake(cradle);return{dock,lander,cradle,paintedMaterials};
+  bake(cradle);return{dock,lander,cradle,paintedMaterials,thrusters};
 }
 
 export function createExteriorShip(){
@@ -524,7 +534,9 @@ export function createExteriorShip(){
     pipe(machinery,m.pipe,[[-12.1,side*5.4,.7],[-14.8,side*5.4,.7],[-16.2,side*3.8,.7]],.1,'Pressurant feed');
   }
   // A wide, shallow aft shoulder; the bells themselves stay circular.
-  loft(core,m.dark,[[-16.7,4.85,8.5],[-15.5,4.85,8.5]],'Engine mounting bulkhead',16);
+  // The forward cap must stop before the pressure hull's x=-15.5 cap;
+  // coincident caps were competing for the same depth values.
+  loft(core,m.dark,[[-16.7,4.85,8.5],[-15.55,4.85,8.5]],'Engine mounting bulkhead',16);
   const engines=[];
   const nozzle=(y,z,r,length,index)=>{
     const group=new THREE.Group();group.name=`Rocket engine ${index}`;group.position.set(-16.4,y,z);core.add(group);engines.push(group);
@@ -566,6 +578,7 @@ export function createExteriorShip(){
   const bounds=new THREE.Box3().setFromObject(root),dimensions=bounds.getSize(new THREE.Vector3());
   let coreScale=1;
   return{root,core,rotor,pods,frame,engines,machinery,dimensions,floorGuides,hub,spokes,evaHatches,dockedLander:probe.lander,probeDock:probe.dock,
+    probeThrusters:probe.thrusters,
     get coreScale(){return coreScale;},
     setCoreScale(value){
       coreScale=THREE.MathUtils.clamp(Number(value)||1,1,2.8);
@@ -584,6 +597,6 @@ export function createExteriorShip(){
     setWear(value){m.paint.map=value?worn:clean;m.paint.needsUpdate=true;m.habitat.map=value?habitatWorn:habitatClean;m.habitat.needsUpdate=true;for(const material of probe.paintedMaterials){material.map=value?worn:clean;material.needsUpdate=true;}marks.visible=Boolean(value);for(const pod of pods)pod.traverse(o=>{if(o.name==='Local vent stain')o.visible=Boolean(value);});},
     setServices(value){machinery.visible=Boolean(value);},
     setAngle(angle){rotor.rotation.x=angle;},
-    dispose(){const geometries=new Set(),materials=new Set(),maps=new Set([clean,worn,habitatClean,habitatWorn,soot,ignition]);root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const material of [].concat(o.material??[])){materials.add(material);for(const map of [material.map,material.bumpMap])if(map)maps.add(map);}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());maps.forEach(m=>m?.dispose());}
+    dispose(){probe.thrusters.dispose();const geometries=new Set(),materials=new Set(),maps=new Set([clean,worn,habitatClean,habitatWorn,soot,ignition]);root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const material of [].concat(o.material??[])){materials.add(material);for(const map of [material.map,material.bumpMap])if(map)maps.add(map);}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());maps.forEach(m=>m?.dispose());}
   };
 }

@@ -13,7 +13,14 @@ import {createStarCatalog,skyHazeColor,starGlow,srgbByte,linearByte} from './ext
   // Match scene 01's oblique bearing and pitch, including a paused study seek,
   // so the lightweight loading sky hands over without changing direction.
   const seconds=Math.max(0,Number(query.get('time'))||0),duration=query.get('mode')==='opening'||isCabin?38:38*4/3;
-  const flight=Math.max(0,Math.min(1,(seconds-5.2)/(duration-5.2))),pitch=(44.5+15.5*flight*flight)*Math.PI/180;
+  const elapsed=Math.max(0,Math.min(duration,seconds));
+  const reveal=6.8,rate=.3,ease=1.2,steadyUntil=15*duration/38;
+  const advance=t=>t<ease?rate*ease*((t/ease)**3-(t/ease)**4/2):rate*(t-ease/2);
+  const initialPitch=44.8-advance(reveal),steadyPitch=initialPitch+advance(steadyUntil);
+  const after=Math.max(0,elapsed-steadyUntil),remaining=duration-steadyUntil;
+  const acceleration=(60-steadyPitch-rate*remaining)/(remaining*remaining);
+  const pitchDegrees=elapsed<=steadyUntil?initialPitch+advance(elapsed):steadyPitch+rate*after+acceleration*after*after;
+  const pitch=pitchDegrees*Math.PI/180;
   const bearing=Math.atan2(35,315),forward=[-Math.cos(pitch)*Math.cos(bearing),-Math.sin(pitch),-Math.cos(pitch)*Math.sin(bearing)];
   const right=normalize([-forward[2],0,forward[0]]);
   const up=[right[1]*forward[2]-right[2]*forward[1],right[2]*forward[0]-right[0]*forward[2],right[0]*forward[1]-right[1]*forward[0]];
@@ -46,15 +53,6 @@ import {createStarCatalog,skyHazeColor,starGlow,srgbByte,linearByte} from './ext
     context.putImageData(pixels,0,0);
   }
   paint();addEventListener('resize',paint);
-  const logo=document.querySelector('.identity');
-  if(logo&&(Number(query.get('time'))>0||query.get('paused')==='1')){
-    const time=Number(query.get('time'))||0;
-    // Pause CSS at the requested film time while the 3D modules are loading.
-    for(const element of [logo,logo.querySelector('.logo-reveal'),logo.querySelector('.logo-image')]){
-      const delay=parseFloat(getComputedStyle(element).animationDelay)||0;
-      element.style.animationDelay=`${delay-time}s`;element.style.animationPlayState='paused';
-    }
-  }
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     document.documentElement.dataset.spacePaintedMs=performance.now().toFixed(1);
     if(!isCabin&&query.get('embedded')==='1')parent.postMessage({type:'tara-exterior',action:'space'},location.origin);
