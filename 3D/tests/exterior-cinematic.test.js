@@ -257,7 +257,10 @@ test('the B ending replaces 09, keeps its initial camera path, and tracks a ship
     const baseline={opening:true,approach:'bow',penultimate:'underside'};
     const b=offset===8?sampleExteriorCinemaFrame(start+offset,baseline).from:sampleExteriorCinema(start+offset,baseline);
     const ending=sampleExteriorCinema(start+offset,options);
-    for(const key of ['target','fov','shipX','angle','probe'])assert.deepEqual(ending[key],b[key]);
+    for(const key of ['fov','angle','probe'])assert.deepEqual(ending[key],b[key]);
+    assert.ok(Math.abs(ending.shipX-b.shipX-offset*EXTERIOR_CRUISE_SPEED*.05)<1e-9,'only scene 05 flight advances five percent faster');
+    assert.ok(Math.abs(ending.target[0]-ending.shipX-b.target[0]+b.shipX)<1e-9);
+    assert.deepEqual(ending.target.slice(1),b.target.slice(1));
     assert.deepEqual(ending.eye.slice(1),b.eye.slice(1));
     assert.ok(Math.abs(ending.eye[0]-b.eye[0]+offset*EXTERIOR_CRUISE_SPEED)<1e-9,'the observer slides in space instead of advancing with the hull');
   }
@@ -281,7 +284,7 @@ test('the B ending replaces 09, keeps its initial camera path, and tracks a ship
     for(let axis=0;axis<3;axis++)assert.ok(Math.abs((at.eye[axis]-before.eye[axis])/epsilon-(after.eye[axis]-at.eye[axis])/epsilon)<.002,'camera velocity settles without a jump');
   }
   const before=sampleExteriorCinemaFrame(86.75,options),later=sampleExteriorCinema(10000,options);
-  assert.equal(later.shipSpeed,EXTERIOR_CRUISE_SPEED);assert.ok(later.shipX>before.shot.shipX);assert.equal(later.cruising,true);
+  assert.equal(later.shipSpeed,EXTERIOR_CRUISE_SPEED*1.05);assert.ok(later.shipX>before.shot.shipX);assert.equal(later.cruising,true);
   assert.deepEqual(sampleExteriorCinemaFrame(86.75,options),before,'seeking remains independent of history');
 });
 test('the B ending never stalls relative ship motion when its camera slide ends around 87 seconds',()=>{
@@ -290,8 +293,8 @@ test('the B ending never stalls relative ship motion when its camera slide ends 
     for(let seconds=79.5;seconds<=96;seconds+=.25){
       const a=sampleExteriorCinema(seconds,options),b=sampleExteriorCinema(seconds+dt,options);
       const relativeSpeed=((b.shipX-b.eye[0])-(a.shipX-a.eye[0]))/dt;
-      assert.ok(relativeSpeed>=EXTERIOR_CRUISE_SPEED-1e-8,`the ship keeps receding at ${seconds}s (${aspect} aspect)`);
-      assert.ok(Math.abs((b.shipX-a.shipX)/dt-EXTERIOR_CRUISE_SPEED)<1e-8,'ship speed stays constant');
+      assert.ok(relativeSpeed>=EXTERIOR_CRUISE_SPEED*1.05-1e-8,`the ship keeps receding at ${seconds}s (${aspect} aspect)`);
+      assert.ok(Math.abs((b.shipX-a.shipX)/dt-EXTERIOR_CRUISE_SPEED*1.05)<1e-8,'ship speed stays constant');
       assert.equal(sampleExteriorCinemaFrame(seconds,options).to,null);
     }
   }

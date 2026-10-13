@@ -2,6 +2,8 @@ import {EXTERIOR,exteriorAngle} from './exterior-mothership.js';
 import {EXTERIOR_CRUISE_SPEED} from './exterior-cruise.js';
 import {sampleExteriorLogo} from './exterior-logo.js';
 import {sampleExteriorProbeFlight} from './exterior-probe-flight.js';
+import {sampleExteriorCinema as sampleSavedCinema,sampleExteriorCinemaFrame as sampleSavedFrame,
+  exteriorCinemaShots as savedShots} from './exterior-cinematic-20261013-r1.js';
 
 // Distinguish an observer in space from a camera bolted to the hull. The
 // second observer slides sideways; the other fixed shots stay in place. The opening approach
@@ -50,10 +52,11 @@ const penultimateViews=Object.freeze({
 // when the eight-second slide eases out, before the ship starts receding again.
 const undersideEndingShots=Object.freeze([...CINEMA_SHOTS.slice(0,-2),{
   ...CINEMA_SHOTS.at(-2),...penultimateViews.underside,id:'underside-ending',mode:'tracking',
-  name:'船底から見送り / 彼方へエンドレス航行',duration:68,cameraDuration:8,near:1,far:1e8,
+  name:'船底から見送り / 彼方へエンドレス航行',duration:68,speed:EXTERIOR_CRUISE_SPEED*1.05,cameraDuration:8,near:1,far:1e8,
   optics:{strength:.34,streakRatio:2.4,haloRatio:.14},
 }]);
-export const exteriorCinemaShots=({ending}={})=>ending==='underside'?undersideEndingShots:CINEMA_SHOTS;
+export const exteriorCinemaShots=(options={})=>options.revision==='20261013-r1'?savedShots(options):
+  options.ending==='underside'?undersideEndingShots:CINEMA_SHOTS;
 
 // Pure time sampling: playback and seeking agree without accumulated camera
 // state. Unequal holds replace the identical start/stop tweens.
@@ -141,11 +144,13 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
     angle:phase+exteriorAngle(elapsed,rpm),fade,titleOpacity,done:false,cruising:time>=duration,duration,time,start,end};
 }
 
-export function sampleExteriorCinema(seconds,options){return sampleCinemaShot(seconds,options);}
+export function sampleExteriorCinema(seconds,options){return options?.revision==='20261013-r1'?
+  sampleSavedCinema(seconds,options):sampleCinemaShot(seconds,options);}
 
 // Dissolves straddle each existing edit point. Both viewpoints advance on the
 // same film clock, so pausing, seeking and slow loading never freeze a layer.
 export function sampleExteriorCinemaFrame(seconds,options){
+  if(options?.revision==='20261013-r1')return sampleSavedFrame(seconds,options);
   const shot=sampleCinemaShot(seconds,options),half=CINEMA_DISSOLVE_SECONDS/2;
   let boundary,index;
   if(shot.index>0&&shot.time<shot.start+half){boundary=shot.start;index=shot.index-1;}

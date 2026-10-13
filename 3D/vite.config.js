@@ -17,6 +17,7 @@ export default defineConfig({
         shipExteriorStudy: fileURLToPath(new URL('./src/ship-exterior-study.html', import.meta.url)),
         shipExteriorCinema: fileURLToPath(new URL('./src/ship-exterior-cinema.html', import.meta.url)),
         exteriorShotStudy: fileURLToPath(new URL('./src/exterior-shot-study.html', import.meta.url)),
+        exteriorSceneCatalog: fileURLToPath(new URL('./src/exterior-scene-catalog.html', import.meta.url)),
         exteriorFlareStudy: fileURLToPath(new URL('./src/exterior-flare-study.html', import.meta.url)),
         cabinAudioStudy: fileURLToPath(new URL('./src/cabin-audio-study.html', import.meta.url)),
         emergencyLightingStudy: fileURLToPath(new URL('./src/emergency-lighting-study.html', import.meta.url)),

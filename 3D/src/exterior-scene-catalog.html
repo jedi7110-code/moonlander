@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TARAIRON / オープニング・シーン一覧</title>
+<style>
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:#080d12;color:#e4e8e5;font:14px/1.65 system-ui,sans-serif}main{max-width:1440px;margin:auto;padding:24px}h1{font-size:21px;font-weight:500;margin:0 0 8px}h2{font-size:18px;font-weight:500;margin:28px 0 8px}p{color:#a3b1b0;margin:8px 0 16px}button,a{font:inherit;color:inherit;border:1px solid #354447;background:#111b22;padding:7px 12px;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-block}button:hover,a:hover{border-color:#a5cabb}button[aria-pressed="true"]{background:#17372e;border-color:#81b7a2}nav{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}iframe{display:block;width:100%;aspect-ratio:16/9;border:1px solid #263335;background:#030609}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #253439}th{font-weight:500;color:#aabcb6}td:first-child{font:12px ui-monospace,monospace;letter-spacing:.06em;width:80px}tbody tr[data-selected="true"]{background:#10231e}td:last-child{white-space:nowrap}caption{text-align:left;color:#a3b1b0;padding:8px 0}.archive-note{font-size:13px}footer{margin-top:24px}@media(max-width:640px){main{padding:12px}h1{font-size:18px}}
+</style></head><body><main>
+<h1>オープニング / シーン一覧・保存版</h1>
+<p>シーンごとに現行案と残したカットを再生できます。直近のBラストは、速度変更前と＋5%の版を残しています。</p>
+<nav aria-label="全体の再生"><a id="current-opening">現行案を最初から再生</a><a id="saved-opening">速度変更前の全編</a><a href="./exterior-shot-study.html?shot=underside&ending=underside">05のスタディーへ</a></nav>
+<h2 id="selected-label">05 / Bをラストに・09なし</h2>
+<iframe id="film" title="選択したシーンのプレビュー" allow="autoplay"></iframe>
+<nav aria-label="選択したシーンの操作"><button id="play">このシーンから再生</button><button id="still">同じ時刻で比較</button><button id="far" hidden>遠ざかった姿・150秒</button><a id="full" target="_blank" rel="noopener">大きく見る</a></nav>
+<div class="table-wrap"><table><caption>保存日：2026年10月13日。番号は編集用の元のシーン番号です。</caption><thead><tr><th>シーン</th><th>カット</th><th>状態</th><th>プレビュー</th></tr></thead><tbody id="cuts"></tbody></table></div>
+<footer><p class="archive-note">保存版は別のカメラ・タイミング定義から再生します。速度変更前の基準コミット：71708bd。保存対象は今回までの03・05・09などのカメラ案です。</p></footer>
+</main><script type="module" src="./exterior-scene-catalog-page.js"></script></body></html>
