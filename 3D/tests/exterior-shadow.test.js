@@ -38,7 +38,7 @@ test('the real approach dissolve activates the close shadow only for the docking
   const ship=createExteriorShip(),sun=new THREE.DirectionalLight(),shadows=createExteriorShadow(sun,ship);
   try{
     const shots=exteriorCinemaShots(),dockingStart=shots.slice(0,shots.findIndex(shot=>shot.id==='lander')).reduce((time,shot)=>time+shot.duration,0);
-    const frame=sampleExteriorCinemaFrame(dockingStart-.2,{opening:true});
+    const frame=sampleExteriorCinemaFrame(dockingStart-.2,{opening:true,transition:'dissolve'});
     assert.equal(frame.from.id,'distant');assert.equal(frame.to.id,'lander');
     for(const shot of [frame.from,frame.to,frame.from]){
       shadows.update(shot);

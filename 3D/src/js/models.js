@@ -12,6 +12,7 @@ const gold = material(0xac7828,.78,.38), silver = material(0x8d9899,.8,.3), cyan
 const green = material(0xc2ff6e,.2,.4,0x8bc34b);
 const boxGeo = new THREE.BoxGeometry(1,1,1), sphereGeo = new THREE.SphereGeometry(1,20,14);
 const cylinderGeo = new THREE.CylinderGeometry(1,1,1,12);
+const octagonalBaseGeo = new THREE.CylinderGeometry(1,1,1,8).rotateY(Math.PI/8);
 
 // Merge the static pieces sharing one material. Animated limbs and the ascent
 // module remain separate; this keeps the articulated models affordable on mobile.
@@ -47,38 +48,47 @@ function panelText(text,width=512,height=128,color='#d7e8da',bg=null) {
 }
 
 /** Reference: assets/spaceship.png — white octagonal cabin, gold insulation, four piston legs. */
-export function createLander({labels=true,footJointHeight=.18}={}) {
+export function createLander({labels=true,footJointHeight=.18,antennaDish=true,lateralFins=true,octagonalBase=false,cabinFixtures=true,landingStruts=true}={}) {
   const g=new THREE.Group();
-  box(g,gold,0,1.85,0,3.8,1.25,3.5);
+  if(octagonalBase){
+    const faceRadius=Math.cos(Math.PI/8);
+    mesh(g,octagonalBaseGeo,gold,0,1.85,0,1.9/faceRadius,1.25,1.75/faceRadius);
+  }else box(g,gold,0,1.85,0,3.8,1.25,3.5);
   box(g,dark,0,1.05,0,2.5,.5,2.8);
   const foilGeo=new THREE.IcosahedronGeometry(1,2);
   for(const x of [-1,1]) for(const z of [-1,1]){
     sphere(g,gold,x*1.48,1.95,z*1.42,.7,.75,.66);
     const blanket=mesh(g,foilGeo,gold,x*1.52,1.85,z*.6,.45,.64,.6);blanket.rotation.z=x*.16;
     const foot=[x*2.95,.18,z*2.65],joint=[foot[0],footJointHeight,foot[2]],hip=[x*1.7,2.3,z*1.5];
-    rod(g,hip,joint,.16,gold);rod(g,[x*.9,1.05,z*1.2],joint,.08,dark);
-    rod(g,[x*2.55,.3,z*2.3],[x*2.72,1.18,z*2.45],.19,silver);
+    if(landingStruts){
+      rod(g,hip,joint,.16,gold);rod(g,[x*.9,1.05,z*1.2],joint,.08,dark);
+      rod(g,[x*2.55,.3,z*2.3],[x*2.72,1.18,z*2.45],.19,silver);
+      for(let i=0;i<5;i++)mesh(g,cylinderGeo,silver,x*2.66,.4+i*.11,z*2.4,.21,.027,.21);
+    }
     mesh(g,cylinderGeo,dark,...foot,.5,.14,.5);
-    for(let i=0;i<5;i++)mesh(g,cylinderGeo,silver,x*2.66,.4+i*.11,z*2.4,.21,.027,.21);
   }
   const engine=mesh(g,new THREE.CylinderGeometry(.45,.73,.8,20,1,true),dark,0,.8,0);engine.material.side=THREE.DoubleSide;
   const ascent=new THREE.Group();g.add(ascent);
   const cabin=mesh(ascent,new THREE.CylinderGeometry(1.45,1.9,2.6,8),white,0,3.75,0,1,1,.9);cabin.rotation.y=Math.PI/8;
   const roof=mesh(ascent,new THREE.CylinderGeometry(1.05,1.44,.3,8),white,0,5.2,0,1,1,.9);roof.rotation.y=Math.PI/8;
-  box(ascent,gold,0,3.85,1.58,1.18,2.64,.075);
-  box(ascent,black,0,3.7,1.64,.92,2.24,.09);
-  box(ascent,silver,0,2.55,1.68,1.08,.12,.15);
+  if(cabinFixtures){
+    box(ascent,gold,0,3.85,1.58,1.18,2.64,.075);
+    box(ascent,black,0,3.7,1.64,.92,2.24,.09);
+    box(ascent,silver,0,2.55,1.68,1.08,.12,.15);
+  }
   for(const x of [-1,1]) {
-    const w=box(ascent,black,x*1.12,4.36,1.3,.66,.52,.05);w.rotation.y=x*.43;
-    const trim=box(ascent,silver,x*1.12,4.68,1.31,.76,.055,.07);trim.rotation.y=x*.43;
+    if(cabinFixtures){
+      const w=box(ascent,black,x*1.12,4.36,1.3,.66,.52,.05);w.rotation.y=x*.43;
+      const trim=box(ascent,silver,x*1.12,4.68,1.31,.76,.055,.07);trim.rotation.y=x*.43;
+    }
     box(ascent,dark,x*1.69,3.14,.3,.23,.48,.57);
     rod(ascent,[x*1.78,3.18,.25],[x*2.03,3.18,.25],.07);
-    for(let i=0;i<6;i++)box(ascent,material(0xa9afac,.3,.5),x*1.77,3.2+i*.23,-.54,.04,.02,.72);
-    for(let j=0;j<4;j++)sphere(ascent,silver,x*.38,2.92+j*.45,1.72,.032);
+    if(lateralFins)for(let i=0;i<6;i++)box(ascent,material(0xa9afac,.3,.5),x*1.77,3.2+i*.23,-.54,.04,.02,.72);
+    if(cabinFixtures)for(let j=0;j<4;j++)sphere(ascent,silver,x*.38,2.92+j*.45,1.72,.032);
   }
-  sphere(ascent,material(0x698778,.7,.18),0,4.4,1.74,.17,.17,.025);
+  if(cabinFixtures)sphere(ascent,material(0x698778,.7,.18),0,4.4,1.74,.17,.17,.025);
   rod(ascent,[.8,5.2,-.5],[.8,6.15,-.5],.03);
-  const dish=mesh(ascent,new THREE.SphereGeometry(.47,20,12,0,Math.PI*2,0,.85),silver,.8,6.12,-.5);dish.rotation.x=.55;
+  if(antennaDish){const dish=mesh(ascent,new THREE.SphereGeometry(.47,20,12,0,Math.PI*2,0,.85),silver,.8,6.12,-.5);dish.rotation.x=.55;}
   rod(ascent,[-.85,5.22,-.8],[-.85,6.02,-.8],.025);sphere(ascent,green,-.85,6.04,-.8,.06);
   if(labels){const name=mesh(ascent,new THREE.PlaneGeometry(1.45,.22),panelText('BARRAMUNDI'),0,3.12,-1.76);name.rotation.y=Math.PI;}
   const ladder=new THREE.Group();g.add(ladder);

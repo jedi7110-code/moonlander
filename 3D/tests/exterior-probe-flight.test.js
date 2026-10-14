@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {sampleExteriorCinema,sampleExteriorCinemaFrame,CINEMA_SHOTS} from '../src/obs/exterior-cinematic.js';
-import {sampleExteriorProbeFlight,applyExteriorProbePose,PROBE_EXHAUST_TAIL} from '../src/obs/exterior-probe-flight.js';
+import {sampleExteriorProbeFlight,sampleExteriorProbeKinematics,applyExteriorProbePose,PROBE_EXHAUST_TAIL} from '../src/obs/exterior-probe-flight.js';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {PROBE_JETS,PROBE_GAS,sampleExteriorProbeControl,sampleExteriorProbeGas} from '../src/obs/exterior-probe-thrusters.js';
 const startOf=id=>CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(shot=>shot.id===id)).reduce((time,shot)=>time+shot.duration,0);
@@ -45,17 +45,17 @@ test('the adjusted approach connects to the trimmed close-up, decelerates to con
   const originalPose=sampleExteriorProbeFlight(12.5);
   assert.deepEqual(openingPose.probe.position,originalPose.position,'07 starts on the former 62.5-second docking pose');
   assert.deepEqual(openingPose.probe.rotation,originalPose.rotation);
-  assert.ok(Math.abs(openingPose.fov-(40-8*4.5/14.75))<1e-10,'the zoom also starts on the requested frame');
+  assert.ok(Math.abs(openingPose.fov-(40-8*4.5/15.25))<1e-10,'the zoom also starts on the requested frame');
   const contactTime=boundary+7.5;
   assert.equal(sampleExteriorCinema(contactTime-.001,{opening:true}).probe.latched,false);
   assert.equal(sampleExteriorCinema(contactTime,{opening:true}).probe.latched,true,'trimming the opening retains the remaining capture motion');
-  assert.equal(sampleExteriorCinemaFrame(contactTime+2.5-.001,{opening:true}).to,null,'the docked shot holds for exactly 2.5 seconds');
-  const transition=sampleExteriorCinemaFrame(contactTime+2.5+.001,{opening:true});
-  assert.equal(transition.from.number,7);assert.equal(transition.to.number,4);assert.ok(transition.mix>0,'the dissolve starts 2.5 seconds after contact');
+  assert.equal(sampleExteriorCinemaFrame(contactTime+2.75-.001,{opening:true}).shot.number,7,'the docked shot holds until the earlier cut');
+  const transition=sampleExteriorCinemaFrame(contactTime+2.75+.001,{opening:true});
+  assert.equal(transition.shot.number,4);assert.equal(transition.to,null);assert.equal(transition.mix,0);
   for(const opening of [true,false]){
     const scale=opening?1:4/3;
     for(const offset of [-.5,0,.5]){
-      const frame=sampleExteriorCinemaFrame(boundary*scale+offset,{opening});
+      const frame=sampleExteriorCinemaFrame(boundary*scale+offset,{opening,transition:'dissolve'});
       assert.deepEqual(frame.from.probe,frame.to.probe,'the adjusted wide approach shares the close-up arrival pose');
     }
   }
@@ -78,6 +78,26 @@ test('control gas pushes opposite deceleration and reverses sides when correctin
     const before=sampleExteriorCinema(start+offset-.01,{opening:true}).probe.position,after=sampleExteriorCinema(start+offset+.01,{opening:true}).probe.position;
     const actual=(after[1]-2*shot.probe.position[1]+before[1])/.0001;
     assert.ok(Math.abs(control.acceleration[1]-actual)<1e-6,'thrust follows the actual retimed approach, including acceleration before braking');
+  }
+});
+
+test('03 spreads braking across the approach without reaccelerating or jumping acceleration at 07',()=>{
+  for(const scale of [1,4/3]){
+    const approachDuration=8*scale,options={approachDuration,captureDuration:12*scale,advance:4.5*scale};
+    let speed=Infinity,maxDeceleration=0;
+    for(let time=.05*scale;time<approachDuration;time+=.05*scale){
+      const motion=sampleExteriorProbeKinematics(time,options);
+      assert.ok(motion.velocity[1]>0&&motion.velocity[1]<=speed+1e-5,'closure slows gradually instead of speeding up before a sudden brake');
+      assert.ok(motion.acceleration[1]<=.001,'a rising craft brakes with opposing thrust');
+      speed=motion.velocity[1];maxDeceleration=Math.max(maxDeceleration,-motion.acceleration[1]);
+    }
+    assert.ok(maxDeceleration*scale*scale<7.7,'the previous 24.6 m/film-s² braking spike is removed');
+    const before=sampleExteriorProbeKinematics(approachDuration-.002*scale,options),after=sampleExteriorProbeKinematics(approachDuration+.002*scale,options);
+    assert.ok(Math.abs(before.velocity[1]-after.velocity[1])*scale<.002);
+    assert.ok(Math.abs(before.acceleration[1]-after.acceleration[1])*scale*scale<.02,'07 inherits the same acceleration, not a new force step');
+    const middle=sampleExteriorProbeControl(approachDuration/2,options);
+    assert.equal(middle.strengths.at(-1),0,'the ascent nozzle stays off during braking');
+    assert.ok(middle.strengths.slice(0,4).every(value=>value>.9),'the braking nozzles explain the slowdown');
   }
 });
 
@@ -187,4 +207,77 @@ test('07 frames both the probe and docking collar closely, and later shots keep 
     applyExteriorProbePose(ship,sampleExteriorCinema(startOf('crossing')+1,{opening:true}).probe);
     assert.deepEqual(ship.dockedLander.position.toArray(),[0,0,0],'rendering another shot restores a fully docked pose');
   }finally{ship.dispose();}
+});
+
+test('every physical control nozzle embeds its base in the probe mounting structure',()=>{
+  const ship=createExteriorShip(),probe=ship.dockedLander;
+  try{
+    probe.removeFromParent();probe.updateMatrixWorld(true);
+    const body=[];probe.traverse(object=>{if(object.isMesh&&object.parent!==ship.probeThrusters.root)body.push(object);});
+    const jets=PROBE_JETS.filter(jet=>jet.nozzle);
+    assert.equal(ship.probeThrusters.root.getObjectByName('Cold-gas nozzles').count,8);
+    for(const jet of jets){
+      const ray=new THREE.Raycaster(new THREE.Vector3(...jet.position),new THREE.Vector3(...jet.direction).negate(),0,.16);
+      const hits=ray.intersectObjects(body,false);
+      assert.ok(hits.length>0,`${jet.id} reaches the mounting structure within its 0.16m nozzle length`);
+      assert.ok(hits[0].distance>.08,`${jet.id} leaves the outlet clear of the structure`);
+    }
+  }finally{ship.probeDock.add(probe);ship.dispose();}
+});
+
+test('control nozzles render their inner walls and recessed throat with front faces',()=>{
+  const ship=createExteriorShip();
+  try{
+    const instance=ship.probeThrusters.root.getObjectByName('Cold-gas nozzles');
+    const nozzle=new THREE.Mesh(instance.geometry,instance.material);nozzle.updateMatrixWorld(true);
+    const cast=(position,direction)=>new THREE.Raycaster(new THREE.Vector3(...position),new THREE.Vector3(...direction),0,.4).intersectObject(nozzle)[0];
+    const throat=cast([0,-.2,0],[0,1,0]),inner=cast([0,-.06,0],[1,0,0]),outer=cast([.2,-.06,0],[-1,0,0]),lip=cast([.08,-.2,0],[0,1,0]);
+    assert.ok(throat&&Math.abs(throat.distance-.245)<.0001,'the outlet sees a recessed throat instead of the background');
+    assert.ok(inner&&outer&&outer.point.x-inner.point.x>.01,'the interior is visible and the metal wall has thickness');
+    assert.ok(lip&&Math.abs(lip.distance-.12)<.0001,'an annular front face closes the exposed lip');
+  }finally{ship.dispose();}
+});
+
+test('hatch and both window frames contact the tapered cabin across their full footprint',()=>{
+  const ship=createExteriorShip(),probe=ship.dockedLander;
+  try{
+    probe.removeFromParent();probe.updateMatrixWorld(true);
+    const cabin=[],fittings=[];
+    probe.traverse(object=>{
+      if(object.isMesh&&object.material.name==='Probe aged pressure panels')cabin.push(object);
+      if(object.userData.cabinFitting)fittings.push(object);
+    });
+    assert.equal(fittings.length,3);
+    for(const fitting of fittings){
+      const {width,height,depth}=fitting.userData.cabinFitting;
+      const normal=new THREE.Vector3(0,0,1).transformDirection(fitting.matrixWorld);
+      assert.ok(normal.y>.1,'each frame follows the taper instead of standing vertically');
+      for(const x of [-.45,0,.45])for(const y of [-.45,0,.45]){
+        const back=fitting.localToWorld(new THREE.Vector3(x*width,y*height,-depth/2));
+        const hit=new THREE.Raycaster(back.addScaledVector(normal,.05),normal.clone().negate(),0,.1).intersectObjects(cabin,false)[0];
+        assert.ok(hit&&hit.distance>.025&&hit.distance<.05,`${fitting.name}: the frame back embeds in the hull at ${x}, ${y}`);
+        assert.ok(hit.face.normal.clone().transformDirection(hit.object.matrixWorld).dot(normal)>.999,'the complete frame sits on the same flat hull facet');
+      }
+    }
+  }finally{ship.probeDock.add(probe);ship.dispose();}
+});
+
+test('landing legs contain no legacy foil strut and stay above each pad sole',()=>{
+  const ship=createExteriorShip(),probe=ship.dockedLander;
+  try{
+    probe.removeFromParent();probe.updateMatrixWorld(true);
+    let lowestFoil=Infinity;
+    const soles=new Map([[-1,-1],[-1,1],[1,-1],[1,1]].map(([x,z])=>[`${x}/${z}`,{x:x*2.95,z:z*2.65,minimum:Infinity}]));
+    probe.traverse(mesh=>{
+      if(!mesh.isMesh||mesh.isInstancedMesh||mesh.userData.exteriorDecal)return;
+      const positions=mesh.geometry.attributes.position;
+      for(let i=0;i<positions.count;i++){
+        const point=new THREE.Vector3().fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld);
+        if(mesh.material.name==='Probe wrinkled thermal blanket')lowestFoil=Math.min(lowestFoil,point.y);
+        for(const sole of soles.values())if(Math.hypot(point.x-sole.x,point.z-sole.z)<.65)sole.minimum=Math.min(sole.minimum,point.y);
+      }
+    });
+    assert.ok(lowestFoil>1.19,'the foil ends at the descent stage instead of extending under the metal pistons');
+    for(const [name,sole]of soles)assert.ok(Math.abs(sole.minimum-.11)<.00001,`${name}: no leg material protrudes beneath the original pad sole`);
+  }finally{ship.probeDock.add(probe);ship.dispose();}
 });

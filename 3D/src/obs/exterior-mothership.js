@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
+import {createParabolicAntenna} from './exterior-antenna.js';
+import {createExteriorDecals} from './exterior-decals.js';
 import taraironWordmark from './tarairon-wordmark.js';
 import {HABITAT_ENVELOPE,HABITAT_FLOORS,HABITAT_WINDOWS,cabinToHabitat} from './habitat-envelope.js';
 
@@ -289,9 +291,6 @@ export function createExteriorMothership(){
   for(const side of [-1,1]){
     chamferBox(core,m.patch,[11.9,-.10,side*3.0],[2.8,2.9,.28],'Rear bridge armour cheek');
     const cheek=chamferBox(core,m.patch,[14.15,.10,side*2.63],[1.9,1.65,.22],'Swept forward armour cheek');cheek.rotation.y=side*.28;
-    const observation=new THREE.Group();observation.position.set(14.25,2.13,side*2.16);observation.rotation.y=side*.29;core.add(observation);
-    box(observation,m.steel,[0,0,0],[1.18,.62,.14],'Forward observation frame');
-    box(observation,m.glass,[0,0,side*.09],[.96,.40,.05],'Forward observation window');
     pipe(machinery,m.pipe,[[9.5,1.1,side*2.58],[10.3,1.1,side*2.67],[11.6,.65,side*2.73],[12.65,.65,side*2.73]],.08,'Bridge service feed');
   }
   const windshield=new THREE.Group();windshield.position.set(14.925,2.81,0);windshield.rotation.z=Math.atan2(-.50,1.35);core.add(windshield);
@@ -443,11 +442,28 @@ export function createExteriorMothership(){
   }
   // Small comms dishes mounted on the fixed forward hull.
   for(const [x,z,r]of [[6.8,.65,.7],[8.3,-1.0,.36]]){
-    rod(machinery,m.steel,[x,2.8,z],[x,4.3,z],.08,'Antenna pedestal');
-    const dish=addMesh(machinery,new THREE.ConeGeometry(r,.35,12,1,true),m.patch,'Communications dish',[x,4.3,z]);dish.rotation.x=.5;
-    rod(machinery,m.pipe,[x,4.3,z],[x,4.9,z],.03,'Antenna feed');
+    rod(machinery,m.steel,[x,2.8,z],[x,3.5,z],.08,'Antenna pedestal');
+    const antenna=createParabolicAntenna({radius:r,depth:r*.30,material:m.patch,structureMaterial:m.steel,feedMaterial:m.dark,name:'Mothership directional communications antenna'});
+    antenna.position.set(x,3.5,z);antenna.rotation.x=.5;
+    // These dishes are fixed: batch their surfaces with the service machinery.
+    antenna.userData.bakeBoundary=false;machinery.add(antenna);
   }
   bake(machinery);bake(hub);bake(frame);engines.forEach(bake);bake(core);
+  const decals=createExteriorDecals();
+  for(const side of [-1,1]){
+    decals.add(core,'pressure',[4,.15,side*3.38],[0,0,side],.55,.20);
+    decals.add(core,'rotate',[-4.9,-.7,side*3.0],[0,0,side],.85,.26);
+    decals.add(core,'exhaust',[-13.5,-1.40,side*7.8],[0,0,side],1.0,.24);
+    decals.add(core,'tank',[-12.1,side*6.06,0],[0,side,0],.65,.22);
+    // The adjacent solid cheek also clears the raised window frames in oblique views.
+    decals.add(core,'sensor',[14.15,-.40,side*2.80],[0,0,side],.65,.22);
+  }
+  for(const pod of pods){
+    const half=EXTERIOR.podWidth/2;
+    for(const side of [-1,1])decals.add(pod,'pressure',[side*(EXTERIOR.podLength/2+2.0),-.85,.5],[side,0,0],1.0,.35);
+    decals.add(pod,'service',[0,half+1.1,-.5],[0,1,0],1.9,.5);
+  }
+  decals.flush();
   const bounds=new THREE.Box3().setFromObject(root),dimensions=bounds.getSize(new THREE.Vector3());
   let coreScale=1;
   const ship={root,core,rotor,pods,frame,engines,machinery,dimensions,floorGuides,hub,spokes,evaHatches,

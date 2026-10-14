@@ -37,7 +37,7 @@ try{
   const openingFrames={};
   const logoPlayback={maxFrameMs:0,skippedBands:0,frames:0,lastReveal:0};
   let logoMeasured=false;
-  // A fresh opening waits at the beginning of the probe's incoming dissolve
+  // A fresh opening waits just before the probe's first shot
   // if a very slow load hasn't finished, so it never appears midway through flight.
   const probeDeadline=CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(shot=>shot.probeStage==='approach'))
     .reduce((seconds,shot)=>seconds+shot.duration,0)-CINEMA_DISSOLVE_SECONDS/2;
@@ -54,13 +54,14 @@ try{
   }
   if(!freshOpening)document.body.classList.remove('waiting-for-film');
   const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,
-    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending'),docking:query.get('docking'),revision:query.get('revision')};
+    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending'),docking:query.get('docking'),openingCamera:query.get('openingCamera'),transition:query.get('transition'),revision:query.get('revision')};
   const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal');
   function drawView(shot,renderTarget,gasTarget){
     ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
     applyExteriorProbePose(ship,shot.probe);
-    // Set this for every view, so the other dissolve layer and later shots
-    // restore the habitats without retaining scene 07's visibility state.
+    // Restore per view, including both dissolve layers. The current scene 07
+    // hides the habitats while retaining their trusses and connecting ring.
+    ship.rotor.visible=shot.rotorVisible!==false;
     for(const pod of ship.pods)pod.visible=shot.habitatsVisible;
     camera.fov=shot.fov;camera.near=shot.near;camera.far=shot.far;camera.up.fromArray(shot.up);camera.updateProjectionMatrix();camera.lookAt(target);
     planet.show(shot.planet?.position);

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import {createLander} from '../js/models.js';
+import {createParabolicAntenna} from './exterior-antenna.js';
+import {createExteriorDecals} from './exterior-decals.js';
 import {createExteriorProbeThrusters} from './exterior-probe-thrusters.js';
 
 export function createExteriorProbe(root,m,build){
@@ -29,7 +31,6 @@ function detailDockedProbe(lander,m){
   // than the game model. Stand the ladder off those faces instead of
   // letting the upper rungs cut through them and their contact shadows.
   lander.userData.ladder.position.z=.16;
-  for(const x of [-.55,.55])rod(lander,m.steel,[x,2.61,1.79],[x,2.61,1.93],.05,'Probe ladder stand-off mount');
   lander.traverse(object=>{
     if(!object.isMesh)return;
     for(const material of [].concat(object.material)){
@@ -48,28 +49,49 @@ function detailDockedProbe(lander,m){
       }
     }
   });
+  // Seat a whole fitting on an actual cabin facet, including its upward
+  // normal from the tapered hull. The back of the frame embeds slightly.
+  const cabinSurfaces=[];
+  lander.traverse(object=>{if(object.isMesh&&object.material.name==='Probe aged pressure panels')cabinSurfaces.push(object);});
+  function attachCabinPanel(name,position,direction,standOff,width,height,depth){
+    lander.updateWorldMatrix(true,true);
+    const normal=new THREE.Vector3(...direction).normalize().transformDirection(lander.matrixWorld);
+    const origin=lander.localToWorld(new THREE.Vector3(...position)).addScaledVector(normal,.5);
+    const hit=new THREE.Raycaster(origin,normal.clone().negate(),0,1).intersectObjects(cabinSurfaces,false)[0];
+    if(!hit)throw new Error(`No cabin surface for ${name}`);
+    const localNormal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld).transformDirection(lander.matrixWorld.clone().invert());
+    const right=new THREE.Vector3(0,1,0).cross(localNormal).normalize(),up=localNormal.clone().cross(right).normalize();
+    const fitting=new THREE.Group();fitting.name=name;
+    fitting.position.copy(lander.worldToLocal(hit.point.clone())).addScaledVector(localNormal,standOff);
+    fitting.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,localNormal));
+    fitting.userData.cabinFitting={width,height,depth};lander.add(fitting);return fitting;
+  }
   for(let j=0;j<8;j++){
     const a=Math.PI/8+j*Math.PI/4;
     rod(lander,m.steel,[Math.sin(a)*1.915,2.46,Math.cos(a)*1.915*.9],
       [Math.sin(a)*1.465,5.04,Math.cos(a)*1.465*.9],.018,'Cabin panel retention seam');
   }
-  chamferBox(lander,m.steel,[0,3.70,1.74],[1.04,2.32,.10],'Probe hatch pressure frame');
-  chamferBox(lander,m.dark,[0,3.70,1.81],[.86,2.12,.065],'Probe sealed hatch leaf');
-  addMesh(lander,new THREE.TorusGeometry(.18,.025,6,18),m.pipe,'Probe hatch porthole rim',[0,4.40,1.86]);
-  const port=addMesh(lander,new THREE.CircleGeometry(.15,24),m.glass,'Probe hatch porthole',[0,4.40,1.868]);port.castShadow=false;
-  rod(lander,m.pipe,[.29,3.25,1.89],[.29,3.64,1.89],.023,'Probe hatch handle');
-  for(const y of [2.85,3.72,4.58])box(lander,m.steel,[-.49,y,1.82],[.12,.16,.11],'Probe hatch hinge');
-  label(lander,'BARRAMUNDI',[0,2.83,1.858],.72,.10,{size:43});
+  const hatch=attachCabinPanel('Probe conformal hatch',[0,3.70,1.4],[0,.15,1],.035,1.04,2.32,.10);
+  chamferBox(hatch,m.steel,[0,0,0],[1.04,2.32,.10],'Probe hatch pressure frame');
+  chamferBox(hatch,m.dark,[0,0,.07],[.86,2.12,.065],'Probe sealed hatch leaf');
+  addMesh(hatch,new THREE.TorusGeometry(.18,.025,6,18),m.pipe,'Probe hatch porthole rim',[0,.70,.12]);
+  const port=addMesh(hatch,new THREE.CircleGeometry(.15,24),m.glass,'Probe hatch porthole',[0,.70,.128]);port.castShadow=false;
+  rod(hatch,m.pipe,[.29,-.45,.15],[.29,-.06,.15],.023,'Probe hatch handle');
+  for(const y of [-.85,.02,.88])box(hatch,m.steel,[-.49,y,.08],[.12,.16,.11],'Probe hatch hinge');
+  for(const x of [-.55,.55]){
+    const hullZ=.9*Math.cos(Math.PI/8)*(1.9-(2.61-2.45)*.45/2.6);
+    rod(lander,m.steel,[x,2.61,hullZ-.015],[x,2.61,1.93],.05,'Probe ladder stand-off mount');
+  }
+
   for(const side of [-1,1]){
-    const window=new THREE.Group();window.position.set(side*1.12,4.36,1.34);window.rotation.y=side*.43;lander.add(window);
+    const window=attachCabinPanel(`Probe conformal observation window ${side<0?'left':'right'}`,[side*1.02,4.36,.93],[side*.707,.16,.786],.020,.82,.66,.065);
     chamferBox(window,m.steel,[0,0,0],[.82,.66,.065],'Probe observation window surround');
     chamferBox(window,m.glass,[0,0,.045],[.65,.49,.026],'Probe recessed observation glass');
     for(const x of [-.34,.34])for(const y of [-.25,.25])box(window,m.pipe,[x,y,.05],[.026,.026,.025],'Window pressure bolt');
-    box(lander,m.steel,[side*1.76,3.17,.28],[.20,.57,.66],'Probe attitude-control manifold');
-    for(const z of [.05,.48]){
-      const nozzle=addMesh(lander,new THREE.CylinderGeometry(.08,.115,.22,10,1,true),m.dark,'Probe attitude nozzle',[side*1.93,3.10,z]);nozzle.rotation.z=side*Math.PI/2;
-      addMesh(lander,new THREE.TorusGeometry(.112,.018,5,12),m.pipe,'Probe attitude nozzle rim',[side*2.04,3.10,z]).rotation.y=Math.PI/2;
-    }
+    // Both lateral jets share a manifold rooted in the cabin wall. The jet
+    // module owns the actual nozzles/lips so there is no second offset set.
+    box(lander,m.steel,[side*1.70,3.10,0],[.32,.60,1.34],'Probe attitude-control manifold');
+    for(const front of [-1,1])box(lander,m.steel,[side*1.60,2.64,front*1.40],[.30,.20,.30],'Probe braking thruster mounting block');
     const bay=new THREE.Group();bay.position.set(side*2.20,1.85,.12);bay.rotation.y=side*Math.PI/2;lander.add(bay);
     chamferBox(bay,m.steel,[0,0,0],[1.1,.85,.10],'Probe exposed service bay');
     box(bay,m.patch,[.19,.02,.085],[.45,.64,.08],'Probe service electronics');
@@ -84,12 +106,15 @@ function detailDockedProbe(lander,m){
   for(const x of [-1,1])for(const z of [-1,1]){
     // Attach on top of the pad: an angled cylinder ending at its center
     // extends below its endpoint by its radius and used to pierce the sole.
-    const hip=[x*1.70,2.30,z*1.50],knee=[x*2.37,1.16,z*2.12],foot=[x*2.95,.30,z*2.65];
+    // Attach to the structural frame below the thermal cover, with no leg
+    // crossing the spherical blanket surface.
+    const hip=[x*1.20,.80,z*1.10],knee=[x*2.37,1.16,z*2.12],foot=[x*2.95,.39,z*2.65];
     rod(lander,m.steel,hip,knee,.205,'Probe upper landing strut');
     rod(lander,m.pipe,knee,foot,.172,'Probe telescopic landing piston');
     rod(lander,m.dark,[x*2.30,1.30,z*2.05],[x*2.45,1.04,z*2.20],.245,'Probe piston gland');
-    box(lander,m.steel,hip,[.43,.32,.40],'Probe leg pivot bracket');
-    rod(lander,m.pipe,[x*1.05,1.2,z*1.22],[x*2.63,.43,z*2.35],.052,'Probe secondary leg brace');
+    const braceJoint=knee.map((value,index)=>THREE.MathUtils.lerp(value,foot[index],.8));
+    rod(lander,m.pipe,[x*1.05,1.2,z*1.22],braceJoint,.052,'Probe secondary leg brace');
+    addMesh(lander,new THREE.SphereGeometry(.14,10,6),m.steel,'Probe landing pad pivot',foot);
     // The game pad is radius .50 and spans y=.11-.25. Keep the added
     // metal rim outside that cylinder rather than sharing its side faces.
     const pad=addMesh(lander,new THREE.CylinderGeometry(.54,.54,.08,20),m.steel,'Probe landing pad rim',[foot[0],.23,foot[2]]);
@@ -100,7 +125,7 @@ function detailDockedProbe(lander,m){
 
 function dockedProbe(root,m){
   const dock=new THREE.Group();dock.name='BARRAMUNDI / underside docking cradle';root.add(dock);
-  const lander=createLander({labels:typeof document!=='undefined',footJointHeight:.30});lander.name='Moonlander game / BARRAMUNDI';dock.add(lander);
+  const lander=createLander({labels:false,antennaDish:false,lateralFins:false,octagonalBase:true,cabinFixtures:false,landingStruts:false});lander.name='Moonlander game / BARRAMUNDI';dock.add(lander);
   lander.userData.flame.visible=false;lander.userData.flame.removeFromParent();
   // Game geometry/materials are module-wide caches. Give this study its own
   // resources so baking and disposal cannot alter a second game instance.
@@ -112,7 +137,20 @@ function dockedProbe(root,m){
     const isolate=material=>{if(!materials.has(material))materials.set(material,material.clone());return materials.get(material);};
     object.material=Array.isArray(object.material)?object.material.map(isolate):isolate(object.material);
   });
-  const paintedMaterials=detailDockedProbe(lander,m);bake(lander);
+  const paintedMaterials=detailDockedProbe(lander,m);
+  // Seat the neighboring beacon mast into the sloping roof as well.
+  rod(lander,m.steel,[-.85,4.96,-.8],[-.85,5.26,-.8],.04,'Beacon antenna roof socket');
+  const antenna=createParabolicAntenna({radius:.38,depth:.13,material:m.patch,structureMaterial:m.steel,feedMaterial:m.dark,name:'Probe directional communications antenna'});
+  antenna.position.set(.8,6.15,-.5);antenna.rotation.x=.55;lander.add(antenna);bake(antenna);
+  bake(lander);
+  const decals=createExteriorDecals();
+  decals.add(lander,'pressure',[0,3.93,1.89],[0,0,1],.65,.26);
+  decals.add(lander,'service',[0,1.63,2.03],[0,0,1],1.10,.31);
+  for(const side of [-1,1]){
+    decals.add(lander,'rcs',[side*1.87,3.1,0],[side,0,0],.38,.23);
+    decals.add(lander,'connector',[side*2.30,1.83,.12],[side,0,0],.72,.25);
+  }
+  decals.flush();
   const thrusters=createExteriorProbeThrusters(lander,{nozzleMaterial:m.dark,rimMaterial:m.pipe});
   const cradle=new THREE.Group();cradle.name='Probe docking hardpoints';dock.add(cradle);
   chamferBox(cradle,m.steel,[0,7.25,0],[2.8,.22,2.2],'Underside docking plate');
@@ -122,7 +160,7 @@ function dockedProbe(root,m){
     rod(cradle,m.steel,[x*.68,5.32,z*.53],[x*1.2,7.14,z*.9],.07,'Probe retention strut');
     box(cradle,m.patch,[x*.68,5.33,z*.53],[.38,.14,.32],'Probe roof clamp');
   }
-  label(cradle,'PROBE / 01',[0,7.06,1.12],1.6,.22,{size:44});
+  label(cradle,'PROBE / 01',[0,7.25,1.102],1.6,.14,{size:44});
   bake(cradle);return{dock,lander,cradle,paintedMaterials,thrusters};
 }
 

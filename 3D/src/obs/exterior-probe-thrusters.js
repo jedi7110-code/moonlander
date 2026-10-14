@@ -9,9 +9,9 @@ export const PROBE_GAS=Object.freeze({length:3.4,width:4.8,speed:3.4/PROBE_EXHAU
 const normalize=values=>{const length=Math.hypot(...values);return values.map(value=>value/length);};
 export const PROBE_JETS=Object.freeze([
   ...[-1,1].flatMap(side=>[-1,1].map(front=>({id:`brake-${side}-${front}`,kind:'brake',side,front,
-    position:[side*2.18,2.55,front*1.94],direction:normalize([side*.55,1,front*.55]),nozzle:true}))),
+    position:[side*1.65,2.85,front*1.42],direction:normalize([side*.55,1,front*.55]),nozzle:true}))),
   ...[-1,1].flatMap(side=>[-1,1].map(front=>({id:`lateral-${side}-${front}`,kind:'lateral',side,front,
-    position:[side*2.04,3.10,front*.48],direction:[side,0,0],nozzle:true}))),
+    position:[side*2.0,3.10,front*.48],direction:[side,0,0],nozzle:true}))),
   {id:'ascent',kind:'ascent',position:[0,.39,0],direction:[0,-1,0],nozzle:false},
 ]);
 const power=(force,scale)=>force>0?1-Math.exp(-force/scale):0;
@@ -72,7 +72,12 @@ export function sampleExteriorProbeGas(seconds,options={}){
 
 export function createExteriorProbeThrusters(lander,{nozzleMaterial,rimMaterial}){
   const root=new THREE.Group();root.name='Probe cold-gas attitude control';root.userData.bakeBoundary=true;lander.add(root);
-  const nozzleGeometry=new THREE.CylinderGeometry(.045,.085,.16,10,1,true),rimGeometry=new THREE.TorusGeometry(.085,.012,5,12);
+  // Closed metal shell, lip annulus, inner wall and recessed throat. The old
+  // one-sided open cylinder disappeared when seen from inside its outlet.
+  const nozzleGeometry=new THREE.LatheGeometry([
+    [.085,-.08],[.045,.08],[0,.08],[0,.045],[.033,.045],[.073,-.08],[.085,-.08],
+  ].map(([radius,y])=>new THREE.Vector2(radius,y)),10);
+  const rimGeometry=new THREE.TorusGeometry(.085,.012,5,12);
   const physicalJets=PROBE_JETS.filter(jet=>jet.nozzle);
   const nozzles=new THREE.InstancedMesh(nozzleGeometry,nozzleMaterial,physicalJets.length),rims=new THREE.InstancedMesh(rimGeometry,rimMaterial,physicalJets.length);
   nozzles.name='Cold-gas nozzles';rims.name='Cold-gas nozzle lips';root.add(nozzles,rims);

@@ -31,8 +31,36 @@ function sampleProbePose(seconds,{approachDuration=8,captureDuration=12,coreScal
     rotation:[0,.10*remaining**2,-.035*remaining**2],latched:u===1};
 }
 
+// The edit advances the old capture clock to reach the approved close-up.
+// Applying that warp to vertical flight made the craft accelerate, then brake
+// almost all at once. Plan braking directly on the film clock instead: ease
+// the closing velocity down over the entire approach and match capture's
+// position, velocity and acceleration at the join. The film compresses real
+// rendezvous time; its metre-per-film-second values are not real flight speeds.
+function sampleControlledPose(seconds,{advance=0,approachDuration=8,captureDuration=12,coreScale=2.6}={}){
+  const options={approachDuration,captureDuration,coreScale};
+  const u=clamp(seconds/approachDuration);
+  const pose=sampleProbePose(seconds+advance*smooth(u),options);
+  if(seconds>=approachDuration)return pose;
+  const captureU=clamp(advance/captureDuration),tangent=6.4*captureDuration/approachDuration;
+  const end=hermite(-7,0,tangent,0,captureU);
+  const endVelocity=((6*captureU*captureU-6*captureU)*-7+(3*captureU*captureU-4*captureU+1)*tangent)/captureDuration;
+  const endAcceleration=((12*captureU-6)*-7+(6*captureU-4)*tangent)/(captureDuration*captureDuration);
+  // Start a little nearer so the probe enters scene 03 earlier, while the
+  // same velocity/acceleration conditions still join the approved close-up.
+  const initial=-140,entryVelocity=2*(end-initial)/approachDuration-endVelocity;
+  // Integral of quintic smoothstep; accelerating/decelerating thrust ramps
+  // smoothly at each end. The small correction matches capture acceleration.
+  const integral=u**4*(2.5-3*u+u*u);
+  pose.position[1]=seconds<0?initial+seconds*entryVelocity:
+    initial+approachDuration*(entryVelocity*u+(endVelocity-entryVelocity)*integral)+
+    .5*endAcceleration*approachDuration**2*u**3*(1-u)**2;
+  return pose;
+}
+
 export function sampleExteriorProbeFlight(seconds,{approachDuration=8,captureDuration=12,coreScale=2.6,controlTime=seconds,controlAdvance=0}={}){
-  const options={approachDuration,captureDuration,coreScale},pose=sampleProbePose(seconds,options);
+  const options={approachDuration,captureDuration,coreScale};
+  const pose=sampleControlledPose(controlTime,{...options,advance:controlAdvance});
   const contactTime=approachDuration+captureDuration-controlAdvance;
   if(!pose.latched||controlTime<contactTime+PROBE_EXHAUST_TAIL)
     pose.thrusterClock={seconds:controlTime,advance:controlAdvance,...options};
@@ -40,9 +68,9 @@ export function sampleExteriorProbeFlight(seconds,{approachDuration=8,captureDur
 }
 
 export function sampleExteriorProbeKinematics(seconds,{advance=0,...options}={}){
-  // Scene 03 advances the original approach clock before the trimmed close-up.
-  // Differentiate that mapping too, so jets follow the movement on screen.
-  const sample=time=>sampleProbePose(time+advance*smooth(clamp(time/(options.approachDuration??8))),options);
+  // Differentiate the exact displayed path, including lateral/attitude capture,
+  // so opposing gas jets remain synchronized with the planned braking.
+  const sample=time=>sampleControlledPose(time,{...options,advance});
   const step=.01,pose=sample(seconds),before=sample(seconds-step),after=sample(seconds+step);
   const velocity=pose.position.map((value,i)=>(after.position[i]-before.position[i])/(2*step));
   const acceleration=pose.position.map((value,i)=>(after.position[i]-2*value+before.position[i])/(step*step));

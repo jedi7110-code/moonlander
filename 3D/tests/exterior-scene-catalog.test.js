@@ -2,10 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {EXTERIOR_SCENE_CATALOG,exteriorSceneURL,CAMERA_REVISION,PREVIOUS_CAMERA_REVISION,LOW_CAMERA_REVISION,FAST_CAMERA_REVISION,FULL_CAMERA_REVISION,LEVEL_CAMERA_REVISION,ENTRY_CAMERA_REVISION} from '../src/obs/exterior-scene-catalog.js';
+import {EXTERIOR_SCENE_CATALOG,exteriorSceneURL,CAMERA_REVISION,PREVIOUS_CAMERA_REVISION,LOW_CAMERA_REVISION,FAST_CAMERA_REVISION,FULL_CAMERA_REVISION,LEVEL_CAMERA_REVISION,ENTRY_CAMERA_REVISION,BEFORE_EXIT_REVISION} from '../src/obs/exterior-scene-catalog.js';
 import {sampleExteriorCinema,sampleExteriorCinemaFrame,exteriorCinemaShots} from '../src/obs/exterior-cinematic.js';
 import {sampleExteriorCinema as previousCinema,sampleExteriorCinemaFrame as previousFrame} from '../src/obs/exterior-cinematic-20261013-r2.js';
 import {sampleExteriorCinema as savedCinema,sampleExteriorCinemaFrame as savedFrame} from '../src/obs/exterior-cinematic-20261013-r1.js';
+
+// Faster/longer early shots shift the shared world origin; compare later camera geometry
+// after removing that translation, rather than requiring its old absolute X.
+const currentShots=exteriorCinemaShots();
+const filmDelay=currentShots[0].duration-36.75+currentShots[1].duration-12;
+const archiveTravelGain=(currentShots[0].duration-5.9)*currentShots[0].speed-(36.75-5.9)*10.12*.97+(currentShots[1].duration-12)*currentShots[1].speed;
+const assertTranslated=(a,b,gain=archiveTravelGain)=>a.forEach((value,index)=>assert.ok(Math.abs(value-b[index]-(index===0?gain:0))<1e-8));
 
 test('the before-speed camera archive stays immutable and routes to its independent sampler',()=>{
   const source=readFileSync(new URL('../src/obs/exterior-cinematic-20261013-r1.js',import.meta.url));
@@ -25,27 +32,32 @@ test('every scene catalog link samples its advertised scene, including all 05 al
     assert.equal(url.pathname,'/3D/ship-exterior-cinema.html');assert.equal(url.searchParams.get('paused'),'1');
     const options=Object.fromEntries(url.searchParams);options.opening=options.mode==='opening';
     assert.equal(sampleExteriorCinema(Number(options.time),options).number,entry.number,entry.id);
-    if(entry.status.includes('保存版'))assert.ok([CAMERA_REVISION,PREVIOUS_CAMERA_REVISION,LOW_CAMERA_REVISION,FAST_CAMERA_REVISION,FULL_CAMERA_REVISION,LEVEL_CAMERA_REVISION,ENTRY_CAMERA_REVISION].includes(options.revision),entry.id);
+    if(entry.status.includes('保存版'))assert.ok([CAMERA_REVISION,PREVIOUS_CAMERA_REVISION,LOW_CAMERA_REVISION,FAST_CAMERA_REVISION,FULL_CAMERA_REVISION,LEVEL_CAMERA_REVISION,ENTRY_CAMERA_REVISION,BEFORE_EXIT_REVISION].includes(options.revision),entry.id);
     const play=new URL(exteriorSceneURL(entry,{time:entry.start,paused:false}),url);
     assert.equal(play.searchParams.has('paused'),false);assert.equal(Number(play.searchParams.get('time')),entry.start);
   }
 });
 test('current camera takes preserve docking and B flight in scene-local time after trimming 01',()=>{
   const options={opening:true,approach:'bow',ending:'underside'},saved={...options,revision:CAMERA_REVISION};
-  const right=sampleExteriorCinema(63.55,options),left=sampleExteriorCinema(64.8,saved);
+  const right=sampleExteriorCinema(63.55+filmDelay,options),left=sampleExteriorCinema(64.8,saved);
   assert.ok(right.eye[0]>right.target[0]);assert.ok(left.eye[0]<left.target[0]);
-  for(const key of ['probe','fov'])assert.deepEqual(right[key],left[key]);
+  for(const key of ['position','rotation'])right.probe[key].forEach((value,i)=>assert.ok(Math.abs(value-left.probe[key][i])<1e-10));
+  assert.equal(right.probe.latched,left.probe.latched);assert.equal(right.probe.visible,left.probe.visible);
+  assert.ok(Math.abs(right.probe.thrusterClock.seconds-left.probe.thrusterClock.seconds)<1e-10);
+  assert.ok(right.fov>left.fov,'07 extends its zoom through the earlier cut');
   const relative=(vector,origin)=>vector.map((v,i)=>v-(i===0?origin:0));
-  assert.deepEqual(relative(right.target,right.shipX),relative(left.target,left.shipX));
+  relative(right.target,right.shipX).forEach((value,i)=>assert.ok(Math.abs(value-relative(left.target,left.shipX)[i])<1e-10));
 
   const approved=EXTERIOR_SCENE_CATALOG.find(entry=>entry.id==='07-docking-right');
   assert.equal(approved.status,'採用・現行');assert.deepEqual(approved.options,{approach:'bow',ending:'underside'});
-  const start=77.5,full={...options,revision:FULL_CAMERA_REVISION};
+  const start=77.5+filmDelay,full={...options,revision:FULL_CAMERA_REVISION};
   for(const offset of [0,4,8.25,21.25,71.25,221.25]){
-    const current=sampleExteriorCinema(start+offset,options),before=sampleExteriorCinema(start+offset+4.5,full);
-    for(const key of ['target','shipX','shipSpeed','fov','probe'])assert.deepEqual(current[key],before[key]);
-    assert.equal(current.eye[0],before.eye[0]);assert.equal(current.eye[2],before.eye[2]);
-    if(offset<=3.5)assert.deepEqual(current.eye,before.eye);else assert.ok(current.eye[1]<before.eye[1]);
+    const current=sampleExteriorCinema(start+offset,options),before=sampleExteriorCinema(start-filmDelay+offset+4.5,full);
+    for(const key of ['shipSpeed','fov','probe'])assert.deepEqual(current[key],before[key]);
+    assertTranslated(current.target,before.target);
+    assert.ok(Math.abs(current.shipX-before.shipX-archiveTravelGain)<1e-8);
+    assert.ok(Math.abs(current.eye[0]-before.eye[0]-archiveTravelGain)<1e-8);assert.equal(current.eye[2],before.eye[2]);
+    if(offset<=3.5)assertTranslated(current.eye,before.eye);else assert.ok(current.eye[1]<before.eye[1]);
   }
   assert.equal(exteriorCinemaShots(options).at(-1).speed,2.1);
   assert.equal(sampleExteriorCinema(100,{opening:true,penultimate:'underside'}).number,9);
@@ -114,13 +126,29 @@ test('05 enters at the previous 80s camera angle while keeping the film edit and
   const source=readFileSync(new URL('../src/obs/exterior-cinematic-20261013-r7.js',import.meta.url));
   assert.equal(createHash('sha256').update(source).digest('hex'),'0d771d776e1f872b6e7f7c2f2b9bc09b2b38a32e3336e5b1d67b26969b69f06e');
   const options={opening:true,approach:'bow',ending:'underside'},saved={...options,revision:ENTRY_CAMERA_REVISION};
-  const start=77.5;
+  const start=77.5+filmDelay;
   for(const offset of [0,1,3.5,11.5,19.5,50]){
     const a=sampleExteriorCinema(start+offset,options),b=sampleExteriorCinema(80+offset,saved);
-    for(const key of ['eye','target','shipX','shipSpeed','fov','optics','probe'])assert.deepEqual(a[key],b[key]);
+    for(const key of ['shipSpeed','fov','optics','probe'])assert.deepEqual(a[key],b[key]);
+    assertTranslated(a.eye,b.eye);assertTranslated(a.target,b.target);
+    assert.ok(Math.abs(a.shipX-b.shipX-archiveTravelGain)<1e-8);
     assert.equal(a.start,start);
   }
-  assert.deepEqual(sampleExteriorCinema(75,options),sampleExteriorCinema(75,saved));
-  assert.equal(sampleExteriorCinemaFrame(77.5,options).mix,.5);
+  const a=sampleExteriorCinema(75+filmDelay,options),b=sampleExteriorCinema(75,saved);
+  for(const key of ['fov','probe'])assert.deepEqual(a[key],b[key]);
+  // The longer planet shot changes its midpoint anchor by half a metre.
+  assertTranslated(a.eye,b.eye,archiveTravelGain-.5);assertTranslated(a.target,b.target,archiveTravelGain-.5);
+  const frame=sampleExteriorCinemaFrame(start,options);
+  assert.equal(frame.shot.number,5);assert.equal(frame.mix,0);assert.equal(frame.to,null);
+  assert.equal(sampleExteriorCinemaFrame(39.5,options).mix,.5);
+});
+
+test('the before-exit timing remains available as an immutable comparison',()=>{
+  const source=readFileSync(new URL('../src/obs/exterior-cinematic-20261014-r8.js',import.meta.url));
+  assert.equal(createHash('sha256').update(source).digest('hex'),'b126cb21365e709db5b0e4d21ef0b3ea8ef5657f592a1a1ae19a98d3fb385e16');
+  const options={opening:true,approach:'bow',ending:'underside',revision:BEFORE_EXIT_REVISION};
+  assert.equal(exteriorCinemaShots(options)[0].duration,36.75);
   assert.equal(sampleExteriorCinemaFrame(36.75,options).mix,.5);
+  assert.equal(sampleExteriorCinema(67,options).number,4);
+  assert.equal(sampleExteriorCinema(77.5,options).number,5);
 });
