@@ -39,13 +39,15 @@ export const CINEMA_SHOTS=Object.freeze([
   {id:'planet',number:2,name:'横移動カメラ / 惑星を横切る遥かな船',mode:'lateral',duration:15.5,speed:48*1.02*1.02,shipScale:1,planetScale:1.15,planetVariant:'rust',flightOrigin:.5/1.02,anchor:14*48/2,probeStage:'away',cameraSlide:[-120,120],cameraOffset:260,
     eye:[[0,350,3900]],target:[[0,100,0]],fov:42,wide:true,planet:true,near:5,far:60000},
   {id:'distant',number:3,name:'固定カメラ / 下から接近する探査機',mode:'fixed',duration:8,dissolve:.4,probeStage:'approach',
-    eye:[[235,72,255]],target:[[0,8,0]],fov:38,wide:true},
+    // A close-inspection near plane cannot separate B's raised skin from its
+    // backing at this distance, particularly in a portrait framing.
+    eye:[[235,72,255]],target:[[0,8,0]],fov:38,wide:true,near:40},
   // Cut the docked hold while the close-up still zooms.
   {id:'lander',number:7,name:'右下から / 探査機のドッキング',mode:'follow',duration:10,sourceOffset:4.5,sourceDuration:14.75,captureDuration:12,probeStage:'dock',
     eye:[[16,-10.4,24]],target:[[0,.6,0]],fov:40,zoomTo:32,zoomDuration:15.25,lander:true,fitAspect:true,hideHabitats:true,hideRotor:true},
   // Balance 04 against the trimmed 07, retaining the approved 05 start.
   {id:'crossing',number:4,name:'超望遠 / 大きな惑星を背景に横切る船',mode:'fixed',duration:10.75,planetVariant:'rust',
-    eye:[[0,7,2100]],target:[[0,0,0]],fov:3.5,wide:true,planet:[1600,-200,-78000],near:10,far:150000},
+    eye:[[0,7,2100]],target:[[0,0,0]],fov:3.5,wide:true,planet:[1600,-200,-78000],near:1000,far:150000},
   {id:'mounted',number:5,name:'船体固定カメラ / 回転する重力区画',mode:'mounted',duration:8,
     eye:[[12.8,3.85,1.8]],target:[[-1.6,6,0]],fov:58,core:true},
   {id:'flyby',number:9,name:'固定カメラ / 背後から通過・彼方へ航行',mode:'fixed',duration:60,speed:6,anchor:0,
