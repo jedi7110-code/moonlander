@@ -20,6 +20,7 @@ export default defineConfig({
         exteriorSceneCatalog: fileURLToPath(new URL('./src/exterior-scene-catalog.html', import.meta.url)),
         exteriorCraftStudy: fileURLToPath(new URL('./src/exterior-craft-study.html', import.meta.url)),
         exteriorPlanetStudy: fileURLToPath(new URL('./src/exterior-planet-study.html', import.meta.url)),
+        exteriorSunriseStudy: fileURLToPath(new URL('./src/exterior-sunrise-study.html', import.meta.url)),
         exteriorFlareStudy: fileURLToPath(new URL('./src/exterior-flare-study.html', import.meta.url)),
         cabinAudioStudy: fileURLToPath(new URL('./src/cabin-audio-study.html', import.meta.url)),
         emergencyLightingStudy: fileURLToPath(new URL('./src/emergency-lighting-study.html', import.meta.url)),

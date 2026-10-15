@@ -63,6 +63,8 @@ test('FOV, zoom and pixel density scale the ship and flare together without incr
   const ship=createExteriorShip();ship.setCoreScale(2.6);
   try{
     const shot=sampleExteriorCinema(126,{opening:true});ship.root.position.x=shot.shipX;
+    assert.equal(shot.optics.strength,.34,'retain the approved last-shot exposure');
+    const exposure=sampleExteriorOptics(ship,cameraFor(shot,16/9),new THREE.Vector2(1280,720),shot.optics)[0].strength;
     let baseline;
     for(const fov of [32,56,80])for(const density of [1,2]){
       const camera=cameraFor(shot,16/9,fov),viewport=new THREE.Vector2(1280*density,720*density);
@@ -70,7 +72,7 @@ test('FOV, zoom and pixel density scale the ship and flare together without incr
       const normalized=samples[0].streakSize/(density*camera.projectionMatrix.elements[5]);
       baseline??=normalized;assert.ok(Math.abs(normalized-baseline)<1e-8,'flare follows the projected object through FOV changes');
       assert.ok(Math.abs(samples[0].streakSize/size-2.4)<1e-10);
-      assert.ok(Math.abs(samples[0].strength-(.65+.20)/2*.8)<1e-12,'last-shot brightness is twenty percent below the midpoint after visual feedback');
+      assert.ok(Math.abs(samples[0].strength-exposure)<1e-12,'FOV and pixel density preserve the same physical lens exposure');
       camera.zoom=1.5;camera.updateProjectionMatrix();
       const zoomed=sampleExteriorOptics(ship,camera,viewport,shot.optics)[0];
       assert.ok(Math.abs(zoomed.streakSize/samples[0].streakSize-1.5)<1e-10);

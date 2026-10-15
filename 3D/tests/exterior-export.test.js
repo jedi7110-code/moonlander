@@ -35,6 +35,6 @@ test('full-bleed 4:5 keeps the entire moving hull offscreen until the logo fades
 });
 test('export retains all later shots, edit times, and incoming dissolve framing',()=>{
   for(const time of [40.6,44,60,63,68,80,106,151.7])assert.deepEqual(sampleExteriorExportFrame(time,options),sampleExteriorCinemaFrame(time,options));
-  const frame=sampleExteriorExportFrame(39.5,options),native=sampleExteriorCinemaFrame(39.5,options);
+  const frame=sampleExteriorExportFrame(29.6,options),native=sampleExteriorCinemaFrame(29.6,options);
   assert.equal(frame.mix,native.mix);assert.deepEqual(frame.to,native.to);assert.ok(frame.from.fov<native.from.fov);
 });

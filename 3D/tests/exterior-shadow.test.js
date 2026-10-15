@@ -5,10 +5,13 @@ import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {createExteriorShadow} from '../src/obs/exterior-shadow.js';
 import {sampleExteriorCinema,sampleExteriorCinemaFrame,exteriorCinemaShots} from '../src/obs/exterior-cinematic.js';
 
+const shots=exteriorCinemaShots();
+const dockingTime=shots.slice(0,shots.findIndex(shot=>shot.id==='lander')).reduce((time,shot)=>time+shot.duration,0)+4;
+
 test('docking shadows resolve ladder rungs and preserve the shallow cover clearance',()=>{
   const ship=createExteriorShip(),sun=new THREE.DirectionalLight(),shadows=createExteriorShadow(sun,ship);
   try{
-    shadows.update(sampleExteriorCinema(64.5,{opening:true}));
+    shadows.update(sampleExteriorCinema(dockingTime,{opening:true}));
     const camera=sun.shadow.camera,texel=(camera.right-camera.left)/sun.shadow.mapSize.x;
     assert.ok(.09/texel>=6,'a 9cm rung spans at least six shadow texels');
     const offset=Math.abs(sun.shadow.bias)*(camera.far-camera.near)+sun.shadow.normalBias;
@@ -25,7 +28,7 @@ test('translating the approaching probe leaves its surface on the same shadow te
   ship.setCoreScale(2.6);
   const coordinate=(shipX,position)=>{
     ship.root.position.x=shipX;ship.dockedLander.position.set(...position);ship.dockedLander.rotation.set(0,0,0);
-    shadows.update(sampleExteriorCinema(64.5,{opening:true}));sun.updateMatrixWorld(true);sun.target.updateMatrixWorld(true);sun.shadow.updateMatrices(sun);
+    shadows.update(sampleExteriorCinema(dockingTime,{opening:true}));sun.updateMatrixWorld(true);sun.target.updateMatrixWorld(true);sun.shadow.updateMatrices(sun);
     return ship.dockedLander.localToWorld(new THREE.Vector3(0,1.76,1.9725)).applyMatrix4(sun.shadow.matrix);
   };
   try{

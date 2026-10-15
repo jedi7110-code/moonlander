@@ -140,7 +140,7 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
         a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);normal.crossVectors(b.sub(a),c.sub(a)).normalize();
         for(let j=0;j<3;j++){const v=new THREE.Vector3().fromBufferAttribute(p,i+j).addScaledVector(normal,depth+.004);p.setXYZ(i+j,v.x,v.y,v.z);}
       }
-      const ink=new THREE.Mesh(geometry,source.material);ink.name='Study B / preserved warning ink';overlay.add(ink);resources.push(geometry);
+      const ink=new THREE.Mesh(geometry,source.material);ink.name='Study B / preserved warning ink';ink.receiveShadow=source.receiveShadow;overlay.add(ink);resources.push(geometry);
     }
     for(const [data,material,withColor]of [[positions,faceMaterial,true],[edges,edgeMaterial,false]]){
       if(!data.length)continue;

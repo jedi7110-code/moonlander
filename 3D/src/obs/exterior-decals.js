@@ -78,7 +78,7 @@ export function createExteriorDecals(){
   function flush(){
     for(const [parent,{geometries,entries}]of batches){
       const geometry=mergeGeometries(geometries,false);geometries.forEach(geometry=>geometry.dispose());
-      const mesh=new THREE.Mesh(geometry,material);mesh.name='Surface warning decals';mesh.userData.exteriorDecal=true;mesh.userData.markings=entries;mesh.castShadow=false;mesh.receiveShadow=false;parent.add(mesh);
+      const mesh=new THREE.Mesh(geometry,material);mesh.name='Surface warning decals';mesh.userData.exteriorDecal=true;mesh.userData.markings=entries;mesh.castShadow=false;mesh.receiveShadow=true;parent.add(mesh);
     }batches.clear();
   }
   return{add,flush};

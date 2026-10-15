@@ -1,13 +1,20 @@
 import * as THREE from 'three';
 import {createExteriorMothership} from './obs/exterior-mothership.js';
 import {createExteriorPlanet,EXTERIOR_PLANET_VARIANTS} from './obs/exterior-planet.js';
-import {sampleExteriorCinema} from './obs/exterior-cinematic.js';
+import {sampleExteriorCinema,CINEMA_SHOTS} from './obs/exterior-cinematic.js';
 import {createExteriorShadow} from './obs/exterior-shadow.js';
 import {createDistantStars} from './obs/exterior-stars.js';
 import {createExteriorDissolve} from './obs/exterior-dissolve.js';
 
 const query=new URLSearchParams(location.search),beforeAfter=query.get('compare')==='before-after';
-const time=Number(query.get('time'))||51.56;
+const startOf=number=>CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(shot=>shot.number===number)).reduce((sum,shot)=>sum+shot.duration,0);
+const requested=Number(query.get('time'))||51.56,number=Number(query.get('scene'))||(requested>60?4:2);
+const definition=CINEMA_SHOTS.find(shot=>shot.number===number),start=startOf(number);
+const time=THREE.MathUtils.clamp(query.has('scene')?requested:start+requested-(number===4?73:39.5),start,start+definition.duration-.01);
+for(const [index,link] of [...document.querySelectorAll('nav a')].entries()){
+  const url=new URL(link.href),number=index===0?2:4,shot=CINEMA_SHOTS.find(shot=>shot.number===number);
+  url.searchParams.set('scene',String(number).padStart(2,'0'));url.searchParams.set('time',startOf(number)+Math.min(number===4?5:12.06,shot.duration-.01));link.href=url.href;
+}
 const shot=sampleExteriorCinema(time,{opening:true,approach:'bow',ending:'underside',docking:'probe-follow',aspect:16/9});
 document.getElementById('description').textContent=`シーン${String(shot.number).padStart(2,'0')} / ${time.toFixed(3)}秒。同じ船・カメラ・光で、惑星の模様と色を比較。${shot.number===2?'02本番はBの赤褐色。惑星＋15％・船は元のサイズ。':'04本番もBの赤褐色。'}`;
 const variants=beforeAfter?[

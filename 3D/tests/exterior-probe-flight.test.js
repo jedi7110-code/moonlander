@@ -49,8 +49,9 @@ test('the adjusted approach connects to the trimmed close-up, decelerates to con
   const contactTime=boundary+7.5;
   assert.equal(sampleExteriorCinema(contactTime-.001,{opening:true}).probe.latched,false);
   assert.equal(sampleExteriorCinema(contactTime,{opening:true}).probe.latched,true,'trimming the opening retains the remaining capture motion');
-  assert.equal(sampleExteriorCinemaFrame(73-.001,{opening:true}).shot.number,7,'the docked shot holds until the approved 73s cut');
-  const transition=sampleExteriorCinemaFrame(73+.001,{opening:true});
+  const cutTime=startOf('crossing');
+  assert.equal(sampleExteriorCinemaFrame(cutTime-.001,{opening:true}).shot.number,7,'the docked shot holds until its current edit point');
+  const transition=sampleExteriorCinemaFrame(cutTime+.001,{opening:true});
   assert.equal(transition.shot.number,4);assert.equal(transition.to,null);assert.equal(transition.mix,0);
   for(const opening of [true,false]){
     const scale=opening?1:4/3;

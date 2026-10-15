@@ -10,8 +10,9 @@ import {sampleExteriorCinema as savedCinema,sampleExteriorCinemaFrame as savedFr
 // Faster/longer early shots shift the shared world origin; compare later camera geometry
 // after removing that translation, rather than requiring its old absolute X.
 const currentShots=exteriorCinemaShots();
-const filmDelay=currentShots[0].duration-36.75+currentShots[1].duration-12;
-const archiveTravelGain=(currentShots[0].duration-5.9)*currentShots[0].speed-(36.75-5.9)*10.12*.97+(currentShots[1].duration-(currentShots[1].flightOrigin??0))*currentShots[1].speed-12*48;
+const dockingExtension=currentShots.find(shot=>shot.id==='lander').duration-8.8;
+const filmDelay=dockingExtension+currentShots[0].duration-36.75+currentShots[1].duration-12;
+const archiveTravelGain=dockingExtension*2+(currentShots[0].duration-5.9)*currentShots[0].speed-(36.75-5.9)*10.12*.97+(currentShots[1].duration-(currentShots[1].flightOrigin??0))*currentShots[1].speed-12*48;
 const assertTranslated=(a,b,gain=archiveTravelGain)=>a.forEach((value,index)=>assert.ok(Math.abs(value-b[index]-(index===0?gain:0))<1e-8));
 
 test('the before-speed camera archive stays immutable and routes to its independent sampler',()=>{
@@ -39,7 +40,7 @@ test('every scene catalog link samples its advertised scene, including all 05 al
 });
 test('current camera takes preserve docking and B flight in scene-local time after trimming 01',()=>{
   const options={opening:true,approach:'bow',ending:'underside'},saved={...options,revision:CAMERA_REVISION};
-  const right=sampleExteriorCinema(63.55+filmDelay,options),left=sampleExteriorCinema(64.8,saved);
+  const right=sampleExteriorCinema(63.55+filmDelay-dockingExtension,options),left=sampleExteriorCinema(64.8,saved);
   assert.ok(right.eye[0]>right.target[0]);assert.ok(left.eye[0]<left.target[0]);
   for(const key of ['position','rotation'])right.probe[key].forEach((value,i)=>assert.ok(Math.abs(value-left.probe[key][i])<1e-10));
   assert.equal(right.probe.latched,left.probe.latched);assert.equal(right.probe.visible,left.probe.visible);
@@ -146,7 +147,7 @@ test('05 enters at the previous 80s camera angle while keeping the film edit and
   assertTranslated(a.eye,b.eye,archiveTravelGain-.75);assertTranslated(a.target,b.target,archiveTravelGain-.75);
   const frame=sampleExteriorCinemaFrame(start,options);
   assert.equal(frame.shot.number,5);assert.equal(frame.mix,0);assert.equal(frame.to,null);
-  assert.equal(sampleExteriorCinemaFrame(39.5,options).mix,.5);
+  assert.equal(sampleExteriorCinemaFrame(currentShots[0].duration,options).mix,.5);
 });
 
 test('the before-exit timing remains available as an immutable comparison',()=>{

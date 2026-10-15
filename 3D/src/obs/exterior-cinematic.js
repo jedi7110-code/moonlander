@@ -31,22 +31,21 @@ import {sampleExteriorCinema as sampleBeforeExitCinema,sampleExteriorCinemaFrame
 // tilts at a fixed position; flight stays at 2 m/s apart from the two flyovers
 // and extreme-wide planet transit.
 export const CINEMA_SHOTS=Object.freeze([
-  // Fade from 38.4 to 40.6s, as the trailing engine clears the lower image edge.
-  // Retain the approved tilt trajectory and ship speed.
-  {id:'overhead',number:1,name:'ティルト / 斜め上から・奥から手前へ接近',mode:'tilt',duration:39.5,sourceDuration:38,speed:10.12*.97*1.03,dissolve:2.2,flightOrigin:5.9,anchor:0,probeStage:'away',
+  // Start the 2.2s dissolve at exactly 28.5s, retaining the camera path and speed.
+  {id:'overhead',number:1,name:'ティルト / 斜め上から・奥から手前へ接近',mode:'tilt',duration:29.6,sourceDuration:38,speed:10.12*.97*1.03,dissolve:2.2,flightOrigin:5.9,anchor:0,probeStage:'away',
     eye:[[315,115,35]],target:[[0,0,0]],tilt:[44.1,60],tiltOffset:-1,tiltOffsetStart:11.4,tiltOffsetDuration:8,fov:42,near:5},
-  // Keep the camera and adjusted entry position; faster travel extends the right exit.
-  {id:'planet',number:2,name:'横移動カメラ / 惑星を横切る遥かな船',mode:'lateral',duration:15.5,speed:48*1.02*1.02,shipScale:1,planetScale:1.15,planetVariant:'rust',flightOrigin:.5/1.02,anchor:14*48/2,probeStage:'away',cameraSlide:[-120,120],cameraOffset:260,
+  // Extend the trimmed take by 2s, preserving the original 15.5s camera/flight pace.
+  {id:'planet',number:2,name:'横移動カメラ / 惑星を横切る遥かな船',mode:'lateral',duration:12.5,sourceDuration:15.5,speed:48*1.02*1.02,shipScale:1,planetScale:1.15,planetVariant:'rust',flightOrigin:.5/1.02,anchor:14*48/2,probeStage:'away',cameraSlide:[-120,120],cameraOffset:260,
     eye:[[0,350,3900]],target:[[0,100,0]],fov:42,wide:true,planet:true,near:5,far:60000},
   {id:'distant',number:3,name:'固定カメラ / 下から接近する探査機',mode:'fixed',duration:8,dissolve:.4,probeStage:'approach',
     // A close-inspection near plane cannot separate B's raised skin from its
     // backing at this distance, particularly in a portrait framing.
     eye:[[235,72,255]],target:[[0,8,0]],fov:38,wide:true,near:40},
-  // Cut the docked hold while the close-up still zooms.
-  {id:'lander',number:7,name:'右下から / 探査機のドッキング',mode:'follow',duration:10,sourceOffset:4.5,sourceDuration:14.75,captureDuration:12,probeStage:'dock',
+  // Contact is 7.5s into 07. Hold until the rear habitat clears the docking view, 3.1s after contact.
+  {id:'lander',number:7,name:'右下から / 探査機のドッキング',mode:'follow',duration:10.6,sourceOffset:4.5,sourceDuration:14.75,captureDuration:12,probeStage:'dock',
     eye:[[16,-10.4,24]],target:[[0,.6,0]],fov:40,zoomTo:32,zoomDuration:15.25,lander:true,fitAspect:true,hideHabitats:true,hideRotor:true},
-  // Balance 04 against the trimmed 07, retaining the approved 05 start.
-  {id:'crossing',number:4,name:'超望遠 / 大きな惑星を背景に横切る船',mode:'fixed',duration:10.75,planetVariant:'rust',
+  // Retain 04's approved entry framing and camera pace as earlier edits move.
+  {id:'crossing',number:4,name:'超望遠 / 大きな惑星を背景に横切る船',mode:'fixed',duration:11.95,anchor:13.15,planetVariant:'rust',
     eye:[[0,7,2100]],target:[[0,0,0]],fov:3.5,wide:true,planet:[1600,-200,-78000],near:1000,far:150000},
   {id:'mounted',number:5,name:'船体固定カメラ / 回転する重力区画',mode:'mounted',duration:8,
     eye:[[12.8,3.85,1.8]],target:[[-1.6,6,0]],fov:58,core:true},
@@ -100,10 +99,13 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   const elapsed=Math.max(0,Number.isFinite(seconds)?seconds:0);
   const time=elapsed;
   const timingScale=duration/OPENING_DURATION;
+  // Decimal edit points must select the same shot when seeking exactly to
+  // their displayed time (e.g. 53.1 + 8.8 must cut at 61.9, not one ulp later).
+  const editTime=value=>opening?Math.round(value*1e10)/1e10:value;
   let index=0,start=0,distance=0;
-  while(index<shots.length-1&&(forcedIndex===null?time>=start+shots[index].duration*timingScale:index<forcedIndex)){
+  while(index<shots.length-1&&(forcedIndex===null?time>=editTime(start+shots[index].duration*timingScale):index<forcedIndex)){
     const previous=shots[index],hold=previous.duration*timingScale;
-    distance+=(hold-(previous.flightOrigin??0))*(previous.speed??EXTERIOR_CRUISE_SPEED);start+=hold;index++;
+    distance+=(hold-(previous.flightOrigin??0))*(previous.speed??EXTERIOR_CRUISE_SPEED);start=editTime(start+hold);index++;
   }
   const definition=shots[index].id==='underside-ending'&&['lower','higher10'].includes(endingCamera)?{...shots[index],settleEye:[-4,endingCamera==='lower'?-10:-16/2.6,14],settleDuration:endingCamera==='higher10'?22:shots[index].settleDuration}:shots[index];
   const alternative=Object.hasOwn(penultimateViews,penultimate)?penultimateViews[penultimate]:null;
@@ -114,7 +116,7 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
       name:'左下から / 探査機のドッキング'}:
     definition.id==='lander'&&dockingView==='probe-follow'?{...definition,mode:'probe-follow',hideHabitats:false,hideRotor:false,
       name:'小型船中心 / 探査機と一緒に動くカメラ'}:definition;
-  const shotDuration=shot.duration*timingScale,end=start+shotDuration,sourceOffset=(shot.sourceOffset??0)*timingScale;
+  const shotDuration=shot.duration*timingScale,end=editTime(start+shotDuration),sourceOffset=(shot.sourceOffset??0)*timingScale;
   const sourceDuration=shot.sourceDuration===undefined?shotDuration+sourceOffset:shot.sourceDuration*timingScale;
   const u=Math.max(0,Math.min(1,(time-start+sourceOffset)/sourceDuration));
   const zoomU=shot.zoomDuration===undefined?u:Math.max(0,Math.min(1,(time-start+sourceOffset)/(shot.zoomDuration*timingScale)));
@@ -198,7 +200,7 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
       const elapsed=Math.max(0,seconds),progress=Math.min(1,elapsed/ease);
       return elapsed<ease?ease*(progress**3-progress**4/2):elapsed-ease/2;
     };
-    const origin=lead+ease,rate=(shot.cameraSlide[1]-shot.cameraSlide[0])/shotDuration;
+    const origin=lead+ease,rate=(shot.cameraSlide[1]-shot.cameraSlide[0])/sourceDuration;
     slide=shot.cameraSlide[0]+rate*(advance(time-start+origin)-advance(origin));
   }
   const observerX=shot.mode==='tracking'?distance:cameraX;
@@ -255,7 +257,7 @@ export function sampleExteriorCinema(seconds,options){return options?.revision==
   sampleEntryCinema(seconds,options):options?.revision==='20261014-r8'?
   sampleBeforeExitCinema(seconds,options):sampleCinemaShot(seconds,options);}
 
-// Current edits cut on the film clock, except 01-to-02 (2.2s) and 03-to-07 (.4s).
+// Current edits cut on the film clock, except 01-to-02 (2.2s), 03-to-07 (.4s).
 // The optional dissolve comparison
 // advances both viewpoints on that same clock; saved revisions keep their edits.
 export function sampleExteriorCinemaFrame(seconds,options){
