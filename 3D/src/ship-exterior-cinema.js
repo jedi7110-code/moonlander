@@ -59,8 +59,8 @@ try{
   function drawView(shot,renderTarget,gasTarget){
     ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
     applyExteriorProbePose(ship,shot.probe);
-    // Restore per view, including both dissolve layers. The current scene 07
-    // hides the habitats while retaining their trusses and connecting ring.
+    // Restore per view, including both dissolve layers. Default scene 07
+    // hides the rotating habitats, trusses and connecting ring together.
     ship.rotor.visible=shot.rotorVisible!==false;
     for(const pod of ship.pods)pod.visible=shot.habitatsVisible;
     camera.fov=shot.fov;camera.near=shot.near;camera.far=shot.far;camera.up.fromArray(shot.up);camera.updateProjectionMatrix();camera.lookAt(target);

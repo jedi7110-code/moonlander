@@ -49,7 +49,7 @@ export class ExteriorCinemaUI{
     if(this.cinematic){
       query.set('mode',opening?'opening':'view');
       // Adopt the approved study take in OBS and the cabin's movie viewer.
-      query.set('approach','bow');query.set('ending','underside');
+      query.set('approach','bow');query.set('ending','underside');query.set('docking','probe-follow');
     }else query.set('viewer','free');
     // Vite bundle locations differ from source modules. Resolve the HTML entry
     // relative to the current page rather than the hashed JS asset directory.

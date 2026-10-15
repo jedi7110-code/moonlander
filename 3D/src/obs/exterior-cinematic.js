@@ -1,3 +1,4 @@
+import {Euler,Vector3} from 'three';
 import {EXTERIOR,exteriorAngle} from './exterior-mothership.js';
 import {EXTERIOR_CRUISE_SPEED} from './exterior-cruise.js';
 import {sampleExteriorLogo} from './exterior-logo.js';
@@ -34,13 +35,14 @@ export const CINEMA_SHOTS=Object.freeze([
   // Retain the approved tilt trajectory and ship speed.
   {id:'overhead',number:1,name:'ティルト / 斜め上から・奥から手前へ接近',mode:'tilt',duration:39.5,sourceDuration:38,speed:10.12*.97*1.03,dissolve:2.2,flightOrigin:5.9,anchor:0,probeStage:'away',
     eye:[[315,115,35]],target:[[0,0,0]],tilt:[44.1,60],tiltOffset:-1,tiltOffsetStart:11.4,tiltOffsetDuration:8,fov:42,near:5},
-  {id:'planet',number:2,name:'横移動カメラ / 惑星を横切る遥かな船',mode:'lateral',duration:14,speed:48,probeStage:'away',cameraSlide:[-120,120],cameraOffset:260,
+  // Keep the camera and adjusted entry position; faster travel extends the right exit.
+  {id:'planet',number:2,name:'横移動カメラ / 惑星を横切る遥かな船',mode:'lateral',duration:15.5,speed:48*1.02*1.02,flightOrigin:.5/1.02,anchor:14*48/2,probeStage:'away',cameraSlide:[-120,120],cameraOffset:260,
     eye:[[0,350,3900]],target:[[0,100,0]],fov:42,wide:true,planet:true,near:5,far:60000},
   {id:'distant',number:3,name:'固定カメラ / 下から接近する探査機',mode:'fixed',duration:8,probeStage:'approach',
     eye:[[235,72,255]],target:[[0,8,0]],fov:38,wide:true},
   // Trim the docked hold by 0.5s and cut while the close-up still zooms.
   {id:'lander',number:7,name:'右下から / 探査機のドッキング',mode:'follow',duration:10.25,sourceOffset:4.5,sourceDuration:14.75,captureDuration:12,probeStage:'dock',
-    eye:[[16,-10,24]],target:[[0,1,0]],fov:40,zoomTo:32,zoomDuration:15.25,lander:true,fitAspect:true,hideHabitats:true},
+    eye:[[16,-10.4,24]],target:[[0,.6,0]],fov:40,zoomTo:32,zoomDuration:15.25,lander:true,fitAspect:true,hideHabitats:true,hideRotor:true},
   // Give the half-second trimmed from 07 to 04, retaining the approved 05 start.
   {id:'crossing',number:4,name:'超望遠 / 大きな惑星を背景に横切る船',mode:'fixed',duration:10.5,
     eye:[[0,7,2100]],target:[[0,0,0]],fov:3.5,wide:true,planet:[1600,-200,-78000],near:10,far:150000},
@@ -106,8 +108,10 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   const shot=definition.id==='mounted'&&alternative?{...definition,...alternative}:
     definition.id==='distant'&&approach==='bow'?{...definition,...bowView,fov:definition.fov,wide:false,
       name:'船首斜め下 / 探査機の接近・03の画角'}:
-    definition.id==='lander'&&dockingView==='left'?{...definition,eye:[[-16,-10,24]],hideHabitats:false,
-      name:'左下から / 探査機のドッキング'}:definition;
+    definition.id==='lander'&&dockingView==='left'?{...definition,eye:[[-16,-10,24]],target:[[0,1,0]],hideHabitats:false,hideRotor:false,
+      name:'左下から / 探査機のドッキング'}:
+    definition.id==='lander'&&dockingView==='probe-follow'?{...definition,mode:'probe-follow',hideHabitats:false,hideRotor:false,
+      name:'小型船中心 / 探査機と一緒に動くカメラ'}:definition;
   const shotDuration=shot.duration*timingScale,end=start+shotDuration,sourceOffset=(shot.sourceOffset??0)*timingScale;
   const sourceDuration=shot.sourceDuration===undefined?shotDuration+sourceOffset:shot.sourceDuration*timingScale;
   const u=Math.max(0,Math.min(1,(time-start+sourceOffset)/sourceDuration));
@@ -177,9 +181,9 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   // Scale flight and its acceleration together without changing the camera path.
   shipSpeed*=shot.flightScale??1;flightDistance*=shot.flightScale??1;
   const shipX=distance+flightDistance;
-  // Anchor the observer at the shot midpoint. Scene 02 then slides the
-  // camera and its target together, keeping its bearing fixed as the ship passes.
-  const cameraX=['fixed','tilt','lateral'].includes(shot.mode)?distance+(shot.anchor??shotDuration/2*shipSpeed)+(shot.cameraOffset??0):shipX;
+  // Explicit anchors retain approved entry framing when a flight is extended.
+  // Scene 02 slides the camera and target together with a fixed bearing.
+  const cameraX=['fixed','tilt','lateral'].includes(shot.mode)?distance+(shot.anchor===undefined?shotDuration/2*shipSpeed:shot.anchor*timingScale)+(shot.cameraOffset??0):shipX;
   const slide=shot.cameraSlide?shot.cameraSlide[0]+(shot.cameraSlide[1]-shot.cameraSlide[0])*u*u*(3-2*u):0;
   const observerX=shot.mode==='tracking'?distance:cameraX;
   eye[0]+=observerX+slide;target[0]+=cameraX+slide;
@@ -199,6 +203,16 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
     sampleExteriorProbeFlight(time-approachStart+advance,{approachDuration,captureDuration,coreScale,
       controlTime:time-approachStart,controlAdvance:(docking.sourceOffset??0)*timingScale}):
     {visible:shot.probeStage!=='away',position:[0,0,0],rotation:[0,0,0],latched:shot.probeStage!=='away'};
+  if(shot.mode==='probe-follow'){
+    // Follow the cabin center through the same pose the renderer applies.
+    // Translate eye and target together: the probe stays centered while its
+    // attitude, docking trajectory and the existing lens zoom remain visible.
+    const center=new Vector3(0,3.1,0).applyEuler(new Euler(...probe.rotation));
+    const offset=eye.map((value,i)=>value-target[i]);
+    target=[shipX+(10.4-EXTERIOR.rotorX)*coreScale+EXTERIOR.rotorX+probe.position[0]+center.x,
+      -2.65*coreScale-7.25+probe.position[1]+center.y,probe.position[2]+center.z];
+    eye=target.map((value,i)=>value+offset[i]);
+  }
   const planet=Array.isArray(shot.planet)?shot.planet:[2200,900,-11000];
   return{index,number:shot.number,id:shot.id,name:shot.name,mode:shot.mode,eye,target,up:shot.up??[0,1,0],fov,shipX,shipSpeed,probe,optics:shot.optics,
     logoReveal:logo.reveal,logoClip:logo.clipPath,

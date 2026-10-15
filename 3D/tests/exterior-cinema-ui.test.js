@@ -33,6 +33,7 @@ test('loading completion reveals the entry cue while the opening remains open',t
   assert.equal(new URL(f.ui.frame.src).pathname,'/3D/ship-exterior-cinema.html');
   const query=new URL(f.ui.frame.src).searchParams;
   assert.equal(query.get('approach'),'bow');assert.equal(query.get('ending'),'underside');
+  assert.equal(query.get('docking'),'probe-follow');assert.equal(query.has('transition'),false);
   assert.equal(f.ui.closeButton.hidden,true);assert.equal(f.trigger.inert,true);
   f.message('ready');assert.equal(f.ui.closeButton.hidden,true,'exterior shaders being ready is not cabin readiness');
   f.ui.hostReady();assert.equal(f.ui.open,true);assert.equal(f.ui.closeButton.hidden,false);
@@ -82,6 +83,7 @@ test('the in-game exterior uses the study mouse viewer and can return immediatel
   const f=fixture(t);f.ui.show();assert.equal(f.ui.closeButton.hidden,false);assert.equal(f.ui.closeButton.textContent,'船内に戻る');
   const url=new URL(f.ui.frame.src);assert.equal(url.pathname,'/3D/ship-exterior-study.html');
   assert.equal(url.searchParams.get('viewer'),'free');assert.equal(url.searchParams.get('embedded'),'1');assert.equal(url.searchParams.has('mode'),false);
+  assert.equal(url.searchParams.has('docking'),false);
   f.ui.closeButton.onclick();assert.equal(f.ui.open,false);
   f.ui.show({opening:true,waitForHost:true});f.ui.dispose();assert.equal(f.ui.open,false);assert.equal(f.ui.frame,null);
 });
@@ -90,6 +92,7 @@ test('the explicit study movie still opens the numbered cinematic viewer',t=>{
   const url=new URL(f.ui.frame.src);assert.equal(url.pathname,'/3D/ship-exterior-cinema.html');
   assert.equal(url.searchParams.get('mode'),'view');assert.equal(url.searchParams.get('core'),'2.4');assert.equal(url.searchParams.get('phase'),'70');assert.equal(url.searchParams.get('rpm'),'5.3');
   assert.equal(url.searchParams.get('approach'),'bow');assert.equal(url.searchParams.get('ending'),'underside');
+  assert.equal(url.searchParams.get('docking'),'probe-follow');assert.equal(url.searchParams.has('transition'),false);
   assert.equal(f.ui.closeButton.textContent,'戻る');
 });
 

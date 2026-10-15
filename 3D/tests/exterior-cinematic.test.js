@@ -7,6 +7,7 @@ import {EXTERIOR,createExteriorShip} from '../src/obs/ship-exterior.js';
 import {EXTERIOR_LOGO,LOGO_SETTLED,sampleExteriorLogo} from '../src/obs/exterior-logo.js';
 import {EXTERIOR_CRUISE_SPEED} from '../src/obs/exterior-cruise.js';
 import {engineDistanceGain} from '../src/obs/exterior-optics.js';
+import {applyExteriorProbePose} from '../src/obs/exterior-probe-flight.js';
 const shotStart=id=>CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(s=>s.id===id)).reduce((sum,s)=>sum+s.duration,0);
 const cameraFor=(shot,aspect=16/9)=>{
   const camera=new THREE.PerspectiveCamera(shot.fov,aspect,shot.near,shot.far);
@@ -17,7 +18,7 @@ const cameraFor=(shot,aspect=16/9)=>{
 // Faster/longer early shots shift the shared world origin; compare later camera geometry
 // after removing that translation, rather than requiring its old absolute X.
 const filmDelay=CINEMA_SHOTS[0].duration-36.75+CINEMA_SHOTS[1].duration-12;
-const archiveTravelGain=(CINEMA_SHOTS[0].duration-5.9)*CINEMA_SHOTS[0].speed-(36.75-5.9)*10.12*.97+(CINEMA_SHOTS[1].duration-12)*CINEMA_SHOTS[1].speed;
+const archiveTravelGain=(CINEMA_SHOTS[0].duration-5.9)*CINEMA_SHOTS[0].speed-(36.75-5.9)*10.12*.97+(CINEMA_SHOTS[1].duration-(CINEMA_SHOTS[1].flightOrigin??0))*CINEMA_SHOTS[1].speed-12*48;
 const assertTranslated=(a,b)=>a.forEach((value,index)=>assert.ok(Math.abs(value-b[index]-(index===0?archiveTravelGain:0))<1e-8));
 
 test('distinct shots cut in order, and the opening keeps playing until the viewer enters',()=>{
@@ -53,11 +54,11 @@ test('editing numbers stay stable, scene 03 leads straight into 07, and scenes 0
 test('scene 01 ship is three percent faster than the previous take, scene 02 camera slides right, and 04 keeps its fixed planet view',()=>{
   assert.equal(CINEMA_SHOTS[0].speed,10.12*.97*1.03);
   const planetStart=shotStart('planet');
-  assert.equal(CINEMA_SHOTS.find(shot=>shot.id==='planet').duration,14);
-  assert.equal(sampleExteriorCinema(53.499,{opening:true}).number,2);
-  assert.equal(sampleExteriorCinema(53.5,{opening:true}).number,3);
+  assert.equal(CINEMA_SHOTS.find(shot=>shot.id==='planet').duration,15.5);
+  assert.equal(sampleExteriorCinema(54.999,{opening:true}).number,2);
+  assert.equal(sampleExteriorCinema(55,{opening:true}).number,3);
   const a=sampleExteriorCinema(planetStart+1,{opening:true}),b=sampleExteriorCinema(planetStart+2,{opening:true});
-  assert.equal(b.shipX-a.shipX,48);
+  assert.ok(Math.abs((b.shipX-a.shipX)-48*1.02*1.02)<1e-10);
   const left=sampleExteriorCinema(planetStart,{opening:true}),right=sampleExteriorCinema(planetStart+CINEMA_SHOTS.find(shot=>shot.id==='planet').duration-.001,{opening:true});
   assert.equal(left.mode,'lateral');assert.ok(Math.abs(right.eye[0]-left.eye[0]-240)<.001);
   assert.ok(Math.abs(right.target[0]-left.target[0]-240)<.001);
@@ -307,6 +308,22 @@ test('the B ending accelerates as its camera settles without slowing the relativ
 });
 test('planet transit slides past a stationary planet while the tiny ship crosses the frame',()=>{
   const start=shotStart('planet'),duration=CINEMA_SHOTS.find(s=>s.id==='planet').duration;
+  // The earlier 14-second, 48m/s cut began 476m left of its camera bearing.
+  // Keep that camera composition and move the ship half a second farther left.
+  for(const opening of [true,false])for(const aspect of [.8,16/9]){
+    const scale=opening?1:EXTERIOR_VIEW_DURATION/OPENING_DURATION,fit=Math.max(1,1/aspect);
+    const entry=sampleExteriorCinema(start*scale,{opening,aspect}),exit=sampleExteriorCinema((start+duration)*scale-.000001,{opening,aspect});
+    const priorShipX=entry.shipX+.5*48*1.02;
+    const previousEntry={...entry,eye:[priorShipX+336*scale+140,100+250*fit,3900*fit],target:[priorShipX+336*scale+140,100,0]};
+    const actual=new THREE.Vector3(entry.shipX,0,0).project(cameraFor(entry,aspect));
+    const previous=new THREE.Vector3(entry.shipX,0,0).project(cameraFor(previousEntry,aspect));
+    assert.ok(actual.distanceTo(previous)<1e-10,'02 keeps the approved camera framing');
+    const beforeShift=new THREE.Vector3(priorShipX,0,0).project(cameraFor(entry,aspect));
+    assert.ok(actual.x<beforeShift.x,'02 begins half a second farther left');
+    const previousExit=new THREE.Vector3(priorShipX+14*48*scale,0,0).project(cameraFor(exit,aspect));
+    const extendedExit=new THREE.Vector3(exit.shipX,0,0).project(cameraFor(exit,aspect));
+    assert.ok(extendedExit.x>previousExit.x,'extra travel is visible at the right end of 02');
+  }
   const a=sampleExteriorCinema(start+.5,{opening:true}),b=sampleExteriorCinema(start+duration-.5,{opening:true});
   assert.ok(b.eye[0]>a.eye[0]&&b.target[0]>a.target[0]);assert.deepEqual(a.planet,b.planet);
   assert.ok(a.planet.position[2]+4200<0,'even the near surface of the planet stays behind the foreground ship');
@@ -330,11 +347,18 @@ test('scene 07 adopts the right-below camera by default and retains the left-bel
       const left=sampleExteriorCinema(seconds,original),right=sampleExteriorCinema(seconds,options);
       assert.equal(right.number,7);assert.equal(right.id,'lander');
       assert.ok(right.eye[0]>right.target[0]);assert.deepEqual(right,sampleExteriorCinema(seconds,{...options,docking:'right'}));
-      for(const key of ['target','fov','probe','shipX','angle','near','far','start','end'])assert.deepEqual(right[key],left[key]);
+      for(const key of ['fov','probe','shipX','angle','near','far','start','end'])assert.deepEqual(right[key],left[key]);
       assert.equal(left.habitatsVisible,true,'the current left-below comparison includes the habitats');
-      assert.deepEqual(right.eye.slice(1),left.eye.slice(1));
-      assert.ok(Math.abs((right.eye[0]-right.target[0])+(left.eye[0]-left.target[0]))<1e-9,'only the left/right camera offset is mirrored');
+      assert.equal(right.rotorVisible,false,'07 isolates docking from the rotating trusses and ring');
+      assert.notEqual(left.rotorVisible,false,'the left-below comparison retains its earlier rotating structure');
+      assert.equal(right.target[0],left.target[0]);assert.equal(right.target[2],left.target[2]);
+      assert.equal(right.eye[2],left.eye[2]);
+      assert.ok(Math.abs(right.eye[1]-left.eye[1]+.4)<1e-9,'07 camera sits slightly lower');
+      assert.ok(Math.abs(right.target[1]-left.target[1]+.4)<1e-9,'the matching aim shift frames the probe higher without changing pitch');
+      assert.ok(Math.abs((right.eye[0]-right.target[0])+(left.eye[0]-left.target[0]))<1e-9,'the left/right camera offset stays mirrored');
     }
+    assert.notEqual(sampleExteriorCinema(start-.001,options).rotorVisible,false,'03 retains the rotating structure');
+    assert.notEqual(sampleExteriorCinema(end+.001,options).rotorVisible,false,'the structure returns after 07');
     for(const seconds of [start-.5,end-.5]){
       const before=sampleExteriorCinemaFrame(seconds,original),after=sampleExteriorCinemaFrame(seconds,options);
       assert.equal(before.mix,after.mix);
@@ -345,6 +369,49 @@ test('scene 07 adopts the right-below camera by default and retains the left-bel
     }
     for(const seconds of [0,54,70+filmDelay,100])assert.deepEqual(sampleExteriorCinemaFrame(seconds,original),sampleExteriorCinemaFrame(seconds,options));
   }
+});
+test('the optional 07 camera follows the actual probe center without changing flight, edit times or other scenes',()=>{
+  const ship=createExteriorShip();ship.setCoreScale(2.6);
+  try{
+    const start=shotStart('lander'),options={opening:true,coreScale:2.6,approach:'bow',ending:'underside'};
+    for(const aspect of [.8,16/9]){
+      let offset;
+      for(const time of [start,start+.46,start+3,start+7,start+10.24]){
+        const base=sampleExteriorCinema(time,{...options,aspect}),tracked=sampleExteriorCinema(time,{...options,aspect,docking:'probe-follow'});
+        assert.equal(tracked.mode,'probe-follow');
+        for(const key of ['probe','fov','shipX','angle','start','end'])assert.deepEqual(tracked[key],base[key]);
+        assert.equal(tracked.habitatsVisible,true,'the follow comparison restores the colonies');
+        assert.notEqual(tracked.rotorVisible,false,'the rotating support structure is visible with its colonies');
+        ship.root.position.x=tracked.shipX;applyExteriorProbePose(ship,tracked.probe);
+        const center=ship.dockedLander.localToWorld(new THREE.Vector3(0,3.1,0));
+        assert.ok(center.distanceTo(new THREE.Vector3(...tracked.target))<1e-8,'aim follows the rendered vehicle center, including its attitude');
+        const projected=center.clone().project(cameraFor(tracked,aspect));
+        assert.ok(Math.hypot(projected.x,projected.y)<1e-9,'the moving probe remains at frame center');
+        const relative=tracked.eye.map((value,i)=>value-tracked.target[i]);
+        if(offset)relative.forEach((value,i)=>assert.ok(Math.abs(value-offset[i])<1e-8));else offset=relative;
+        assert.deepEqual(tracked,sampleExteriorCinema(time,{...options,aspect,docking:'probe-follow'}),'seeking is deterministic');
+      }
+      const a=sampleExteriorCinema(start,{...options,aspect,docking:'probe-follow'}),b=sampleExteriorCinema(start+5,{...options,aspect,docking:'probe-follow'});
+      assert.ok(b.eye[1]>a.eye[1],'the observer rises with the probe during docking');
+    }
+    for(const time of [0,40.6,56,75,100])assert.deepEqual(sampleExteriorCinemaFrame(time,{...options,docking:'probe-follow'}),sampleExteriorCinemaFrame(time,options));
+    for(const opening of [true,false]){
+      const boundary=start*(opening?1:EXTERIOR_VIEW_DURATION/OPENING_DURATION),following={...options,opening,docking:'probe-follow'};
+      let previousAngle;
+      for(const offset of [-.75,-.001,0,.001,.75]){
+        const frame=sampleExteriorCinemaFrame(boundary+offset,following);
+        assert.equal(frame.from.number,offset<0?3:7);
+        assert.equal(frame.to,null,'03 cuts directly to the follow camera');assert.equal(frame.mix,0);
+        const base=sampleExteriorCinema(boundary+offset,{...options,opening});
+        assert.equal(frame.from.angle,base.angle,'the cut preserves the absolute rotation clock');
+        if(previousAngle!==undefined)assert.ok(frame.from.angle>previousAngle,'the rotor keeps moving through the transition');
+        previousAngle=frame.from.angle;
+        assert.equal(frame.from.shipX,base.shipX);assert.deepEqual(frame.from.probe,base.probe);
+        assert.equal(frame.from.habitatsVisible,true);assert.notEqual(frame.from.rotorVisible,false);
+      }
+      assert.equal(sampleExteriorCinemaFrame(boundary,{...options,opening}).to,null,'the regular 07 retains its current cut');
+    }
+  }finally{ship.dispose();}
 });
 test('space is visible immediately, and scene changes never fade to black',()=>{
   assert.equal(sampleExteriorCinema(0).fade,0);assert.equal(sampleExteriorCinema(EXTERIOR_VIEW_DURATION).fade,0);

@@ -11,7 +11,7 @@ import {sampleExteriorCinema as savedCinema,sampleExteriorCinemaFrame as savedFr
 // after removing that translation, rather than requiring its old absolute X.
 const currentShots=exteriorCinemaShots();
 const filmDelay=currentShots[0].duration-36.75+currentShots[1].duration-12;
-const archiveTravelGain=(currentShots[0].duration-5.9)*currentShots[0].speed-(36.75-5.9)*10.12*.97+(currentShots[1].duration-12)*currentShots[1].speed;
+const archiveTravelGain=(currentShots[0].duration-5.9)*currentShots[0].speed-(36.75-5.9)*10.12*.97+(currentShots[1].duration-(currentShots[1].flightOrigin??0))*currentShots[1].speed-12*48;
 const assertTranslated=(a,b,gain=archiveTravelGain)=>a.forEach((value,index)=>assert.ok(Math.abs(value-b[index]-(index===0?gain:0))<1e-8));
 
 test('the before-speed camera archive stays immutable and routes to its independent sampler',()=>{
@@ -46,10 +46,14 @@ test('current camera takes preserve docking and B flight in scene-local time aft
   assert.ok(Math.abs(right.probe.thrusterClock.seconds-left.probe.thrusterClock.seconds)<1e-10);
   assert.ok(right.fov>left.fov,'07 extends its zoom through the earlier cut');
   const relative=(vector,origin)=>vector.map((v,i)=>v-(i===0?origin:0));
-  relative(right.target,right.shipX).forEach((value,i)=>assert.ok(Math.abs(value-relative(left.target,left.shipX)[i])<1e-10));
+  relative(right.target,right.shipX).forEach((value,i)=>assert.ok(Math.abs(value-relative(left.target,left.shipX)[i]+(i===1?.4:0))<1e-10));
 
-  const approved=EXTERIOR_SCENE_CATALOG.find(entry=>entry.id==='07-docking-right');
-  assert.equal(approved.status,'採用・現行');assert.deepEqual(approved.options,{approach:'bow',ending:'underside'});
+  const approved=EXTERIOR_SCENE_CATALOG.find(entry=>entry.id==='07-docking-probe-follow');
+  assert.equal(approved.status,'採用・現行');assert.deepEqual(approved.options,{approach:'bow',ending:'underside',docking:'probe-follow'});
+  for(const entry of EXTERIOR_SCENE_CATALOG.filter(entry=>entry.status.startsWith('採用')))
+    assert.deepEqual(entry.options,approved.options,'all adopted scene links play the same approved film');
+  const docked=sampleExteriorCinemaFrame(approved.start,{...approved.options,opening:true});
+  assert.equal(docked.from.mode,'probe-follow');assert.equal(docked.to,null);assert.equal(docked.from.habitatsVisible,true);
   const start=77.5+filmDelay,full={...options,revision:FULL_CAMERA_REVISION};
   for(const offset of [0,4,8.25,21.25,71.25,221.25]){
     const current=sampleExteriorCinema(start+offset,options),before=sampleExteriorCinema(start-filmDelay+offset+4.5,full);
