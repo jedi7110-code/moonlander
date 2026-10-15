@@ -3,6 +3,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {createParabolicAntenna} from './exterior-antenna.js';
 import {createExteriorDecals} from './exterior-decals.js';
+import {addConformalServiceFairings} from './exterior-service-fairing.js';
 import taraironWordmark from './tarairon-wordmark.js';
 import {HABITAT_ENVELOPE,HABITAT_FLOORS,HABITAT_WINDOWS,cabinToHabitat} from './habitat-envelope.js';
 
@@ -17,6 +18,57 @@ export const exteriorAngle=(seconds,rpm=EXTERIOR.rpm)=>seconds*rpm*Math.PI/30;
 const V=(...values)=>new THREE.Vector3(...values);
 function random(seed=817){return()=>{seed=(Math.imul(1664525,seed)+1013904223)>>>0;return seed/4294967296;};}
 
+// Dedicated end sheets live beside the original side paint in the same atlas.
+// Keeping one material preserves the existing spacecraft draw-call budget.
+function endPaint(c,{x,y,w,h,faceWidth,faceHeight,cut,habitat=false,worn=false}){
+  const r=random(habitat?938:274),left=-faceWidth/2,right=faceWidth/2,bottom=-faceHeight/2,top=faceHeight/2;
+  c.save();c.translate(x+w/2,y+h/2);c.scale(w/faceWidth,-h/faceHeight);
+  c.fillStyle='#c7c1ac';c.fillRect(left,bottom,faceWidth,faceHeight);
+  const perimeter=inset=>{
+    const l=left+inset,rr=right-inset,b=bottom+inset,t=top-inset,k=Math.max(.02,cut-inset*.59);
+    c.beginPath();c.moveTo(l+k,b);c.lineTo(rr-k,b);c.lineTo(rr,b+k);c.lineTo(rr,t-k);
+    c.lineTo(rr-k,t);c.lineTo(l+k,t);c.lineTo(l,t-k);c.lineTo(l,b+k);c.closePath();
+  };
+  perimeter(.04);c.clip();
+  c.fillStyle='#c1baa5';c.fillRect(left,bottom,faceWidth,faceHeight);
+  const seam=(points)=>{
+    for(const [offset,color]of [[.012,'#ddd6bf'],[0,'#918c7e']]){
+      c.strokeStyle=color;c.lineWidth=habitat?.018:.007;c.beginPath();
+      points.forEach(([px,py],i)=>i?c.lineTo(px+offset,py+offset):c.moveTo(px+offset,py+offset));c.stroke();
+    }
+  };
+  c.strokeStyle='#918c7e';c.lineWidth=habitat?.025:.009;perimeter(habitat?.20:.07);c.stroke();
+  c.strokeStyle='#ded7c0';perimeter(habitat?.23:.08);c.stroke();
+  if(habitat){
+    // Clear central service panel follows the real hatch at y=-0.5m.
+    const a=1.45,b=-2.3,t=1.3;
+    seam([[-a,b],[a,b],[a,t],[-a,t],[-a,b]]);
+    for(const sign of [-1,1]){
+      seam([[sign*a,b],[sign*a,bottom+.2]]);seam([[sign*a,t],[sign*a,top-.2]]);
+      seam([[sign*a,2.8],[sign*(right-.2),2.8]]);
+      seam([[sign*a,-3.4],[sign*(right-.2),-3.4]]);
+      seam([[sign*a,-.5],[sign*(right-.2),-.5]]);
+    }
+    seam([[-a,3.5],[a,3.5]]);seam([[-a,-3.8],[a,-3.8]]);
+  }else{
+    // Small, symmetric pressure plates on the chamfered bow; no side seams.
+    seam([[0,bottom+.07],[0,top-.07]]);
+  }
+  const bolt=habitat?.022:.009;
+  c.fillStyle='#747164';
+  for(const sign of [-1,1])for(const yy of [-.65,0,.65]){
+    const zz=sign*(right-(habitat?.34:.13));
+    c.beginPath();c.arc(zz,yy*(top-cut),bolt,0,Math.PI*2);c.fill();
+  }
+  if(worn){
+    for(let i=0;i<(habitat?700:120);i++){
+      const px=left+r()*faceWidth,py=bottom+r()*faceHeight,len=(habitat?.025:.008)*(1+r()*3);
+      c.strokeStyle=i%4?'#68665a30':'#e6dec544';c.lineWidth=habitat?.007:.003;
+      c.beginPath();c.moveTo(px,py);c.lineTo(px+len,py+len*.3);c.stroke();
+    }
+  }
+  c.restore();
+}
 function paintMap(worn,habitat=false){
   if(typeof document==='undefined')return null;
   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;
@@ -47,7 +99,27 @@ function paintMap(worn,habitat=false){
     }
     for(let i=0;i<400;i++){c.fillStyle='#3d3d3538';c.fillRect(r()*1024,r()*512,.5+r()*2,.5+r()*2);}
   }
-  const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;map.name=worn?'Aged beige / seams and abrasion':'Beige / service panels';return map;
+  const atlas=document.createElement('canvas');atlas.width=2048;atlas.height=1024;
+  const a=atlas.getContext('2d');a.fillStyle='#c7c1ac';a.fillRect(0,0,2048,1024);a.drawImage(canvas,0,512);
+  // Unused upper-left atlas space supplies full-resolution access-cover paint.
+  // Fine abrasion matches the surrounding service parts without enlarged
+  // stains or a panel line running through the removable cover.
+  a.fillStyle='#c7c1ac';a.fillRect(0,0,512,512);
+  if(worn){
+    const wear=random(731);
+    for(let i=0;i<240;i++){
+      const x=wear()*512,y=wear()*512,length=1+wear()*12;
+      a.strokeStyle=i%4?'#66635844':'#e0d8be66';a.lineWidth=.35+wear()*.7;
+      a.beginPath();a.moveTo(x,y);a.lineTo(x+length,y+(wear()-.5)*3);a.stroke();
+    }
+    for(let i=0;i<65;i++){a.fillStyle='#66635833';a.fillRect(wear()*512,wear()*512,.5+wear(),.5+wear());}
+  }
+  if(habitat)endPaint(a,{x:1024,y:0,w:1024,h:1024,faceWidth:EXTERIOR.podWidth-1,faceHeight:EXTERIOR.podDepth-2.5,cut:.85,habitat:true,worn});
+  else{
+    endPaint(a,{x:1024,y:512,w:1024,h:512,faceWidth:2.9,faceHeight:2.15,cut:.45,worn});
+    endPaint(a,{x:1024,y:0,w:1024,h:512,faceWidth:3.3,faceHeight:1.5,cut:.35,worn});
+  }
+  const map=new THREE.CanvasTexture(atlas);map.repeat.set(.5,.5);map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;map.name=worn?'Aged beige / seams and abrasion':'Beige / service panels';return map;
 }
 function sootMap(){
   if(typeof document==='undefined')return null;
@@ -114,7 +186,7 @@ function loft(parent,m,sections,name,segments=8){
   for(const [offset,reverse]of [[0,true],[(sections.length-1)*(segments+1),false]])for(let j=1;j<segments-1;j++)indices.push(offset,offset+(reverse?j+1:j),offset+(reverse?j:j+1));
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setIndex(indices);g.computeVertexNormals();return addMesh(parent,g,m,name);
 }
-function facetedHull(parent,m,sections,name){
+function facetedHull(parent,m,sections,name,endStyle='bow'){
   const positions=[],uvs=[],indices=[];
   for(const [i,[x,bottom,top,width,cut]]of sections.entries()){
     const ring=[[bottom,-width+cut],[bottom+cut,-width],[top-cut,-width],[top,-width+cut],
@@ -124,8 +196,17 @@ function facetedHull(parent,m,sections,name){
   for(let i=0;i<sections.length-1;i++)for(let j=0;j<8;j++){
     const a=i*8+j,next=i*8+(j+1)%8,b=a+8;indices.push(a,next,b,b,next,next+8);
   }
-  for(const [offset,reverse]of [[0,true],[(sections.length-1)*8,false]])
+  // End vertices must be independent: axial side UVs have a constant U here,
+  // which collapses the entire end into a stretched line of side paint.
+  for(const [section,reverse]of [[0,true],[sections.length-1,false]]){
+    const offset=positions.length/3,[,bottom,top,width]=sections[section];
+    for(let j=0;j<8;j++){
+      const source=(section*8+j)*3,[x,y,z]=positions.slice(source,source+3);
+      positions.push(x,y,z);
+      uvs.push(1+(z+width)/(2*width),(y-bottom)/(top-bottom)*(endStyle==='habitat'?2:1)+(endStyle==='command'?1:0));
+    }
     for(let j=1;j<7;j++)indices.push(offset,offset+(reverse?j+1:j),offset+(reverse?j:j+1));
+  }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
   return addMesh(parent,geometry,m,name);
@@ -212,7 +293,7 @@ function habitatShell(pod,m,index,stain){
       [x-.10,-half-.95,half+.95,depth/2+.12,1.25],[x+.65,-half,half,depth/2,.65]]:
       [[x-.65,-half,half,depth/2,.65],[x+.10,-half-.95,half+.95,depth/2+.12,1.25],
       [x+1.8,-half+1.25,half-1.25,depth/2-.50,.85]];
-    const end=facetedHull(pod,paint,sections,'Tapered habitat end casing');end.position.z=mid;
+    const end=facetedHull(pod,paint,sections,'Tapered habitat end casing','habitat');end.position.z=mid;
   }
   for(const window of windows){
     const outside=window.face==='corridor'?front-.10:back+.02;
@@ -256,6 +337,12 @@ function habitatShell(pod,m,index,stain){
     box(end,m.dark,[-1.35,-1.15,.10],[.36,1.4,.12],'End cooling grille');
     label(end,'SERVICE',[0,.20,.18],1.0,.20,{size:50});
   }
+  // Retain the hatch leaves as continuous surfaces in optional panel studies,
+  // including after their meshes have been merged into the habitat batches.
+  pod.userData.panelKeepouts=[-1,1].map(side=>({
+    min:[side>0?EXTERIOR.podLength/2+1.87:-EXTERIOR.podLength/2-2.05,-1.75,mid-.87],
+    max:[side>0?EXTERIOR.podLength/2+2.05:-EXTERIOR.podLength/2-1.87,.75,mid+.87],
+  }));
   label(pod,`HAB / 0${index+1}`,[7,half+1.13,-.20],3.8,.70,{rotation:[-Math.PI/2,0,0]});
   const residue=addMesh(pod,new THREE.PlaneGeometry(5.4,2.4),stain,'Local vent stain',[.5,half+1.26,1.3]);residue.rotation.x=-Math.PI/2;residue.castShadow=false;
   bake(pod);return guides;
@@ -304,30 +391,72 @@ export function createExteriorMothership(){
 
   // A fixed axial spine through a rotating bearing. The aft body grows to
   // contain the propulsion equipment; the bow carries small pressure windows.
-  loft(core,m.paint,[[-15.5,4.85,8.5],[-11.8,4.95,8.3],[-8.8,3.45,3.45],[-5.9,3.25,3.25],[6.1,3.25,3.25],[9.0,3.0,3.1]],'Faceted pressure hull');
+  const pressureSkin=loft(core,m.paint,[[-15.5,4.85,8.5],[-11.8,4.95,8.3],[-8.8,3.45,3.45],[-5.9,3.25,3.25],[6.1,3.25,3.25],[9.0,3.0,3.1]],'Faceted pressure hull');
   // Shoulders, lower chines and the roof change angle independently along the bow.
-  facetedHull(core,m.paint,[[8.8,-2.8,2.8,3.08,.9],[11,-2.65,2.4,3.0,.85],
+  const forwardSkin=facetedHull(core,m.paint,[[8.8,-2.8,2.8,3.08,.9],[11,-2.65,2.4,3.0,.85],
     [13.4,-2.2,2.05,2.85,.75],[15.6,-1.7,1.5,2.2,.65],[17.3,-1.15,1.0,1.45,.45]],'Multi-facet forward pressure hull');
   facetedHull(core,m.paint,[[9.3,1.2,2.4,1.95,.30],[10.4,1.15,3.15,2.3,.40],
-    [12.8,1.15,3.3,2.3,.48],[14.25,1.05,2.95,2.05,.40],[15.6,.95,2.45,1.65,.35]],'Sloping faceted command module');
+    [12.8,1.15,3.3,2.3,.48],[14.25,1.05,2.95,2.05,.40],[15.6,.95,2.45,1.65,.35]],'Sloping faceted command module','command');
   for(const side of [-1,1]){
     chamferBox(core,m.patch,[11.9,-.10,side*3.0],[2.8,2.9,.28],'Rear bridge armour cheek');
     const cheek=chamferBox(core,m.patch,[14.15,.10,side*2.63],[1.9,1.65,.22],'Swept forward armour cheek');cheek.rotation.y=side*.28;
     pipe(machinery,m.pipe,[[9.5,1.1,side*2.58],[10.3,1.1,side*2.67],[11.6,.65,side*2.73],[12.65,.65,side*2.73]],.08,'Bridge service feed');
   }
-  const windshield=new THREE.Group();windshield.position.set(14.925,2.81,0);windshield.rotation.z=Math.atan2(-.50,1.35);core.add(windshield);
-  chamferBox(windshield,m.steel,[0,0,0],[1.40,.12,2.65],'Inclined forward bridge visor');
-  box(windshield,m.glass,[0,.085,0],[1.10,.035,2.35],'Inclined forward bridge glass');
-  for(let i=0;i<3;i++)box(windshield,m.patch,[0,.12,-.78+i*.78],[1.40,.055,.085],'Bridge pressure mullion');
+  const paneOutline=(Type,center,width,height,cut,left,right)=>{
+    const shape=new Type(),l=center-width/2,r=center+width/2,b=-height/2,t=height/2;
+    shape.moveTo(l,b);shape.lineTo(r,b);shape.lineTo(r,t-(right?cut:0));
+    if(right)shape.lineTo(r-cut,t);
+    shape.lineTo(l+(left?cut:0),t);if(left)shape.lineTo(l,t-cut);
+    shape.closePath();return shape;
+  };
+  const pressurePanes=(parent,{spacing,width,height,cut,name,taper=0,outerExpansion=0})=>{
+    for(let i=0;i<4;i++){
+      const left=i===0,right=i===3,edge=left?-1:right?1:0;
+      const center=(i-1.5)*spacing+edge*outerExpansion/2,paneWidth=width+Math.abs(edge)*outerExpansion;
+      const outline=(Type,w,h,c)=>{
+        if(!taper)return paneOutline(Type,center,w,h,c,left,right);
+        const shape=new Type(),l=center-w/2,r=center+w/2,b=-h/2,t=h/2;
+        // The two outside edges remain parallel to the narrowing roof facet.
+        // Use the same reference line for the rim and its inset glass.
+        const shift=y=>(y+height/2)*taper;
+        shape.moveTo(l+(left?shift(b):0),b);shape.lineTo(r-(right?shift(b):0),b);
+        shape.lineTo(r-(right?shift(t):0),t);shape.lineTo(l+(left?shift(t):0),t);
+        shape.closePath();return shape;
+      };
+      const rim=outline(THREE.Shape,paneWidth,height,cut);
+      rim.holes.push(outline(THREE.Path,paneWidth-.13,height-.17,cut-.04));
+      addMesh(parent,new THREE.ExtrudeGeometry(rim,{depth:.06,bevelEnabled:false,curveSegments:1}),m.steel,name+' pressure rim / '+i);
+      const glass=addMesh(parent,new THREE.ShapeGeometry(outline(THREE.Shape,paneWidth-.11,height-.15,cut-.03)),m.glass,name+' recessed glass / '+i,[0,0,.026]);
+      glass.castShadow=false;
+    }
+  };
+  // The roof panes follow the actual sloping top facet, using the same inset
+  // glazing and embedded pressure rims as the forward windows.
+  const windshield=new THREE.Group();windshield.name='Inclined command skylights';
+  windshield.position.set(14.925,2.70,0);windshield.rotation.z=Math.atan2(-.50,1.35);core.add(windshield);
+  const roofGlazing=new THREE.Group();roofGlazing.position.y=-.01;
+  roofGlazing.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(V(0,0,1),V(1,0,0),V(0,1,0)));windshield.add(roofGlazing);
+  // Widen only the outside panes: their forward corners align at z=±1.21
+  // with the top corners of the front windows, with clearance to the roof chine.
+  pressurePanes(roofGlazing,{spacing:.69,width:.60,height:1.25,cut:.22,name:'Command skylight',outerExpansion:.18,
+    taper:((2.05-.40)-(1.65-.35))/1.35*Math.cos(windshield.rotation.z)});
+  // Four forward panes sit directly on the command module's x=15.6 end
+  // facet. Embed the rims in that skin; recess the glass behind their lips.
+  const forwardWindows=new THREE.Group();forwardWindows.name='Forward command windows';
+  forwardWindows.position.set(15.59,1.95,0);forwardWindows.rotation.y=Math.PI/2;core.add(forwardWindows);
+  pressurePanes(forwardWindows,{spacing:.74,width:.64,height:.78,cut:.22,name:'Forward command'});
   for(const x of [-10.2,-7.2,5.7,8.9]){
     const collar=axisRing(core,m.steel,x,x<-8?4.3:3.27,.12,'Hull structural collar',16);
     if(x<-8)collar.scale.x=1.36;
   }
+  // Compact inspection lids cover the seam discontinuity halfway through
+  // each tapered facet, using the same aged paint as the pressure skin.
+  const serviceCovers=addConformalServiceFairings(core,{surfaces:[pressureSkin,forwardSkin],paint:m.paint,metal:m.dark,addMesh});
   // Replaceable cladding, boxed service bays and restrained identification.
   for(const side of [-1,1]){
-    const panel=chamferBox(core,m.patch,[9.7,side*2.4,0],[6.2,.18,4.1],'Forward maintenance cover');
-    panel.rotation.x=side>0?0:Math.PI;
-    for(let i=0;i<6;i++)box(machinery,m.steel,[9.0+i*.52,side*2.53,.25],[.26,.1,2.3],'Cooling slot');
+    // The old flat upper/lower maintenance covers intersected the tapered
+    // hull, leaving their edges exposed as disconnected strips. The obsolete
+    // covers and buried cooling slots are removed; the pressure skin is intact.
     for(let i=0;i<4;i++){
       box(core,m.steel,[11.9,.90-i*.62,side*3.17],[1.92,.40,.10],'Bridge window frame');
       box(core,m.glass,[11.9,.90-i*.62,side*3.24],[1.66,.24,.055],'Inset bridge glass');
@@ -336,6 +465,7 @@ export function createExteriorMothership(){
   }
   for(const side of [-1,1]){
     const hatch=new THREE.Group();hatch.name='EVA airlock hatch / '+(side>0?'starboard':'port');
+    hatch.userData.panelDetailExclude=true;
     hatch.position.set(4.0,.02,side*3.10);core.add(hatch);evaHatches.push(hatch);
     chamferBox(hatch,m.steel,[0,0,0],[1.70,2.36,.22],'EVA pressure frame');
     chamferBox(hatch,m.dark,[0,0,side*.13],[1.46,2.12,.10],'EVA perimeter seal');
@@ -475,6 +605,10 @@ export function createExteriorMothership(){
   }
   bake(machinery);bake(hub);bake(frame);engines.forEach(bake);bake(core);
   const decals=createExteriorDecals();
+  for(const cover of serviceCovers){
+    const {point,normal,up}=cover.userData.warning;
+    decals.add(core,'electrical',point,normal,.43,.16,{up});
+  }
   for(const side of [-1,1]){
     decals.add(core,'pressure',[4,.15,side*3.38],[0,0,side],.55,.20);
     decals.add(core,'rotate',[-4.9,-.7,side*3.0],[0,0,side],.85,.26);
@@ -484,8 +618,8 @@ export function createExteriorMothership(){
     decals.add(core,'sensor',[14.15,-.40,side*2.80],[0,0,side],.65,.22);
   }
   for(const pod of pods){
-    const half=EXTERIOR.podWidth/2;
-    for(const side of [-1,1])decals.add(pod,'pressure',[side*(EXTERIOR.podLength/2+2.0),-.85,.5],[side,0,0],1.0,.35);
+    const half=EXTERIOR.podWidth/2,hatchCenterZ=(-HABITAT_ENVELOPE.front+HABITAT_ENVELOPE.rearRoomBack)/2;
+    for(const side of [-1,1])decals.add(pod,'pressure',[side*(EXTERIOR.podLength/2+2.0),-.85,hatchCenterZ],[side,0,0],1.0,.35,{up:[0,1,0]});
     decals.add(pod,'service',[0,half+1.1,-.5],[0,1,0],1.9,.5);
   }
   decals.flush();

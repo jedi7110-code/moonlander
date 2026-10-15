@@ -15,6 +15,7 @@ export const EXTERIOR_MARKINGS=Object.freeze({
   sensor:['CAUTION','VIEWPORT','KEEP CLEAR','caution'],
   dock:['CAUTION','DOCKING LATCH','KEEP CLEAR','caution'],
   connector:['SERVICE','GAS / POWER','ISOLATE FIRST','service'],
+  electrical:['WARNING','ISOLATE POWER','BEFORE OPENING','danger'],
 });
 // Local model metres: enough depth separation without a visibly floating label.
 export const EXTERIOR_DECAL_CLEARANCE=.003;
@@ -36,7 +37,7 @@ export function createExteriorDecals(){
   const material=new THREE.MeshStandardMaterial({map:texture,color:texture?0xffffff:0xc2a450,transparent:true,roughness:.92,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
   material.name='Printed equipment warning ink';
   const batches=new Map();
-  function add(parent,key,position,normal,width,height){
+  function add(parent,key,position,normal,width,height,{up=null}={}){
     if(!EXTERIOR_MARKINGS[key])throw new Error(`Unknown marking ${key}`);
     parent.updateWorldMatrix(true,true);
     const localNormal=new THREE.Vector3(...normal).normalize(),worldNormal=localNormal.clone().transformDirection(parent.matrixWorld);
@@ -47,6 +48,12 @@ export function createExteriorDecals(){
     if(!hit)return false;
     const actualNormal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
     const orientation=new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),actualNormal));
+    if(up){
+      const projectorUp=new THREE.Vector3(...up).transformDirection(parent.matrixWorld).projectOnPlane(actualNormal).normalize();
+      const projectorRight=new THREE.Vector3().crossVectors(projectorUp,actualNormal).normalize();
+      projectorUp.crossVectors(actualNormal,projectorRight).normalize();
+      orientation.setFromRotationMatrix(new THREE.Matrix4().makeBasis(projectorRight,projectorUp,actualNormal));
+    }
     const scale=parent.getWorldScale(new THREE.Vector3()),size=new THREE.Vector3(width*scale.x,height*scale.y,.035*Math.max(scale.x,scale.y,scale.z));
     const geometry=new DecalGeometry(hit.object,hit.point,orientation,size);
     if(!geometry.attributes.position.count){geometry.dispose();return false;}

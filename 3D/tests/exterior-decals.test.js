@@ -3,6 +3,30 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {EXTERIOR_DECAL_CLEARANCE} from '../src/obs/exterior-decals.js';
+import {HABITAT_ENVELOPE} from '../src/obs/habitat-envelope.js';
+
+test('habitat hatch warnings stay centered and their printed rows follow the door edges',()=>{
+  const ship=createExteriorShip(),centerZ=(-HABITAT_ENVELOPE.front+HABITAT_ENVELOPE.rearRoomBack)/2;
+  try{
+    ship.setAngle(.7);ship.root.updateMatrixWorld(true);let count=0;
+    for(const pod of ship.pods)pod.traverse(mesh=>{
+      if(!mesh.userData.exteriorDecal)return;
+      const positions=mesh.geometry.attributes.position,uv=mesh.geometry.attributes.uv;
+      for(const entry of mesh.userData.markings){
+        if(entry.key!=='pressure')continue;count++;
+        assert.ok(Math.abs(entry.point[2]-centerZ)<1e-9,'label stays centered across the door');
+        for(let i=entry.vertexStart;i<entry.vertexStart+entry.vertexCount;i+=3){
+          const a=new THREE.Vector3().fromBufferAttribute(positions,i),b=new THREE.Vector3().fromBufferAttribute(positions,i+1),c=new THREE.Vector3().fromBufferAttribute(positions,i+2);
+          const du1=uv.getX(i+1)-uv.getX(i),du2=uv.getX(i+2)-uv.getX(i),dv1=uv.getY(i+1)-uv.getY(i),dv2=uv.getY(i+2)-uv.getY(i),det=du1*dv2-du2*dv1;
+          if(Math.abs(det)<1e-12)continue;
+          const up=c.clone().sub(a).multiplyScalar(du1).sub(b.clone().sub(a).multiplyScalar(du2)).multiplyScalar(1/det).normalize();
+          assert.ok(up.dot(new THREE.Vector3(0,1,0))>.99999,'actual atlas UVs align with the hatch vertical axis');
+          for(const p of [a,b,c]){assert.ok(Math.abs(p.z-centerZ)<.86);assert.ok(p.y>-1.74&&p.y<.74,'ink stays on the pressure cover');}
+        }
+      }
+    });assert.equal(count,6);
+  }finally{ship.dispose();}
+});
 
 test('equipment warnings remain on the actual craft surfaces after scaling and rotor rotation',()=>{
   const ship=createExteriorShip();
@@ -18,8 +42,29 @@ test('equipment warnings remain on the actual craft surfaces after scaling and r
           const ray=new THREE.Raycaster(point.clone().addScaledVector(normal,.02),normal.negate(),0,.04),hit=ray.intersectObjects(body,false)[0];
           assert.ok(hit&&Math.abs(hit.distance-.02)<.002,`${decal.parent.name}/${entry.key} sits on its physical surface`);
         }
-      });assert.equal(count,25,'both craft have equipment-specific markings');
+      });assert.equal(count,29,'both craft and four inspection lids have equipment-specific markings');
     }
+  }finally{ship.dispose();}
+});
+
+test('inspection lid warning text reads upright on both sides of the ship',()=>{
+  const ship=createExteriorShip();let left=0,right=0;
+  try{
+    ship.core.traverse(mesh=>{
+      if(!mesh.userData.exteriorDecal)return;
+      const p=mesh.geometry.attributes.position,uv=mesh.geometry.attributes.uv;
+      for(const entry of mesh.userData.markings){
+        if(entry.key!=='electrical')continue;
+        entry.point[2]<0?left++:right++;
+        for(let i=entry.vertexStart;i<entry.vertexStart+entry.vertexCount;i+=3){
+          const a=new THREE.Vector3().fromBufferAttribute(p,i),b=new THREE.Vector3().fromBufferAttribute(p,i+1).sub(a),c=new THREE.Vector3().fromBufferAttribute(p,i+2).sub(a);
+          const du1=uv.getX(i+1)-uv.getX(i),du2=uv.getX(i+2)-uv.getX(i),dv1=uv.getY(i+1)-uv.getY(i),dv2=uv.getY(i+2)-uv.getY(i),det=du1*dv2-du2*dv1;
+          if(Math.abs(det)<1e-12)continue;
+          const up=c.multiplyScalar(du1).sub(b.multiplyScalar(du2)).multiplyScalar(1/det).normalize();
+          assert.ok(up.y>.6,'printed upper edge must face the top of the ship on either side');
+        }
+      }
+    });assert.equal(left,2);assert.equal(right,2);
   }finally{ship.dispose();}
 });
 

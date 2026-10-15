@@ -3,9 +3,10 @@ import * as THREE from 'three';
 // One shared spacecraft and renderer, two independently rendered viewpoints.
 // Grade each image before mixing: a dissolve must not dim to black, blend
 // camera positions, or brighten the overlapping engine emissions.
-export function createExteriorDissolve(renderer){
+export function createExteriorDissolve(renderer,{samples=0}={}){
   const type=renderer.extensions.has('EXT_color_buffer_float')||renderer.extensions.has('EXT_color_buffer_half_float')?THREE.HalfFloatType:THREE.UnsignedByteType;
   const targets=[0,1].map(()=>new THREE.WebGLRenderTarget(1,1,{type,depthBuffer:true,depthTexture:new THREE.DepthTexture(1,1,THREE.UnsignedIntType)}));
+  for(const target of targets)target.samples=renderer.capabilities.isWebGL2?Math.min(samples,renderer.capabilities.maxSamples):0;
   const gasTargets=[0,1].map(()=>new THREE.WebGLRenderTarget(1,1,{type,depthBuffer:false}));
   const emptyGas=new THREE.DataTexture(new Uint8Array(4),1,1);emptyGas.needsUpdate=true;
   const size=new THREE.Vector2(),scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,0,1);

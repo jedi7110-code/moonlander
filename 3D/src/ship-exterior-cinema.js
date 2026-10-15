@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {createExteriorMothership,EXTERIOR} from './obs/exterior-mothership.js';
+import {EXTERIOR} from './obs/exterior-mothership.js';
+import {createProductionExterior} from './obs/exterior-production.js';
 import {createExteriorOptics} from './obs/exterior-optics.js';
 import {createDistantStars} from './obs/exterior-stars.js';
 import {createExteriorPlanet} from './obs/exterior-planet.js';
@@ -27,7 +28,8 @@ try{
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   const dissolve=createExteriorDissolve(renderer);
-  const ship=createExteriorMothership();ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
+  const ship=createProductionExterior({original:query.get('finish')==='original'});ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
+  document.documentElement.dataset.exteriorFinish=JSON.stringify(ship.finish??{mothership:'A',probe:'A'});
   let gasPass=null;
   const optics=createExteriorOptics(ship),stars=createDistantStars();scene.add(stars.haze,stars.field,new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
   const planet=createExteriorPlanet({variant:query.get('planetVariant')});scene.add(planet.body);
@@ -38,6 +40,10 @@ try{
   const freshOpening=opening&&time===0&&running;
   let probeReady=false,probeLoading=null,playingFrames=0,logoResolvedFrames=0,introFinishedFrames=0;
   const openingFrames={};
+  // Opt-in measurement for comparing the approved finish with the original
+  // at the same paused shot; normal playback keeps no profiling samples.
+  const profile=query.get('profile')==='1'?{warm:0,frames:[],cpu:[],done:false}:null;
+  if(profile)renderer.info.autoReset=false;
   const logoPlayback={maxFrameMs:0,skippedBands:0,frames:0,lastReveal:0};
   let logoMeasured=false;
   // A fresh opening waits just before the probe's first shot
@@ -143,7 +149,19 @@ try{
       time+=dt;
       if(!probeReady)time=Math.min(time,probeDeadline);
     }last=now;
+    if(profile&&!profile.done)renderer.info.reset();
+    const drawStarted=profile&&!profile.done?performance.now():0;
     draw();
+    if(profile&&!profile.done&&++profile.warm>20){
+      const interval=now-(profile.previous??now);profile.previous=now;
+      if(interval>0&&interval<200)profile.frames.push(interval);
+      profile.cpu.push(performance.now()-drawStarted);
+      if(profile.frames.length>=120){
+        const stats=values=>{const sorted=values.slice().sort((a,b)=>a-b);return{median:sorted[Math.floor(sorted.length*.5)],p95:sorted[Math.floor(sorted.length*.95)]};};
+        document.documentElement.dataset.exteriorProfile=JSON.stringify({frames:stats(profile.frames),cpu:stats(profile.cpu),render:{...renderer.info.render},memory:{...renderer.info.memory},finish:ship.finish??'original'});
+        profile.done=true;renderer.info.autoReset=true;
+      }
+    }
     if(running&&++playingFrames===2){
       document.documentElement.dataset.filmStartedMs=performance.now().toFixed(1);tell('playing');
     }
