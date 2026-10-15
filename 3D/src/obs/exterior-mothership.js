@@ -70,7 +70,23 @@ function ignitionMap(){
   }
   const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;map.name='Low ignition / uneven blue-white heat';return map;
 }
+// Confine the bounce to the last inner profile segment beside the throat.
+// The broad bell wall and lip retain the original dark metal response.
+function nozzleBounceMap(){
+  const width=8,height=128,data=new Uint8Array(width*height*4);
+  for(let y=0;y<height;y++){
+    const v=y/(height-1),t=THREE.MathUtils.clamp((v-.86)/.14,0,1);
+    const light=Math.round(255*t*t*(3-2*t));
+    for(let x=0;x<width;x++){const offset=(y*width+x)*4;data[offset]=data[offset+1]=data[offset+2]=light;data[offset+3]=255;}
+  }
+  const map=new THREE.DataTexture(data,width,height,THREE.RGBAFormat);
+  map.channel=1;map.minFilter=map.magFilter=THREE.LinearFilter;map.needsUpdate=true;
+  map.name='Nozzle bounce / throat recess only';return map;
+}
 function addMesh(parent,geometry,material,name,position=[0,0,0]){
+  // Keep unlit steel parts on the same draw batch: only the nozzle bell
+  // supplies nonzero UVs in the secondary channel used by the bounce mask.
+  if(material.emissiveMap?.channel===1&&!geometry.hasAttribute('uv1'))geometry.setAttribute('uv1',new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count*2),2));
   const mesh=new THREE.Mesh(geometry,material);mesh.name=name;mesh.position.set(...position);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
 function box(parent,m,p,size,name='Equipment enclosure'){return addMesh(parent,new THREE.BoxGeometry(...size),m,name,p);}
@@ -250,6 +266,10 @@ function bake(group){
     if(!mesh.isMesh||mesh.material.transparent)return;
     for(let parent=mesh.parent;parent&&parent!==group;parent=parent.parent)if(parent.userData.bakeBoundary)return;
     const geometry=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();
+    // Shared antenna builders also supply steel geometry. Normalize their
+    // secondary UVs here so every member of the steel batch stays unlit
+    // unless it explicitly carries the bell's inner-wall mask coordinates.
+    if(mesh.material.emissiveMap?.channel===1&&!geometry.hasAttribute('uv1'))geometry.setAttribute('uv1',new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count*2),2));
     geometry.applyMatrix4(inverse.clone().multiply(mesh.matrixWorld));
     // Extruded shells carry additional normal/UV attributes only; drop groups
     // before merging because each batch owns one material.
@@ -268,6 +288,8 @@ export function createExteriorMothership(){
     pipe:material('Warm service metal',0x8e8b77,.70,.48),red:material('Oxide maintenance paint',0x79554a,.2),glass:material('Small pressure window',0x1d3338,.48,.3),white:material('Worn insulation',0x9e9b8b,.05,.94),
     habitat:material('Habitat service skin',0xe0ded0,.16,.86,habitatWorn)};
   m.black.emissive.set(0x9edcff);m.black.emissiveIntensity=.30;m.black.emissiveMap=ignition;
+  m.bell=m.steel;
+  m.bell.emissive.set(0x80baff);m.bell.emissiveIntensity=.05;m.bell.emissiveMap=nozzleBounceMap();
   m.igniter=new THREE.MeshBasicMaterial({color:new THREE.Color(0x639ac0).multiplyScalar(.22),toneMapped:true});m.igniter.name='Recessed blue-white igniter';
   const stain=new THREE.MeshStandardMaterial({map:soot,transparent:true,roughness:1,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3});stain.name='Local exhaust residue';
   const root=new THREE.Group();root.name='TARAIRON / exterior study';
@@ -414,10 +436,13 @@ export function createExteriorMothership(){
   const nozzle=(y,z,r,length,index)=>{
     const group=new THREE.Group();group.name=`Rocket engine ${index}`;group.position.set(-16.4,y,z);core.add(group);engines.push(group);
     group.userData.glowPoint=[-1.73,0,0];group.userData.throatRadius=r*.24;
+    group.userData.nozzleLipX=-1.2-length;group.userData.nozzleRadius=r;
     axisCylinder(group,m.steel,-.6,r*.64,1.2,'Combustion chamber',12);
     // Lathed bell with a recessed open mouth, not a glowing solid disc.
     const profile=[[r*.33,0],[r*.35,.55],[r*.47,1.05],[r*.77,1.65],[r,length],[r-.08,length],[r*.70,1.65],[r*.40,1.02],[r*.26,.55]];
-    const bell=addMesh(group,new THREE.LatheGeometry(profile.map(([r,x])=>new THREE.Vector2(r,x)),16),m.steel,'Open rocket bell',[-1.2,0,0]);bell.rotation.z=Math.PI/2;
+    const bellGeometry=new THREE.LatheGeometry(profile.map(([r,x])=>new THREE.Vector2(r,x)),16);
+    bellGeometry.setAttribute('uv1',bellGeometry.getAttribute('uv').clone());
+    const bell=addMesh(group,bellGeometry,m.bell,'Open rocket bell',[-1.2,0,0]);bell.rotation.z=Math.PI/2;
     const inner=addMesh(group,new THREE.CylinderGeometry(r*.24,r*.24,.04,16),m.black,'Deep nozzle throat',[-1.66,0,0]);inner.rotation.z=Math.PI/2;
     axisRing(group,m.igniter,-1.78,r*.27,.028,'Recessed ignition ring',16);
     axisRing(group,m.pipe,-1.2-length,r,.055,'Nozzle lip');
@@ -493,9 +518,10 @@ export function createExteriorMothership(){
     },
     setFloorGuides(value){floorGuides.forEach(group=>{group.visible=Boolean(value);});},
     setWear(value){m.paint.map=value?worn:clean;m.paint.needsUpdate=true;m.habitat.map=value?habitatWorn:habitatClean;m.habitat.needsUpdate=true;for(const material of probe?.paintedMaterials??[]){material.map=value?worn:clean;material.needsUpdate=true;}marks.visible=Boolean(value);for(const pod of pods)pod.traverse(o=>{if(o.name==='Local vent stain')o.visible=Boolean(value);});},
+    setNozzleBounce(value){m.bell.emissiveIntensity=value ? .05 : 0;},
     setServices(value){machinery.visible=Boolean(value);},
     setAngle(angle){rotor.rotation.x=angle;},
-    dispose(){disposed=true;probe?.thrusters.dispose();const geometries=new Set(),materials=new Set(),maps=new Set([clean,worn,habitatClean,habitatWorn,soot,ignition]);root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const material of [].concat(o.material??[])){materials.add(material);for(const map of [material.map,material.bumpMap])if(map)maps.add(map);}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());maps.forEach(m=>m?.dispose());}
+    dispose(){disposed=true;probe?.thrusters.dispose();const geometries=new Set(),materials=new Set(),maps=new Set([clean,worn,habitatClean,habitatWorn,soot,ignition]);root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const material of [].concat(o.material??[])){materials.add(material);for(const map of [material.map,material.bumpMap,material.emissiveMap])if(map)maps.add(map);}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());maps.forEach(m=>m?.dispose());}
   };
   return ship;
 }

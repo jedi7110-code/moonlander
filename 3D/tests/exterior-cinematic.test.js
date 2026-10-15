@@ -60,8 +60,8 @@ test('scene 01 ship is three percent faster than the previous take, scene 02 cam
   const a=sampleExteriorCinema(planetStart+1,{opening:true}),b=sampleExteriorCinema(planetStart+2,{opening:true});
   assert.ok(Math.abs((b.shipX-a.shipX)-48*1.02*1.02)<1e-10);
   const left=sampleExteriorCinema(planetStart,{opening:true}),right=sampleExteriorCinema(planetStart+CINEMA_SHOTS.find(shot=>shot.id==='planet').duration-.001,{opening:true});
-  assert.equal(left.mode,'lateral');assert.ok(Math.abs(right.eye[0]-left.eye[0]-240)<.001);
-  assert.ok(Math.abs(right.target[0]-left.target[0]-240)<.001);
+  assert.equal(left.mode,'lateral');assert.ok(Math.abs(right.eye[0]-left.eye[0]-240*(15.5-.001)/15.5)<1e-9);
+  assert.ok(Math.abs(right.target[0]-left.target[0]-240*(15.5-.001)/15.5)<1e-9);
   assert.deepEqual(left.eye.slice(1),right.eye.slice(1));assert.deepEqual(left.target.slice(1),right.target.slice(1));
   assert.deepEqual(left.planet,right.planet,'the distant planet stays in world space as the camera slides');
   const start=shotStart('crossing'),mid=sampleExteriorCinema(start+5,{opening:true}),end=sampleExteriorCinema(start+9,{opening:true});
@@ -267,7 +267,11 @@ test('the B ending replaces 09, keeps its initial camera path, and tracks a ship
     const baseline={...options,revision:'20261013-r7'};
     const b=sampleExteriorCinema(start-filmDelay+offset+2.5,baseline),ending=sampleExteriorCinema(start+offset,options);
     for(const key of ['fov','probe','shipSpeed'])assert.deepEqual(ending[key],b[key]);
-    assertTranslated(ending.eye,b.eye);assertTranslated(ending.target,b.target);
+    const lower=sampleExteriorCinema(start+offset,{...options,endingCamera:'lower'});
+    assertTranslated(lower.eye,b.eye);assertTranslated(lower.target,b.target);
+    assert.equal(ending.eye[0],lower.eye[0]);
+    if(offset<=3.5)assert.deepEqual(ending.eye,lower.eye);
+    else assert.ok(ending.eye[1]>sampleExteriorCinema(start+3.5,options).eye[1],'the final rise has begun smoothly');
     assert.ok(Math.abs(ending.shipX-b.shipX-archiveTravelGain)<1e-8);
     assert.equal(ending.angle,sampleExteriorCinema(start+offset,{opening:true}).angle);
   }
@@ -306,6 +310,22 @@ test('the B ending accelerates as its camera settles without slowing the relativ
     }
   }
 });
+test('02 camera is already cruising when the incoming dissolve first reveals it',()=>{
+  for(const opening of [true,false]){
+    const scale=opening?1:EXTERIOR_VIEW_DURATION/OPENING_DURATION;
+    const start=shotStart('planet')*scale,fade=CINEMA_SHOTS[0].dissolve;
+    const expectedRate=240/(15.5*scale),dt=.001*scale;
+    for(const time of [start-fade/2+.001*scale,start-dt,start,start+fade/2-2*dt]){
+      const a=sampleExteriorCinemaFrame(time,{opening}).to;
+      const b=sampleExteriorCinemaFrame(time+dt,{opening}).to;
+      assert.equal(a.id,'planet');assert.equal(b.id,'planet');
+      assert.ok(Math.abs((b.eye[0]-a.eye[0])/dt-expectedRate)<1e-7,'incoming camera moves at cruise speed throughout the fade');
+      assert.ok(Math.abs((b.target[0]-a.target[0])/dt-expectedRate)<1e-7,'camera and aim translate together');
+      assert.deepEqual(a.planet,b.planet);assert.equal(a.fov,b.fov);
+    }
+  }
+});
+
 test('planet transit slides past a stationary planet while the tiny ship crosses the frame',()=>{
   const start=shotStart('planet'),duration=CINEMA_SHOTS.find(s=>s.id==='planet').duration;
   // The earlier 14-second, 48m/s cut began 476m left of its camera bearing.
@@ -376,7 +396,7 @@ test('the optional 07 camera follows the actual probe center without changing fl
     const start=shotStart('lander'),options={opening:true,coreScale:2.6,approach:'bow',ending:'underside'};
     for(const aspect of [.8,16/9]){
       let offset;
-      for(const time of [start,start+.46,start+3,start+7,start+10.24]){
+      for(const time of [start,start+.46,start+3,start+7,start+CINEMA_SHOTS.find(shot=>shot.id==='lander').duration-.01]){
         const base=sampleExteriorCinema(time,{...options,aspect}),tracked=sampleExteriorCinema(time,{...options,aspect,docking:'probe-follow'});
         assert.equal(tracked.mode,'probe-follow');
         for(const key of ['probe','fov','shipX','angle','start','end'])assert.deepEqual(tracked[key],base[key]);
@@ -400,19 +420,36 @@ test('the optional 07 camera follows the actual probe center without changing fl
       let previousAngle;
       for(const offset of [-.75,-.001,0,.001,.75]){
         const frame=sampleExteriorCinemaFrame(boundary+offset,following);
-        assert.equal(frame.from.number,offset<0?3:7);
-        assert.equal(frame.to,null,'03 cuts directly to the follow camera');assert.equal(frame.mix,0);
+        const blending=Math.abs(offset)<.2;
+        assert.equal(frame.from.number,blending||offset<0?3:7);
+        if(blending){assert.equal(frame.to.number,7);assert.ok(frame.mix>0&&frame.mix<1);}
+        else{assert.equal(frame.to,null);assert.equal(frame.mix,0);}
         const base=sampleExteriorCinema(boundary+offset,{...options,opening});
-        assert.equal(frame.from.angle,base.angle,'the cut preserves the absolute rotation clock');
+        assert.equal(frame.from.angle,base.angle,'the transition preserves the absolute rotation clock');
+        if(frame.to){assert.equal(frame.to.angle,base.angle);assert.deepEqual(frame.to.probe,frame.from.probe);}
         if(previousAngle!==undefined)assert.ok(frame.from.angle>previousAngle,'the rotor keeps moving through the transition');
         previousAngle=frame.from.angle;
-        assert.equal(frame.from.shipX,base.shipX);assert.deepEqual(frame.from.probe,base.probe);
+        assert.ok(Math.abs(frame.from.shipX-base.shipX)<1e-9);assert.deepEqual(frame.from.probe,base.probe);
         assert.equal(frame.from.habitatsVisible,true);assert.notEqual(frame.from.rotorVisible,false);
       }
-      assert.equal(sampleExteriorCinemaFrame(boundary,{...options,opening}).to,null,'the regular 07 retains its current cut');
+      assert.equal(sampleExteriorCinemaFrame(boundary,{...options,opening}).to.number,7,'the regular 07 shares the short dissolve');
     }
   }finally{ship.dispose();}
 });
+test('03 to 07 dissolves for 0.4 seconds while both views follow the same moving probe',()=>{
+  const options={opening:true,approach:'bow',ending:'underside',docking:'probe-follow'},boundary=shotStart('lander');
+  assert.equal(sampleExteriorCinemaFrame(boundary-.201,options).to,null);
+  for(const [offset,expected]of [[-.2,0],[0,.5],[.199,null]]){
+    const frame=sampleExteriorCinemaFrame(boundary+offset,options);
+    assert.equal(frame.from.number,3);assert.equal(frame.to.number,7);
+    assert.deepEqual(frame.from.probe,frame.to.probe);assert.equal(frame.from.shipX,frame.to.shipX);
+    if(expected!==null)assert.ok(Math.abs(frame.mix-expected)<1e-10);
+    else assert.ok(frame.mix>.99);
+    assert.deepEqual(frame,sampleExteriorCinemaFrame(boundary+offset,options));
+  }
+  assert.equal(sampleExteriorCinemaFrame(boundary+.201,options).to,null);
+});
+
 test('space is visible immediately, and scene changes never fade to black',()=>{
   assert.equal(sampleExteriorCinema(0).fade,0);assert.equal(sampleExteriorCinema(EXTERIOR_VIEW_DURATION).fade,0);
   assert.equal(sampleExteriorCinema(1).fade,0);
@@ -566,12 +603,33 @@ test('05 rises after the broad slide and settles below hull height with continuo
       assert.ok(Math.abs(center.x)<1&&Math.abs(center.y)<1&&center.z<1);
     }
     const settled=sampleExteriorCinema(start+19.5,options),later=sampleExteriorCinema(start+60,options);
-    assert.ok(Math.abs(settled.eye[1]+10*2.6*Math.max(1,1/aspect))<1e-10);assert.equal(settled.target[1],0);assert.ok(settled.shipX>settled.eye[0]);
+    assert.ok(Math.abs(settled.eye[1]+9.5*2.6*Math.max(1,1/aspect))<1e-10);assert.equal(settled.target[1],0);assert.ok(settled.shipX>settled.eye[0]);
     assert.deepEqual(settled.eye,later.eye);assert.ok(later.target[0]>settled.target[0]);
     for(const boundary of [start+3.5,start+19.5]){
       const a=sampleExteriorCinema(boundary-dt,options),b=sampleExteriorCinema(boundary,options),c=sampleExteriorCinema(boundary+dt,options);
       for(let i=0;i<3;i++)assert.ok(Math.abs((b.eye[i]-a.eye[i])/dt-(c.eye[i]-b.eye[i])/dt)<.002);
     }
+  }
+});
+
+test('the 10m higher 05 camera takes 22 seconds to rise while retaining the original gentle pace',()=>{
+  const begin=shotStart('mounted')+3.5,duration=22,dt=.001;
+  for(const aspect of [.6,16/9,2.4]){
+    const options={opening:true,ending:'underside',endingCamera:'higher10',aspect};
+    const height=time=>sampleExteriorCinema(time,options).eye[1];
+    const speed=time=>(height(time+dt)-height(time-dt))/(2*dt);
+    const lowerHeight=time=>sampleExteriorCinema(time,{...options,endingCamera:'lower'}).eye[1];
+    const originalPeak=(lowerHeight(begin+8+dt)-lowerHeight(begin+8-dt))/(2*dt);
+    assert.ok(Math.abs(speed(begin+duration/2)/originalPeak-1)<.02,'peak rise speed remains within two percent of the original take, including portrait fitting');
+    let previous=Infinity;
+    for(const progress of [.5,.65,.8,.9,.98]){
+      const actual=speed(begin+duration*progress);
+      assert.ok(actual>0&&actual<previous,'the final half progressively slows down');previous=actual;
+    }
+    assert.ok(height(begin+16)<height(begin+duration),'the camera is still rising at the old stopping time');
+    assert.ok(Math.abs(speed(begin+duration))<.001,'speed reaches zero continuously');
+    assert.equal(height(begin+duration+1),height(begin+duration));
+    assert.ok(Math.abs(height(begin+duration)+16*Math.max(1,1/aspect))<1e-9,'the 10m higher endpoint is retained');
   }
 });
 
@@ -586,8 +644,13 @@ test('later current edits cut without ghost layers and preserve the logo and con
       for(const offset of [-.749,-.001,0,.001,.749]){
         const frame=sampleExteriorCinemaFrame(boundary+offset,options);
         assert.equal(frame.shot.number,shots[index+(offset>=0?1:0)].number);
-        assert.equal(frame.to,null);assert.equal(frame.mix,0);
-        assert.deepEqual(frame.from,sampleExteriorCinema(boundary+offset,options));
+        if(shots[index].dissolve&&Math.abs(offset)<shots[index].dissolve/2){
+          assert.equal(frame.from.number,3);assert.equal(frame.to.number,7);
+          assert.deepEqual(frame.from.probe,frame.to.probe);
+        }else{
+          assert.equal(frame.to,null);assert.equal(frame.mix,0);
+          assert.deepEqual(frame.from,sampleExteriorCinema(boundary+offset,options));
+        }
         assert.deepEqual(frame,sampleExteriorCinemaFrame(boundary+offset,options));
       }
       if(shots[index].number===3){
@@ -603,7 +666,7 @@ test('later current edits cut without ghost layers and preserve the logo and con
   }
 });
 
-test('01 dissolves for 2.2 seconds and 07 cuts half a second sooner while still zooming',()=>{
+test('01 dissolves for 2.2 seconds and 07 cuts at 73 seconds while still zooming',()=>{
   const options={opening:true,approach:'bow',ending:'underside'};
   for(const [time,mix] of [[38.4,0],[39.5,.5]]){
     const frame=sampleExteriorCinemaFrame(time,options);
@@ -611,10 +674,10 @@ test('01 dissolves for 2.2 seconds and 07 cuts half a second sooner while still 
   }
   assert.equal(sampleExteriorCinemaFrame(38.399,options).to,null);
   assert.equal(sampleExteriorCinemaFrame(40.6,options).to,null);
-  const before=sampleExteriorCinemaFrame(67+filmDelay-.001,options),cut=sampleExteriorCinemaFrame(67+filmDelay,options);
+  const before=sampleExteriorCinemaFrame(66.75+filmDelay-.001,options),cut=sampleExteriorCinemaFrame(66.75+filmDelay,options);
   assert.equal(before.shot.number,7);assert.equal(cut.shot.number,4);assert.equal(cut.to,null);
   assert.ok(before.shot.fov>32,'the zoom has not reached its final field of view');
-  assert.ok(before.shot.fov<sampleExteriorCinema(66.9+filmDelay,options).fov,'the close-up is still zooming at the cut');
+  assert.ok(before.shot.fov<sampleExteriorCinema(66.65+filmDelay,options).fov,'the close-up is still zooming at the cut');
   assert.equal(sampleExteriorCinema(77.5+filmDelay,options).number,5,'05 follows the same shot lengths after the longer 01');
 });
 

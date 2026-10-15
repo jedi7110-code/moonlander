@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {sampleExteriorCinema} from '../src/obs/exterior-cinematic.js';
-import {projectedShipSize,sampleExteriorOptics} from '../src/obs/exterior-optics.js';
+import {projectedShipSize,sampleExteriorOptics,engineApertureVisibility} from '../src/obs/exterior-optics.js';
 
 function cameraFor(shot,aspect,fov=shot.fov){
   const camera=new THREE.PerspectiveCamera(fov,aspect,shot.near,shot.far);
@@ -21,6 +21,40 @@ test('changing viewport aspect preserves flare length and brightness for the sam
         assert.ok(Math.abs(sample[i].haloSize-samples[0][i].haloSize)<1e-8);
         assert.equal(sample[i].strength,samples[0][i].strength);
       }
+    }
+  }finally{ship.dispose();}
+});
+
+test('the adopted 05 take keeps per-engine exposure through real portrait fitting and resolution changes',()=>{
+  const ship=createExteriorShip();ship.setCoreScale(2.6);
+  try{
+    for(const time of [104.73,113.64,126,160]){
+      const baselineShot=sampleExteriorCinema(time,{opening:true,ending:'underside',aspect:16/9});
+      ship.root.position.x=baselineShot.shipX;
+      const baseline=sampleExteriorOptics(ship,cameraFor(baselineShot,16/9),new THREE.Vector2(1280,720),baselineShot.optics);
+      for(const [width,height,density]of [[360,640,1],[720,1280,2],[720,720,1],[1280,720,1],[1920,1080,1],[3840,2160,1],[2560,1080,1]]){
+        const aspect=width/height,shot=sampleExteriorCinema(time,{opening:true,ending:'underside',aspect});
+        ship.root.position.x=shot.shipX;
+        const camera=cameraFor(shot,aspect),viewport=new THREE.Vector2(width*density,height*density),size=projectedShipSize(ship,camera,viewport);
+        const actual=sampleExteriorOptics(ship,camera,viewport,shot.optics);
+        for(const [i,sample]of actual.entries()){
+          assert.ok(Math.abs(sample.strength-baseline[i].strength)<1e-11,`${time}s at ${width}x${height}, DPR ${density}: engine ${i} retains its exposure`);
+          assert.ok(Math.abs(sample.streakSize/size-1.3)<1e-11,'streak length remains relative to the ship');
+          assert.ok(Math.abs(sample.haloSize/size-.14)<1e-11,'halo size remains relative to the ship');
+        }
+      }
+    }
+  }finally{ship.dispose();}
+});
+
+test('physical nozzle aperture hides recessed sources from the front without a screen pixel mask',()=>{
+  const ship=createExteriorShip();ship.setCoreScale(2.6);ship.root.updateMatrixWorld(true);
+  try{
+    for(const engine of ship.engines){
+      const local=point=>engine.localToWorld(new THREE.Vector3(...point));
+      assert.equal(engineApertureVisibility(engine,local([-200,0,0])),1,'the unobstructed mouth shows the full throat');
+      assert.equal(engineApertureVisibility(engine,local([10,0,0])),0,'the back of the engine cannot flare through the ship');
+      assert.equal(engineApertureVisibility(engine,local([-10,100,0])),0,'the nozzle wall blocks an oblique observer');
     }
   }finally{ship.dispose();}
 });

@@ -26,7 +26,7 @@ export const EXTERIOR_SCENE_CATALOG=Object.freeze([
   {id:'07-docking-left-current',number:7,label:'左下・居住区あり',status:'比較用・現行',start:63,time:64.112,options:{...ending,docking:'left'}},
   {id:'07-docking-right',number:7,label:'右下・小型船のドッキング',status:'比較用・現行',start:63,time:69.8,options:ending},
   {id:'07-docking-probe-follow',number:7,label:'小型船中心・追従・居住区あり',status:'採用・現行',start:63,time:64.041,options:adopted},
-  {id:'04-crossing-current',number:4,label:'超望遠・惑星を横切る母艦',status:'採用・現行',start:73.25,time:78.5,options:adopted},
+  {id:'04-crossing-current',number:4,label:'超望遠・惑星を横切る母艦',status:'採用・現行',start:73,time:78.5,options:adopted},
   {id:'04-crossing',number:4,label:'超望遠・惑星を横切る母艦',status:'保存版',start:68.75,time:73.75,options:saved},
   {id:'05-b-ending-current',number:5,label:'80秒のアングルから・船体より少し下で停止',status:'採用・現行・船の速度を5%調整',start:83.75,time:87.75,options:adopted},
   {id:'05-b-ending-r7',number:5,label:'開始アングル変更前・80秒の構図',status:'直前保存版',start:77.5,time:80,options:{...ending,revision:ENTRY_CAMERA_REVISION}},

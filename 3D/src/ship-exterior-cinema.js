@@ -10,6 +10,9 @@ import {createExteriorShadow} from './obs/exterior-shadow.js';
 import {createExteriorGasPass} from './obs/exterior-gas-pass.js';
 import {EXTERIOR_LOGO,LOGO_SETTLED} from './obs/exterior-logo.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),opening=query.get('mode')==='opening',embedded=query.get('embedded')==='1';
+// Optional study override; the adopted film keeps its authored optics.
+const requestedFlareRatio=Number(query.get('flareRatio'));
+const flareRatio=[2.4,2,1.5,1.4,1.3,1].includes(requestedFlareRatio)?requestedFlareRatio:null;
 const tell=action=>{if(embedded)parent.postMessage({type:'tara-exterior',action},location.origin);};
 if(embedded)$('cabin').hidden=true;
 $('scene-number').hidden=embedded;
@@ -27,7 +30,7 @@ try{
   const ship=createExteriorMothership();ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
   let gasPass=null;
   const optics=createExteriorOptics(ship),stars=createDistantStars();scene.add(stars.haze,stars.field,new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
-  const planet=createExteriorPlanet();scene.add(planet.body);
+  const planet=createExteriorPlanet({variant:query.get('planetVariant')});scene.add(planet.body);
   const sun=new THREE.DirectionalLight(0xfff2d4,3.15),shadows=createExteriorShadow(sun,ship);
   const bounce=new THREE.DirectionalLight(0x8ca7bd,.65);scene.add(sun,bounce,sun.target,bounce.target);
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),target=new THREE.Vector3(),size=new THREE.Vector2();
@@ -54,19 +57,20 @@ try{
   }
   if(!freshOpening)document.body.classList.remove('waiting-for-film');
   const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,
-    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending'),docking:query.get('docking'),openingCamera:query.get('openingCamera'),transition:query.get('transition'),revision:query.get('revision')};
+    rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending'),endingCamera:query.get('endingCamera'),docking:query.get('docking'),openingCamera:query.get('openingCamera'),transition:query.get('transition'),revision:query.get('revision')};
   const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal');
   function drawView(shot,renderTarget,gasTarget){
-    ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
+    ship.root.scale.setScalar(shot.shipScale??1);ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
     applyExteriorProbePose(ship,shot.probe);
     // Restore per view, including both dissolve layers. Default scene 07
     // hides the rotating habitats, trusses and connecting ring together.
     ship.rotor.visible=shot.rotorVisible!==false;
     for(const pod of ship.pods)pod.visible=shot.habitatsVisible;
     camera.fov=shot.fov;camera.near=shot.near;camera.far=shot.far;camera.up.fromArray(shot.up);camera.updateProjectionMatrix();camera.lookAt(target);
-    planet.show(shot.planet?.position);
+    planet.setVariant(query.get('planetVariant')??shot.planet?.variant??'current');
+    planet.body.scale.setScalar(shot.planet?.scale??1);planet.show(shot.planet?.position);
     shadows.update(shot);bounce.position.set(shot.shipX-38,-15,-30);bounce.target.position.set(shot.shipX,0,0);
-    stars.follow(camera);renderer.getDrawingBufferSize(size);optics.update(camera,size,shot.optics);
+    stars.follow(camera);renderer.getDrawingBufferSize(size);optics.update(camera,size,flareRatio!==null&&shot.id==='underside-ending'?{...shot.optics,streakRatio:flareRatio}:shot.optics);
     if(gasPass)return gasPass.render(scene,camera,renderTarget,gasTarget);
     renderer.render(scene,camera);return false;
   }

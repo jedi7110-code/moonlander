@@ -53,7 +53,7 @@ test('current camera takes preserve docking and B flight in scene-local time aft
   for(const entry of EXTERIOR_SCENE_CATALOG.filter(entry=>entry.status.startsWith('採用')))
     assert.deepEqual(entry.options,approved.options,'all adopted scene links play the same approved film');
   const docked=sampleExteriorCinemaFrame(approved.start,{...approved.options,opening:true});
-  assert.equal(docked.from.mode,'probe-follow');assert.equal(docked.to,null);assert.equal(docked.from.habitatsVisible,true);
+  assert.equal(docked.from.number,3);assert.equal(docked.to.mode,'probe-follow');assert.equal(docked.mix,.5);assert.equal(docked.to.habitatsVisible,true);
   const start=77.5+filmDelay,full={...options,revision:FULL_CAMERA_REVISION};
   for(const offset of [0,4,8.25,21.25,71.25,221.25]){
     const current=sampleExteriorCinema(start+offset,options),before=sampleExteriorCinema(start-filmDelay+offset+4.5,full);
@@ -133,15 +133,17 @@ test('05 enters at the previous 80s camera angle while keeping the film edit and
   const start=77.5+filmDelay;
   for(const offset of [0,1,3.5,11.5,19.5,50]){
     const a=sampleExteriorCinema(start+offset,options),b=sampleExteriorCinema(80+offset,saved);
-    for(const key of ['shipSpeed','fov','optics','probe'])assert.deepEqual(a[key],b[key]);
-    assertTranslated(a.eye,b.eye);assertTranslated(a.target,b.target);
+    for(const key of ['shipSpeed','fov','probe'])assert.deepEqual(a[key],b[key]);
+    assert.deepEqual(a.optics,{...b.optics,streakRatio:1.3});
+    const u=Math.max(0,Math.min(1,(offset-3.5)/16)),rise=u*u*(3-2*u);
+    assertTranslated(a.eye.map((value,i)=>value-(i===1?1.3*rise:0)),b.eye);assertTranslated(a.target,b.target);
     assert.ok(Math.abs(a.shipX-b.shipX-archiveTravelGain)<1e-8);
     assert.equal(a.start,start);
   }
   const a=sampleExteriorCinema(75+filmDelay,options),b=sampleExteriorCinema(75,saved);
   for(const key of ['fov','probe'])assert.deepEqual(a[key],b[key]);
-  // The longer planet shot changes its midpoint anchor by half a metre.
-  assertTranslated(a.eye,b.eye,archiveTravelGain-.5);assertTranslated(a.target,b.target,archiveTravelGain-.5);
+  // The 0.75s transferred from docking to 04 moves its midpoint anchor by 0.75m.
+  assertTranslated(a.eye,b.eye,archiveTravelGain-.75);assertTranslated(a.target,b.target,archiveTravelGain-.75);
   const frame=sampleExteriorCinemaFrame(start,options);
   assert.equal(frame.shot.number,5);assert.equal(frame.mix,0);assert.equal(frame.to,null);
   assert.equal(sampleExteriorCinemaFrame(39.5,options).mix,.5);
