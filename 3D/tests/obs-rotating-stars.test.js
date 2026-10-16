@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PerspectiveCamera,Scene,Vector3} from 'three';
-import {createSpaceStars,createCutawayStars} from '../src/obs/space-stars.js';
+import {createSpaceStars} from '../src/obs/space-stars.js';
 import {HABITAT_ROTATION,CABIN_SKY_ROTATION,cabinSkyAngle} from '../src/obs/habitat-rotation.js';
 import {EXTERIOR,exteriorAngle} from '../src/obs/exterior-mothership.js';
 
@@ -14,9 +14,9 @@ test('the cabin sky eases the physical counter-rotation to 60 percent for window
   assert.ok(Math.abs(cabinSkyAngle(CABIN_SKY_ROTATION.periodSeconds))<1e-12);
 });
 
-test('all window sides and the cutaway use the same seamless full-sphere stars and paused simulation time',()=>{
-  const front=createSpaceStars({rotating:true}),rear=createSpaceStars({rear:true,rotating:true}),cutaway=createCutawayStars({rotating:true});
-  const fields=[front,rear,cutaway],scene=new Scene(),camera=new PerspectiveCamera(70,1,.025,150);
+test('all window sides use the same seamless full-sphere stars and paused simulation time',()=>{
+  const front=createSpaceStars({rotating:true}),rear=createSpaceStars({rear:true,rotating:true});
+  const fields=[front,rear],scene=new Scene(),camera=new PerspectiveCamera(70,1,.025,150);
   scene.add(...fields);camera.position.set(1,5,0);camera.updateMatrixWorld(true);
   const sample=(field,seconds)=>{
     scene.userData.cabinSkySeconds=seconds;field.onBeforeRender(renderer,scene,camera);
@@ -25,7 +25,6 @@ test('all window sides and the cutaway use the same seamless full-sphere stars a
   try{
     assert.equal(front.geometry.attributes.position.count,6000);
     assert.deepEqual(front.geometry.attributes.position.array,rear.geometry.attributes.position.array);
-    assert.deepEqual(front.geometry.attributes.position.array,cutaway.geometry.attributes.position.array);
     const vertices=front.geometry.attributes.position.array,start=sample(front,0);
     assert.ok(start.distanceTo(sample(front,1))>1,'one second moves visible star directions');
     for(const seconds of [0,1,CABIN_SKY_ROTATION.periodSeconds-.0000001,CABIN_SKY_ROTATION.periodSeconds,CABIN_SKY_ROTATION.periodSeconds+.0000001]){

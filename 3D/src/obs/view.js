@@ -45,7 +45,6 @@ import {createGroomingTools,prepareGroomingMotion} from './grooming.js';
 import {createMachinedMetals} from './machined-metals.js';
 import {CharacterCamera} from './character-camera.js';
 import {createMetalDeckStyle} from './metal-deck.js';
-import {createCutawayStars} from './space-stars.js';
 import {nextPreparationFrame,runPreparationSteps} from './background-preparation.js';
 
 export class ObservationView {
@@ -139,7 +138,6 @@ export class ObservationView {
     this.resize=()=>{if(this.renderer.xr.isPresenting)return;const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;this.zoomAnchor=null;this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
     this.observer=new ResizeObserver(this.resize);this.observer.observe(canvas);this.resize();this.viewHeight=this.targetHeight;this.setFrustum();
     this.listeners=[];this.bindControls();
-    this.scene.add(createCutawayStars({rotating:true}));
     limitShadowCasters(this.scene);
   }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}

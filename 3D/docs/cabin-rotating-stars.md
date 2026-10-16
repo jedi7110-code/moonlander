@@ -6,8 +6,9 @@ OBS window stars counter-rotate around the cabin's longitudinal X axis at
 separate from the shared 200m / 1g physical reference (5.3004 RPM), independent of
 the lazy exterior model and planetary system.
 
-The corridor, rear windows and cutaway use the same deterministic 6,000-star
-full-sphere catalogue. They share `scene.userData.cabinSkySeconds`, set from the
+The corridor and rear windows use the same deterministic 6,000-star
+full-sphere catalogue. The cutaway's outer background stays plain; stars appear
+only through actual windows. They share `scene.userData.cabinSkySeconds`, set from the
 existing simulation time before rendering. Pausing freezes them; mirrored and
 XR render passes receive the same phase. The sphere turns rather than scrolling
 a finite image, so there is no texture edge or discontinuity at a full turn.
