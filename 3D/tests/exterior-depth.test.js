@@ -7,11 +7,12 @@ import {sampleExteriorCinemaFrame, CINEMA_SHOTS} from '../src/obs/exterior-cinem
 const bounds=new Box3(new Vector3(-72,-40,-40),new Vector3(46,40,40));
 const depth=(camera,d)=>.5*(camera.far+camera.near)/(camera.far-camera.near)-camera.far*camera.near/((camera.far-camera.near)*d)+.5;
 test('wide inspection preserves the glass and hatch clearances in a 24-bit depth buffer',()=>{
-  const target=new Vector3(),camera=new PerspectiveCamera(38,4/5,.05,2000);
-  for(const distance of [120,200,400,700]){
+  const target=new Vector3(),camera=new PerspectiveCamera(38,4/5,.05,100000);
+  for(const distance of [120,200,400,700,1040,3000,6000,10000]){
     camera.position.set(distance,0,0);fitExteriorInspectionDepth(camera,target,bounds);
     // 0.02m hatch label clearance, viewed at a grazing angle.
     const surface=distance+72,gap=.02*.25;
+    assert.ok(camera.near<distance-72&&camera.far>surface,'the entire ship remains inside the depth range');
     const steps=(depth(camera,surface)-depth(camera,surface-gap))*(2**24-1);
     assert.ok(steps>4,`raised surface loses depth separation at ${distance}m: ${steps}`);
   }

@@ -351,7 +351,7 @@ document.addEventListener('keydown',event=>{
   const supply={f:'food',w:'water',c:'catfood'}[event.key.toLowerCase()];
   if(supply){event.preventDefault();useSupply(supply);}else if(event.code==='Space'){event.preventDefault();setPause(!paused);}
 });
-function visibilityChanged(){previous=performance.now();accumulator=0;audio.pause((immersive?.active?!immersive.visible:document.hidden)||paused||games.open||exterior.open);}
+function visibilityChanged(){previous=performance.now();accumulator=0;audio.pause((immersive?.active?!immersive.visible:document.hidden)||paused||games.open||exterior.open,{immediate:exterior.open});}
 document.addEventListener('visibilitychange',visibilityChanged);
 window.addEventListener('pageshow',visibilityChanged);
 refreshIcons();localize();

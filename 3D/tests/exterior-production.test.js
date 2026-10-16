@@ -16,6 +16,10 @@ test('production adopts B without a duplicate painted skin and keeps the probe l
     await Promise.all([ship.prepareProbe(),original.prepareProbe()]);
     assert.equal(count(ship.dockedLander),count(original.dockedLander),'probe A gains no geometry');
     const probe=ship.dockedLander;await ship.prepareProbe();assert.equal(ship.dockedLander,probe);
+    const finish=hit.object.material,vertices=count(ship.root);
+    ship.setWear(false);assert.equal(finish.roughness,.74,'free-view clean paint reaches the B finish');
+    ship.setWear(true);assert.equal(finish.roughness,.90);
+    assert.equal(count(ship.root),vertices,'wear controls retain the approved panel geometry');
   }finally{ship.dispose();original.dispose();}
 });
 

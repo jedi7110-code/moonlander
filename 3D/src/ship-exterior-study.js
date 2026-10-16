@@ -1,14 +1,22 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {createExteriorShip,EXTERIOR,rotationGravity,exteriorAngle} from './obs/ship-exterior.js';
+import {EXTERIOR,rotationGravity,exteriorAngle} from './obs/exterior-mothership.js';
+import {createProductionExterior} from './obs/exterior-production.js';
 import {createExteriorOptics} from './obs/exterior-optics.js';
 import {createExteriorCruise} from './obs/exterior-cruise.js';
 import {createDistantStars} from './obs/exterior-stars.js';
+import {createExteriorSun} from './obs/exterior-sun.js';
+import {createExteriorSkyPlanet} from './obs/exterior-planet.js';
+import {createExteriorSystemUI} from './obs/exterior-system-ui.js';
+import {createExteriorShadow} from './obs/exterior-shadow.js';
 import {createExteriorDissolve} from './obs/exterior-dissolve.js';
 import {createExteriorCameraLimit} from './obs/exterior-camera-limit.js';
+import {fitExteriorInspectionDepth} from './obs/exterior-depth.js';
 import {ExteriorCinemaUI} from './obs/exterior-cinema-ui.js';
 const $=id=>document.getElementById(id),canvas=$('ship-view');
 const entryQuery=new URLSearchParams(location.search),embedded=entryQuery.get('embedded')==='1',freeView=entryQuery.get('viewer')==='free';
+const softPanelLines=entryQuery.get('panelLines')==='soft';
+let enhancedPlanets=entryQuery.get('planetScale')==='enhanced';
 const tell=action=>{if(embedded)parent.postMessage({type:'tara-exterior',action},location.origin);};
 document.addEventListener('keydown',event=>{if(embedded&&event.key==='Escape'){event.preventDefault();tell('exit');}});
 let cleanup=()=>{},closed=false;
@@ -21,24 +29,36 @@ try{
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   // Use the cinema's linear star blending and final color conversion. Direct
   // canvas rendering converts each point before blending, changing the sky.
-  const presentation=createExteriorDissolve(renderer);
-  const ship=createExteriorShip();ship.setCoreScale(Number(new URLSearchParams(location.search).get('core'))||2.6);scene.add(ship.root);
+  const presentation=createExteriorDissolve(renderer,{samples:softPanelLines?4:0});
+  const ship=createProductionExterior({panelLines:softPanelLines?{width:1.5,color:0x73796e}:null});
+  cleanup=()=>{ship.dispose();presentation.dispose();renderer.dispose();renderer.forceContextLoss();};
+  await ship.prepareProbe();
+  if(closed)throw new Error('Exterior view closed during loading');
+  ship.setCoreScale(Number(entryQuery.get('core'))||2.6);scene.add(ship.root);
+  document.documentElement.dataset.exteriorFinish=JSON.stringify(ship.finish);
   const optics=createExteriorOptics(ship),bufferSize=new THREE.Vector2();
+  const planetProjection=new THREE.Vector3();
   scene.add(new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
-  const sun=new THREE.DirectionalLight(0xfff2d4,3.15);sun.position.set(64,-110,92);sun.castShadow=true;
-  sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-32;sun.shadow.camera.right=32;sun.shadow.camera.top=32;sun.shadow.camera.bottom=-32;
-  sun.shadow.camera.left=-80;sun.shadow.camera.right=80;sun.shadow.camera.top=80;sun.shadow.camera.bottom=-80;
-  sun.shadow.camera.near=1;sun.shadow.camera.far=320;sun.shadow.bias=-.00012;sun.shadow.normalBias=.05;scene.add(sun);
+  const sun=new THREE.DirectionalLight(0xfff2d4,3.15),shadows=createExteriorShadow(sun,ship);
+  shadows.update({id:'whole'});scene.add(sun);
   const bounce=new THREE.DirectionalLight(0x8ca7bd,.65);bounce.position.set(-38,-15,-30);scene.add(bounce,sun.target,bounce.target);
-  const stars=createDistantStars();scene.add(stars.haze,stars.field);
-  const camera=new THREE.PerspectiveCamera(38,1,.1,2400),controls=new OrbitControls(camera,canvas);
-  controls.enableDamping=true;controls.dampingFactor=.10;controls.maxDistance=260;controls.screenSpacePanning=true;controls.rotateSpeed=.6;
-  const cameraLimit=createExteriorCameraLimit({ship,camera,controls});
+  const stars=createDistantStars({radius:50000});scene.add(stars.haze,stars.field);
+  const planet=createExteriorSkyPlanet({light:sun,ship,emphasis:enhancedPlanets});scene.add(planet.root);
+  const systemUI=createExteriorSystemUI(planet.ephemeris);
+  const distantSun=createExteriorSun(sun,{ship,distance:50000,visibility:()=>planet.sunVisibility});scene.add(distantSun.mesh,distantSun.glare);
+  const camera=new THREE.PerspectiveCamera(38,1,.1,100000),controls=new OrbitControls(camera,canvas);
+  controls.enableDamping=true;controls.dampingFactor=.10;controls.maxDistance=5000;controls.screenSpacePanning=true;controls.rotateSpeed=.6;
+  const cameraLimit=createExteriorCameraLimit({ship,camera,controls,minShipDistance:100});
   const cruise=createExteriorCruise({ship,camera,controls,lights:[sun,bounce]});
   let currentView='whole',running=true,angle=55*Math.PI/180,rpm=EXTERIOR.rpm,disposed=false,last=0,frame=0,visible=true,measureFrames=0,measureTime=0;
   const habitatTarget=new THREE.Vector3(),followDelta=new THREE.Vector3(),rotorAxis=new THREE.Vector3(1,0,0);let trackingAngle=angle;
   const views={
     whole:{name:'全体 / 斜め',target:[-2,0,0],eye:[-90,38,70],extent:72},
+    sunlight:{name:'恒星 / 船体を照らす光の方向',target:[-45,-33,22],eye:[-180,140,-125],extent:72},
+    planet:{name:'母艦と巨大惑星 / 太陽側から',target:[-2,0,0],eye:planet.getViewDirection(new THREE.Vector3()).multiplyScalar(-240).toArray(),extent:72},
+    oceanPlanet:{name:'S-01 c / 海洋惑星の方向',planetIndex:1,target:[-2,0,0],eye:[0,0,240],extent:72},
+    gasPlanet:{name:'S-01 d / ガス惑星の方向',planetIndex:2,target:[-2,0,0],eye:[0,0,240],extent:72},
+    icePlanet:{name:'S-01 e / 氷の惑星の方向',planetIndex:3,target:[-2,0,0],eye:[0,0,240],extent:72},
     bow:{name:'船首 / 前方の装備',target:[11,0,0],eye:[34,12,20],extent:20},
     side:{name:'側面 / 船体と重力区画',target:[-2,0,0],eye:[-2,14,115],extent:72},
     stern:{name:'船尾 / ロケット機関部',target:[-15,0,0],eye:[-43,9,17],extent:25},
@@ -50,6 +70,17 @@ try{
     habitatRear:{name:'重力区画 / 厚さを揃えた背面',target:[-1.6,EXTERIOR.radius,0],eye:[40,EXTERIOR.radius+16,34],extent:38},
     bearing:{name:'軸受 / 固定船体との接続',target:[-1.6,0,0],eye:[13,9,14],extent:16}
   };
+  const viewName=key=>views[key].name+(Number.isInteger(views[key].planetIndex)?` · ${enhancedPlanets?'見た目強調':'実寸の光点'}`:'');
+  function planetScaleUI(){
+    document.querySelectorAll('[data-planet-scale]').forEach(button=>button.setAttribute('aria-pressed',String((button.dataset.planetScale==='enhanced')===enhancedPlanets)));
+    $('planet-scale-description').textContent=enhancedPlanets?'見た目強調：海洋惑星を大きめ、ガス・氷は小さめに表示します。位置・公転は共通です。':'実寸：遠方の惑星は小さな光点です。各ボタンで、その方向を向きます。';
+    if(currentView)$('view-name').textContent=viewName(currentView);
+  }
+  document.querySelectorAll('[data-planet-scale]').forEach(button=>button.onclick=()=>{
+    enhancedPlanets=button.dataset.planetScale==='enhanced';planet.setEmphasis(enhancedPlanets);planetScaleUI();
+    const query=new URLSearchParams(location.search);query.set('planetScale',enhancedPlanets?'enhanced':'physical');history.replaceState(null,'',`?${query}`);
+  });
+  planetScaleUI();
   function gravity(){ $('rpm-value').textContent=`${rpm.toFixed(1)} RPM`;$('gravity').textContent=`約 ${rotationGravity(rpm).toFixed(2)} g`;$('period').textContent=rpm>0?`約 ${(60/rpm).toFixed(1)} 秒`:'停止'; }
   function phase(){const degrees=((angle*180/Math.PI)%360+360)%360;$('phase').value=degrees;$('phase-value').textContent=`${Math.round(degrees)}°`;ship.setAngle(angle);}
   function settings(){const query=new URLSearchParams(location.search);query.set('phase',String(Math.round(angle*180/Math.PI)));query.set('rpm',String(rpm));if(running)query.delete('paused');else query.set('paused','1');history.replaceState(null,'',`?${query}`);}
@@ -59,8 +90,15 @@ try{
     const fixedView=['bow','stern','sternSide','sternFace','eva','bearing'].includes(key);
     const mapped=p=>[(p[0]-EXTERIOR.rotorX)*scale+EXTERIOR.rotorX,p[1]*scale,p[2]*scale];
     const view={...base,target:fixedView?mapped(base.target):base.target,eye:fixedView?mapped(base.eye):base.eye,
-      extent:fixedView?base.extent*scale:['whole','side'].includes(key)?Math.max(72,ship.dimensions.x*1.10):base.extent};
+      extent:fixedView?base.extent*scale:['whole','side','planet'].includes(key)?Math.max(72,ship.dimensions.x*1.10):base.extent};
     controls.target.set(...view.target).add(ship.root.position);camera.position.set(...view.eye).add(ship.root.position);
+    if(Number.isInteger(base.planetIndex)){
+      const direction=planet.getBodyDirection(base.planetIndex,new THREE.Vector3());
+      // Leave the real, unresolved planet beside the ship instead of hiding
+      // it directly behind the hull. This changes only the observer's view.
+      direction.applyAxisAngle(new THREE.Vector3(0,1,0),.20);
+      camera.position.copy(controls.target).addScaledVector(direction,-600);
+    }
     if(key==='lander'){
       ship.dockedLander.getWorldPosition(controls.target);controls.target.y+=3.1;
       camera.position.copy(controls.target).add(new THREE.Vector3(-7,-2.8,10));
@@ -72,10 +110,14 @@ try{
     }
     const offset=camera.position.clone().sub(controls.target),minDistance=view.extent/(2*Math.tan(camera.fov*Math.PI/360)*Math.min(1,camera.aspect));
     if(offset.length()<minDistance)camera.position.copy(controls.target).add(offset.setLength(minDistance));
-    controls.update();cameraLimit.update();$('view-name').textContent=view.name;document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===key)));
+    controls.update();cameraLimit.update();$('view-name').textContent=viewName(key);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===key)));
     const query=new URLSearchParams(location.search);query.set('view',key);history.replaceState(null,'',`?${query}`);
   }
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+  document.querySelectorAll('[data-panel-lines]').forEach(button=>{
+    button.setAttribute('aria-pressed',String((button.dataset.panelLines==='soft')===softPanelLines));
+    button.onclick=()=>{const query=new URLSearchParams(location.search);query.set('panelLines',button.dataset.panelLines);location.search=query;};
+  });
   $('play').onclick=()=>play(!running);
   $('rpm').oninput=()=>{rpm=Number($('rpm').value);gravity();settings();};
   $('phase').oninput=()=>{play(false);angle=Number($('phase').value)*Math.PI/180;phase();settings();};
@@ -106,7 +148,7 @@ try{
   if(cinema)$('cinema').onclick=()=>cinema.show({cinematic:true,core:ship.coreScale,phase:angle*180/Math.PI,rpm});
   const visibility=()=>{visible=!document.hidden;last=0;};
   // A free-view visit can be closed while the shaders are still compiling.
-  cleanup=()=>{if(disposed)return;disposed=true;cinema?.dispose();cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();controls.dispose();cameraLimit.dispose();presentation.dispose();optics.dispose();ship.dispose();stars.dispose();renderer.dispose();renderer.forceContextLoss();};
+  cleanup=()=>{if(disposed)return;disposed=true;cinema?.dispose();systemUI.dispose();cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();controls.dispose();cameraLimit.dispose();presentation.dispose();optics.dispose();ship.dispose();stars.dispose();planet.dispose();distantSun.dispose();renderer.dispose();renderer.forceContextLoss();};
   await renderer.compileAsync(scene,camera);
   function render(now){
     if(disposed)return;frame=requestAnimationFrame(render);if(!visible||cinema?.open){last=0;return;}
@@ -118,7 +160,19 @@ try{
       followDelta.copy(camera.position).sub(controls.target).applyAxisAngle(rotorAxis,angle-trackingAngle);
       camera.position.copy(habitatTarget).add(followDelta);controls.target.copy(habitatTarget);trackingAngle=angle;
     }
-    controls.update();cameraLimit.update();stars.follow(camera);renderer.getDrawingBufferSize(bufferSize);optics.update(camera,bufferSize);
+    controls.update();cameraLimit.update();
+    fitExteriorInspectionDepth(camera,controls.target,cameraLimit.bounds);
+    stars.follow(camera);planet.follow(camera,canvas.clientHeight);sun.intensity=3.15*planet.sunVisibility;distantSun.update(camera);renderer.getDrawingBufferSize(bufferSize);optics.update(camera,bufferSize);systemUI.update();
+    const selectedPlanet=views[currentView]?.planetIndex,planetLabel=$('planet-target');
+    planetLabel.hidden=true;
+    if(Number.isInteger(selectedPlanet)){
+      const entry=planet.entries[selectedPlanet];planetProjection.copy(entry.body.position).project(camera);
+      if((entry.body.visible||entry.marker.visible)&&Math.abs(planetProjection.x)<.9&&Math.abs(planetProjection.y)<.95&&Math.abs(planetProjection.z)<1){
+        planetLabel.hidden=false;planetLabel.textContent=entry.spec.name;
+        planetLabel.style.left=`${(planetProjection.x+1)*.5*canvas.clientWidth}px`;
+        planetLabel.style.top=`${(1-planetProjection.y)*.5*canvas.clientHeight}px`;
+      }
+    }
     let viewDraws=0;
     presentation.render({from:camera,to:null,mix:0},()=>{renderer.render(scene,camera);viewDraws=renderer.info.render.calls;return false;});
     if(rawDt>0){measureFrames++;measureTime+=rawDt;}

@@ -37,7 +37,7 @@ test('loading completion reveals the entry cue while the opening remains open',t
   assert.equal(f.ui.closeButton.hidden,true);assert.equal(f.trigger.inert,true);
   f.message('ready');assert.equal(f.ui.closeButton.hidden,true,'exterior shaders being ready is not cabin readiness');
   f.ui.hostReady();assert.equal(f.ui.open,true);assert.equal(f.ui.closeButton.hidden,false);
-  assert.equal(f.ui.closeButton.textContent,'クリックして船内映像を表示');
+  assert.equal(f.ui.closeButton.textContent,'船内映像に切替え');
   assert.deepEqual(f.changes,[true]);
 });
 test('the cabin boot gate waits for playback rather than the sky or shader readiness',async t=>{
@@ -83,6 +83,8 @@ test('the in-game exterior uses the study mouse viewer and can return immediatel
   const f=fixture(t);f.ui.show();assert.equal(f.ui.closeButton.hidden,false);assert.equal(f.ui.closeButton.textContent,'船内に戻る');
   const url=new URL(f.ui.frame.src);assert.equal(url.pathname,'/3D/ship-exterior-study.html');
   assert.equal(url.searchParams.get('viewer'),'free');assert.equal(url.searchParams.get('embedded'),'1');assert.equal(url.searchParams.has('mode'),false);
+  assert.equal(url.searchParams.get('panelLines'),'soft','OBS adopts the approved wider, lighter panel seams');
+  assert.equal(url.searchParams.get('planetScale'),'enhanced','OBS adopts the approved apparent planetary sizes');
   assert.equal(url.searchParams.has('docking'),false);
   f.ui.closeButton.onclick();assert.equal(f.ui.open,false);
   f.ui.show({opening:true,waitForHost:true});f.ui.dispose();assert.equal(f.ui.open,false);assert.equal(f.ui.frame,null);

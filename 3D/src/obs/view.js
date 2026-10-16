@@ -138,7 +138,7 @@ export class ObservationView {
     this.resize=()=>{if(this.renderer.xr.isPresenting)return;const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;this.zoomAnchor=null;this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
     this.observer=new ResizeObserver(this.resize);this.observer.observe(canvas);this.resize();this.viewHeight=this.targetHeight;this.setFrustum();
     this.listeners=[];this.bindControls();
-    this.scene.add(createCutawayStars());
+    this.scene.add(createCutawayStars({rotating:true}));
     limitShadowCasters(this.scene);
   }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
@@ -365,6 +365,9 @@ export class ObservationView {
     this.targetCenter.copy(this.center);
   }
   render(dt,time,actor,brain,catRoutine,care,paused=false,airlock=null,xrFrame=null,prepareOnly=false){
+    // One simulation time for every window, mirror and XR eye. Pausing the
+    // cabin freezes the sky too; rendering never accumulates a second clock.
+    this.scene.userData.cabinSkySeconds=time;
     this.characterCamera?.restorePose();
     this.emergencyLighting?.update(paused?0:dt,brain.environment,paused?null:this.audio?.loopTime('hatch-alarm'));
     this.ship.consoleScreens?.update({brain,care,airlock,droid:this.droidRoutine,clock:time});

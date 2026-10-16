@@ -4,37 +4,48 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>船体外観スタディー | TARAIRON</title>
   <script>if(new URLSearchParams(location.search).get('viewer')==='free')document.documentElement.classList.add('free-view');</script>
-  <script type="module" crossorigin src="/3D/assets/shipExteriorStudy-DOkm7cze.js"></script>
+  <script type="module" crossorigin src="/3D/assets/shipExteriorStudy-DuOlCYNw.js"></script>
   <link rel="modulepreload" crossorigin href="/3D/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-CnE1qQjU.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-89AtUoK5.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-ZnPhKgT8.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-TokOFYDY.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/preload-helper-BRmpjvBv.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-2xnijP3t.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-CHUuShus.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/layout-B4aEPe7t.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/viewing-wall-profile-Bj-3mBAX.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/bathroom-window-layout-5n_Ve5mS.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/habitat-rotation-DAj5v-8I.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/bulkhead-gate-layout-BOid6TaK.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-probe-flight-1Or2YSC9.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/models-CsROi5Aa.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-probe-BUpW-HJ-.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/ship-exterior-CU9SGX9B.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-optics-DONX0HK5.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-stars-BqRzAvSP.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-dissolve-RFCECory.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-cinema-ui-BG7M-PCa.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-shadow-CcEruUGM.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-probe-line-study-BHmdyM3x.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-production-DrrxbyBp.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-optics-jmN8Pb_5.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-stars-xftVhLiK.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-planet-tNJIoH-w.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-dissolve-C838-CeA.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-depth-CjZabxrl.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-cinema-ui-7AxBuSaK.js">
   <link rel="stylesheet" crossorigin href="/3D/assets/exterior-cinema-ui-CkXJ3Oq9.css">
-  <link rel="stylesheet" crossorigin href="/3D/assets/shipExteriorStudy-Cve0olbe.css">
+  <link rel="stylesheet" crossorigin href="/3D/assets/shipExteriorStudy-fIA0mNcg.css">
 </head>
 <body>
   <header><div><p class="eyebrow">TARAIRON / EXTERIOR STUDY 01</p><h1>船体外観</h1></div><a href="./obs.html">船内へ ↗</a></header>
   <main>
     <div class="viewport"><canvas id="ship-view" tabindex="0" aria-label="宇宙空間で船体を観察する3Dビュー"></canvas><div id="status" role="status">船体を組み立てています…</div>
       <div class="view-label"><span id="view-name">全体 / 斜め</span><span>FIXED CORE · ROTATING HABITAT</span></div>
+      <div id="planet-target" hidden></div>
       <div class="view-bottom"><span>ドラッグ：回転　右ドラッグ：移動　ホイール：拡大</span><span id="performance"></span></div>
     </div>
     <aside>
       <section><span class="section-no">01 / OBSERVATION</span><h2>見る位置</h2><nav aria-label="観察する視点"><button data-view="whole" aria-pressed="true">全体</button><button data-view="bow" aria-pressed="false">船首</button><button data-view="side" aria-pressed="false">側面</button><button data-view="stern" aria-pressed="false">船尾・ロケット</button><button data-view="sternSide" aria-pressed="false">船尾側面・ロゴ</button><button data-view="sternFace" aria-pressed="false">船尾正面・光</button><button data-view="eva" aria-pressed="false">船外用ハッチ</button><button data-view="lander" aria-pressed="false">船体下・探査機</button><button data-view="habitat" aria-pressed="false">重力区画</button><button data-view="habitatRear" aria-pressed="false">区画・背面</button><button data-view="bearing" aria-pressed="false">軸受・接続部</button></nav></section>
       <section><button id="cinema" class="wide" aria-haspopup="dialog">ムービーで眺める</button><p class="description">遠景・接近・横切り・船体下・船尾の画角を自動で切り替えます。</p></section>
+      <section>
+        <button data-view="sunlight">恒星と船体を見る</button><button data-view="planet">母艦と惑星を見る</button>
+        <button id="system-map" class="wide" aria-haspopup="dialog">S-01 恒星系の配置を見る</button>
+        <p class="description">光る恒星の周りを、岩石・海洋・ガス・氷の4惑星が公転します。母艦は岩石惑星の高軌道。実時間1倍で進みます。</p>
+        <h2>惑星の見え方</h2>
+        <nav aria-label="惑星の大きさの比較"><button data-planet-scale="physical">実寸</button><button data-planet-scale="enhanced">見た目強調</button></nav>
+        <p class="description" id="planet-scale-description">実寸：遠方の惑星は小さな光点です。各ボタンで、その方向を向きます。</p>
+        <nav aria-label="遠方の惑星の方向"><button data-view="oceanPlanet">海洋惑星 c</button><button data-view="gasPlanet">ガス惑星 d</button><button data-view="icePlanet">氷の惑星 e</button></nav>
+      </section>
       <section><span class="section-no">02 / ROTATION</span><h2>3つの重力区画</h2><p class="description">中央船体の周りを、周回通路と骨組みでつながった3区画が回転します。</p>
         <label class="check"><input id="cruise" type="checkbox" checked>ゆっくり前進</label><p class="description">カメラは航行する船体を追います。星は遠い背景として表示します。</p>
         <button id="play" aria-pressed="true" class="wide">回転を止める</button>
@@ -44,6 +55,7 @@
       </section>
       <section><span class="section-no">03 / HABITAT</span><h2>船体とのバランス</h2><label class="range-label" for="core">中央船体の大きさ <output id="core-value">2.6 倍</output></label><input id="core" type="range" min="1" max="2.8" value="2.6" step=".1"><p class="description">1倍が直前の比率。中央船体と軸受を大きくして比較します。居住区画の実寸と回転半径は共通です。</p><label class="check"><input id="floors" type="checkbox">3階の床位置を重ねる</label><p class="description">OBS船内と同じ高さ・横幅。廊下側は各階5枚、反対側は奥部屋・シャワー・トイレの計3枚。1区画18枚の窓です。</p></section>
       <section><span class="section-no">04 / SURFACE</span><h2>外装と機器</h2><label class="check"><input id="services" type="checkbox" checked>露出した配管・機器</label><label class="check"><input id="wear" type="checkbox" checked>擦れ・すす汚れ</label><label class="check"><input id="flares" type="checkbox" checked>青いレンズフレア</label><p class="description">船体側面の船外用ハッチ、交換パネル、露出した配管と点検機器。7基のノズルの奥に青白い火。全ての機関に横長の青いフレア。リング型のゴーストはありません。</p></section>
+      <section><h2>パネルライン比較</h2><nav aria-label="パネルラインの仕上げ"><button data-panel-lines="original">従来の線</button><button data-panel-lines="soft">太め・淡い線</button></nav></section>
       <div class="study-note">最外側のLEVEL 3床を周長200m・1Gの基準にしています。上の2階は回転軸側に重なり、同じ回転速度で重力が少し小さくなります。</div>
     </aside>
   </main>

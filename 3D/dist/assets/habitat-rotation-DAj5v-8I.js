@@ -1,0 +1,1 @@
+const n={width:.98,height:1.08,y:1.61,wallBack:-3.86,wallDepth:.12},o=Object.freeze({width:1.2,height:.82,y:1.51}),c=200,a=c/(2*Math.PI),e=Math.sqrt(9.80665/a),t=Object.freeze({circumference:c,radius:a,radiansPerSecond:e,rpm:e*30/Math.PI,periodSeconds:2*Math.PI/e}),r=s=>-(s%t.periodSeconds/t.periodSeconds)*2*Math.PI;export{n as B,t as H,o as O,r as c};

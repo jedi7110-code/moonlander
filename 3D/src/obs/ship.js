@@ -491,7 +491,7 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
-  animated.add(createRearWindowStars(staticRoot));
+  animated.add(createRearWindowStars(staticRoot,{rotating:true}));
   yield;
   const staticMesh=mergeStatic?(yield* batchStaticSteps(staticRoot,{xrLOD:true})):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);

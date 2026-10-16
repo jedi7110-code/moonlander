@@ -1,0 +1,1 @@
+function p(t,e,s){const i=t.position.distanceTo(e),n=s.distanceToPoint(t.position),a=Math.min(80,i/16,n>0?n/4:.1),c=n>0?Math.min(n/2,i*i/2e4):0,o=Math.max(.02,a,c);Math.abs(t.near-o)>1e-6&&(t.near=o,t.updateProjectionMatrix())}export{p as f};

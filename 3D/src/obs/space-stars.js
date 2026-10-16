@@ -1,4 +1,5 @@
 import {BackSide,BoxGeometry,BufferGeometry,Color,Float32BufferAttribute,Matrix3,Mesh,MeshBasicMaterial,Points,PointsMaterial,Vector3} from 'three';
+import {cabinSkyAngle} from './habitat-rotation.js';
 
 export const SPACE_COLOR=0x010307;
 
@@ -104,7 +105,7 @@ function windowStarRange(stars,windows){
 // Store directions on one shell, then centre it on the active camera/VR eye.
 // Camera translation cannot change the constellation; only its rotation can.
 // The reference eye preserves the density and brightness of the existing view.
-function distantSky(stars,{reference=[0,5,0],windows=null,matchPov=false,optimizeWindows=true}={}){
+function distantSky(stars,{reference=[0,5,0],windows=null,matchPov=false,optimizeWindows=true,rotating=false}={}){
   const geometry=stars.geometry,positions=geometry.getAttribute('position'),weights=geometry.getAttribute('starSize');
   const radius=64,origin=new Vector3(...reference),direction=new Vector3(),sizes=[];
   for(let i=0;i<positions.count;i++){
@@ -119,10 +120,11 @@ function distantSky(stars,{reference=[0,5,0],windows=null,matchPov=false,optimiz
   // Three r155 omits cameraPosition/viewMatrix for PointsMaterial. Upload the
   // active eye and rotation explicitly, including each separate VR eye.
   const eye={value:new Vector3()},cameraRotation={value:new Matrix3()},pixelRatio={value:1};
-  stars.onBeforeRender=(renderer,_scene,camera)=>{
+  stars.onBeforeRender=(renderer,scene,camera)=>{
     eye.value.setFromMatrixPosition(camera.matrixWorld);
     cameraRotation.value.setFromMatrix4(camera.matrixWorld);
     stars.position.copy(eye.value);stars.parent?.worldToLocal(stars.position);
+    if(rotating)stars.rotation.x=cabinSkyAngle(scene?.userData?.cabinSkySeconds??0);
     stars.updateMatrixWorld(true);pixelRatio.value=renderer.getPixelRatio();
   };
   stars.material.onBeforeCompile=shader=>{
@@ -167,7 +169,10 @@ function distantSky(stars,{reference=[0,5,0],windows=null,matchPov=false,optimiz
 
 // Both sides use the POV window's catalog, density, colours, and point sizes.
 // Rotate the rear field to face the opposite side without changing its look.
-export function createSpaceStars({rear=false,windows=null,panoramic=false,optimizeWindows=true}={}){
+export function createSpaceStars({rear=false,windows=null,panoramic=false,optimizeWindows=true,rotating=false}={}){
+  // A patch cannot rotate through a full turn without exposing its edges.
+  // Front/rear windows share one full-sphere catalogue and the same phase.
+  if(rotating)panoramic=true;
   let seed=73191;
   const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
   const positions=[],colors=[],color=new Color();
@@ -180,7 +185,7 @@ export function createSpaceStars({rear=false,windows=null,panoramic=false,optimi
       const vertical=random()*2-1,azimuth=random()*Math.PI*2,radius=45+random()*40,horizontal=Math.sqrt(1-vertical*vertical);
       x=Math.cos(azimuth)*horizontal*radius;y=vertical*radius+5;z=Math.sin(azimuth)*horizontal*radius;
     }else{x=(random()-.5)*155;y=(random()-.5)*90+5;z=40+random()*35;}
-    positions.push(rear?-x:x,y,rear?-z:z);
+    positions.push(rear&&!rotating?-x:x,y,rear&&!rotating?-z:z);
     color.setHSL(.56+random()*.09,.08+random()*.23,.46+random()*.42);colors.push(...color.toArray());
   }
   const geometry=new BufferGeometry().setAttribute('position',new Float32BufferAttribute(positions,3)).setAttribute('color',new Float32BufferAttribute(colors,3));
@@ -188,12 +193,20 @@ export function createSpaceStars({rear=false,windows=null,panoramic=false,optimi
   material.userData.cabinAlwaysPowered=true;material.userData.castShadow=false;
   const stars=new Points(geometry,material);stars.name=rear?'Rear windows / stars':'POV / stars';
   stars.userData.panoramic=panoramic;
-  distantSky(stars,{windows,matchPov:true,optimizeWindows});
-  if(panoramic&&optimizeWindows)windowStarRange(stars,windows);
+  stars.userData.rotatingSky=rotating;
+  distantSky(stars,{windows,matchPov:true,optimizeWindows,rotating});
+  // The fixed-catalogue slice assumes a stationary hemisphere. Rotation uses
+  // the full 6,000-point draw; the shader still clips to actual window holes.
+  if(panoramic&&optimizeWindows&&!rotating)windowStarRange(stars,windows);
   return stars;
 }
 
-export function createCutawayStars(){
+export function createCutawayStars({rotating=false}={}){
+  if(rotating){
+    const stars=createSpaceStars({rotating:true});
+    stars.name='Cutaway / rotating stars';stars.material.color.setHex(0x9bafb5);
+    return stars;
+  }
   const positions=new Float32Array(420*3);
   for(let i=0;i<420;i++){
     positions[i*3]=Math.sin(i*162.2)*45;positions[i*3+1]=Math.sin(i*714.1)*26+5;positions[i*3+2]=-9-Math.abs(Math.sin(i))*10;
@@ -203,7 +216,7 @@ export function createCutawayStars(){
   stars.name='Cutaway / stars';return distantSky(stars,{reference:[0,5,60]});
 }
 
-export function createRearWindowStars(root){
+export function createRearWindowStars(root,{rotating=false}={}){
   const windows=[];
   root.updateMatrixWorld(true);
   root.traverse(mesh=>{
@@ -214,5 +227,5 @@ export function createRearWindowStars(root){
   // Keep the existing cutaway background intact. Only rays passing through a
   // real window opening reach this field. Opaque cabin furniture still occludes
   // it through the normal depth buffer, including the pocket doors.
-  return createSpaceStars({rear:true,windows});
+  return createSpaceStars({rear:true,windows,rotating});
 }

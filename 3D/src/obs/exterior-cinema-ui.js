@@ -30,7 +30,7 @@ export class ExteriorCinemaUI{
       }};
     window.addEventListener('message',this.message);document.addEventListener('keydown',this.key,true);
   }
-  buttonText(){return this.opening?this.words('クリックして船内映像を表示','Click to enter the cabin'):this.cinematic?this.words('戻る','Return'):this.words('船内に戻る','Return to cabin');}
+  buttonText(){return this.opening?this.words('船内映像に切替え','Click to enter the cabin'):this.cinematic?this.words('戻る','Return'):this.words('船内に戻る','Return to cabin');}
   show({opening=false,cinematic=false,core=2.6,phase=55,rpm,waitForHost=false}={}){
     if(this.open)return;this.open=true;this.opening=opening;this.cinematic=opening||cinematic;this.focus=document.activeElement;
     this.hostIsReady=!waitForHost;
@@ -50,7 +50,10 @@ export class ExteriorCinemaUI{
       query.set('mode',opening?'opening':'view');
       // Adopt the approved study take in OBS and the cabin's movie viewer.
       query.set('approach','bow');query.set('ending','underside');query.set('docking','probe-follow');
-    }else query.set('viewer','free');
+    }else{
+      query.set('viewer','free');
+      query.set('panelLines','soft');query.set('planetScale','enhanced');
+    }
     // Vite bundle locations differ from source modules. Resolve the HTML entry
     // relative to the current page rather than the hashed JS asset directory.
     const page=this.cinematic?'ship-exterior-cinema.html':'ship-exterior-study.html';

@@ -6,8 +6,9 @@ import {createExteriorDecals} from './exterior-decals.js';
 import {addConformalServiceFairings} from './exterior-service-fairing.js';
 import taraironWordmark from './tarairon-wordmark.js';
 import {HABITAT_ENVELOPE,HABITAT_FLOORS,HABITAT_WINDOWS,cabinToHabitat} from './habitat-envelope.js';
+import {HABITAT_ROTATION} from './habitat-rotation.js';
 
-const referenceCircumference=200,referenceRadius=referenceCircumference/(2*Math.PI);
+const referenceCircumference=HABITAT_ROTATION.circumference,referenceRadius=HABITAT_ROTATION.radius;
 export const EXTERIOR=Object.freeze({radius:referenceRadius-HABITAT_ENVELOPE.centerY,
   gravityRadius:referenceRadius,circumference:referenceCircumference,rpm:Math.sqrt(9.80665/referenceRadius)*60/(2*Math.PI),rotorX:-1.6,
   podLength:HABITAT_ENVELOPE.right-HABITAT_ENVELOPE.left,
@@ -242,9 +243,15 @@ function shipWordmark(parent,p,width,rotation){
   group.position.set(...p);group.rotation.set(0,rotation,0);parent.add(group);
   const material=new THREE.MeshStandardMaterial({color:0x45473c,roughness:.9,side:THREE.DoubleSide,
     polygonOffset:true,polygonOffsetFactor:-2});material.name='TARAIRON wordmark ink';
+  material.userData.exteriorInk=true;
   const scale=width/1417;
   for(const path of new SVGLoader().parse(taraironWordmark).paths)for(const shape of SVGLoader.createShapes(path)){
-    const geometry=new THREE.ShapeGeometry(shape,8);geometry.translate(-713.5,-685,0);geometry.scale(scale,-scale,1);geometry.computeVertexNormals();
+    const geometry=new THREE.ShapeGeometry(shape,8);geometry.translate(-713.5,-685,0);geometry.scale(scale,-scale,1);
+    // Flipping SVG's Y axis reverses triangle winding. Restore outward faces
+    // so the ink can be offset along its normal onto the raised B paint.
+    const indices=geometry.index;
+    for(let i=0;i<indices.count;i+=3){const b=indices.getX(i+1);indices.setX(i+1,indices.getX(i+2));indices.setX(i+2,b);}
+    geometry.computeVertexNormals();
     const mesh=addMesh(group,geometry,material,'TARAIRON original letter');mesh.castShadow=false;
   }
 }

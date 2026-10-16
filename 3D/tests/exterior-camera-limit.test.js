@@ -14,7 +14,42 @@ test('a camera inside a front-sided hull is moved outside its exit face with two
     assert.equal(material.side,THREE.FrontSide,'collision queries do not change the ship appearance');
     root.position.x=3600;camera.position.set(3601,0,0);controls.target.x=3600;
     guard.update();assert.equal(camera.position.x,3622,'the limit follows the cruising ship');
-    camera.position.set(3700,100,0);guard.update();assert.equal(controls.minDistance,8,'a clear distant view keeps normal orbit controls');
+    camera.position.set(3700,100,0);guard.update();
+    assert.ok(Math.abs(controls.minDistance-(10*Math.SQRT2+2))<1e-8,'a distant camera already has the correct hull stop');
+  }finally{guard.dispose();mesh.geometry.dispose();material.dispose();}
+});
+
+test('zoom stops before a separate thin habitat even when a wheel step would skip it',()=>{
+  const root=new THREE.Group(),material=new THREE.MeshBasicMaterial(),habitat=new THREE.Mesh(new THREE.BoxGeometry(.1,10,10),material);
+  habitat.position.x=30;root.add(habitat);
+  const camera=new THREE.PerspectiveCamera(),controls={target:new THREE.Vector3(),maxDistance:520};
+  const guard=createExteriorCameraLimit({ship:{root},camera,controls});
+  try{
+    camera.position.x=100;guard.update();
+    assert.ok(Math.abs(controls.minDistance-32.05)<1e-6,'the stop is established before reaching the hull bounds');
+    camera.position.x=8;guard.update();
+    assert.ok(Math.abs(camera.position.x-32.05)<1e-6,'a large zoom step cannot tunnel through the habitat');
+    assert.equal(controls.maxDistance,520,'collision protection preserves the doubled zoom-out range');
+    habitat.visible=false;camera.position.x=8;guard.update();
+    assert.equal(controls.minDistance,8,'hidden geometry cannot block zoom');
+    habitat.visible=true;camera.position.set(0,100,0);guard.update();
+    assert.equal(controls.minDistance,8,'empty space keeps the normal close limit');
+  }finally{guard.dispose();habitat.geometry.dispose();material.dispose();}
+});
+
+test('free exterior keeps the preview standoff even after panning or a large zoom step',()=>{
+  const root=new THREE.Group(),material=new THREE.MeshBasicMaterial(),mesh=new THREE.Mesh(new THREE.BoxGeometry(40,20,20),material);
+  root.add(mesh);
+  const camera=new THREE.PerspectiveCamera(),controls={target:new THREE.Vector3(),maxDistance:5000};
+  const guard=createExteriorCameraLimit({ship:{root},camera,controls,minShipDistance:100});
+  try{
+    camera.position.set(150,0,0);assert.equal(guard.update(),100,'the nearest zoom is the preview distance, not the hull surface');
+    camera.position.set(5,0,0);guard.update();assert.equal(camera.position.length(),100);
+    controls.target.set(10,0,50);camera.position.set(30,0,50);guard.update();
+    assert.ok(Math.abs(camera.position.length()-100)<1e-10,'panning cannot bypass the distance from the ship');
+    root.position.set(3600,0,0);controls.target.set(3610,0,50);camera.position.set(3630,0,50);guard.update();
+    assert.ok(Math.abs(camera.position.distanceTo(root.position)-100)<1e-10,'the standoff follows the cruising ship');
+    assert.equal(controls.maxDistance,5000);
   }finally{guard.dispose();mesh.geometry.dispose();material.dispose();}
 });
 

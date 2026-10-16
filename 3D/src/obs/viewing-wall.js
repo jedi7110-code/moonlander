@@ -70,7 +70,7 @@ function exteriorSpace(){
     x:viewingWallPanelX(i),y:floor+PROFILE.windowY,z:PROFILE.faceZ+.145,
     width:PROFILE.windowWidth,height:PROFILE.windowHeight,cut:.12,
   });
-  root.add(createSpaceBackdrop(),createSpaceStars({panoramic:true,windows}));return root;
+  root.add(createSpaceBackdrop(),createSpaceStars({panoramic:true,windows,rotating:true}));return root;
 }
 
 function pressureReturns(parent,m,floor){

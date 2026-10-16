@@ -50,11 +50,11 @@ export function collectPaintPlanes(group){
 // This optional overlay belongs only to the craft study. Every plate is clipped
 // to the real painted hull triangles, so it follows slopes and never bridges a
 // window opening. The original model/materials are left intact for A/B switching.
-export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false}={}){
+export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false,seamWidth=1,seamColor=0x50564f}={}){
   const faceMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.74,metalness:.23,flatShading:true});
   faceMaterial.name='Study / segmented exterior plates';
   const wearMap=createPanelWearMap(),weathering={value:0};installPanelSoot(faceMaterial,weathering);
-  const edgeMaterial=new THREE.MeshStandardMaterial({color:0x50564f,roughness:.72,metalness:.50,flatShading:true});
+  const edgeMaterial=new THREE.MeshStandardMaterial({color:seamColor,roughness:.72,metalness:.50,flatShading:true});
   edgeMaterial.name='Study / recessed joints and retainers';
   const roots=[],resources=[],stats={plates:0,triangles:0,replacedTriangles:0},covered=new Map();
   const oldResidue=[];
@@ -65,7 +65,8 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
     {group:ship.core,pitch:[3.2,1.9],gap:.022,depth:.010},
     ...ship.pods.map(group=>({group,pitch:[5.8,3.5],gap:.05,depth:.016})),
   ];
-  for(const {group,pitch,gap,depth}of parts){
+  for(const {group,pitch,gap:baseGap,depth}of parts){
+    const gap=baseGap*seamWidth;
     // A's habitat paint combines its warm gray material tint with the beige
     // atlas. Preserve that darker finish on the optional segmented plates.
     const panelPaint=ship.pods.includes(group)?new THREE.Color(0xe0ded0).multiply(new THREE.Color(0xc1baa5)):new THREE.Color(0xc7c1ac);
@@ -129,18 +130,18 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
       }
     }
     const overlay=new THREE.Group();overlay.name='Optional panel detail comparison';overlay.visible=false;group.add(overlay);roots.push(overlay);
-    // Printed warnings sit 3mm above the original skin: lift copies onto this
-    // optional version so the extra plate thickness cannot cover their ink.
+    // Warnings and the aft wordmark sit just above A's skin. Lift copies onto
+    // B's raised plates so their added thickness cannot bury the printed ink.
     group.updateWorldMatrix(true,true);const inverse=group.matrixWorld.clone().invert(),warnings=[];
-    group.traverse(mesh=>{if(mesh.isMesh&&mesh.userData.exteriorDecal)warnings.push(mesh);});
+    group.traverse(mesh=>{if(mesh.isMesh&&(mesh.userData.exteriorDecal||mesh.material?.userData?.exteriorInk))warnings.push(mesh);});
     for(const source of warnings){
-      const geometry=source.geometry.clone().applyMatrix4(inverse.clone().multiply(source.matrixWorld));
+      const geometry=(source.geometry.index?source.geometry.toNonIndexed():source.geometry.clone()).applyMatrix4(inverse.clone().multiply(source.matrixWorld));
       const p=geometry.attributes.position,a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),normal=new THREE.Vector3();
       for(let i=0;i<p.count;i+=3){
         a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);normal.crossVectors(b.sub(a),c.sub(a)).normalize();
         for(let j=0;j<3;j++){const v=new THREE.Vector3().fromBufferAttribute(p,i+j).addScaledVector(normal,depth+.004);p.setXYZ(i+j,v.x,v.y,v.z);}
       }
-      const ink=new THREE.Mesh(geometry,source.material);ink.name='Study B / preserved warning ink';ink.receiveShadow=source.receiveShadow;overlay.add(ink);resources.push(geometry);
+      const ink=new THREE.Mesh(geometry,source.material);ink.name=source.userData.exteriorDecal?'Study B / preserved warning ink':'Study B / preserved wordmark ink';ink.receiveShadow=source.receiveShadow;overlay.add(ink);resources.push(geometry);
     }
     for(const [data,material,withColor]of [[positions,faceMaterial,true],[edges,edgeMaterial,false]]){
       if(!data.length)continue;

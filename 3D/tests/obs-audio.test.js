@@ -27,6 +27,22 @@ function context(){
 }
 const response=()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)});
 const soundCount=Object.keys(CABIN_SOUNDS).length;
+test('the exterior immediately silences the cabin bus and returning preserves the sound preference',async()=>{
+  const ctx=context(),audio=new CabinAudio({enabled:true,createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
+  try{
+    audio.unlock();await audio.load();assert.equal(audio.audible,true);
+    audio.setLoop('exterior-check','hatchAlarm',true);assert.ok(audio.loops.size);
+    let cancelled=false,instant=false;
+    audio.master.gain.cancelScheduledValues=()=>{cancelled=true;};
+    audio.master.gain.setValueAtTime=value=>{instant=value===0;audio.master.gain.value=value;};
+    audio.pause(true,{immediate:true});
+    assert.ok(cancelled&&instant);assert.equal(audio.master.gain.value,0);assert.equal(audio.audible,false);assert.equal(audio.loops.size,0);
+    assert.equal(audio.enabled,true,'temporary exterior silence does not turn off the user preference');
+    audio.pause(false);assert.equal(audio.audible,true);assert.equal(audio.master.gain.value,.55);
+    await audio.toggle();audio.pause(true,{immediate:true});audio.pause(false);
+    assert.equal(audio.enabled,false);assert.equal(audio.audible,false,'returning cannot unmute a manually muted cabin');
+  }finally{audio.dispose();}
+});
 test('warning follows the current hatch fault through repair, mute, pause, late loading and recovery',async()=>{
   const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
   const h=harness();h.driver=new CabinSoundEvents(audio);

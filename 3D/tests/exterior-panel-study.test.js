@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Raycaster,Vector3} from 'three';
+import {Raycaster,Vector3,Mesh,PlaneGeometry,MeshStandardMaterial,DoubleSide} from 'three';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {createExteriorPanelStudy} from '../src/obs/exterior-panel-study.js';
 import {HABITAT_ENVELOPE} from '../src/obs/habitat-envelope.js';
@@ -78,5 +78,35 @@ test('optional panel seams never cross EVA or habitat hatch leaves',()=>{
       assert.ok(door,'sample must hit an actual hatch');
       assert.ok(!overlay||overlay.distance>door.distance+.02,'panel geometry must stay behind the continuous hatch leaf');
     }
+  }finally{study.dispose();ship.dispose();}
+});
+
+test('aft wordmark ink clears B plates from frontal and oblique views on both sides',()=>{
+  const ship=createExteriorShip(),material=new MeshStandardMaterial({side:DoubleSide});
+  material.userData.exteriorInk=true;
+  const facet=Math.cos(Math.PI/8),slope=facet*(8.3-8.5)/3.7,tilt=Math.atan(-slope);
+  for(const side of [-1,1]){
+    const logo=new Mesh(new PlaneGeometry(3,.4),material);
+    logo.position.set(-13.5,-.9,side*(facet*8.5+slope*2+.006));
+    logo.rotation.y=side>0?tilt:Math.PI-tilt;ship.core.add(logo);
+  }
+  const study=createExteriorPanelStudy(ship,{replaceSkin:true});study.setEnabled(true);
+  try{
+    const ink=[];ship.core.traverse(mesh=>{if(mesh.name==='Study B / preserved wordmark ink')ink.push(mesh);});
+    assert.equal(ink.length,2);
+    for(const scale of [1,2.6]){
+      ship.setCoreScale(scale);ship.root.updateMatrixWorld(true);
+      const surfaces=[];ship.core.traverseVisible(mesh=>{if(mesh.isMesh&&!mesh.material.transparent)surfaces.push(mesh);});
+      for(const logo of ink)for(const offset of [-1,0,1])for(const oblique of [-2,0,2]){
+        // Cloned ink geometry is expressed in the core coordinate system.
+        const side=Math.sign(logo.geometry.attributes.position.getZ(0));
+        const point=ship.core.localToWorld(new Vector3(-13.5+offset,-.9,side*(facet*8.5+slope*(2+offset))));
+        const normal=new Vector3(-slope,0,side).normalize();
+        const direction=normal.clone().add(new Vector3(oblique,0,0)).normalize();
+        const hit=new Raycaster(point.clone().addScaledVector(direction,3),direction.negate(),0,6).intersectObjects(surfaces,false)[0];
+        assert.equal(hit?.object,logo,'raised panels must not cover the wordmark from an oblique camera');
+      }
+    }
+    study.setEnabled(false);assert.ok(ink.every(mesh=>!mesh.parent.visible),'A/B switching restores the original ink');
   }finally{study.dispose();ship.dispose();}
 });

@@ -83,7 +83,12 @@ export class CabinAudio {
   }
   get audible(){return this.enabled&&this.unlocked&&!this.paused&&!this.disposed&&this.context?.state==='running';}
   get stats(){return{loaded:this.buffers.size,total:Object.keys(CABIN_SOUNDS).length,active:this.voices.size,loops:this.loops.size,failed:this.failures.length};}
-  syncMaster(){if(this.context&&!this.disposed)this.master.gain.setTargetAtTime(this.enabled&&this.unlocked&&!this.paused?.55:0,this.context.currentTime,.08);}
+  syncMaster(immediate=false){
+    if(!this.context||this.disposed)return;
+    const gain=this.master.gain,now=this.context.currentTime,value=this.enabled&&this.unlocked&&!this.paused?.55:0;
+    if(immediate){gain.cancelScheduledValues(now);gain.setValueAtTime(value,now);}
+    else gain.setTargetAtTime(value,now,.08);
+  }
   get focus(){return this.listener.overview?clamp(this.listener.focus??0):1;}
   setViewListener(camera,view,firstPerson=false){
     const e=camera.matrixWorld.elements;
@@ -153,11 +158,11 @@ export class CabinAudio {
     if(this.fanGain)this.fanGain.gain.setTargetAtTime(.012+.028*this.spatial(plantFan).gain,this.context.currentTime,.4);
     // Condensate drops remain visual only; no synthetic pitched water plips.
   }
-  pause(paused){
+  pause(paused,{immediate=false}={}){
     const wasPaused=this.paused;this.paused=Boolean(paused);
     if(this.paused){this.stopAll();this.playbackSession.pause();}
     else if(wasPaused&&this.enabled&&this.unlocked)this.unlock({gesture:false});
-    this.syncMaster();
+    this.syncMaster(immediate&&this.paused);
   }
   dispose(){this.stopAll();this.disposed=true;this.enabled=false;this.playbackSession.dispose();this.abort?.abort();this.buffers.clear();this.loops.clear();this.voices.clear();this.context?.close();}
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {EXTERIOR_SYSTEM,createExteriorEphemeris,visibleDiscFraction} from './exterior-system.js';
 
 export const EXTERIOR_PLANET_VARIANTS=Object.freeze([
   {id:'current',label:'青灰の海洋惑星',description:'暗い海と岩の大陸、薄い雲。'},
@@ -8,11 +9,16 @@ export const EXTERIOR_PLANET_VARIANTS=Object.freeze([
 ]);
 const variantIndex=id=>Math.max(0,EXTERIOR_PLANET_VARIANTS.findIndex(variant=>variant.id===id));
 
+// Apparent disc diameters in degrees for the optional visual study. Physical
+// orbital positions, illumination and occultation calculations stay unchanged.
+export const EXTERIOR_PLANET_EMPHASIS=Object.freeze({ochre:.5,current:1.1,ice:.35});
+
 // An angular background proxy keeps planetary depth out of the small-scale
 // ship's depth buffer. No fetched maps or time-dependent texture generation.
-export function createExteriorPlanet({variant='current'}={}){
+export function createExteriorPlanet({variant='current',background=false}={}){
   const geometry=new THREE.SphereGeometry(4200,96,64);
   const material=new THREE.ShaderMaterial({
+    depthTest:!background,depthWrite:!background,
     uniforms:{pattern:{value:variantIndex(variant)},lightDirection:{value:new THREE.Vector3(64,-110,92).normalize()}},
     vertexShader:`
       varying vec3 vSurface;
@@ -23,6 +29,7 @@ export function createExteriorPlanet({variant='current'}={}){
         vec4 world=modelMatrix*vec4(position,1.0);
         vWorld=world.xyz;vNormal=mat3(modelMatrix)*normal;
         gl_Position=projectionMatrix*viewMatrix*world;
+        ${background?'gl_Position.z=gl_Position.w*.99999;':''}
       }`,
     fragmentShader:`
       uniform vec3 lightDirection;
@@ -87,7 +94,88 @@ export function createExteriorPlanet({variant='current'}={}){
   const body=new THREE.Mesh(geometry,material);body.name='Planet background';body.visible=false;
   // Stars are an infinite-distance field with no depth writes. Draw this
   // opaque background after them, while keeping the nearer ship's depth.
-  body.renderOrder=1;
+  body.renderOrder=background?-8:1;
+  if(background)body.frustumCulled=false;
   return{body,setVariant(id){material.uniforms.pattern.value=variantIndex(id);},show(position){body.visible=Boolean(position);if(position)body.position.fromArray(position);},
     dispose(){geometry.dispose();material.dispose();}};
+}
+
+// Physical positions are kept in kilometres around the star. Only angular
+// proxies enter the ship's metre-scale render scene, preserving depth precision.
+export function createExteriorSkyPlanet({light=null,ship=null,clock=()=>Date.now()/1000,emphasis=false}={}){
+  const worldUp=new THREE.Vector3(0,1,0),initialSun=new THREE.Vector3(64,-110,92).normalize(),target=new THREE.Vector3();
+  if(light){light.getWorldPosition(initialSun);light.target.getWorldPosition(target);initialSun.sub(target).normalize();}
+  const lightDistance=light?light.position.distanceTo(light.target.position):1;
+  const right=new THREE.Vector3().crossVectors(worldUp,initialSun);
+  if(right.lengthSq()<1e-6)right.set(0,0,1).cross(initialSun);
+  right.normalize();const up=new THREE.Vector3().crossVectors(initialSun,right).normalize(),tilt=35*Math.PI/180;
+  const initialView=initialSun.clone().multiplyScalar(-Math.cos(tilt))
+    .addScaledVector(right,Math.sin(tilt)*Math.SQRT1_2).addScaledVector(up,-Math.sin(tilt)*Math.SQRT1_2);
+  right.crossVectors(initialView,worldUp).normalize();up.crossVectors(right,initialView).normalize();
+  const initialPlacement=initialView.clone().addScaledVector(right,.22).addScaledVector(up,.07).normalize();
+  const ephemeris=createExteriorEphemeris({sunDirection:initialSun,planetDirection:initialPlacement,clock});
+  const root=new THREE.Group();root.name='S-01 / four physical planetary orbits';
+  const pixels=new Uint8Array(16*16*4);
+  for(let y=0;y<16;y++)for(let x=0;x<16;x++){
+    const i=(y*16+x)*4,r=Math.hypot(x-7.5,y-7.5)/7.5;
+    pixels[i]=pixels[i+1]=pixels[i+2]=255;pixels[i+3]=Math.round(Math.exp(-r*r*6)*255);
+  }
+  const pointTexture=new THREE.DataTexture(pixels,16,16);pointTexture.needsUpdate=true;
+  pointTexture.magFilter=pointTexture.minFilter=THREE.LinearFilter;
+  const entries=EXTERIOR_SYSTEM.planets.map(spec=>{
+    const planet=createExteriorPlanet({variant:spec.id,background:true});
+    const marker=new THREE.Sprite(new THREE.SpriteMaterial({map:pointTexture,color:spec.color,
+      transparent:true,depthTest:false,depthWrite:false,toneMapped:false,blending:THREE.AdditiveBlending}));
+    marker.name=`${spec.name} / unresolved reflected light`;marker.renderOrder=-7;marker.frustumCulled=false;
+    const spinAxis=ephemeris.normal.clone().applyAxisAngle(ephemeris.radial,spec.tilt*Math.PI/180);
+    root.add(planet.body,marker);
+    return{...planet,spec,marker,spinAxis,direction:new THREE.Vector3(),distanceKm:0,angularRadius:0,displayAngularRadius:0};
+  });
+  const observer=new THREE.Vector3(),shipCenter=new THREE.Vector3(),starDirection=new THREE.Vector3(),relative=new THREE.Vector3(),rotation=new THREE.Quaternion();
+  let frame=ephemeris.sample(),sunVisibility=1;
+  function sample(){frame=ephemeris.sample();relative.copy(frame.planetPositions[0]).sub(frame.observer).normalize();return relative;}
+  function follow(camera,height=1000){
+    sample();observer.copy(frame.observer);
+    if(ship){ship.root.getWorldPosition(shipCenter);observer.addScaledVector(relative.copy(camera.position).sub(shipCenter),.001);}
+    starDirection.copy(observer).negate().normalize();sunVisibility=1;
+    const starDistance=observer.length(),starRadius=Math.asin(EXTERIOR_SYSTEM.star.radiusKm/starDistance);
+    const proxyDistance=13600,tanHalfFov=Math.tan(camera.fov*Math.PI/360)/camera.zoom;
+    entries.forEach((entry,i)=>{
+      relative.copy(frame.planetPositions[i]).sub(observer);entry.distanceKm=relative.length();entry.direction.copy(relative).normalize();
+      entry.angularRadius=Math.asin(entry.spec.radiusKm/entry.distanceKm);
+      const emphasizedDiameter=emphasis?EXTERIOR_PLANET_EMPHASIS[entry.spec.id]??0:0;
+      entry.displayAngularRadius=Math.max(entry.angularRadius,emphasizedDiameter*Math.PI/360);
+      entry.body.position.copy(camera.position).addScaledVector(entry.direction,proxyDistance);
+      entry.body.scale.setScalar(proxyDistance*Math.sin(entry.displayAngularRadius)/4200);
+      entry.body.quaternion.setFromAxisAngle(entry.spinAxis,frame.spinAngles[i]);
+      entry.body.material.uniforms.lightDirection.value.copy(frame.planetPositions[i]).negate().normalize();
+      if(entry.distanceKm<starDistance)sunVisibility*=visibleDiscFraction(starRadius,entry.angularRadius,entry.direction.angleTo(starDirection));
+      const discPixels=height*Math.tan(entry.displayAngularRadius)/tanHalfFov;
+      entry.marker.position.copy(entry.body.position);entry.marker.scale.setScalar(2*proxyDistance*tanHalfFov/height*2);
+      const phase=entry.body.material.uniforms.lightDirection.value.angleTo(relative.copy(observer).sub(frame.planetPositions[i]).normalize());
+      const lambert=(Math.sin(phase)+(Math.PI-phase)*Math.cos(phase))/Math.PI;
+      const flux=EXTERIOR_SYSTEM.star.luminositySolar/entry.spec.orbitAU**2*entry.spec.albedo*lambert*(entry.spec.radiusKm/entry.distanceKm)**2;
+      const magnitude=-26.74-2.5*Math.log10(Math.max(1e-30,flux));
+      entry.marker.material.opacity=THREE.MathUtils.clamp(10**(-.4*(magnitude+1))*.7,0,.9)*(1-THREE.MathUtils.smoothstep(discPixels,.5,2));
+      entry.marker.visible=discPixels<2;entry.body.visible=discPixels>=.5;
+    });
+    for(const entry of entries){
+      if(entries.some(other=>other!==entry&&other.distanceKm<entry.distanceKm&&entry.direction.angleTo(other.direction)+entry.angularRadius<other.angularRadius)){
+        entry.body.visible=false;entry.marker.visible=false;
+      }
+    }
+    if(light){
+      // The small directional-light offset serves only the ship's shadow map.
+      light.position.copy(light.target.position).addScaledVector(starDirection,lightDistance);
+    }
+  }
+  return{root,body:entries[0].body,entries,ephemeris,
+    setEmphasis(value){emphasis=Boolean(value);},
+    get sunVisibility(){return sunVisibility;},
+    getDirection(output){return output.copy(sample());},
+    getBodyDirection(index,output){sample();return output.copy(frame.planetPositions[index]).sub(frame.observer).normalize();},
+    getViewDirection(output){rotation.setFromUnitVectors(initialPlacement,sample());return output.copy(initialView).applyQuaternion(rotation);},
+    follow,
+    dispose(){entries.forEach(entry=>{entry.dispose();entry.marker.material.dispose();});pointTexture.dispose();root.removeFromParent();}
+  };
 }
