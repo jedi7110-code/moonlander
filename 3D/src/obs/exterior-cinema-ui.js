@@ -30,7 +30,7 @@ export class ExteriorCinemaUI{
       }};
     window.addEventListener('message',this.message);document.addEventListener('keydown',this.key,true);
   }
-  buttonText(){return this.opening?this.words('船内映像に切替え','Click to enter the cabin'):this.cinematic?this.words('戻る','Return'):this.words('船内に戻る','Return to cabin');}
+  buttonText(){return this.opening?this.words('船内映像に接続','Connect to cabin feed'):this.cinematic?this.words('戻る','Return'):this.words('船内に戻る','Return to cabin');}
   show({opening=false,cinematic=false,core=2.6,phase=55,rpm,waitForHost=false}={}){
     if(this.open)return;this.open=true;this.opening=opening;this.cinematic=opening||cinematic;this.focus=document.activeElement;
     this.hostIsReady=!waitForHost;

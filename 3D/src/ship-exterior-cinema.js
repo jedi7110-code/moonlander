@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {EXTERIOR} from './obs/exterior-mothership.js';
-import {createProductionExterior} from './obs/exterior-production.js';
+import {createProductionExterior,EXTERIOR_SOFT_PANEL_LINES} from './obs/exterior-production.js';
 import {createExteriorOptics} from './obs/exterior-optics.js';
 import {createDistantStars} from './obs/exterior-stars.js';
 import {createExteriorPlanet} from './obs/exterior-planet.js';
@@ -27,8 +27,8 @@ try{
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  const dissolve=createExteriorDissolve(renderer);
-  const ship=createProductionExterior({original:query.get('finish')==='original'});ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
+  const dissolve=createExteriorDissolve(renderer,{samples:EXTERIOR_SOFT_PANEL_LINES.samples});
+  const ship=createProductionExterior({original:query.get('finish')==='original',panelLines:EXTERIOR_SOFT_PANEL_LINES});ship.setCoreScale(Number(query.get('core'))||2.6);scene.add(ship.root);
   document.documentElement.dataset.exteriorFinish=JSON.stringify(ship.finish??{mothership:'A',probe:'A'});
   let gasPass=null;
   const optics=createExteriorOptics(ship),stars=createDistantStars();scene.add(stars.haze,stars.field,new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));

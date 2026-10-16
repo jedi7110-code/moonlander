@@ -4,6 +4,8 @@
 .exterior-cinema-close{position:absolute;right:max(20px,env(safe-area-inset-right));top:max(18px,env(safe-area-inset-top));padding:10px 16px;border:1px solid #747c7e;border-radius:4px;background:#101619c9;color:#e1e5dc;font:500 13px system-ui;cursor:pointer;z-index:2}
 .exterior-cinema-close:focus-visible{outline:2px solid #f3d77d;outline-offset:4px}
 .exterior-cinema-close[hidden]{display:none!important}
-.exterior-cinema-modal.opening .exterior-cinema-close{top:auto;bottom:max(22px,env(safe-area-inset-bottom));max-width:calc(100% - 40px);background:#1016199c;border-color:#85969588;animation:enter-cabin-cue .7s ease both}
+.exterior-cinema-modal.opening .exterior-cinema-close{top:auto;bottom:max(22px,env(safe-area-inset-bottom));max-width:calc(100% - 40px);background:#0e1b16d9;border-color:#9ed07470;color:#d7edcf;text-shadow:0 0 2px #d6f6d099,0 0 7px #9ed07470,0 0 14px #88b86640;animation:enter-cabin-cue .7s ease both}
+.exterior-cinema-modal.opening .exterior-cinema-close:hover{background:#182b20e6;border-color:#9ed074b3}
+.exterior-cinema-modal.opening .exterior-cinema-close:focus-visible{outline-color:#c2d990}
 @keyframes enter-cabin-cue{from{opacity:0}to{opacity:1}}
 #obs-exterior{width:auto;min-width:48px;padding:0 9px;white-space:nowrap;font:500 11px/1 system-ui,sans-serif}

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {EXTERIOR,rotationGravity,exteriorAngle} from './obs/exterior-mothership.js';
-import {createProductionExterior} from './obs/exterior-production.js';
+import {createProductionExterior,EXTERIOR_SOFT_PANEL_LINES} from './obs/exterior-production.js';
 import {createExteriorOptics} from './obs/exterior-optics.js';
 import {createExteriorCruise} from './obs/exterior-cruise.js';
 import {createDistantStars} from './obs/exterior-stars.js';
@@ -29,8 +29,8 @@ try{
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   // Use the cinema's linear star blending and final color conversion. Direct
   // canvas rendering converts each point before blending, changing the sky.
-  const presentation=createExteriorDissolve(renderer,{samples:softPanelLines?4:0});
-  const ship=createProductionExterior({panelLines:softPanelLines?{width:1.5,color:0x73796e}:null});
+  const presentation=createExteriorDissolve(renderer,{samples:softPanelLines?EXTERIOR_SOFT_PANEL_LINES.samples:0});
+  const ship=createProductionExterior({panelLines:softPanelLines?EXTERIOR_SOFT_PANEL_LINES:null});
   cleanup=()=>{ship.dispose();presentation.dispose();renderer.dispose();renderer.forceContextLoss();};
   await ship.prepareProbe();
   if(closed)throw new Error('Exterior view closed during loading');

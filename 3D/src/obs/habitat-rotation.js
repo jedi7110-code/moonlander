@@ -3,5 +3,7 @@
 const circumference=200,radius=circumference/(2*Math.PI),radiansPerSecond=Math.sqrt(9.80665/radius);
 export const HABITAT_ROTATION=Object.freeze({circumference,radius,radiansPerSecond,
   rpm:radiansPerSecond*30/Math.PI,periodSeconds:2*Math.PI/radiansPerSecond});
-// The inertial sky turns in the opposite direction in the rotating cabin.
-export const cabinSkyAngle=seconds=>-((seconds%HABITAT_ROTATION.periodSeconds)/HABITAT_ROTATION.periodSeconds)*2*Math.PI;
+// Ease the visible sky motion for comfortable window viewing.
+// Physical habitat rotation remains the shared 200m / 1g reference above.
+export const CABIN_SKY_ROTATION=Object.freeze({rate:.6,periodSeconds:HABITAT_ROTATION.periodSeconds/.6});
+export const cabinSkyAngle=seconds=>-((seconds%CABIN_SKY_ROTATION.periodSeconds)/CABIN_SKY_ROTATION.periodSeconds)*2*Math.PI;

@@ -37,7 +37,7 @@ test('loading completion reveals the entry cue while the opening remains open',t
   assert.equal(f.ui.closeButton.hidden,true);assert.equal(f.trigger.inert,true);
   f.message('ready');assert.equal(f.ui.closeButton.hidden,true,'exterior shaders being ready is not cabin readiness');
   f.ui.hostReady();assert.equal(f.ui.open,true);assert.equal(f.ui.closeButton.hidden,false);
-  assert.equal(f.ui.closeButton.textContent,'船内映像に切替え');
+  assert.equal(f.ui.closeButton.textContent,'船内映像に接続');
   assert.deepEqual(f.changes,[true]);
 });
 test('the cabin boot gate waits for playback rather than the sky or shader readiness',async t=>{

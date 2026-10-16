@@ -1,9 +1,10 @@
 # Cabin window stars
 
-OBS window stars now counter-rotate around the cabin's longitudinal X axis at
-the same physical spin rate as the external habitat: approximately 5.3004 RPM,
-one turn in 11.32 seconds. `habitat-rotation.js` holds the common 200m / 1g
-reference, independent of the lazy exterior model and planetary system.
+OBS window stars counter-rotate around the cabin's longitudinal X axis at
+60 percent of the physical spin rate for more comfortable viewing: approximately
+3.1802 RPM, one turn in 18.87 seconds. `habitat-rotation.js` keeps this visual rate
+separate from the shared 200m / 1g physical reference (5.3004 RPM), independent of
+the lazy exterior model and planetary system.
 
 The corridor, rear windows and cutaway use the same deterministic 6,000-star
 full-sphere catalogue. They share `scene.userData.cabinSkySeconds`, set from the

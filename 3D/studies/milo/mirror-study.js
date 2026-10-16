@@ -66,7 +66,8 @@ async function init(){
     }
     if(++frame%20===0){
       const target=view.groomingMirror.getRenderTarget?.(),active=variant!=='off'&&view.groomingMirror.visible&&reflection.calls>0;
-      const resolution=variant==='direct'?`画面へ直接 ${direct.userData.mirrorQuality.width} × ${direct.userData.mirrorQuality.height}px / MSAA ${direct.userData.mirrorQuality.samples} / 色・ガラス加工なし`:target?`${target.width} × ${target.height}px / MSAA ${target.samples}`:'金属面のみ';
+      const mirrorQuality=view.groomingMirror.userData.mirrorQuality;
+      const resolution=mirrorQuality?.direct?`画面へ直接 ${mirrorQuality.width} × ${mirrorQuality.height}px / MSAA ${mirrorQuality.samples} / 色・ガラス加工なし`:target?`${target.width} × ${target.height}px / MSAA ${target.samples}`:'金属面のみ';
       $('status').textContent=`${titles[variant]} / 反射 ${active?'ON':'OFF'} / ${resolution} / ${run?'測定中…':playing?'動作再生中':'停止した動作で比較'}`;
     }
   }

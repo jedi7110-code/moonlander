@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Group,Mesh,BoxGeometry,MeshStandardMaterial,CanvasTexture,Raycaster,Vector3} from 'three';
-import {createProductionExterior} from '../src/obs/exterior-production.js';
+import {createProductionExterior,EXTERIOR_SOFT_PANEL_LINES} from '../src/obs/exterior-production.js';
 import {createProbeLineStudy} from '../src/obs/exterior-probe-line-study.js';
 
 test('production adopts B without a duplicate painted skin and keeps the probe lazy and geometrically unchanged',async()=>{
-  const ship=createProductionExterior(),original=createProductionExterior({original:true});
+  const ship=createProductionExterior({panelLines:EXTERIOR_SOFT_PANEL_LINES}),original=createProductionExterior({original:true});
   const count=root=>{let n=0;root.traverse(m=>{if(m.isMesh)n+=m.geometry.index?.count??m.geometry.attributes.position.count;});return n;};
   try{
     assert.equal(ship.dockedLander,null);assert.ok(ship.finish.panels.replacedTriangles>2000);

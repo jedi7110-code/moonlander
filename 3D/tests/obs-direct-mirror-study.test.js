@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {AlwaysStencilFunc,Color,EqualStencilFunc,KeepStencilOp,Mesh,MeshBasicMaterial,NotEqualStencilFunc,PerspectiveCamera,Plane,PlaneGeometry,ReplaceStencilOp,Scene,Vector3,Vector4,ZeroStencilOp} from 'three';
-import {createDirectMirror,createDirectMirrorCamera,directMirrorStencil} from '../studies/milo/direct-mirror.js';
+import {createDirectMirror,createDirectMirrorCamera,directMirrorStencil} from '../src/obs/direct-mirror.js';
 
 test('direct reflected view agrees with a mirrored world, without a texture or horizontal-image mistake',()=>{
   const mirror=new Mesh(new PlaneGeometry(.72,.89)),source=new PerspectiveCamera(60,1.7,.025,150),rig=createDirectMirrorCamera();

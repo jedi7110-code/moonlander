@@ -38,7 +38,8 @@ import {createDroidChargingBaySteps,DROID_DOCK} from './droid-charging.js';
 import {createDroidServiceRig} from './droid-service.js';
 import {CabinStartupLighting} from './startup-lighting.js';
 import {CabinEmergencyLighting} from './emergency-lighting.js';
-import {createCabinMirror,isMiloMirrorView} from './cabin-mirror.js';
+import {isMiloMirrorView} from './cabin-mirror.js';
+import {createDirectMirror} from './direct-mirror.js';
 import {attachHairGrowthSteps} from './hair-growth.js';
 import {createGroomingTools,prepareGroomingMotion} from './grooming.js';
 import {createMachinedMetals} from './machined-metals.js';
@@ -128,7 +129,7 @@ export class ObservationView {
       tool.visible=false;
       tool.traverse(part=>{if(part.material?.anisotropy>0)part.material.defines.USE_UV='';});
     }
-    this.groomingMirror=createCabinMirror({room:this.ship.groomingStation.mirrorRoom});
+    this.groomingMirror=createDirectMirror({room:this.ship.groomingStation.mirrorRoom});
     this.restingMirror=new THREE.Mesh(new THREE.PlaneGeometry(.72,.89),new THREE.MeshStandardMaterial({color:0xa8b5b5,metalness:1,roughness:.08}));
     this.restingMirror.material.userData.cabinKeepSurface=true;
     this.ship.groomingStation.mirror.add(this.groomingMirror,this.restingMirror);

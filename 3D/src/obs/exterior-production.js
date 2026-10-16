@@ -2,6 +2,9 @@ import {createExteriorMothership} from './exterior-mothership.js';
 import {createExteriorPanelStudy} from './exterior-panel-study.js';
 import {createProbeLineStudy} from './exterior-probe-line-study.js';
 
+// Shared approved seam treatment for the free study and opening film.
+export const EXTERIOR_SOFT_PANEL_LINES=Object.freeze({width:1.5,color:0x73796e,samples:4});
+
 // The approved finish is shared by the OBS opening, free exterior and previews.
 // Probe construction stays lazy; its finish is ready before shader warm-up.
 export function createProductionExterior({original=false,panelLines=null}={}){
@@ -9,7 +12,8 @@ export function createProductionExterior({original=false,panelLines=null}={}){
   if(original)return ship;
   const panels=createExteriorPanelStudy(ship,{replaceSkin:true,seamWidth:panelLines?.width??1,seamColor:panelLines?.color??0x50564f});
   panels.setEnabled(true);panels.setWeathering(true);
-  ship.finish={mothership:'B',probe:'A / dark seams',panels:panels.stats};
+  ship.finish={mothership:'B',probe:'A / dark seams',panels:panels.stats,
+    panelLines:{width:panelLines?.width??1,color:panelLines?.color??0x50564f}};
   const prepare=ship.prepareProbe.bind(ship),dispose=ship.dispose.bind(ship),setWear=ship.setWear.bind(ship);
   let probeLines=null,disposed=false,wear=true;
   const finishProbe=()=>{
