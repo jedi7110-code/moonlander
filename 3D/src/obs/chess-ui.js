@@ -19,7 +19,7 @@ export class CabinChess {
       <div class="chess-layout">
         <section class="chess-table">
           <div class="chess-player"><span class="chess-side carbon-dot"></span><strong>MILO JARVIS</strong><span id="chess-turn" role="status" aria-live="polite"></span></div>
-          <div class="chess-board" role="grid" aria-label="Chess board"></div>
+          <div class="chess-stage"><div class="chess-board" role="grid" aria-label="Chess board"></div></div>
           <div class="chess-player"><span class="chess-side ivory-dot"></span><strong id="chess-you"></strong><span id="chess-last-move"></span></div>
         </section>
         <aside class="chess-sidebar">

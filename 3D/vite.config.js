@@ -27,6 +27,7 @@ export default defineConfig({
         ladderStructureStudy: fileURLToPath(new URL('./src/ladder-structure-study.html', import.meta.url)),
         sofaStudy: fileURLToPath(new URL('./src/sofa-study.html', import.meta.url)),
         loungeSmokingStudy: fileURLToPath(new URL('./src/lounge-smoking-study.html', import.meta.url)),
+        loungeGamesStudy: fileURLToPath(new URL('./src/lounge-games-study.html', import.meta.url)),
         galleyStudy: fileURLToPath(new URL('./src/galley-study.html', import.meta.url)),
         hatchRepairStudy: fileURLToPath(new URL('./src/hatch-repair-study.html', import.meta.url)),
         hatchDoorStudy: fileURLToPath(new URL('./src/hatch-door-study.html', import.meta.url)),

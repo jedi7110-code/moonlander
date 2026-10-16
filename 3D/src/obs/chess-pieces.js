@@ -8,5 +8,6 @@ const shapes={
   k:'<path d="M32 4v13M26 9h12" fill="none" stroke-width="4"/><path d="M32 23c-3-11-16-8-16 0 0 7 7 9 9 15h14c2-6 9-8 9-15 0-8-13-11-16 0zM25 38h14l3 8H22z"/><path d="M32 23v10" fill="none"/>'
 };
 export function pieceSVG(type,color){
-  return `<svg class="chess-piece ${color==='w'?'ivory':'carbon'}" viewBox="0 0 64 64" aria-hidden="true"><g stroke-linejoin="round" stroke-linecap="round" stroke-width="2.2">${shapes[type]}<path d="M22 46h20l3 5v5H19v-5z"/><path d="M20 51h24" fill="none"/></g></svg>`;
+  const shape=shapes[type];
+  return `<svg class="chess-piece ${color==='w'?'ivory':'carbon'}" viewBox="0 0 64 64" aria-hidden="true"><g class="piece-depth" transform="translate(0 5)" stroke-linejoin="round" stroke-linecap="round" stroke-width="2.2">${shape}</g><g class="piece-face" stroke-linejoin="round" stroke-linecap="round" stroke-width="2.2">${shape}<path d="M22 46h20l3 5v5H19v-5z"/><path d="M20 51h24" fill="none"/></g></svg>`;
 }
