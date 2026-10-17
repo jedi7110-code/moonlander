@@ -8,6 +8,8 @@ import {createChessPieceGeometry,chessSquarePosition,chessSquareAt,chessGridMatr
 import {createChessHologram,createChessFootGlowMaterial} from './chess-hologram.js';
 import {chessMoveTransition,chessArcPosition,chessCaptureScale} from './chess-motion.js';
 import {createChessOrbit} from './chess-camera.js';
+import {CHESS_REVEAL,sampleChessReveal,applyChessLayerReveal} from './chess-reveal.js';
+import {createChessRevealCap} from './chess-reveal-cap.js';
 
 export function createChess3DView({stage,board,onSquare,onLand,onSettled,appearance={}}){
   const canvas=document.createElement('canvas');canvas.className='chess-3d-canvas';canvas.setAttribute('aria-hidden','true');
@@ -15,6 +17,7 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.localClippingEnabled=true;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x0b1b1d);
   const camera=new THREE.PerspectiveCamera(34,1,.1,200),target=new THREE.Vector3(0,.3,0),defaultDirection=new THREE.Vector3(0,15,14).normalize(),direction=defaultDirection.clone();
   camera.position.copy(target).addScaledVector(direction,24);
@@ -31,6 +34,15 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
   const captureHologram=createChessHologram({...appearance,color:0xc3848c,emissive:0x723a43,tint:new THREE.Color(.65,.28,.30)});
   const white=keep(whiteHologram.material),black=keep(blackHologram.material),capturable=keep(captureHologram.material);
   const depth=keep(new THREE.MeshBasicMaterial({colorWrite:false}));
+  const shadowDepth=keep(new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking}));
+  const revealPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),0);
+  const layerUniforms={chessLayerActive:{value:1},chessLayerBase:{value:0},chessLayerCursor:{value:-CHESS_REVEAL.halfWidth},chessLayerRight:{value:new THREE.Vector3(1,0,0)}};
+  for(const material of [white,black,capturable,depth,shadowDepth]){
+    material.clippingPlanes=[revealPlane];material.clipShadows=true;applyChessLayerReveal(material,layerUniforms);
+  }
+  // The build exposes inner surfaces. The depth prepass still retains only the
+  // nearest surface, while double-sided drawing prevents transparent backs.
+  for(const material of [white,black,capturable,depth]){material.side=THREE.DoubleSide;material.forceSinglePass=true;}
   const neon=basic(0x2de9f3,.6);
   function mesh(geometry,material,parent=scene,position=[0,0,0]){
     const object=new THREE.Mesh(keep(geometry),material);object.position.set(...position);parent.add(object);return object;
@@ -56,6 +68,7 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
   const fill=new THREE.DirectionalLight(0x22bde5,1.4);fill.position.set(5,5,-6);scene.add(fill);
   const pieceRoot=new THREE.Group(),markerRoot=new THREE.Group();scene.add(pieceRoot,markerRoot);
   const geometries=Object.fromEntries('prnbqk'.split('').map(type=>[type,keep(createChessPieceGeometry(type))]));
+  const revealHeight=Math.max(...Object.values(geometries).map(geometry=>geometry.boundingBox.max.y))+.01;
   const footGlowPlane=keep(new THREE.PlaneGeometry(1.2,1.2));
   const footGlowMaterials={w:keep(createChessFootGlowMaterial(undefined,appearance.glow)),b:keep(createChessFootGlowMaterial(0x278fc9,appearance.glow))};
   const markerMaterial=keep(new THREE.MeshBasicMaterial({color:0x66eaff,transparent:true,opacity:.75,depthWrite:false}));
@@ -65,12 +78,38 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
   const hole=new THREE.Path();hole.moveTo(-.455,-.455);hole.lineTo(-.455,.455);hole.lineTo(.455,.455);hole.lineTo(.455,-.455);hole.closePath();borderShape.holes.push(hole);
   const border=keep(new THREE.ShapeGeometry(borderShape)),dot=keep(new THREE.CircleGeometry(.095,32)),capture=keep(new THREE.RingGeometry(.39,.42,48)),wash=keep(new THREE.PlaneGeometry(.97,.97));
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const revealCaps=reducedMotion?{}:Object.fromEntries(Object.entries(geometries).map(([type,geometry])=>[
+    type,Array.from({length:CHESS_REVEAL.layers+1},(_,layer)=>keep(createChessRevealCap(geometry,revealHeight*layer/CHESS_REVEAL.layers)))
+  ]));
   let state={pieces:[],flipped:false,targets:[],last:[]},disposed=false,frame=0,animation=null,width=0,height=0,fitDistance=0;
+  let preparing=true,revealing=!reducedMotion,revealSeconds=0,lastRevealFrame=null;
+  if(reducedMotion){revealPlane.constant=1000;layerUniforms.chessLayerActive.value=0;}
   function invalidate(){
-    if(disposed||frame)return;
+    if(disposed||frame||preparing)return;
     frame=requestAnimationFrame(time=>{
       frame=0;if(disposed||document.hidden)return;
-      let landed=null;
+      let landed=null,revealSettled=false;
+      if(revealing){
+        if(lastRevealFrame!==null)revealSeconds+=Math.max(0,Math.min(.1,(time-lastRevealFrame)/1000));
+        lastRevealFrame=time;
+        const reveal=sampleChessReveal(revealSeconds,revealHeight);revealPlane.constant=reveal.height+1e-5;
+        layerUniforms.chessLayerBase.value=reveal.baseHeight;layerUniforms.chessLayerCursor.value=reveal.cursor;
+        stage.dataset.revealLayer=String(reveal.layer);
+        for(const piece of pieceRoot.children){
+          piece.userData.footGlow.visible=reveal.layer>0||reveal.sweep>0;
+          for(let i=0;i<piece.userData.revealCaps.length;i++){
+            const cap=piece.userData.revealCaps[i],geometry=revealCaps[piece.userData.type][Math.min(reveal.layer+i,CHESS_REVEAL.layers)];
+            cap.visible=!reveal.done&&geometry.attributes.position.count>0;
+            for(const surface of cap.children)surface.geometry=geometry;
+          }
+        }
+        if(reveal.done){
+          // Keep the compiled clipping variant, but clear the path for later
+          // moves whose arcs rise above the standing pieces.
+          revealPlane.constant=1000;layerUniforms.chessLayerActive.value=0;revealing=false;revealSettled=true;
+          stage.classList.remove('is-revealing');board.inert=false;board.setAttribute('aria-busy','false');
+        }
+      }
       if(animation){
         animation.start??=time;
         const progress=Math.min(1,(time-animation.start)/(animation.duration*1000));
@@ -83,18 +122,26 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
         if(progress>=1){landed=animation.move;animation=null;buildPieces();board.setAttribute('aria-busy','false');}
       }
       composer.render();
-      if(animation)invalidate();
-      if(landed){onLand?.(landed);onSettled?.();}
+      if(animation||revealing)invalidate();
+      if(landed)onLand?.(landed);
+      if(landed||revealSettled)onSettled?.();
     });
   }
   function createPiece(piece){
       const root=new THREE.Group();root.name=piece.color+' '+piece.type+' '+piece.square;root.userData.square=piece.square;
-      root.position.copy(chessSquarePosition(piece.square));root.rotation.y=(piece.color==='b'?Math.PI:0)+(piece.type==='n'?Math.PI/2:0);
+      root.position.copy(chessSquarePosition(piece.square));root.rotation.y=(piece.color==='b'?Math.PI:0)+(piece.type==='n'?Math.PI/2:0);root.userData.type=piece.type;root.userData.revealCaps=[];
       // Match the study's single visible surface, without revealing intersecting
       // crowns/necks or drawing the back of a neighbouring piece through it.
       const prepass=new THREE.Mesh(geometries[piece.type],depth);prepass.renderOrder=1;root.add(prepass);
       const body=new THREE.Mesh(geometries[piece.type],piece.color==='w'?white:black);body.renderOrder=2;body.castShadow=true;body.receiveShadow=true;root.add(body);root.userData.body=body;root.userData.color=piece.color;
+      body.customDepthMaterial=shadowDepth;
+      if(revealing)for(let i=0;i<2;i++){
+        const cap=new THREE.Group();cap.visible=false;root.add(cap);root.userData.revealCaps.push(cap);
+        const geometry=revealCaps[piece.type][0],prepass=new THREE.Mesh(geometry,depth),surface=new THREE.Mesh(geometry,body.material);
+        prepass.renderOrder=1;surface.renderOrder=2;surface.castShadow=surface.receiveShadow=true;surface.customDepthMaterial=shadowDepth;cap.add(prepass,surface);
+      }
       const glow=new THREE.Mesh(footGlowPlane,footGlowMaterials[piece.color]);glow.rotation.x=-Math.PI/2;glow.position.y=.012;
+      glow.visible=!revealing||revealPlane.constant>0;
       glow.raycast=()=>{};root.userData.footGlow=glow;root.add(glow);
       pieceRoot.add(root);return root;
   }
@@ -114,7 +161,7 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
     const transition=changed&&!reducedMotion?chessMoveTransition(state,next):null;
     state=next;markerRoot.clear();
     pieceRoot.rotation.y=markerRoot.rotation.y=state.flipped?Math.PI:0;
-    if(changed||!pieceRoot.children.length){animation=buildPieces(transition);board.setAttribute('aria-busy',String(Boolean(animation)));}
+    if(changed||!pieceRoot.children.length){animation=buildPieces(preparing||revealing?null:transition);board.setAttribute('aria-busy',String(preparing||revealing||Boolean(animation)));}
     const captures=new Set(state.selected?state.captures??[]:[]);
     for(const piece of pieceRoot.children)piece.userData.body.material=piece.userData.color==='w'?white:captures.has(piece.userData.square)?capturable:black;
     const occupied=new Set(state.pieces.map(piece=>piece.square));
@@ -147,6 +194,7 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
   function syncCamera(){
     if(!width||!height)return;
     camera.updateMatrixWorld(true);
+    layerUniforms.chessLayerRight.value.setFromMatrixColumn(camera.matrixWorld,0);
     board.style.transform='matrix3d('+chessGridMatrix(camera,width,height).join(',')+')';invalidate();
   }
   function resetCamera(){
@@ -174,7 +222,7 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
   const pointerUp=event=>{
     pointers.delete(event.pointerId);if(!pointers.size)canvas.classList.remove('is-dragging');
     if(!down||down.id!==event.pointerId)return;const gesture=down;down=null;
-    if(gesture.moved||pointers.size||event.button!==0||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>7||animation)return;
+    if(gesture.moved||pointers.size||event.button!==0||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>7||preparing||revealing||animation)return;
     const rect=canvas.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2),camera);
     const hit=ray.intersectObjects(pieceRoot.children,true)[0];let square=null;
     if(hit){let object=hit.object;while(object&&!object.userData.square)object=object.parent;square=object?.userData.square;}
@@ -183,13 +231,20 @@ export function createChess3DView({stage,board,onSquare,onLand,onSettled,appeara
   };
   const pointerCancel=event=>{pointers.delete(event.pointerId);down=null;canvas.classList.remove('is-dragging');};
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerCancel);
-  const visibility=()=>{if(!document.hidden)invalidate();};document.addEventListener('visibilitychange',visibility);
+  const visibility=()=>{lastRevealFrame=null;if(!document.hidden)invalidate();};document.addEventListener('visibilitychange',visibility);
   stage.prepend(canvas);stage.classList.add('is-3d');
   const observer=new ResizeObserver(resize);observer.observe(stage);resize();
-  return{update,resetCamera,setAppearance,get animating(){return animation!==null;},dispose(){
+  stage.classList.toggle('is-revealing',revealing);stage.dataset.revealLayer=String(reducedMotion?CHESS_REVEAL.layers:0);
+  // Compile and warm the complete pipeline before starting the entrance clock.
+  // The first presented canvas contains the board and no visible piece layers.
+  const ready=Promise.resolve().then(async()=>{
+    if(disposed)return;await renderer.compileAsync(scene,camera);if(disposed)return;
+    composer.render();preparing=false;board.inert=revealing;board.setAttribute('aria-busy',String(revealing));invalidate();
+  });
+  return{update,ready,resetCamera,setAppearance,get animating(){return preparing||revealing||animation!==null;},dispose(){
     disposed=true;animation=null;cancelAnimationFrame(frame);observer.disconnect();document.removeEventListener('visibilitychange',visibility);controls.dispose();
     canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerCancel);
-    stage.classList.remove('is-3d');board.style.removeProperty('transform');board.removeAttribute('aria-busy');canvas.remove();
+    stage.classList.remove('is-3d','is-revealing');delete stage.dataset.revealLayer;board.inert=false;board.style.removeProperty('transform');board.removeAttribute('aria-busy');canvas.remove();
     resources.forEach(resource=>resource.dispose());sun.shadow.map?.dispose();
     bloom.dispose();output.dispose();composer.dispose();renderer.dispose();renderer.forceContextLoss();
   }};

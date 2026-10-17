@@ -1,4 +1,4 @@
-import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize2,Minimize2,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike} from 'lucide';
+import {createIcons,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize2,Minimize2,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike,Rotate3d} from 'lucide';
 import {CabinBrain,isChessRequest,isGameAcceptance} from './brain.js';
 import {CabinLoungeGames} from './lounge-games.js';
 import {loungeGamePromptAvailable,updateLoungeGamePrompt} from './lounge-prompt.js';
@@ -33,7 +33,7 @@ const CatFoodBowl=[
   ['ellipse',{cx:12,cy:12,rx:7,ry:2}],
   ['circle',{cx:8,cy:9,r:1}],['circle',{cx:12,cy:8,r:1}],['circle',{cx:16,cy:9,r:1}],
 ];
-const icons={CatFoodBowl,Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize2,Minimize2,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike};
+const icons={CatFoodBowl,Eye,Sprout,Pause,Play,VolumeX,Volume2,Cat,Bot,Scan,UserRound,Minus,Plus,Maximize2,Minimize2,Radio,ArrowUpRight,X,Utensils,Droplet,Disc3,Send,RadioTower,Swords,MessageCircle,Undo2,ArrowDownUp,Flag,RotateCcw,RotateCw,ArrowLeft,HeartPulse,Cross,Bed,ShowerHead,Toilet,Bike,Rotate3d};
 const refreshIcons=()=>createIcons({icons});
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const stationName=id=>({smoking:words('シャワー左の灰皿','Shower-side ashtray'),grooming:words('洗面台・散髪','Washbasin / grooming'),plant:words('栽培棚','Plant rack'),gym:words('ジム','Gym'),medical:words('医療区画','Medical bay'),eva:words('宇宙服ラック','Suit rack'),airlock:words('船外ハッチ','EVA hatch'),innerHatch:words('船内ハッチ','Inner hatch')}[id]||t('st_'+id));

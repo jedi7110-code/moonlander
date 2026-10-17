@@ -10,7 +10,7 @@ const icon=name=>`<i data-lucide="${name}"></i>`;
 export class CabinChess {
   constructor({parent,onClose,onMove,onLand,onResult,refreshIcons}){
     this.onClose=onClose;this.onMove=onMove;this.onLand=onLand;this.onResult=onResult;this.refreshIcons=refreshIcons;
-    this.worker=null;this.epoch=0;this.selected=null;this.promotion=null;this.flipped=false;this.error=false;this.view=null;this.viewEpoch=0;this.appearance={};
+    this.worker=null;this.epoch=0;this.selected=null;this.promotion=null;this.flipped=false;this.error=false;this.view=null;this.viewEpoch=0;this.viewLoading=false;this.appearance={};
     let saved=null;try{saved=JSON.parse(localStorage.getItem(CHESS_SAVE_KEY));}catch{}
     this.match=new ChessMatch(saved);
     this.dialog=document.createElement('dialog');this.dialog.id='cabin-chess';this.dialog.setAttribute('aria-labelledby','chess-title');
@@ -19,7 +19,7 @@ export class CabinChess {
       <div class="chess-layout">
         <section class="chess-table">
           <div class="chess-player"><span class="chess-side carbon-dot"></span><strong>MILO JARVIS</strong><span id="chess-turn" role="status" aria-live="polite"></span></div>
-          <div class="chess-stage"><div class="chess-board" role="grid" aria-label="Chess board"></div><button type="button" data-action="reset-view" class="chess-view-reset"></button></div>
+          <div class="chess-stage"><div class="chess-board" role="grid" aria-label="Chess board"></div><button type="button" data-action="reset-view" class="chess-view-reset">${icon('rotate-3d')}</button></div>
           <div class="chess-player"><span class="chess-side ivory-dot"></span><strong id="chess-you"></strong><span id="chess-last-move"></span></div>
         </section>
         <aside class="chess-sidebar">
@@ -60,7 +60,8 @@ export class CabinChess {
   show(){
     if(this.open)return;
     this.returnFocus=document.activeElement;this.selected=null;this.promotion=null;this.confirmation=null;
-    this.dialog.showModal();this.render();this.think();this.cells.find(cell=>cell.dataset.square==='e2').focus();void this.prepare3D();
+    this.viewLoading=true;this.stage.classList.add('is-loading');this.board.inert=true;this.board.setAttribute('aria-busy','true');
+    this.dialog.showModal();this.render();void this.prepare3D();
   }
   async prepare3D(){
     const epoch=++this.viewEpoch;
@@ -68,14 +69,20 @@ export class CabinChess {
       const {createChess3DView}=await import('./chess-3d.js');
       if(epoch!==this.viewEpoch||!this.open)return;
       this.view=createChess3DView({stage:this.stage,board:this.board,appearance:this.appearance,onSquare:square=>this.choose(square),onLand:move=>this.onLand?.(move),onSettled:()=>{if(this.open){this.render();this.think();}}});this.render();
-    }catch(error){console.warn('Chess 3D unavailable; keeping the accessible board.',error);}
+      await this.view.ready;
+      if(epoch!==this.viewEpoch||!this.open)return;
+      this.viewLoading=false;this.stage.classList.remove('is-loading');this.render();this.think();
+    }catch(error){
+      if(epoch!==this.viewEpoch||!this.open)return;
+      this.release3D();this.render();this.think();console.warn('Chess 3D unavailable; keeping the accessible board.',error);
+    }
   }
-  release3D(){this.viewEpoch++;this.view?.dispose();this.view=null;}
+  release3D(){this.viewEpoch++;this.viewLoading=false;this.view?.dispose();this.view=null;this.stage.classList.remove('is-loading');this.board.inert=false;this.board.removeAttribute('aria-busy');}
   setAppearance(appearance){this.appearance={...appearance};this.view?.setAppearance(this.appearance);}
   close(){if(this.open)this.dialog.close();}
   cancelAI(){this.epoch++;this.worker?.terminate();this.worker=null;clearTimeout(this.watchdog);clearTimeout(this.replyTimer);this.thinking=false;}
   think(){
-    if(!this.open||document.hidden||this.match.result||this.match.humanTurn||this.confirmation||this.thinking||this.view?.animating)return;
+    if(!this.open||document.hidden||this.match.result||this.match.humanTurn||this.confirmation||this.thinking||this.viewLoading||this.view?.animating)return;
     this.cancelAI();this.thinking=true;this.error=false;const epoch=this.epoch,fen=this.match.game.fen();
     const fail=()=>{if(epoch!==this.epoch)return;this.cancelAI();this.error=true;this.render();};
     try{
@@ -97,7 +104,7 @@ export class CabinChess {
     this.render();
   }
   choose(square){
-    if(!this.match.humanTurn||this.promotion||this.confirmation||this.view?.animating)return;
+    if(!this.match.humanTurn||this.promotion||this.confirmation||this.viewLoading||this.view?.animating)return;
     if(this.selected===square){this.selected=null;this.render();return;}
     if(this.selected){
       const moves=this.match.legal(this.selected).filter(move=>move.to===square);
@@ -134,7 +141,7 @@ export class CabinChess {
   render(){
     const game=this.match.game,history=this.match.history,last=history.at(-1),result=this.match.result;
     this.$('title').textContent=words('マイロとチェス','Chess with Milo');this.$('you').textContent=words('あなた / 白','YOU / WHITE');
-    this.dialog.querySelector('.chess-view-reset').textContent=words('初期視点','Reset view');
+    this.dialog.querySelector('.chess-view-reset').setAttribute('aria-label',words('初期視点','Reset view'));
     this.$('paused-label').textContent=this.saveFailed?words('保存不可 / このページ内で継続','Save unavailable / keep this page open'):words('船内時間 停止中','SHIP TIME PAUSED');
     this.$('score-title').textContent=words('棋譜','MOVES');this.$('level-label').textContent=words('マイロの強さ','Milo’s level');
     this.$('level').value=String(this.match.level);[...this.$('level').options].forEach((option,i)=>option.textContent=words(...[['気軽に','Casual'],['ふつう','Regular'],['真剣勝負','Challenging']][i]));

@@ -1,8 +1,8 @@
 import {CabinLoungeGames} from './obs/lounge-games.js';
 import {CHESS_HOLOGRAM_SETTINGS} from './obs/chess-hologram.js';
-import {createIcons,X,Pause,RotateCw,Undo2,ArrowDownUp,Flag,RotateCcw,ArrowLeft} from 'lucide';
+import {createIcons,X,Pause,RotateCw,Undo2,ArrowDownUp,Flag,RotateCcw,ArrowLeft,Rotate3d} from 'lucide';
 
-const icons={X,Pause,RotateCw,Undo2,ArrowDownUp,Flag,RotateCcw,ArrowLeft};
+const icons={X,Pause,RotateCw,Undo2,ArrowDownUp,Flag,RotateCcw,ArrowLeft,Rotate3d};
 const games=new CabinLoungeGames({parent:document.body,refreshIcons:()=>createIcons({icons})});
 const params=new URLSearchParams(location.search);
 params.delete('translucency');params.delete('glow');
