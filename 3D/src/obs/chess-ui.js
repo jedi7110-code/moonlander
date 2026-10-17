@@ -8,8 +8,8 @@ const names={p:['ポーン','Pawn'],r:['ルーク','Rook'],n:['ナイト','Knigh
 const icon=name=>`<i data-lucide="${name}"></i>`;
 
 export class CabinChess {
-  constructor({parent,onClose,onMove,onResult,refreshIcons}){
-    this.onClose=onClose;this.onMove=onMove;this.onResult=onResult;this.refreshIcons=refreshIcons;
+  constructor({parent,onClose,onMove,onLand,onResult,refreshIcons}){
+    this.onClose=onClose;this.onMove=onMove;this.onLand=onLand;this.onResult=onResult;this.refreshIcons=refreshIcons;
     this.worker=null;this.epoch=0;this.selected=null;this.promotion=null;this.flipped=false;this.error=false;this.view=null;this.viewEpoch=0;this.appearance={};
     let saved=null;try{saved=JSON.parse(localStorage.getItem(CHESS_SAVE_KEY));}catch{}
     this.match=new ChessMatch(saved);
@@ -67,7 +67,7 @@ export class CabinChess {
     try{
       const {createChess3DView}=await import('./chess-3d.js');
       if(epoch!==this.viewEpoch||!this.open)return;
-      this.view=createChess3DView({stage:this.stage,board:this.board,appearance:this.appearance,onSquare:square=>this.choose(square),onSettled:()=>{if(this.open){this.render();this.think();}}});this.render();
+      this.view=createChess3DView({stage:this.stage,board:this.board,appearance:this.appearance,onSquare:square=>this.choose(square),onLand:move=>this.onLand?.(move),onSettled:()=>{if(this.open){this.render();this.think();}}});this.render();
     }catch(error){console.warn('Chess 3D unavailable; keeping the accessible board.',error);}
   }
   release3D(){this.viewEpoch++;this.view?.dispose();this.view=null;}
@@ -112,6 +112,7 @@ export class CabinChess {
     this.selected=null;this.promotion=null;this.error=false;
     if(this.match.claimResult())this.onResult?.(this.match.result);
     this.save();this.onMove?.(move);this.render();this.think();
+    if(!this.view?.animating)this.onLand?.(move);
   }
   action(action){
     if(action==='close'){this.close();return;}
@@ -143,18 +144,19 @@ export class CabinChess {
     const retry=this.dialog.querySelector('[data-action="retry"]');retry.hidden=!this.error;retry.querySelector('span').textContent=words('再接続','Reconnect');
     const resultNames={mate:['チェックメイト','Checkmate'],resigned:['投了','Resigned'],stalemate:['ステイルメイト','Stalemate'],repetition:['同一局面の反復','Threefold repetition'],material:['戦力不足','Insufficient material'],draw:['引き分け','Draw']};
     if(result)this.$('turn').textContent=words(...resultNames[result.reason]);
-    const targets=new Set(this.selected?this.match.legal(this.selected).map(move=>move.to):[]);
+    const legal=this.selected?this.match.legal(this.selected):[],targets=new Set(legal.map(move=>move.to));
+    const captures=new Set(legal.filter(move=>move.captured).map(move=>move.flags.includes('e')?move.to[0]+move.from[1]:move.to));
     this.board.dataset.turn=game.turn();this.board.dataset.ply=String(history.length);this.board.setAttribute('aria-label',words('チェス盤','Chess board'));
     this.cells.forEach((cell,index)=>{
       const file=this.flipped?7-index%8:index%8,rank=this.flipped?Math.floor(index/8)+1:8-Math.floor(index/8),square='abcdefgh'[file]+rank,piece=game.get(square),selected=this.selected===square;
-      cell.dataset.square=square;cell.className=`chess-square ${(file+rank)%2?'light':'dark'}${selected?' selected':''}${targets.has(square)?' legal':''}${last&&(last.from===square||last.to===square)?' last':''}${game.isCheck()&&piece?.type==='k'&&piece.color===game.turn()?' check':''}`;
-      cell.setAttribute('aria-label',`${square}${piece?' '+words(piece.color==='w'?'白':'黒',piece.color==='w'?'White':'Black')+' '+words(...names[piece.type]):''}${targets.has(square)?words(' 移動可能',' Legal move'):''}`);
+      cell.dataset.square=square;cell.className=`chess-square ${(file+rank)%2?'light':'dark'}${selected?' selected':''}${targets.has(square)?' legal':''}${captures.has(square)?' capture-target':''}${last&&(last.from===square||last.to===square)?' last':''}${game.isCheck()&&piece?.type==='k'&&piece.color===game.turn()?' check':''}`;
+      cell.setAttribute('aria-label',`${square}${piece?' '+words(piece.color==='w'?'白':'黒',piece.color==='w'?'White':'Black')+' '+words(...names[piece.type]):''}${targets.has(square)?words(' 移動可能',' Legal move'):''}${captures.has(square)?words(' 取れます',' Capturable'):''}`);
       cell.setAttribute('aria-selected',String(selected));
       const markup=`${piece?pieceSVG(piece.type,piece.color):''}<span class="square-file">${index>=56?'abcdefgh'[file]:''}</span><span class="square-rank">${index%8===0?rank:''}</span>`;
       if(cell.innerHTML!==markup)cell.innerHTML=markup;
     });
     if(this.view)this.view.update({
-      pieces:game.board().flat().filter(Boolean),positionKey:game.fen(),move:last,flipped:this.flipped,selected:this.selected,targets:[...targets],
+      pieces:game.board().flat().filter(Boolean),positionKey:game.fen(),move:last,flipped:this.flipped,selected:this.selected,targets:[...targets],captures:[...captures],
       last:last?[last.from,last.to]:[],check:game.isCheck()?game.board().flat().find(piece=>piece?.type==='k'&&piece.color===game.turn())?.square:null
     });
     const moveList=this.$('moves'),wasAtEnd=moveList.scrollHeight-moveList.scrollTop-moveList.clientHeight<30;

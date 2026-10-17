@@ -100,9 +100,9 @@ const scene={
   }
 };
 const brain=new CabinBrain(scene,actor,{care,name:'MILO'});
-const games=new CabinLoungeGames({parent:$('observation'),refreshIcons,
+const games=new CabinLoungeGames({parent:$('observation'),refreshIcons,audio,
+  onAudioChange(){const button=$('obs-sound');button.setAttribute('aria-pressed',String(audio.enabled));button.setAttribute('aria-label',audio.enabled?words('船内音をオフ','Turn cabin audio off'):words('船内音をオン','Turn cabin audio on'));button.innerHTML=`<i data-lucide="${audio.enabled?'volume-2':'volume-x'}"></i>`;refreshIcons();},
   onClose(){brain.finishGame();previous=performance.now();accumulator=0;audio.pause(paused||document.hidden);updateHUD();if(games.returnFocus===$('open-lounge-games'))$('ship-view').focus({preventScroll:true});},
-  onMove(){audio.tone(340,.07,.02);},
   onResult(){brain.needs.fun=Math.min(100,brain.needs.fun+25);brain.rapport=Math.min(100,brain.rapport+5);}
 });
 const exterior=exteriorCinema;

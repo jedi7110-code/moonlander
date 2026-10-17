@@ -2,6 +2,9 @@
 #cabin-games button,.lounge-chess-back{font:inherit;color:inherit;border:1px solid #71817880;border-radius:4px;background:#293432;padding:9px 13px;cursor:pointer}#cabin-games button:hover:not(:disabled){background:#394b43}#cabin-games button:disabled{opacity:.4;cursor:default}#cabin-games button:focus-visible,.lounge-chess-back:focus-visible{outline:3px solid #e9cc7a;outline-offset:2px}
 .lounge-header,.lounge-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 24px;border-bottom:1px solid #8d9c7d30}.lounge-header span{font:11px var(--mono);color:#b5c398}.lounge-header h2{margin:5px 0 0;font-size:21px;font-weight:500}.lounge-content{padding:20px 24px}.lounge-intro{margin:0 0 22px;color:#bbc8be;font-size:14px}
 .lounge-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.lounge-header-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+#cabin-chess .lounge-sound,#cabin-games .lounge-sound{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:1px solid #71817880;border-radius:4px;background:#293432;color:#b9cbbd;cursor:pointer}
+.lounge-sound svg{display:block;width:18px;height:18px}
 #cabin-games .lounge-choices button{display:grid;grid-template-rows:48px auto minmax(44px,1fr) 20px;align-items:start;justify-items:start;text-align:left;padding:24px 18px;gap:16px;min-height:245px;background:linear-gradient(145deg,#30443c,#1d2928)}
 .lounge-choice-icon{display:grid;place-items:center;width:48px;height:48px;color:#d9d6ac}
 .lounge-choice-icon svg{display:block;width:44px;height:44px;stroke-width:1.6}

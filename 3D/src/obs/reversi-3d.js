@@ -4,7 +4,7 @@ import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
-import {createChessHologram,createChessFootGlowMaterial} from './chess-hologram.js';
+import {createChessHologram,createChessFootGlowMaterial,REVERSI_HOLOGRAM_SETTINGS} from './chess-hologram.js';
 
 export function createReversi3DView({stage,board}){
   const canvas=document.createElement('canvas');canvas.className='reversi-3d-canvas';canvas.setAttribute('aria-hidden','true');
@@ -49,11 +49,11 @@ export function createReversi3DView({stage,board}){
   const fill=new THREE.DirectionalLight(0x8aba75,1.4);fill.position.set(5,5,-6);scene.add(fill);
   const profile=[[0,.025],[.29,.025],[.33,.035],[.35,.06],[.35,.13],[.335,.16],[.30,.175],[0,.175]];
   const disc=keep(new THREE.LatheGeometry(profile.map(([r,y])=>new THREE.Vector2(r,y)),64));
-  const player=keep(createChessHologram({color:0x608b5b,emissive:0x385030,tint:new THREE.Color(.28,.43,.23)}).material);
-  const milo=keep(createChessHologram({color:0x23472b,emissive:0x123019,tint:new THREE.Color(.07,.22,.085)}).material);
+  const player=keep(createChessHologram({...REVERSI_HOLOGRAM_SETTINGS,color:0x608b5b,emissive:0x385030,tint:new THREE.Color(.28,.43,.23)}).material);
+  const milo=keep(createChessHologram({...REVERSI_HOLOGRAM_SETTINGS,color:0x23472b,emissive:0x123019,tint:new THREE.Color(.07,.22,.085)}).material);
   const depth=keep(new THREE.MeshBasicMaterial({colorWrite:false}));
   const glowPlane=keep(new THREE.PlaneGeometry(1.2,1.2));
-  const playerGlow=keep(createChessFootGlowMaterial(0x8eae7c)),miloGlow=keep(createChessFootGlowMaterial(0x3f7241));
+  const playerGlow=keep(createChessFootGlowMaterial(0x8eae7c,REVERSI_HOLOGRAM_SETTINGS.glow)),miloGlow=keep(createChessFootGlowMaterial(0x3f7241,REVERSI_HOLOGRAM_SETTINGS.glow));
   const legalDot=keep(new THREE.CircleGeometry(.065,32));
   const legalMaterial=keep(new THREE.MeshBasicMaterial({color:0x64865b,transparent:true,opacity:.30,depthWrite:false}));
   const pieces=new THREE.Group(),markers=new THREE.Group();scene.add(pieces,markers);

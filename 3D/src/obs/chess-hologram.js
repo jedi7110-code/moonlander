@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-export const CHESS_HOLOGRAM_SETTINGS=Object.freeze({translucency:30,glow:70});
+export const CHESS_HOLOGRAM_SETTINGS=Object.freeze({translucency:30,glow:100});
+export const REVERSI_HOLOGRAM_SETTINGS=Object.freeze({translucency:30,glow:70});
 
 // A soft annulus on one quad avoids coplanar ring triangles and thin hard edges.
 // Screen-space derivatives keep both edges filtered even at grazing angles.

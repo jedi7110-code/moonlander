@@ -1,10 +1,12 @@
 import {CabinChess} from './chess-ui.js';
 import {ReversiMatch,chooseReversiMove} from './reversi-match.js';
+import {CabinAudio} from './audio.js';
+import {bindCabinAudioGestures} from './audio-unlock.js';
 import {PokerMatch,cardLabel,evaluateHand,POKER_HAND_NAMES} from './poker-match.js';
 import {getLang} from '../../../js/obs/i18n.js?v=15';
 import './lounge-games.css';
 import {FALL_LINE_URL} from './pad-screen.js';
-import {createElement,ChessKnight,Spade,BookOpen} from 'lucide';
+import {createElement,ChessKnight,Spade,BookOpen,Volume2,VolumeX} from 'lucide';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 const labels={chess:['チェス','Chess'],poker:['ポーカー','Poker'],reversi:['リバーシ','Reversi']};
@@ -16,18 +18,25 @@ const choiceIcons={chess:ChessKnight,poker:Spade,novel:BookOpen,reversi:[
   ['circle',{cx:16,cy:16,r:6,fill:'#293c35'}],
 ]};
 const choiceIcon=kind=>`<span class="lounge-choice-icon" aria-hidden="true">${createElement(choiceIcons[kind],{'stroke-width':1.6,focusable:'false'}).outerHTML}</span>`;
+const soundIcon=enabled=>createElement(enabled?Volume2:VolumeX,{'aria-hidden':'true',focusable:'false','stroke-width':1.8}).outerHTML;
 
 export class CabinLoungeGames{
-  constructor({parent,onClose,onMove,onResult,refreshIcons}){
+  constructor({parent,onClose,onMove,onResult,refreshIcons,audio,onAudioChange}){
     this.onClose=onClose;this.onMove=onMove;this.onResult=onResult;this.active=false;this.kind=null;this.selected=new Set();this.epoch=0;
+    this.ownsAudio=!audio;this.audio=audio??new CabinAudio({ambience:false,enabled:true,library:{}});this.onAudioChange=onAudioChange;
+    if(this.ownsAudio)this.audio.pause(true);
+    this.unbindAudio=this.ownsAudio?bindCabinAudioGestures(this.audio,{ignore:()=>!this.active||!['chess','reversi'].includes(this.kind)}):()=>{};
     this.matches={reversi:new ReversiMatch(read(keys.reversi)),poker:new PokerMatch(read(keys.poker))};
     this.reversiView=null;this.reversiViewEpoch=0;this.reversiViewLoading=false;
-    this.chess=new CabinChess({parent,onMove,onResult,refreshIcons,onClose:()=>{
+    this.chess=new CabinChess({parent,onMove,onResult,refreshIcons,onLand:move=>this.audio.playGameSound({game:'chess',move}),onClose:()=>{
       if(this.returningToMenu){this.returningToMenu=false;this.showMenu();queueMicrotask(()=>this.dialog.querySelector('button').focus());}
       else this.finish();
     }});
     this.backButton=document.createElement('button');this.backButton.type='button';this.backButton.className='lounge-chess-back';
     this.backButton.onclick=()=>{this.returningToMenu=true;this.chess.close();};this.chess.dialog.querySelector('.chess-footer').prepend(this.backButton);
+    const close=this.chess.dialog.querySelector('.chess-header>[data-action="close"]'),actions=document.createElement('div');actions.className='lounge-header-actions';
+    close.before(actions);actions.innerHTML=this.soundButton();actions.append(close);
+    actions.querySelector('[data-action="sound"]').addEventListener('click',()=>void this.toggleSound());
     this.dialog=document.createElement('dialog');this.dialog.id='cabin-games';this.dialog.setAttribute('aria-labelledby','lounge-title');parent.append(this.dialog);
     this.dialog.addEventListener('click',event=>{const target=event.target.closest('button');if(!target)return;
       if(target.dataset.game)this.select(target.dataset.game);
@@ -43,20 +52,34 @@ export class CabinLoungeGames{
     });
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
     this.dialog.addEventListener('close',()=>{if(this.switchingToChess){this.switchingToChess=false;return;}this.finish();});
-    this.visibility=()=>{this.cancelAI();if(!document.hidden)this.think();};document.addEventListener('visibilitychange',this.visibility);
+    this.visibility=()=>{this.cancelAI();this.syncAudio();if(!document.hidden)this.think();};document.addEventListener('visibilitychange',this.visibility);
+    this.pagehide=()=>this.audio.setGameActive(false);window.addEventListener('pagehide',this.pagehide);window.addEventListener('pageshow',this.visibility);
+  }
+  soundButton(){return `<button type="button" class="lounge-sound" data-action="sound" aria-pressed="${this.audio.enabled}" aria-label="${this.audio.enabled?words('音をオフ','Turn sound off'):words('音をオン','Turn sound on')}">${soundIcon(this.audio.enabled)}</button>`;}
+  syncAudio(){
+    this.audio.setGameActive(this.active&&!document.hidden&&['chess','reversi'].includes(this.kind));
+    for(const button of [this.chess.dialog.querySelector('[data-action="sound"]'),this.dialog.querySelector('[data-action="sound"]')])if(button){
+      button.setAttribute('aria-pressed',String(this.audio.enabled));button.setAttribute('aria-label',this.audio.enabled?words('音をオフ','Turn sound off'):words('音をオン','Turn sound on'));
+      button.innerHTML=soundIcon(this.audio.enabled);
+    }
+  }
+  async toggleSound(){
+    try{await this.audio.toggle();}catch(error){console.warn('Game audio unavailable.',error);}
+    this.syncAudio();this.onAudioChange?.();
   }
   get open(){return this.active;}
   get title(){return this.kind==='novel'?'FALL-LINE ── '+words('フォールライン','THE FALL'):this.kind?words(...labels[this.kind]):words('ラウンジゲーム','Lounge games');}
   show(kind=null){if(this.active)return;this.returnFocus=document.activeElement;this.active=true;this.showMenu();if(labels[kind])this.select(kind);}
-  showMenu(){this.cancelAI();this.kind=null;this.confirmation=false;this.render();if(!this.dialog.open)this.dialog.showModal();this.dialog.querySelector('[data-game]').focus();}
+  showMenu(){this.cancelAI();this.kind=null;this.syncAudio();this.confirmation=false;this.render();if(!this.dialog.open)this.dialog.showModal();this.dialog.querySelector('[data-game]').focus();}
   select(kind){
     if(!labels[kind]&&kind!=='novel')return;this.cancelAI();this.save();this.kind=kind;this.confirmation=false;this.selected.clear();
+    this.syncAudio();
     if(kind!=='reversi')this.releaseReversi3D();
     if(kind==='chess'){this.switchingToChess=true;this.dialog.close();this.chess.show();this.backButton.textContent=words('ゲームを選ぶ','Choose game');}
     else{this.render();this.dialog.querySelector('[data-action="menu"]').focus();this.think();}
   }
   close(){this.cancelAI();this.save();if(this.chess.open)this.chess.close();else this.dialog.close();}
-  finish(){if(!this.active)return;this.active=false;this.cancelAI();this.releaseReversi3D();this.save();this.onClose?.();if(this.returnFocus?.isConnected)this.returnFocus.focus();}
+  finish(){if(!this.active)return;this.active=false;this.syncAudio();this.cancelAI();this.releaseReversi3D();this.save();this.onClose?.();if(this.returnFocus?.isConnected)this.returnFocus.focus();}
   async prepareReversi3D(){
     if(this.reversiViewLoading)return;
     this.reversiViewLoading=true;const epoch=this.reversiViewEpoch;
@@ -86,23 +109,25 @@ export class CabinLoungeGames{
     this.thinking=true;const epoch=this.epoch;this.render();
     this.timer=setTimeout(()=>{
       if(epoch!==this.epoch||!this.active||this.kind!=='reversi')return;
-      this.thinking=false;match.move(chooseReversiMove(match.board),-1);this.afterMove();
+      this.thinking=false;this.commitReversi(chooseReversiMove(match.board),-1);
     },450);
   }
-  afterMove(){const match=this.matches[this.kind];if(match.claimResult())this.onResult?.(match.result);this.save();this.onMove?.();this.render();this.think();}
-  moveReversi(index){if(this.kind==='reversi'&&!this.confirmation&&this.matches.reversi.move(index))this.afterMove();}
+  afterMove(sound){const match=this.matches[this.kind];if(match.claimResult())this.onResult?.(match.result);this.save();if(sound)this.audio.playGameSound(sound);this.onMove?.();this.render();this.think();}
+  commitReversi(index,side=1){if(this.matches.reversi.move(index,side))this.afterMove({game:'reversi',side});}
+  moveReversi(index){if(this.kind==='reversi'&&!this.confirmation)this.commitReversi(index);}
   toggleCard(index){
     if(this.kind!=='poker'||this.matches.poker.phase!=='draw'||this.confirmation)return;
     if(this.selected.has(index))this.selected.delete(index);else if(this.selected.size<3)this.selected.add(index);
     this.render();this.dialog.querySelector(`[data-card="${index}"]`).focus();
   }
   action(action){
+    if(action==='sound'){void this.toggleSound();return;}
     if(action==='close'){this.close();return;}
     if(action==='menu'){this.save();this.showMenu();return;}
     if(action==='read-novel'){this.select('novel');return;}
     if(action==='new'){this.cancelAI();this.confirmation=true;this.render();this.dialog.querySelector('[data-action="cancel"]').focus();return;}
     if(action==='cancel'){this.confirmation=false;this.render();this.think();return;}
-    if(action==='confirm'){this.matches[this.kind].reset();this.selected.clear();this.confirmation=false;this.save();this.render();this.think();return;}
+    if(action==='confirm'){this.audio.stopGameSounds();this.matches[this.kind].reset();this.selected.clear();this.confirmation=false;this.save();this.render();this.think();return;}
     if(this.confirmation||this.kind!=='poker')return;
     const match=this.matches.poker;
     if(action==='draw'){if(match.draw([...this.selected])){this.selected.clear();this.afterMove();}}
@@ -123,7 +148,7 @@ export class CabinLoungeGames{
       const descriptions={chess:words('白を持って先手。3段階のマイロと対局。','Take white. Three opponent levels.'),poker:words('5枚ドロー・1回交換。ゲーム内チップで一対一。','Five-card draw. Heads-up with play chips.'),reversi:words('あなたは黒。置ける場所を見ながら一局。','You play black. Legal moves are highlighted.')};
       content=`<p class="lounge-intro">${words('ゲームや読書をどうぞ。続きの対局も、ここから。','Choose a game or a book. Your saved games are here, too.')}</p><div class="lounge-choices">${Object.keys(labels).map(kind=>`<button data-game="${kind}">${choiceIcon(kind)}<strong>${words(...labels[kind])}</strong><span class="lounge-choice-description">${descriptions[kind]}</span><small>${words('選ぶ →','Play →')}</small></button>`).join('')}<button type="button" class="lounge-reading" data-action="read-novel">${choiceIcon('novel')}<strong>${words('小説を読む','Read a novel')}</strong><span class="lounge-choice-description">FALL-LINE ── ${words('フォールライン','THE FALL')}</span><small>${words('読む →','Read →')}</small></button></div>`;
     }else content=reading?`<iframe class="lounge-novel" title="FALL-LINE ── フォールライン" src="${FALL_LINE_URL}"></iframe>`:this.kind==='reversi'?this.renderReversi():this.renderPoker();
-    this.dialog.innerHTML=`<header class="lounge-header"><div><span>RECREATION / TARAIRON</span><h2 id="lounge-title">${this.title}</h2></div>${button('close',words('船内へ戻る','Back to cabin'))}</header><div class="lounge-content">${content}</div>${this.confirmation?`<div class="lounge-confirm" role="alert">${words('現在の対局を終えて最初から始めますか？','End this game and start over?')}${this.kind==='poker'?words('チップは双方500に戻ります。','Both stacks return to 500.'):''}${button('cancel',words('続ける','Continue'))}${button('confirm',words('最初から','Start over'))}</div>`:''}<footer class="lounge-footer">${this.kind?button('menu',words('← 選択肢へ戻る','← Back to choices')):''}<span>${reading?words('読書中・船内時間は停止中','Reading · Ship time paused'):this.saveFailed?words('保存できません。このページ内で継続できます。','Save unavailable. Keep this page open.'):words('船内時間は停止中・対局は自動保存','Ship time paused · Games saved automatically')}</span>${this.kind&&!reading?button('new',words('新しい対局','New game')):''}</footer>`;
+    this.dialog.innerHTML=`<header class="lounge-header"><div><span>RECREATION / TARAIRON</span><h2 id="lounge-title">${this.title}</h2></div><div class="lounge-header-actions">${this.kind==='reversi'?this.soundButton():''}${button('close',words('船内へ戻る','Back to cabin'))}</div></header><div class="lounge-content">${content}</div>${this.confirmation?`<div class="lounge-confirm" role="alert">${words('現在の対局を終えて最初から始めますか？','End this game and start over?')}${this.kind==='poker'?words('チップは双方500に戻ります。','Both stacks return to 500.'):''}${button('cancel',words('続ける','Continue'))}${button('confirm',words('最初から','Start over'))}</div>`:''}<footer class="lounge-footer">${this.kind?button('menu',words('← 選択肢へ戻る','← Back to choices')):''}<span>${reading?words('読書中・船内時間は停止中','Reading · Ship time paused'):this.saveFailed?words('保存できません。このページ内で継続できます。','Save unavailable. Keep this page open.'):words('船内時間は停止中・対局は自動保存','Ship time paused · Games saved automatically')}</span>${this.kind&&!reading?button('new',words('新しい対局','New game')):''}</footer>`;
     if(this.kind==='reversi'){
       if(this.reversiView){this.reversiView.attach(this.dialog.querySelector('.reversi-stage'),this.dialog.querySelector('.reversi-board'));this.updateReversi3D();}
       else void this.prepareReversi3D();
@@ -142,5 +167,5 @@ export class CabinLoungeGames{
     const controls=m.phase==='showdown'?button('next',words('次のハンド','Next hand'),Math.min(m.chips.you,m.chips.milo)<10):m.phase==='draw'?button('draw',words(this.selected.size?`${this.selected.size}枚交換`:'交換しない',this.selected.size?`Exchange ${this.selected.size}`:'Stand pat')):m.toCall?button('call',words('コール 10','Call 10'))+button('fold',words('フォールド','Fold')):button('check',words('チェック','Check'))+button('bet',words('ベット 10','Bet 10'),!m.canBet)+button('fold',words('フォールド','Fold'));
     return`<div class="lounge-scores"><span>MILO <b>${m.chips.milo}</b></span><span>HAND ${m.handNumber} · POT <b>${m.pot}</b></span></div><div class="poker-table">${hand(m.milo,!reveal)}<p class="poker-note">${reveal?words(...POKER_HAND_NAMES[evaluateHand(m.milo).category]):m.miloDraw===null?words('マイロの手札','Milo’s hand'):words(`マイロは${m.miloDraw}枚交換。`,`Milo drew ${m.miloDraw}.`)}</p><p class="lounge-status" role="status" aria-live="polite">${status}</p>${hand(m.you,false,m.phase==='draw')}<p class="poker-note">${words(...POKER_HAND_NAMES[evaluateHand(m.you).category])}</p></div><div class="lounge-scores"><span>${words('あなたのチップ','YOUR CHIPS')} <b>${m.chips.you}</b></span></div><div class="poker-actions">${controls}</div>${m.phase==='showdown'&&Math.min(m.chips.you,m.chips.milo)<10?`<p>${words('チップ不足です。「新しい対局」で双方500から再開できます。','Not enough chips. Choose New game to restart with 500 each.')}</p>`:''}<details class="lounge-rules"><summary>${words('遊び方・役の順番','Rules & hand rankings')}</summary><p>${words('5枚ドロー。参加料は各10、交換は一度・最大3枚。交換前後に各1回、10の固定ベット。レイズなし。双方が払える時だけベット可能。現金・購入・換金はありません。','Five-card draw. Ante 10 each, one draw of up to 3 cards. One fixed bet of 10 before and after drawing; no raises. Bets require both players to cover them. No real money, purchases or cash-out.')}</p><p>${POKER_HAND_NAMES.slice().reverse().map(n=>words(...n)).join(' → ')}</p></details>`;
   }
-  dispose(){this.cancelAI();this.releaseReversi3D();document.removeEventListener('visibilitychange',this.visibility);this.chess.dispose();this.dialog.remove();}
+  dispose(){this.active=false;this.syncAudio();this.unbindAudio();if(this.ownsAudio)this.audio.dispose();this.cancelAI();this.releaseReversi3D();document.removeEventListener('visibilitychange',this.visibility);window.removeEventListener('pagehide',this.pagehide);window.removeEventListener('pageshow',this.visibility);this.chess.dispose();this.dialog.remove();}
 }

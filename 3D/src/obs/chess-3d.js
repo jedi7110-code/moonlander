@@ -9,7 +9,7 @@ import {createChessHologram,createChessFootGlowMaterial} from './chess-hologram.
 import {chessMoveTransition,chessArcPosition,chessCaptureScale} from './chess-motion.js';
 import {createChessOrbit} from './chess-camera.js';
 
-export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}){
+export function createChess3DView({stage,board,onSquare,onLand,onSettled,appearance={}}){
   const canvas=document.createElement('canvas');canvas.className='chess-3d-canvas';canvas.setAttribute('aria-hidden','true');
   const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'low-power'});
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -28,7 +28,8 @@ export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}
   const light=keep(new THREE.MeshLambertMaterial({color:0x18434a}));
   const dark=keep(new THREE.MeshLambertMaterial({color:0x09272e}));
   const whiteHologram=createChessHologram(appearance),blackHologram=createChessHologram({...appearance,color:0x075979,emissive:0x034763,tint:new THREE.Color(.10,.42,.9)});
-  const white=keep(whiteHologram.material),black=keep(blackHologram.material);
+  const captureHologram=createChessHologram({...appearance,color:0xc3848c,emissive:0x723a43,tint:new THREE.Color(.65,.28,.30)});
+  const white=keep(whiteHologram.material),black=keep(blackHologram.material),capturable=keep(captureHologram.material);
   const depth=keep(new THREE.MeshBasicMaterial({colorWrite:false}));
   const neon=basic(0x2de9f3,.6);
   function mesh(geometry,material,parent=scene,position=[0,0,0]){
@@ -69,7 +70,7 @@ export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}
     if(disposed||frame)return;
     frame=requestAnimationFrame(time=>{
       frame=0;if(disposed||document.hidden)return;
-      let settled=false;
+      let landed=null;
       if(animation){
         animation.start??=time;
         const progress=Math.min(1,(time-animation.start)/(animation.duration*1000));
@@ -79,11 +80,11 @@ export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}
           glow.scale.setScalar(1+mover.object.position.y*.25);
         }
         if(animation.victim){const scale=chessCaptureScale(progress);animation.victim.scale.setScalar(Math.max(.001,scale));animation.victim.visible=scale>.001;}
-        if(progress>=1){animation=null;buildPieces();board.setAttribute('aria-busy','false');settled=true;}
+        if(progress>=1){landed=animation.move;animation=null;buildPieces();board.setAttribute('aria-busy','false');}
       }
       composer.render();
       if(animation)invalidate();
-      if(settled)onSettled?.();
+      if(landed){onLand?.(landed);onSettled?.();}
     });
   }
   function createPiece(piece){
@@ -92,7 +93,7 @@ export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}
       // Match the study's single visible surface, without revealing intersecting
       // crowns/necks or drawing the back of a neighbouring piece through it.
       const prepass=new THREE.Mesh(geometries[piece.type],depth);prepass.renderOrder=1;root.add(prepass);
-      const body=new THREE.Mesh(geometries[piece.type],piece.color==='w'?white:black);body.renderOrder=2;body.castShadow=true;body.receiveShadow=true;root.add(body);
+      const body=new THREE.Mesh(geometries[piece.type],piece.color==='w'?white:black);body.renderOrder=2;body.castShadow=true;body.receiveShadow=true;root.add(body);root.userData.body=body;root.userData.color=piece.color;
       const glow=new THREE.Mesh(footGlowPlane,footGlowMaterials[piece.color]);glow.rotation.x=-Math.PI/2;glow.position.y=.012;
       glow.raycast=()=>{};root.userData.footGlow=glow;root.add(glow);
       pieceRoot.add(root);return root;
@@ -106,7 +107,7 @@ export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}
       if(mover){root.position.copy(mover.fromPosition);movers.push({...mover,object:root});}
     }
     const victim=transition?.captured?createPiece(transition.captured):null;
-    return transition?{...transition,movers,victim,start:null}:null;
+    return transition?{...transition,move:state.move,movers,victim,start:null}:null;
   }
   function update(next){
     const changed=state.positionKey!==next.positionKey;
@@ -114,6 +115,8 @@ export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}
     state=next;markerRoot.clear();
     pieceRoot.rotation.y=markerRoot.rotation.y=state.flipped?Math.PI:0;
     if(changed||!pieceRoot.children.length){animation=buildPieces(transition);board.setAttribute('aria-busy',String(Boolean(animation)));}
+    const captures=new Set(state.selected?state.captures??[]:[]);
+    for(const piece of pieceRoot.children)piece.userData.body.material=piece.userData.color==='w'?white:captures.has(piece.userData.square)?capturable:black;
     const occupied=new Set(state.pieces.map(piece=>piece.square));
     const mark=(square,geometry,material,y)=>{
       if(!square)return;const object=new THREE.Mesh(geometry,material);object.rotation.x=-Math.PI/2;
@@ -150,7 +153,7 @@ export function createChess3DView({stage,board,onSquare,onSettled,appearance={}}
     controls.target.copy(target);camera.position.copy(target).addScaledVector(defaultDirection,24);fitDistance=0;resize();
   }
   function setAppearance({translucency,glow}){
-    for(const {uniforms} of [whiteHologram,blackHologram]){
+    for(const {uniforms} of [whiteHologram,blackHologram,captureHologram]){
       if(Number.isFinite(translucency))uniforms.holoOpacity.value=1-THREE.MathUtils.clamp(translucency,0,75)/100;
       if(Number.isFinite(glow))uniforms.holoGlow.value=THREE.MathUtils.clamp(glow,0,100)/100;
     }

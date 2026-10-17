@@ -1,15 +1,17 @@
 import {CABIN_SOUNDS,CABIN_AUDIO_BASE} from './sound-library.js';
 import {PLANT,FLOORS} from './layout.js';
 import {CabinPlaybackSession} from './audio-unlock.js';
+import {gameContactSamples,gameSoundSequence} from './game-sounds.js';
 
 const clamp=value=>Math.max(0,Math.min(1,value));
 const smooth=value=>{const t=clamp(value);return t*t*(3-2*t);};
 const plantFan={x:(PLANT.x-700)*.022+2.03,y:(870-FLOORS[PLANT.floor].y)*.016+2.18,z:-.65};
 
 export class CabinAudio {
-  constructor({createContext=()=>{const Context=globalThis.AudioContext||globalThis.webkitAudioContext;return Context?new Context():null;},fetchAudio=(...args)=>fetch(...args),ambience=true,enabled=false,playbackSession=new CabinPlaybackSession()}={}){
+  constructor({createContext=()=>{const Context=globalThis.AudioContext||globalThis.webkitAudioContext;return Context?new Context():null;},fetchAudio=(...args)=>fetch(...args),ambience=true,enabled=false,library=CABIN_SOUNDS,playbackSession=new CabinPlaybackSession()}={}){
     this.enabled=enabled;this.unlocked=false;this.paused=false;this.context=null;this.createContext=createContext;this.fetchAudio=fetchAudio;
     this.playbackSession=playbackSession;
+    this.library=library;this.gameActive=false;this.gameVoices=new Set();this.gameBuffers=new Map();
     this.buffers=new Map();this.voices=new Set();this.loops=new Map();this.failures=[];this.disposed=false;
     this.ambience=ambience;
     this.listener={x:0,y:3.4,z:1,rightX:1,rightY:0,rightZ:0,overview:true,focus:0};
@@ -19,6 +21,7 @@ export class CabinAudio {
     if(!this.context){
       this.context=this.createContext();if(!this.context)throw new Error('Web Audio unavailable');
       this.master=this.context.createGain();this.master.gain.value=0;this.master.connect(this.context.destination);
+      this.gameMaster=this.context.createGain();this.gameMaster.gain.value=0;this.gameMaster.connect(this.context.destination);
       if(this.ambience){
       this.ambientGain=this.context.createGain();this.ambientGain.gain.value=.4;this.ambientGain.connect(this.master);
       for(const frequency of [48,96]){const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.frequency.value=frequency;gain.gain.value=frequency===48?.055:.018;oscillator.connect(gain).connect(this.ambientGain);oscillator.start();}
@@ -33,7 +36,7 @@ export class CabinAudio {
     return true;
   }
   unlock({gesture=true}={}){
-    if(this.disposed||!this.enabled||this.paused)return false;
+    if(this.disposed||!this.enabled||(this.paused&&!this.gameActive))return false;
     // Only an input gesture may start a fresh page's audio. Restoration is
     // allowed after activation, but never changes the user's on/off choice.
     if(!gesture&&!this.unlocked)return false;
@@ -59,7 +62,7 @@ export class CabinAudio {
     if(this.enabled){
       try{this.prepare();this.unlock();void this.load();}
       catch(error){this.enabled=false;this.syncMaster();throw error;}
-    }else{this.stopAll();this.playbackSession.pause();}
+    }else{this.stopAll();this.stopGameSounds();this.playbackSession.pause();}
     this.syncMaster();return this.enabled;
   }
   // OBS preloads while connecting (enabled by default); manual studies remain
@@ -67,7 +70,7 @@ export class CabinAudio {
   // Three concurrent fetches, one decode per local file, no delayed one-shot queue.
   load(){
     if(this.loading)return this.loading;
-    this.abort=new AbortController();const pending=Object.entries(CABIN_SOUNDS);
+    this.abort=new AbortController();const pending=Object.entries(this.library);
     const worker=async()=>{
       while(pending.length&&!this.disposed){
         const [id,definition]=pending.shift();
@@ -82,12 +85,42 @@ export class CabinAudio {
     this.loading=Promise.all([worker(),worker(),worker()]);return this.loading;
   }
   get audible(){return this.enabled&&this.unlocked&&!this.paused&&!this.disposed&&this.context?.state==='running';}
-  get stats(){return{loaded:this.buffers.size,total:Object.keys(CABIN_SOUNDS).length,active:this.voices.size,loops:this.loops.size,failed:this.failures.length};}
+  get stats(){return{loaded:this.buffers.size,total:Object.keys(this.library).length,active:this.voices.size,loops:this.loops.size,failed:this.failures.length};}
   syncMaster(immediate=false){
     if(!this.context||this.disposed)return;
     const gain=this.master.gain,now=this.context.currentTime,value=this.enabled&&this.unlocked&&!this.paused?.55:0;
     if(immediate){gain.cancelScheduledValues(now);gain.setValueAtTime(value,now);}
     else gain.setTargetAtTime(value,now,.08);
+    this.gameMaster.gain.cancelScheduledValues(now);
+    this.gameMaster.gain.setValueAtTime(this.enabled&&this.unlocked&&this.gameActive?.30:0,now);
+  }
+  setGameActive(active){
+    if(this.disposed)return;
+    this.gameActive=Boolean(active);
+    if(!this.gameActive){this.stopGameSounds();if(this.paused)this.playbackSession.pause();}
+    else if(this.enabled&&this.unlocked)this.unlock({gesture:false});
+    this.syncMaster();
+  }
+  playGameSound(event){
+    if(!this.enabled||!this.unlocked||!this.gameActive||this.disposed||this.context?.state!=='running')return;
+    const now=this.context.currentTime;
+    for(const {kind,delay,volume}of gameSoundSequence(event)){
+      if(this.gameVoices.size>=24)break;
+      const key=kind;
+      if(!this.gameBuffers.has(key)){
+        const samples=gameContactSamples(kind,this.context.sampleRate),buffer=this.context.createBuffer(1,samples.length,this.context.sampleRate);
+        buffer.getChannelData(0).set(samples);this.gameBuffers.set(key,buffer);
+      }
+      const source=this.context.createBufferSource(),gain=this.context.createGain();
+      source.buffer=this.gameBuffers.get(key);gain.gain.value=volume;source.connect(gain).connect(this.gameMaster);
+      const voice={source,gain};this.gameVoices.add(voice);
+      source.onended=()=>{source.disconnect();gain.disconnect();this.gameVoices.delete(voice);};
+      source.start(now+delay);
+    }
+  }
+  stopGameSounds(){
+    for(const {source,gain}of this.gameVoices){source.stop();source.disconnect();gain.disconnect();}
+    this.gameVoices.clear();
   }
   get focus(){return this.listener.overview?clamp(this.listener.focus??0):1;}
   setViewListener(camera,view,firstPerson=false){
@@ -114,7 +147,7 @@ export class CabinAudio {
     voice.pan?.pan.setTargetAtTime(spatial.pan,now,.04);
   }
   play(id,{position=null,volume=1,rate=1,loop=false,key=null}={}){
-    const definition=CABIN_SOUNDS[id],buffer=this.buffers.get(id);
+    const definition=this.library[id],buffer=this.buffers.get(id);
     if(!definition||!buffer||!this.audible||this.voices.size>=12)return null;
     if([...this.voices].filter(v=>v.id===id&&!v.stopping).length>=3)return null;
     if(this.spatial(position).gain*definition.gain*volume<.003)return null;
@@ -160,9 +193,9 @@ export class CabinAudio {
   }
   pause(paused,{immediate=false}={}){
     const wasPaused=this.paused;this.paused=Boolean(paused);
-    if(this.paused){this.stopAll();this.playbackSession.pause();}
+    if(this.paused){this.stopAll();if(!this.gameActive)this.playbackSession.pause();}
     else if(wasPaused&&this.enabled&&this.unlocked)this.unlock({gesture:false});
     this.syncMaster(immediate&&this.paused);
   }
-  dispose(){this.stopAll();this.disposed=true;this.enabled=false;this.playbackSession.dispose();this.abort?.abort();this.buffers.clear();this.loops.clear();this.voices.clear();this.context?.close();}
+  dispose(){this.stopAll();this.stopGameSounds();this.gameBuffers.clear();this.disposed=true;this.enabled=false;this.playbackSession.dispose();this.abort?.abort();this.buffers.clear();this.loops.clear();this.voices.clear();this.context?.close();}
 }
