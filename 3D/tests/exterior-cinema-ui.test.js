@@ -13,19 +13,23 @@ function fixture(t){
   const previous={document:globalThis.document,window:globalThis.window,location:globalThis.location};
   let document;
   class Element{
-    constructor(tag){this.tagName=tag;this.children=[];this.inert=false;this.hidden=false;this.attributes={};this.contentWindow={};}
+    constructor(tag){this.tagName=tag;this.children=[];this.inert=false;this.hidden=false;this.attributes={};this.contentWindow={};this.style={setProperty:(key,value)=>{this.style[key]=value;}};}
     setAttribute(key,value){this.attributes[key]=value;}
     append(...elements){for(const element of elements){element.parent=this;this.children.push(element);}}
     focus(){document.activeElement=this;}
     remove(){if(this.parent)this.parent.children=this.parent.children.filter(element=>element!==this);}
+    querySelector(selector){for(const child of this.children){if(child.className===selector.slice(1))return child;const nested=child.querySelector(selector);if(nested)return nested;}return null;}
+    cloneNode(deep){const copy=new Element(this.tagName);copy.className=this.className;copy.attributes={...this.attributes};if(deep)copy.append(...this.children.map(child=>child.cloneNode(true)));return copy;}
   }
   const parent=new Element('main'),trigger=new Element('button'),alreadyInert=new Element('div');alreadyInert.inert=true;parent.append(trigger,alreadyInert);
-  document={body:parent,documentElement:{dataset:{}},activeElement:trigger,createElement:tag=>new Element(tag),getElementById:()=>null,addEventListener(){},removeEventListener(){}};
+  const loading=new Element('div'),loadingFrame=new Element('div'),gauge=new Element('span');
+  loadingFrame.className='loading-frame';gauge.className='loading-gauge';loadingFrame.append(gauge);loading.append(loadingFrame);parent.append(loading);
+  document={body:parent,documentElement:{dataset:{}},activeElement:trigger,createElement:tag=>new Element(tag),getElementById:id=>id==='loading'?loading:null,addEventListener(){},removeEventListener(){}};
   Object.assign(globalThis,{document,window:{addEventListener(){},removeEventListener(){}},location:{origin:'http://localhost',href:'http://localhost/3D/obs.html'}});
   const changes=[],ui=new ExteriorCinemaUI({parent,onChange:open=>changes.push(open)});
   t.after(()=>{ui.dispose();for(const [key,value]of Object.entries(previous)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}});
   const message=action=>ui.message({origin:location.origin,source:ui.frame.contentWindow,data:{type:'tara-exterior',action}});
-  return{ui,parent,trigger,alreadyInert,changes,message,document};
+  return{ui,parent,trigger,alreadyInert,changes,message,document,loadingFrame};
 }
 
 test('loading completion reveals the entry cue while the opening remains open',t=>{
@@ -35,10 +39,26 @@ test('loading completion reveals the entry cue while the opening remains open',t
   assert.equal(query.get('approach'),'bow');assert.equal(query.get('ending'),'underside');
   assert.equal(query.get('docking'),'probe-follow');assert.equal(query.has('transition'),false);
   assert.equal(f.ui.closeButton.hidden,true);assert.equal(f.trigger.inert,true);
+  const indicator=f.ui.loadingIndicator;
+  assert.equal(indicator.hidden,false);assert.equal(indicator.attributes.role,'progressbar');
+  assert.notEqual(indicator.children[0],f.loadingFrame,'the original loading frame is cloned');
+  assert.ok(indicator.querySelector('.loading-gauge'));
   f.message('ready');assert.equal(f.ui.closeButton.hidden,true,'exterior shaders being ready is not cabin readiness');
   f.ui.hostReady();assert.equal(f.ui.open,true);assert.equal(f.ui.closeButton.hidden,false);
   assert.equal(f.ui.closeButton.textContent,'船内映像に接続');
+  assert.equal(indicator.hidden,true);assert.equal(indicator.attributes['aria-valuenow'],'100');
   assert.deepEqual(f.changes,[true]);
+});
+test('real loading milestones advance monotonically and never expose the button before readiness',t=>{
+  const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
+  f.ui.hostProgress(.4);f.ui.hostProgress(.2);f.ui.hostProgress(NaN);
+  assert.equal(f.ui.loadingIndicator.attributes['aria-valuenow'],'40');
+  assert.equal(f.ui.loadingIndicator.style['--cabin-load-progress'],'0.4');
+  f.ui.hostProgress(1);assert.equal(f.ui.loadingIndicator.attributes['aria-valuenow'],'99');
+  assert.equal(f.ui.closeButton.hidden,true);assert.equal(f.ui.loadingIndicator.hidden,false);
+  f.ui.hostReady();f.ui.closeButton.onclick();assert.equal(f.ui.loadingIndicator,null);
+  f.ui.show();assert.equal(f.ui.loadingIndicator,null,'returning to an already loaded cabin needs no progress indicator');
+  assert.equal(f.ui.closeButton.hidden,false);
 });
 test('the cabin boot gate waits for playback rather than the sky or shader readiness',async t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});

@@ -361,7 +361,8 @@ async function start(){
     // Decode beside the 3D startup so the first lighting/bed stroke is ready.
     // The mixer remains silent until a real input gesture unlocks it.
     if(audio.enabled){try{audio.prepare();void audio.load();}catch(error){console.warn('Cabin audio preparation failed.',error);}}
-    view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true});
+    exterior.hostProgress(.15);
+    view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,onProgress:value=>exterior.hostProgress(.15+value*.6)});
     view.audio=audio;
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     view.feedback=feedback;
@@ -406,12 +407,15 @@ async function start(){
     // KHR_parallel_shader_compile the driver links them on worker threads and
     // the page stays responsive, instead of the first draw stalling on each one.
     await view.compilePrograms();
+    exterior.hostProgress(.9);
     view.render(0,elapsed,actor,brain,cat,care,true,airlock,null,true);
     await view.warmDraws();
+    exterior.hostProgress(.96);
     await revealStartupScene({
       draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),
       reveal:()=>{$('loading').hidden=true;},
     });
+    exterior.hostProgress(.98);
     $('lighting-hint').hidden=false;
     loadCabinLucyGroomCache(view.cat).then(()=>{cat.groomAvailable=true;},error=>console.warn('Lucy grooming correction unavailable; grooming stays off.',error));
     view.onSceneActivate=()=>{try{audio.unlock();}catch(error){console.warn('Cabin audio activation failed.',error);}return activateStartupLighting(view.startupLighting,{audio,onActivate:()=>{brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}});};

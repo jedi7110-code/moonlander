@@ -48,16 +48,20 @@ import {createMetalDeckStyle} from './metal-deck.js';
 import {nextPreparationFrame,runPreparationSteps} from './background-preparation.js';
 
 export class ObservationView {
-  static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false}={}){
-    const [m,head,lucy]=await Promise.all([materials(),loadMiloHead(),loadLucy({deferGroomCache}),loadEVAGarment(),loadMiloBody()]);
+  static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false,onProgress=()=>{}}={}){
+    let loaded=0;
+    const assets=[materials(),loadMiloHead(),loadLucy({deferGroomCache}),loadEVAGarment(),loadMiloBody()];
+    const [m,head,lucy]=await Promise.all(assets.map(asset=>asset.then(value=>{onProgress(.4*++loaded/assets.length);return value;})));
     head.userData.setAppearance({hair:'crop',beard:'none'});
     const deckStyle=floorBuilder?null:createMetalDeckStyle();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
     const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor});
+    onProgress(.6);
     const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip,deferSetup:true});
     const preparation=[];
     await runPreparationSteps(view.preparationSteps,{onStep:(label,ms)=>{preparation.push({name:typeof label==='string'?label:'batch',ms:Math.round(ms)});document.documentElement.dataset.cabinAssemblyMs=JSON.stringify(preparation);}});
     delete view.preparationSteps;
+    onProgress(.8);
     view.deckStyle=deckStyle;
     try{
       await nextPreparationFrame();
@@ -76,6 +80,7 @@ export class ObservationView {
       view.emergencyLighting=new CabinEmergencyLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,workCenter});
       await nextPreparationFrame();
       if(characterViews)view.characterCamera=new CharacterCamera(view);
+      onProgress(1);
       return view;
     }catch(error){view.dispose();throw error;}
   }

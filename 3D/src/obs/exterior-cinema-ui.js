@@ -61,13 +61,35 @@ export class ExteriorCinemaUI{
     this.closeButton=document.createElement('button');this.closeButton.type='button';this.closeButton.className='exterior-cinema-close';
     this.closeButton.textContent=this.buttonText();
     this.closeButton.hidden=!this.hostIsReady;this.closeButton.onclick=()=>this.close();
+    this.loadingIndicator=null;this.loadProgress=0;
+    if(opening&&!this.hostIsReady){
+      // Reuse the original cabin connection frame rather than a second design.
+      const original=document.getElementById('loading')?.querySelector('.loading-frame');
+      if(original){
+        this.loadingIndicator=document.createElement('div');this.loadingIndicator.className='exterior-cinema-loading';
+        this.loadingIndicator.setAttribute('role','progressbar');
+        this.loadingIndicator.setAttribute('aria-label',this.words('船内映像に接続中','Connecting to habitat'));
+        this.loadingIndicator.setAttribute('aria-valuemin','0');this.loadingIndicator.setAttribute('aria-valuemax','100');
+        this.loadingIndicator.append(original.cloneNode(true));this.hostProgress(0);
+      }
+    }
     this.inert=[...this.parent.children].map(element=>[element,element.inert]);this.inert.forEach(([el])=>{el.inert=true;});
-    this.shell.append(this.frame,this.closeButton);this.parent.append(this.shell);
+    this.shell.append(this.frame,this.closeButton);if(this.loadingIndicator)this.shell.append(this.loadingIndicator);this.parent.append(this.shell);
     (this.hostIsReady?this.closeButton:this.shell).focus({preventScroll:true});this.onChange(true);
+  }
+  hostProgress(value){
+    if(this.hostIsReady||!Number.isFinite(value))return;
+    this.loadProgress=Math.max(this.loadProgress??0,Math.min(.99,Math.max(0,value)));
+    this.loadingIndicator?.style.setProperty('--cabin-load-progress',String(this.loadProgress));
+    this.loadingIndicator?.setAttribute('aria-valuenow',String(Math.round(this.loadProgress*100)));
   }
   hostReady(){
     this.hostIsReady=true;
-    if(this.open){this.closeButton.textContent=this.buttonText();this.closeButton.hidden=false;}
+    this.loadProgress=1;
+    if(this.open){
+      if(this.loadingIndicator){this.loadingIndicator.setAttribute('aria-valuenow','100');this.loadingIndicator.hidden=true;}
+      this.closeButton.textContent=this.buttonText();this.closeButton.hidden=false;
+    }
   }
   whenPlaying(){return this.playingPromise;}
   whenLogoResolved(){return this.logoResolvedPromise;}
@@ -75,7 +97,7 @@ export class ExteriorCinemaUI{
   close({force=false}={}){
     if(!this.open)return;
     if(!force&&!this.hostIsReady)return;
-    this.open=false;this.shell.remove();this.frame=null;
+    this.open=false;this.shell.remove();this.frame=null;this.loadingIndicator=null;
     this.inert.forEach(([el,value])=>{el.inert=value;});this.focus?.focus?.({preventScroll:true});this.onChange(false);
   }
   dispose(){this.close({force:true});window.removeEventListener('message',this.message);document.removeEventListener('keydown',this.key,true);}

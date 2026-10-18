@@ -7,7 +7,8 @@ async function bootFixture(t,opening){
   const previous={document:globalThis.document,location:globalThis.location,testOpeningBoot:globalThis.testOpeningBoot};
   const events=[];let play,intro,loaded;
   const playing=new Promise(resolve=>{play=resolve;}),finished=new Promise(resolve=>{intro=resolve;}),mainLoaded=new Promise(resolve=>{loaded=resolve;});
-  const ui={show(){events.push('opening');},whenPlaying(){return playing;},whenLogoResolved(){return finished;}};
+  const progress=[];
+  const ui={show(){events.push('opening');},hostProgress(value){progress.push(value);},whenPlaying(){return playing;},whenLogoResolved(){return finished;}};
   globalThis.testOpeningBoot={exteriorCinema:ui,shouldPlayExteriorOpening:()=>opening,loadCabin(){events.push('cabin module');loaded();}};
   globalThis.location={search:''};globalThis.document={documentElement:{dataset:{}},
     head:{append(){events.push('network preload');}},getElementById:id=>id==='cabin-preloads'?{content:{cloneNode(){return{};}}}:{hidden:false}};
@@ -17,14 +18,16 @@ async function bootFixture(t,opening){
     .replace("import {shouldPlayExteriorOpening} from './exterior-cinema-policy.js';",'')
     .replace("await import('./main.js');",'await loadCabin();');
   await import(`data:text/javascript,${encodeURIComponent(source+`\n// opening=${opening}`)}`);
-  return{events,play,intro,mainLoaded};
+  return{events,play,intro,mainLoaded,progress};
 }
 test('real boot starts network preloads after playback and delays cabin module evaluation until the full logo is presented',async t=>{
   const f=await bootFixture(t,true);assert.deepEqual(f.events,['opening']);
   f.play();await Promise.resolve();await Promise.resolve();assert.deepEqual(f.events,['opening','network preload']);
   assert.equal(document.documentElement.dataset.cabinBuildStartedMs,undefined);
+  assert.deepEqual(f.progress,[.05]);
   f.intro();await f.mainLoaded;assert.deepEqual(f.events,['opening','network preload','cabin module']);
   assert.ok(Number(document.documentElement.dataset.cabinBuildStartedMs)>=Number(document.documentElement.dataset.cabinLoadStartedMs));
+  assert.deepEqual(f.progress,[.05,.12]);
 });
 test('opening bypass loads the cabin immediately without waiting for film signals',async t=>{
   const f=await bootFixture(t,false);await f.mainLoaded;assert.deepEqual(f.events,['network preload','cabin module']);

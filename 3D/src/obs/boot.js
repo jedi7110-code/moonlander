@@ -8,6 +8,7 @@ async function boot(){
     // The lightweight sky and shader-ready signal precede actual playback.
     // Cabin preloads and its module graph must wait for moving film frames.
     await exteriorCinema.whenPlaying();
+    exteriorCinema.hostProgress(.05);
   }else document.getElementById('space-boot').hidden=true;
   document.documentElement.dataset.cabinLoadStartedMs=performance.now().toFixed(1);
   const preloads=document.getElementById('cabin-preloads');
@@ -16,6 +17,7 @@ async function boot(){
   // logo has reached the screen. CPU and GPU batches yield to moving film.
   if(opening)await exteriorCinema.whenLogoResolved();
   document.documentElement.dataset.cabinBuildStartedMs=performance.now().toFixed(1);
+  if(opening)exteriorCinema.hostProgress(.12);
   await import('./main.js');
 }
 void boot().catch(error=>{
