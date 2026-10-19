@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
-export function habitatMountLayout({radius,podDepth}){
-  const skinY=-podDepth/2-.95;
-  return {skinY,ringRadius:radius+skinY-1.35,supportRadius:radius+skinY-1.05,
-    width:13.4,depth:4.2,centerZ:.35,ringSegments:48,railXs:[-2.15,2.15],sparXs:[-1.75,1.75]};
+export function habitatMountLayout({radius,podDepth,podCenterZ}){
+  const skinY=-podDepth/2-.95,supportRadius=radius+skinY-1.05;
+  return {skinY,podRadius:radius,ringRadius:radius+skinY-1.35,supportRadius,pinY:supportRadius-radius,
+    width:13.4,depth:4.2,centerZ:podCenterZ,ringSegments:48,railXs:[-2.15,2.15],sparXs:[-1.75,1.75]};
 }
 
 export function ringRailSeat(radius,z,segments=48){
@@ -14,18 +14,18 @@ export function ringRailSeat(radius,z,segments=48){
 }
 
 export function addHabitatFoundation(pod,m,layout,{addMesh,box,rod,pipe,bake}){
-  const {skinY,ringRadius,supportRadius,width,depth,centerZ,railXs,sparXs}=layout;
-  const radius=pod.position.length(),pinY=supportRadius-radius-skinY;
+  const {skinY,ringRadius,width,depth,centerZ,railXs,sparXs}=layout;
+  const radius=layout.podRadius,pinY=layout.pinY-skinY;
   const outline=new THREE.Shape(),halfWidth=width/2,front=centerZ-depth/2,back=centerZ+depth/2,cut=.42;
   outline.moveTo(-halfWidth+cut,front);outline.lineTo(halfWidth-cut,front);
   outline.lineTo(halfWidth,front+cut);outline.lineTo(halfWidth,back-cut);
   outline.lineTo(halfWidth-cut,back);outline.lineTo(-halfWidth+cut,back);
   outline.lineTo(-halfWidth,back-cut);outline.lineTo(-halfWidth,front+cut);outline.closePath();
-  const opening=new THREE.Path();opening.moveTo(-1.10,-.55);opening.lineTo(-1.10,.55);
-  opening.lineTo(1.10,.55);opening.lineTo(1.10,-.55);opening.closePath();outline.holes.push(opening);
+  const opening=new THREE.Path();opening.moveTo(-1.10,centerZ-.55);opening.lineTo(-1.10,centerZ+.55);
+  opening.lineTo(1.10,centerZ+.55);opening.lineTo(1.10,centerZ-.55);opening.closePath();outline.holes.push(opening);
   const plate=addMesh(pod,new THREE.ExtrudeGeometry(outline,{depth:.28,bevelEnabled:false,curveSegments:1}),
     m.patch,'Habitat structural load-spreader',[0,skinY+.02,0]);plate.rotation.x=Math.PI/2;
-  for(const z of [-1.25,1.25]){
+  for(const z of [centerZ-1.25,centerZ+1.25]){
     box(pod,m.steel,[0,skinY-.48,z],[12.6,.46,.28],'Foundation boxed longitudinal girder');
     box(pod,m.patch,[0,skinY-.75,z],[12.8,.12,.55],'Foundation girder lower flange');
     box(pod,m.steel,[0,skinY+.90,z],[12.0,.18,.45],'Pressure-roof structural doubler');
@@ -37,11 +37,11 @@ export function addHabitatFoundation(pod,m,layout,{addMesh,box,rod,pipe,bake}){
   for(const x of [-5.9,-3.9,-1.6,1.6,3.9,5.9])for(const z of [front+.22,back-.22]){
     rod(pod,m.steel,[x,skinY-.27,z],[x,skinY-.37,z],.085,'Load-spreader captive bolt');
   }
-  for(const x of railXs)for(const z of [-1.30,1.30]){
-    const railSeat=ringRailSeat(ringRadius,z),railY=railSeat.y-radius,web=new THREE.Shape();
+  for(const x of railXs)for(const z of [centerZ-1.30,centerZ+1.30]){
+    const railSeat=ringRailSeat(ringRadius,z-centerZ),railY=railSeat.y-radius,web=new THREE.Shape();
     web.moveTo(x-.78,skinY-.25);web.lineTo(x+.78,skinY-.25);
     web.lineTo(x+.31,railY+.10);web.lineTo(x-.31,railY+.10);web.closePath();
-    const coolantSeat=ringRailSeat(ringRadius+.6,z),coolantY=coolantSeat.y-radius,coolantBore=new THREE.Path();
+    const coolantSeat=ringRailSeat(ringRadius+.6,z-centerZ),coolantY=coolantSeat.y-radius,coolantBore=new THREE.Path();
     coolantBore.absarc(x,coolantY,.14,0,Math.PI*2,true);web.holes.push(coolantBore);
     addMesh(pod,new THREE.ExtrudeGeometry(web,{depth:.22,bevelEnabled:false,curveSegments:1}),
       m.patch,'Ring saddle tapered shear web',[0,0,z-.11]);
@@ -56,15 +56,15 @@ export function addHabitatFoundation(pod,m,layout,{addMesh,box,rod,pipe,bake}){
     }
   }
   const neckBottom=ringRadius-radius-.12,neckTop=skinY+.95,neckHeight=neckTop-neckBottom;
-  for(const x of [-1.04,1.04])box(pod,m.patch,[x,(neckTop+neckBottom)/2,0],[.12,neckHeight,1.02],'Sealed radial access neck side');
-  for(const z of [-.45,.45])box(pod,m.patch,[0,(neckTop+neckBottom)/2,z],[1.98,neckHeight,.12],'Sealed radial access neck face');
+  for(const x of [-1.04,1.04])box(pod,m.patch,[x,(neckTop+neckBottom)/2,centerZ],[.12,neckHeight,1.02],'Sealed radial access neck side');
+  for(const z of [centerZ-.45,centerZ+.45])box(pod,m.patch,[0,(neckTop+neckBottom)/2,z],[1.98,neckHeight,.12],'Sealed radial access neck face');
   for(const y of [neckBottom+.22,skinY-.30]){
-    for(const x of [-1.12,1.12])box(pod,m.steel,[x,y,0],[.16,.16,1.20],'Access neck bolted flange');
-    for(const z of [-.54,.54])box(pod,m.steel,[0,y,z],[2.08,.16,.12],'Access neck bolted flange');
+    for(const x of [-1.12,1.12])box(pod,m.steel,[x,y,centerZ],[.16,.16,1.20],'Access neck bolted flange');
+    for(const z of [centerZ-.54,centerZ+.54])box(pod,m.steel,[0,y,z],[2.08,.16,.12],'Access neck bolted flange');
   }
   const sockets=sparXs.map(x=>{
     const socket=new THREE.Group();socket.name='Radial spar pinned foundation shoe';
-    socket.position.set(x,skinY,0);pod.add(socket);
+    socket.position.set(x,skinY,centerZ);pod.add(socket);
     box(socket,m.steel,[0,-.40,0],[2.12,.28,1.58],'Spar shoe bedplate');
     for(const z of [-.52,.52]){
       const cheek=new THREE.Shape();cheek.moveTo(-.94,-.47);cheek.lineTo(.94,-.47);
@@ -83,7 +83,7 @@ export function addHabitatFoundation(pod,m,layout,{addMesh,box,rod,pipe,bake}){
   });
   pod.userData.panelKeepouts??=[];
   pod.userData.panelKeepouts.push({min:[-halfWidth-.02,neckBottom-.45,front-.02],max:[halfWidth+.02,skinY+.03,back+.02]});
-  pod.userData.habitatMount={...layout,pinY:supportRadius-radius};
+  pod.userData.habitatMount={...layout};
   return sockets;
 }
 

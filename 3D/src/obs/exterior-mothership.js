@@ -11,10 +11,12 @@ import {HABITAT_ENVELOPE,HABITAT_FLOORS,HABITAT_WINDOWS,cabinToHabitat} from './
 import {HABITAT_ROTATION} from './habitat-rotation.js';
 
 const referenceCircumference=HABITAT_ROTATION.circumference,referenceRadius=HABITAT_ROTATION.radius;
-export const EXTERIOR=Object.freeze({radius:referenceRadius-HABITAT_ENVELOPE.centerY,
+const habitatCenterZ=(-HABITAT_ENVELOPE.front+HABITAT_ENVELOPE.rearRoomBack)/2;
+export const EXTERIOR=Object.freeze({radius:Math.sqrt(referenceRadius**2-habitatCenterZ**2)-HABITAT_ENVELOPE.centerY,
   gravityRadius:referenceRadius,circumference:referenceCircumference,rpm:Math.sqrt(9.80665/referenceRadius)*60/(2*Math.PI),rotorX:-1.6,
   podLength:HABITAT_ENVELOPE.right-HABITAT_ENVELOPE.left,
   podWidth:HABITAT_ENVELOPE.front+HABITAT_ENVELOPE.rearRoomBack,
+  podCenterZ:habitatCenterZ,
   podDepth:HABITAT_ENVELOPE.top-HABITAT_ENVELOPE.bottom,bowX:17.3,sternX:-23.3});
 export const rotationGravity=(rpm,radius=EXTERIOR.gravityRadius)=>(rpm*2*Math.PI/60)**2*radius/9.80665;
 export const exteriorAngle=(seconds,rpm=EXTERIOR.rpm)=>seconds*rpm*Math.PI/30;
@@ -523,7 +525,9 @@ export function createExteriorMothership(){
   }
   for(let i=0;i<3;i++){
     const angle=i*Math.PI*2/3,pod=new THREE.Group();pod.name=`Gravity section ${i+1}`;
-    pod.rotation.x=angle;pod.position.set(0,Math.cos(angle)*EXTERIOR.radius,Math.sin(angle)*EXTERIOR.radius);rotor.add(pod);pods.push(pod);
+    pod.rotation.x=angle;pod.position.set(0,
+      Math.cos(angle)*EXTERIOR.radius+Math.sin(angle)*EXTERIOR.podCenterZ,
+      Math.sin(angle)*EXTERIOR.radius-Math.cos(angle)*EXTERIOR.podCenterZ);rotor.add(pod);pods.push(pod);
     const truss=new THREE.Group();truss.name='Adjustable radial support';truss.rotation.x=angle;frame.add(truss);spokes.push(truss);
     const spokeEnd=habitatMount.supportRadius;
     for(const x of [-1.75,1.75]){

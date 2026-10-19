@@ -132,9 +132,9 @@ try{
     }
     else if((name==='habitat-mount'||name==='habitat-mount-rear')&&!probe){
       const pod=ship.pods[0],side=name==='habitat-mount-rear'?1:-1;pod.updateWorldMatrix(true,false);
-      const y=pod.userData.habitatMount.skinY;
-      controls.target.copy(pod.localToWorld(new THREE.Vector3(0,y-.50,.35)));
-      camera.position.copy(pod.localToWorld(new THREE.Vector3(13,y-15,side*22)));
+      const {skinY,centerZ}=pod.userData.habitatMount;
+      controls.target.copy(pod.localToWorld(new THREE.Vector3(0,skinY-.50,centerZ)));
+      camera.position.copy(pod.localToWorld(new THREE.Vector3(13,skinY-15,side*22)));
       camera.up.transformDirection(pod.matrixWorld);
     }
     else if(name==='hub-mount'&&!probe){

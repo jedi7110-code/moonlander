@@ -44,7 +44,7 @@ test('three equally spaced gravity sections rotate as one rigid assembly with a 
     for(const angle of [0,.35,Math.PI,Math.PI*2]){
       ship.setAngle(angle);ship.root.updateMatrixWorld(true);
       for(let i=0;i<3;i++){
-        const p=ship.pods[i].getWorldPosition(new Vector3());
+        const p=ship.pods[i].localToWorld(new Vector3(0,0,EXTERIOR.podCenterZ));
         assert.ok(Math.abs(Math.hypot(p.y,p.z)-EXTERIOR.radius)<1e-9);
         assert.ok(Math.abs(p.x-EXTERIOR.rotorX)<1e-9);assert.ok(ship.pods[i].position.equals(initial[i]));
         assert.equal(ship.pods[i].parent,ship.rotor);

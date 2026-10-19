@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {Raycaster,Vector3} from 'three';
 import {createExteriorMothership,EXTERIOR} from '../src/obs/exterior-mothership.js';
 import {habitatMountLayout,ringRailSeat} from '../src/obs/exterior-habitat-mount.js';
+import {HABITAT_ENVELOPE,HABITAT_WINDOWS,cabinToHabitat} from '../src/obs/habitat-envelope.js';
+import {ACCESS_LADDER} from '../src/obs/layout.js';
 
 const vector=values=>new Vector3(...values);
 function castLocal(group,origin,direction,surface){
@@ -23,10 +25,10 @@ test('the ring clears the service skin and its structural rails seat in the real
     const tunnel=castLocal(ship.frame,[0,layout.ringRadius+1,0],[0,-1,0],batch(ship.frame,'Replacement panel'));
     assert.ok(Math.abs(tunnel.y-layout.ringRadius-.42)<1e-5);
     assert.ok(EXTERIOR.radius+skin.y-tunnel.y>.90,'the pressure passage no longer intersects the folded habitat skin');
-    for(const x of layout.railXs)for(const z of [-1.3,1.3]){
-      const y=ringRailSeat(layout.ringRadius,z).y-EXTERIOR.radius;
+    for(const x of layout.railXs)for(const z of [layout.centerZ-1.3,layout.centerZ+1.3]){
+      const y=ringRailSeat(layout.ringRadius,z-layout.centerZ).y-EXTERIOR.radius;
       const clamp=castLocal(pod,[x,y,z],[1,0,0],steel);
-      const rail=castLocal(ship.frame,[x+1,y+EXTERIOR.radius,z],[-1,0,0],batch(ship.frame,'Unpainted structure'));
+      const rail=castLocal(ship.frame,[x+.20,y+EXTERIOR.radius,z-layout.centerZ],[-1,0,0],batch(ship.frame,'Unpainted structure'));
       assert.ok(Math.abs(clamp.x-x-.15)<.002,'clamp bore meets the rail without a floating bracket');
       assert.ok(Math.abs(clamp.x-rail.x)<.002,'the saddle and actual ring tube share their bearing surface');
     }
@@ -34,7 +36,7 @@ test('the ring clears the service skin and its structural rails seat in the real
 });
 
 test('all six pinned shoes stay seated and meet their spar endpoints at every core scale and rotor angle',()=>{
-  const ship=createExteriorMothership(),layout=habitatMountLayout(EXTERIOR),pinY=-1.05;
+  const ship=createExteriorMothership(),layout=habitatMountLayout(EXTERIOR),pinY=layout.pinY-layout.skinY;
   try{
     assert.equal(ship.mountSockets.length,6);
     for(const scale of [1,2.6,1.6,2.8,1]){
@@ -53,6 +55,44 @@ test('all six pinned shoes stay seated and meet their spar endpoints at every co
           assert.ok(Math.abs(shoeTop.y+socket.position.y-foundation.y)<1e-5,'the shoe bedplate bears on the common load-spreader');
           assert.deepEqual(socket.scale.toArray(),[1,1,1],'hardware is repositioned, not stretched');
         }
+      }
+    }
+  }finally{ship.dispose();}
+});
+
+test('straight radial supports share the actual habitat exterior centerline while interior coordinates stay unchanged',()=>{
+  const ship=createExteriorMothership(),layout=habitatMountLayout(EXTERIOR);
+  const centerZ=(-HABITAT_ENVELOPE.front+HABITAT_ENVELOPE.rearRoomBack)/2;
+  try{
+    assert.equal(layout.centerZ,centerZ);
+    for(const scale of [1,1.6,2.6,2.8])for(const angle of [0,.8,Math.PI]){
+      ship.setCoreScale(scale);ship.setAngle(angle);ship.root.updateMatrixWorld(true);
+      assert.equal(ship.hub.rotation.x,0,'the bearing hub has no compensating tilt');
+      for(const [index,pod]of ship.pods.entries()){
+        const patch=batch(pod,'Replacement panel');
+        const front=castLocal(pod,[6,layout.skinY-.10,centerZ-4],[0,0,1],patch);
+        const back=castLocal(pod,[6,layout.skinY-.10,centerZ+4],[0,0,-1],patch);
+        assert.ok(Math.abs((front.z+back.z)/2-centerZ)<1e-5,'the actual load-spreader is centered on the outer roof');
+        for(const socket of ship.mountSockets.filter(socket=>socket.parent===pod))assert.equal(socket.position.z,centerZ);
+        const spoke=ship.spokes[index];
+        assert.equal(spoke.rotation.x,pod.rotation.x,'the support is perpendicular to the habitat roof');
+        for(const radial of [3.75,layout.supportRadius]){
+          const endpoint=pod.worldToLocal(spoke.localToWorld(new Vector3(0,radial,0)));
+          assert.ok(Math.abs(endpoint.z-centerZ)<1e-8,'both ends of the straight spar share the habitat centerline');
+        }
+        const neckFront=castLocal(pod,[0,layout.skinY-.45,centerZ-1],[0,0,1],patch);
+        const neckBack=castLocal(pod,[0,layout.skinY-.45,centerZ+1],[0,0,-1],patch);
+        assert.ok(Math.abs((neckFront.z+neckBack.z)/2-centerZ)<1e-5,'the external access neck shares the same centerline');
+        const skin=batch(pod,'Habitat service skin');
+        const casingFront=castLocal(pod,[HABITAT_ENVELOPE.right+.50,0,centerZ-8],[0,0,1],skin);
+        const casingBack=castLocal(pod,[HABITAT_ENVELOPE.right+.50,0,centerZ+8],[0,0,-1],skin);
+        assert.ok(Math.abs((casingFront.z+casingBack.z)/2-centerZ)<1e-5,'the real outer casing, not just its attachment, is centered');
+        const center=pod.localToWorld(new Vector3(0,0,centerZ));
+        assert.ok(Math.abs(Math.hypot(center.y,center.z)-EXTERIOR.radius)<1e-8);
+        assert.deepEqual(pod.userData.windows,HABITAT_WINDOWS.map(window=>({...window,...cabinToHabitat(window)})));
+        assert.equal(pod.userData.cabinScale,1);
+        const ladder=cabinToHabitat({x:0,y:HABITAT_ENVELOPE.top,z:ACCESS_LADDER.depth});
+        assert.equal(ladder.z,1.08,'the interior ladder has not been shifted onto the exterior centerline');
       }
     }
   }finally{ship.dispose();}
