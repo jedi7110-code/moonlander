@@ -4,18 +4,17 @@ import {shouldPlayExteriorOpening} from './exterior-cinema-policy.js';
 async function boot(){
   const opening=shouldPlayExteriorOpening(location.search);
   if(opening){
-    exteriorCinema.show({opening:true,waitForHost:true});
-    // The lightweight sky and shader-ready signal precede actual playback.
-    // Cabin preloads and its module graph must wait for moving film frames.
-    await exteriorCinema.whenPlaying();
-    exteriorCinema.hostProgress(.05);
+    exteriorCinema.show({opening:true,waitForHost:true,waitForEntry:true});
+    // No cabin fetches or assembly compete with the opening. The entry click
+    // disposes the film renderer before the original connection screen loads.
+    await exteriorCinema.whenEntryRequested();
+    document.getElementById('space-boot').hidden=true;
+    document.getElementById('loading').hidden=false;
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }else document.getElementById('space-boot').hidden=true;
   document.documentElement.dataset.cabinLoadStartedMs=performance.now().toFixed(1);
   const preloads=document.getElementById('cabin-preloads');
   if(preloads)document.head.append(preloads.content.cloneNode(true));
-  // Fetch during the reveal; begin cooperative assembly once the complete
-  // logo has reached the screen. CPU and GPU batches yield to moving film.
-  if(opening)await exteriorCinema.whenLogoResolved();
   document.documentElement.dataset.cabinBuildStartedMs=performance.now().toFixed(1);
   if(opening)exteriorCinema.hostProgress(.12);
   await import('./main.js');

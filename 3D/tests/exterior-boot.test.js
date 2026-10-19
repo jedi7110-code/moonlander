@@ -4,11 +4,13 @@ import {readFile} from 'node:fs/promises';
 const bootSource=await readFile(new URL('../src/obs/boot.js',import.meta.url),'utf8');
 
 async function bootFixture(t,opening){
-  const previous={document:globalThis.document,location:globalThis.location,testOpeningBoot:globalThis.testOpeningBoot};
-  const events=[];let play,intro,loaded;
+  const previous={document:globalThis.document,location:globalThis.location,requestAnimationFrame:globalThis.requestAnimationFrame,testOpeningBoot:globalThis.testOpeningBoot};
+  const events=[];let play,intro,enter,loaded;
   const playing=new Promise(resolve=>{play=resolve;}),finished=new Promise(resolve=>{intro=resolve;}),mainLoaded=new Promise(resolve=>{loaded=resolve;});
   const progress=[];
-  const ui={show(){events.push('opening');},hostProgress(value){progress.push(value);},whenPlaying(){return playing;},whenLogoResolved(){return finished;}};
+  const entry=new Promise(resolve=>{enter=resolve;});
+  const ui={show(options){assert.equal(options.waitForEntry,true);events.push('opening');},hostProgress(value){progress.push(value);},whenEntryRequested(){return entry;},whenPlaying(){return playing;},whenLogoResolved(){return finished;}};
+  globalThis.requestAnimationFrame=callback=>setImmediate(callback);
   globalThis.testOpeningBoot={exteriorCinema:ui,shouldPlayExteriorOpening:()=>opening,loadCabin(){events.push('cabin module');loaded();}};
   globalThis.location={search:''};globalThis.document={documentElement:{dataset:{}},
     head:{append(){events.push('network preload');}},getElementById:id=>id==='cabin-preloads'?{content:{cloneNode(){return{};}}}:{hidden:false}};
@@ -18,16 +20,17 @@ async function bootFixture(t,opening){
     .replace("import {shouldPlayExteriorOpening} from './exterior-cinema-policy.js';",'')
     .replace("await import('./main.js');",'await loadCabin();');
   await import(`data:text/javascript,${encodeURIComponent(source+`\n// opening=${opening}`)}`);
-  return{events,play,intro,mainLoaded,progress};
+  return{events,play,intro,enter,mainLoaded,progress};
 }
-test('real boot starts network preloads after playback and delays cabin module evaluation until the full logo is presented',async t=>{
+test('opening playback and the logo never start cabin fetches or assembly; only entry does',async t=>{
   const f=await bootFixture(t,true);assert.deepEqual(f.events,['opening']);
-  f.play();await Promise.resolve();await Promise.resolve();assert.deepEqual(f.events,['opening','network preload']);
+  f.play();f.intro();await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.events,['opening']);
+  assert.equal(document.documentElement.dataset.cabinLoadStartedMs,undefined);
   assert.equal(document.documentElement.dataset.cabinBuildStartedMs,undefined);
-  assert.deepEqual(f.progress,[.05]);
-  f.intro();await f.mainLoaded;assert.deepEqual(f.events,['opening','network preload','cabin module']);
+  assert.deepEqual(f.progress,[]);
+  f.enter();await f.mainLoaded;assert.deepEqual(f.events,['opening','network preload','cabin module']);
   assert.ok(Number(document.documentElement.dataset.cabinBuildStartedMs)>=Number(document.documentElement.dataset.cabinLoadStartedMs));
-  assert.deepEqual(f.progress,[.05,.12]);
+  assert.deepEqual(f.progress,[.12]);
 });
 test('opening bypass loads the cabin immediately without waiting for film signals',async t=>{
   const f=await bootFixture(t,false);await f.mainLoaded;assert.deepEqual(f.events,['network preload','cabin module']);

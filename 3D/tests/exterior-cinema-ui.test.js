@@ -49,6 +49,19 @@ test('loading completion reveals the entry cue while the opening remains open',t
   assert.equal(indicator.hidden,true);assert.equal(indicator.attributes['aria-valuenow'],'100');
   assert.deepEqual(f.changes,[true]);
 });
+test('deferred opening shows entry without loading and releases the film before cabin boot',async t=>{
+  const f=fixture(t);f.ui.show({opening:true,waitForHost:true,waitForEntry:true});
+  assert.equal(f.ui.closeButton.hidden,false);assert.equal(f.ui.closeButton.textContent,'船内映像に接続');
+  assert.equal(f.ui.loadingIndicator,null);assert.equal(f.document.activeElement,f.ui.closeButton);
+  let entered=false;const entry=f.ui.whenEntryRequested().then(()=>{
+    assert.equal(f.ui.frame,null);assert.equal(f.ui.open,false);entered=true;
+  });
+  f.message('playing');f.message('logo-resolved');f.message('intro-finished');f.message('done');f.message('exit');
+  f.ui.close();await Promise.resolve();assert.equal(entered,false);assert.equal(f.ui.open,true);
+  f.ui.closeButton.onclick();await entry;assert.equal(entered,true);assert.equal(f.trigger.inert,false);
+  f.ui.hostReady();f.ui.show();assert.equal(f.ui.closeButton.textContent,'船内に戻る');
+  f.ui.closeButton.onclick();assert.equal(f.ui.open,false);
+});
 test('real loading milestones advance monotonically and never expose the button before readiness',t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true});
   f.ui.hostProgress(.4);f.ui.hostProgress(.2);f.ui.hostProgress(NaN);

@@ -24,16 +24,18 @@ export class ExteriorCinemaUI{
     }};
     this.key=event=>{if(!this.open)return;if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();this.close();}
       else if(event.key==='Tab'){
-        if(!this.hostIsReady){event.preventDefault();this.shell.focus();}
+        if(!this.hostIsReady&&!this.waitForEntry){event.preventDefault();this.shell.focus();}
         else if(event.target===this.shell){event.preventDefault();this.closeButton.focus();}
         else if(event.target===this.closeButton){event.preventDefault();this.frame.focus();}
       }};
     window.addEventListener('message',this.message);document.addEventListener('keydown',this.key,true);
   }
   buttonText(){return this.opening?this.words('船内映像に接続','Connect to cabin feed'):this.cinematic?this.words('戻る','Return'):this.words('船内に戻る','Return to cabin');}
-  show({opening=false,cinematic=false,core=2.6,phase=55,rpm,waitForHost=false}={}){
+  show({opening=false,cinematic=false,core=2.6,phase=55,rpm,waitForHost=false,waitForEntry=false}={}){
     if(this.open)return;this.open=true;this.opening=opening;this.cinematic=opening||cinematic;this.focus=document.activeElement;
     this.hostIsReady=!waitForHost;
+    this.waitForEntry=opening&&waitForEntry;
+    this.entryRequestedPromise=new Promise(resolve=>{this.resolveEntryRequested=resolve;});
     this.playing=false;
     this.playingPromise=new Promise((resolve,reject)=>{this.resolvePlaying=resolve;this.rejectPlaying=reject;});
     this.logoResolvedPromise=new Promise((resolve,reject)=>{this.resolveLogoResolved=resolve;this.rejectLogoResolved=reject;});
@@ -60,9 +62,13 @@ export class ExteriorCinemaUI{
     this.frame.src=new URL(`./${page}?${query}`,location.href).href;
     this.closeButton=document.createElement('button');this.closeButton.type='button';this.closeButton.className='exterior-cinema-close';
     this.closeButton.textContent=this.buttonText();
-    this.closeButton.hidden=!this.hostIsReady;this.closeButton.onclick=()=>this.close();
+    this.closeButton.hidden=!this.hostIsReady&&!this.waitForEntry;
+    this.closeButton.onclick=()=>{
+      if(this.waitForEntry){this.close({force:true});this.resolveEntryRequested();}
+      else this.close();
+    };
     this.loadingIndicator=null;this.loadProgress=0;
-    if(opening&&!this.hostIsReady){
+    if(opening&&!this.hostIsReady&&!this.waitForEntry){
       // Reuse the original cabin connection frame rather than a second design.
       const original=document.getElementById('loading')?.querySelector('.loading-frame');
       if(original){
@@ -75,7 +81,7 @@ export class ExteriorCinemaUI{
     }
     this.inert=[...this.parent.children].map(element=>[element,element.inert]);this.inert.forEach(([el])=>{el.inert=true;});
     this.shell.append(this.frame,this.closeButton);if(this.loadingIndicator)this.shell.append(this.loadingIndicator);this.parent.append(this.shell);
-    (this.hostIsReady?this.closeButton:this.shell).focus({preventScroll:true});this.onChange(true);
+    (this.hostIsReady||this.waitForEntry?this.closeButton:this.shell).focus({preventScroll:true});this.onChange(true);
   }
   hostProgress(value){
     if(this.hostIsReady||!Number.isFinite(value))return;
@@ -92,6 +98,7 @@ export class ExteriorCinemaUI{
     }
   }
   whenPlaying(){return this.playingPromise;}
+  whenEntryRequested(){return this.entryRequestedPromise;}
   whenLogoResolved(){return this.logoResolvedPromise;}
   whenIntroFinished(){return this.introFinishedPromise;}
   close({force=false}={}){
