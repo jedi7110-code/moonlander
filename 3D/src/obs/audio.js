@@ -23,7 +23,7 @@ export class CabinAudio {
       this.master=this.context.createGain();this.master.gain.value=0;this.master.connect(this.context.destination);
       this.gameMaster=this.context.createGain();this.gameMaster.gain.value=0;this.gameMaster.connect(this.context.destination);
       if(this.ambience){
-      this.ambientGain=this.context.createGain();this.ambientGain.gain.value=.4;this.ambientGain.connect(this.master);
+      this.ambientGain=this.context.createGain();this.ambientGain.gain.value=.2;this.ambientGain.connect(this.master);
       for(const frequency of [48,96]){const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.frequency.value=frequency;gain.gain.value=frequency===48?.055:.018;oscillator.connect(gain).connect(this.ambientGain);oscillator.start();}
       const buffer=this.context.createBuffer(1,this.context.sampleRate*2,this.context.sampleRate),samples=buffer.getChannelData(0);
       for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
@@ -187,7 +187,7 @@ export class CabinAudio {
     const now=this.context.currentTime,osc=this.context.createOscillator(),gain=this.context.createGain();osc.type=type;osc.frequency.value=frequency;gain.gain.setValueAtTime(volume,now);gain.gain.exponentialRampToValueAtTime(.0001,now+duration);osc.connect(gain).connect(this.master);osc.start();osc.stop(now+duration);osc.onended=()=>{osc.disconnect();gain.disconnect();};
   }
   update(){
-    if(this.ambientGain)this.ambientGain.gain.setTargetAtTime(.4+.25*this.focus,this.context.currentTime,.4);
+    if(this.ambientGain)this.ambientGain.gain.setTargetAtTime(.2+.125*this.focus,this.context.currentTime,.4);
     if(this.fanGain)this.fanGain.gain.setTargetAtTime(.012+.028*this.spatial(plantFan).gain,this.context.currentTime,.4);
     // Condensate drops remain visual only; no synthetic pitched water plips.
   }

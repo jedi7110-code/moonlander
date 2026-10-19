@@ -228,7 +228,7 @@ test('ambient updates follow camera focus but never synthesize pitched water dro
     audio.setListener({...plantFan,overview:true,focus});
     for(let frame=0;frame<3600;frame++){ctx.currentTime+=1/60;audio.update();}
     assert.equal(audio.fanGain.gain.value,.012+.028*(.18*(1-focus)+.55*focus));
-    assert.equal(audio.ambientGain.gain.value,.4+.25*focus);
+    assert.equal(audio.ambientGain.gain.value,.2+.125*focus);
     assert.equal(ctx.created.length,initialNodes,'no per-drop oscillators, gains or buffers');
   }
   const near=audio.fanGain.gain.value;
