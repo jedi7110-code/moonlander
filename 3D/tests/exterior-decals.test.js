@@ -101,13 +101,22 @@ test('rendered warning triangles have physical clearance and bow warnings clear 
   }finally{ship.dispose();}
 });
 
-test('the corrected probe antenna mounts on the top of its existing mast',()=>{
+test('the probe antenna mounts on its outboard support outside the docking capture envelope',()=>{
   const ship=createExteriorShip(),probe=ship.dockedLander;
   try{
     probe.removeFromParent();probe.updateMatrixWorld(true);
     const antenna=probe.getObjectByName('Probe directional communications antenna');assert.ok(antenna);
-    const ray=new THREE.Raycaster(new THREE.Vector3(1,6.13,-.5),new THREE.Vector3(-1,0,0),0,.4);
+    const coupling=antenna.localToWorld(new THREE.Vector3(0,-.045,0));
+    const ray=new THREE.Raycaster(coupling.clone().add(new THREE.Vector3(.2,0,0)),new THREE.Vector3(-1,0,0),0,.4);
     const hit=ray.intersectObject(antenna,true)[0];
-    assert.ok(hit&&hit.distance>.1&&hit.distance<.2,'the antenna coupling surrounds the mast endpoint');
+    assert.ok(hit&&hit.distance>.1&&hit.distance<.2,'the antenna coupling surrounds the outboard support endpoint');
+    antenna.traverse(mesh=>{
+      if(!mesh.isMesh)return;
+      const positions=mesh.geometry.attributes.position;
+      for(let index=0;index<positions.count;index++){
+        const point=mesh.localToWorld(new THREE.Vector3().fromBufferAttribute(positions,index));
+        if(point.y>5.30)assert.ok(Math.hypot(point.x,point.z)>1.20,'the dish and feed clear the mating flange and capture guides');
+      }
+    });
   }finally{ship.probeDock.add(probe);ship.dispose();}
 });

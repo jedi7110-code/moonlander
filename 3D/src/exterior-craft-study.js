@@ -8,10 +8,12 @@ import {createExteriorShadow} from './obs/exterior-shadow.js';
 import {fitExteriorInspectionDepth} from './obs/exterior-depth.js';
 import {createExteriorPanelStudy} from './obs/exterior-panel-study.js';
 import {createProbeLineStudy} from './obs/exterior-probe-line-study.js';
+import {createDockingClearanceStudy} from './obs/exterior-docking-study.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),probe=query.get('craft')==='probe';
 let cleanup=()=>{};window.addEventListener('pagehide',()=>cleanup(),{once:true});
 try{
   const renderer=new THREE.WebGLRenderer({canvas:$('view'),antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));
+  renderer.localClippingEnabled=true;
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   const scene=new THREE.Scene();scene.background=new THREE.Color($('background').value);
   const ambient=new THREE.HemisphereLight(0xe3edf5,0x6e7480,1.25);scene.add(ambient);
@@ -34,9 +36,10 @@ try{
   lighting($('lighting').value==='space');
   $('lighting').onchange=()=>lighting($('lighting').value==='space');
   const model=probe?ship.dockedLander:ship.root;
-  if(probe){model.removeFromParent();scene.add(model);}else{ship.probeDock.visible=false;scene.add(model);}
+  if(probe){model.removeFromParent();scene.add(model);}else{ship.probeDock.visible=true;ship.dockedLander.visible=false;scene.add(model);}
   const panelStudy=probe?null:createExteriorPanelStudy(ship);
   const probeLines=probe?createProbeLineStudy(ship):null;
+  const dockingClearance=probe?null:createDockingClearanceStudy(ship);
   $('probe-lines-control').hidden=!probe;$('probe-lines').checked=query.get('lines')!=='0';
   const applyProbeLines=()=>{
     probeLines?.setEnabled($('probe-lines').checked);
@@ -77,6 +80,12 @@ try{
   const directions={whole:[1,.35,1.2],front:probe?[0,0,1]:[1,0,0],side:probe?[1,0,0]:[0,0,1],rear:probe?[0,0,-1]:[-1,0,0],under:[.3,-1,.35]};
   function view(name){
     current=name;controls.target.copy(center);camera.up.set(0,1,0);
+    if(!probe){
+      ship.dockedLander.visible=['docking','docking-section','docking-undocked'].includes(name);
+      ship.dockedLander.position.set(0,name==='docking-undocked'?-3.4:0,0);
+    }
+    dockingClearance?.setEnabled(name==='docking-section');
+    $('docking-dimensions').hidden=name!=='docking-section';
     if(name==='antenna'){
       controls.target.copy(probe?new THREE.Vector3(.8,6.3,-.4):new THREE.Vector3(22,11.5,-.45));
       camera.position.copy(probe?new THREE.Vector3(2.4,8,1.8):new THREE.Vector3(31,19,15));
@@ -121,6 +130,38 @@ try{
       camera.position.copy(pod.localToWorld(new THREE.Vector3(EXTERIOR.podLength/2+9,1,z)));
       camera.up.transformDirection(pod.matrixWorld);
     }
+    else if((name==='habitat-mount'||name==='habitat-mount-rear')&&!probe){
+      const pod=ship.pods[0],side=name==='habitat-mount-rear'?1:-1;pod.updateWorldMatrix(true,false);
+      const y=pod.userData.habitatMount.skinY;
+      controls.target.copy(pod.localToWorld(new THREE.Vector3(0,y-.50,.35)));
+      camera.position.copy(pod.localToWorld(new THREE.Vector3(13,y-15,side*22)));
+      camera.up.transformDirection(pod.matrixWorld);
+    }
+    else if(name==='hub-mount'&&!probe){
+      const pod=ship.pods[0];pod.updateWorldMatrix(true,false);
+      controls.target.copy(ship.hub.localToWorld(new THREE.Vector3(0,4.05,0)));
+      camera.position.copy(controls.target).add(new THREE.Vector3(13,0,0))
+        .add(new THREE.Vector3(0,8,-12).transformDirection(pod.matrixWorld).multiplyScalar(14));
+      camera.up.transformDirection(pod.matrixWorld);
+    }
+    else if(name==='engine-mount'&&!probe){
+      const engine=ship.engines[1];engine.updateWorldMatrix(true,false);
+      controls.target.copy(engine.localToWorld(new THREE.Vector3(-.5,0,0)));
+      camera.position.copy(engine.localToWorld(new THREE.Vector3(-3.8,3.3,4.2)));
+    }
+    else if(name==='docking-undocked'&&!probe){
+      ship.probeDock.updateWorldMatrix(true,false);
+      controls.target.copy(ship.probeDock.localToWorld(new THREE.Vector3(0,2.2,0)));
+      camera.position.copy(ship.probeDock.localToWorld(new THREE.Vector3(9,1.5,18)));
+    }
+    else if((name==='docking'||name==='docking-section')&&!probe){
+      ship.probeDock.updateWorldMatrix(true,false);
+      controls.target.copy(ship.probeDock.localToWorld(new THREE.Vector3(0,name==='docking-section'?6.3:5.7,0)));
+      camera.position.copy(ship.probeDock.localToWorld(name==='docking-section'?new THREE.Vector3(3.2,6.4,7.5):new THREE.Vector3(6,2.4,8)));
+    }
+    else if(name==='probe-port'&&probe){
+      controls.target.set(0,5.35,0);camera.position.set(3.2,8.7,4.2);
+    }
     else if(name==='markings'){
       controls.target.copy(probe?new THREE.Vector3(0,3.2,1.8):new THREE.Vector3(-34,-3.5,20));
       camera.position.copy(probe?new THREE.Vector3(4.7,3.8,8):new THREE.Vector3(-42,9,45));
@@ -139,17 +180,18 @@ try{
   $('nozzle-bounce-control').hidden=probe;
   $('habitat-hatch-view').hidden=probe;
   $('habitat-face-view').hidden=probe;$('bow-face-view').hidden=probe;
-  for(const id of ['service-top-view','service-under-view','service-side-view','service-cover-view','service-cover-left-view','eva-hatch-view'])$(id).hidden=probe;
+  for(const id of ['service-top-view','service-under-view','service-side-view','service-cover-view','service-cover-left-view','eva-hatch-view','habitat-mount-view','habitat-mount-rear-view','hub-mount-view','engine-mount-view','docking-view','docking-section-view','docking-undocked-view'])$(id).hidden=probe;
+  $('probe-port-view').hidden=!probe;
   $('nozzle-bounce').onchange=()=>ship.setNozzleBounce($('nozzle-bounce').checked);
   $('gas-control').hidden=!probe;$('nozzle-view').hidden=false;$('nozzle-view').textContent=probe?'姿勢制御ノズル':'主エンジン内側';$('foot-view').hidden=!probe;$('bridge-view').hidden=probe;$('front-windows-view').hidden=probe;$('skylights-view').hidden=probe;
-  $('note').textContent=probe?'姿勢制御ノズルと取付台を拡大して確認できます。ガスは減速中の噴射を表示します。':'オープニングと同じ母艦モデル。小型船を外した状態で確認できます。';
+  $('note').textContent=probe?'姿勢制御ノズルと取付台を拡大して確認できます。ガスは減速中の噴射を表示します。':'オープニングと同じ母艦モデル。台座は常時表示。「ドッキング部」で小型船も表示します。';
   for(const button of document.querySelectorAll('[data-view]'))button.onclick=()=>view(button.dataset.view);
   $('background').onchange=()=>scene.background.set($('background').value);
   $('wire').onchange=()=>model.traverse(mesh=>{for(const material of [].concat(mesh.material??[]))if(!material.isShaderMaterial)material.wireframe=$('wire').checked;});
   $('reset').onclick=()=>view('whole');
   const resize=()=>{const rect=$('view').getBoundingClientRect();renderer.setSize(Math.max(1,rect.width),Math.max(1,rect.height),false);camera.aspect=rect.width/Math.max(1,rect.height);camera.updateProjectionMatrix();view(current);};
   const observer=new ResizeObserver(resize);observer.observe($('view'));resize();
-  cleanup=()=>{if(disposed)return;disposed=true;cancelAnimationFrame(frame);observer.disconnect();controls.dispose();presentation.dispose();panelStudy?.dispose();probeLines?.dispose();if(probe){ship.probeDock.add(model);}ship.dispose();renderer.dispose();renderer.forceContextLoss();};
+  cleanup=()=>{if(disposed)return;disposed=true;cancelAnimationFrame(frame);observer.disconnect();controls.dispose();presentation.dispose();dockingClearance?.dispose();panelStudy?.dispose();probeLines?.dispose();if(probe){ship.probeDock.add(model);}ship.dispose();renderer.dispose();renderer.forceContextLoss();};
   await renderer.compileAsync(scene,camera);$('status').hidden=true;
   // The compositor supplies the opaque/depth and gas targets to the draw callback.
   function render(now){

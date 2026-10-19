@@ -8,6 +8,7 @@ import {FLOOR_Y} from '../src/obs/ship.js';
 import {createViewingWall,cabinWallMaterials} from '../src/obs/viewing-wall.js';
 import {buildSurfaceFixture,disposeSurfaceFixture} from './helpers/cabin-surface-fixture.js';
 import {engineFacingGain} from '../src/obs/exterior-optics.js';
+import {habitatMountLayout} from '../src/obs/exterior-habitat-mount.js';
 
 test('all four probe legs terminate above the landing pad soles',()=>{
   const ship=createExteriorShip();
@@ -67,7 +68,7 @@ test('the enlarged stern and seven open rocket engines remain behind the rotatin
   }finally{ship.dispose();}
 });
 test('core balance changes preserve the cabin and floor gravity while keeping both ends of every radial support attached',()=>{
-  const ship=createExteriorShip(),end=EXTERIOR.radius-EXTERIOR.podDepth/2+.30;
+  const ship=createExteriorShip(),end=habitatMountLayout(EXTERIOR).supportRadius;
   try{
     for(const scale of [1,1.6,2.6,2.8]){
       ship.setCoreScale(scale);
@@ -97,7 +98,12 @@ test('service equipment can be hidden without losing the pressure hull or engine
   try{
     ship.setServices(false);assert.equal(ship.machinery.visible,false);assert.equal(ship.core.visible,true);assert.ok(ship.engines.every(e=>e.children.some(c=>c.isMesh)));
     ship.setServices(true);assert.equal(ship.machinery.visible,true);
-    let draws=0;ship.root.traverse(o=>{if(o.isMesh)draws++;});assert.ok(draws<120,`merged hull and docked lander use ${draws} meshes`);
+    let draws=0;ship.root.traverse(o=>{if(o.isMesh)draws++;});
+    assert.equal(ship.mountSockets.length,6);
+    assert.ok(ship.mountSockets.every(socket=>socket.children.length===0),'adjustable clevis geometry stays in the existing habitat steel batches');
+    assert.equal(ship.dockHatches.length,2);
+    assert.ok(ship.dockHatches.every(hatch=>hatch.children.filter(child=>child.isMesh).length===1),'only the two moving pressure hatches need separate batches');
+    assert.ok(draws-ship.dockHatches.length<120,`hull budget plus two operational pressure hatches uses ${draws} meshes`);
   }finally{ship.dispose();}
 });
 test('rotation speed and the displayed centrifugal acceleration use the same physical radius',()=>{

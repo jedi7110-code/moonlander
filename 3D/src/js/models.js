@@ -48,7 +48,7 @@ function panelText(text,width=512,height=128,color='#d7e8da',bg=null) {
 }
 
 /** Reference: assets/spaceship.png — white octagonal cabin, gold insulation, four piston legs. */
-export function createLander({labels=true,footJointHeight=.18,antennaDish=true,lateralFins=true,octagonalBase=false,cabinFixtures=true,landingStruts=true}={}) {
+export function createLander({labels=true,footJointHeight=.18,antennaDish=true,antennaMasts=true,lateralFins=true,octagonalBase=false,cabinFixtures=true,landingStruts=true}={}) {
   const g=new THREE.Group();
   if(octagonalBase){
     const faceRadius=Math.cos(Math.PI/8);
@@ -87,9 +87,9 @@ export function createLander({labels=true,footJointHeight=.18,antennaDish=true,l
     if(cabinFixtures)for(let j=0;j<4;j++)sphere(ascent,silver,x*.38,2.92+j*.45,1.72,.032);
   }
   if(cabinFixtures)sphere(ascent,material(0x698778,.7,.18),0,4.4,1.74,.17,.17,.025);
-  rod(ascent,[.8,5.2,-.5],[.8,6.15,-.5],.03);
+  if(antennaMasts)rod(ascent,[.8,5.2,-.5],[.8,6.15,-.5],.03);
   if(antennaDish){const dish=mesh(ascent,new THREE.SphereGeometry(.47,20,12,0,Math.PI*2,0,.85),silver,.8,6.12,-.5);dish.rotation.x=.55;}
-  rod(ascent,[-.85,5.22,-.8],[-.85,6.02,-.8],.025);sphere(ascent,green,-.85,6.04,-.8,.06);
+  if(antennaMasts){rod(ascent,[-.85,5.22,-.8],[-.85,6.02,-.8],.025);sphere(ascent,green,-.85,6.04,-.8,.06);}
   if(labels){const name=mesh(ascent,new THREE.PlaneGeometry(1.45,.22),panelText('BARRAMUNDI'),0,3.12,-1.76);name.rotation.y=Math.PI;}
   const ladder=new THREE.Group();g.add(ladder);
   rod(ladder,[-.55,.18,2.7],[-.55,2.63,1.76],.045);rod(ladder,[.55,.18,2.7],[.55,2.63,1.76],.045);

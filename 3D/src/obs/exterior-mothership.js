@@ -4,6 +4,8 @@ import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {createParabolicAntenna} from './exterior-antenna.js';
 import {createExteriorDecals} from './exterior-decals.js';
 import {addConformalServiceFairings} from './exterior-service-fairing.js';
+import {addHabitatFoundation,batchHabitatSockets,habitatMountLayout} from './exterior-habitat-mount.js';
+import {cutDockPassage} from './exterior-docking.js';
 import taraironWordmark from './tarairon-wordmark.js';
 import {HABITAT_ENVELOPE,HABITAT_FLOORS,HABITAT_WINDOWS,cabinToHabitat} from './habitat-envelope.js';
 import {HABITAT_ROTATION} from './habitat-rotation.js';
@@ -172,8 +174,8 @@ function pipe(parent,m,points,r=.07,name='Service line'){for(let i=1;i<points.le
 function axisCylinder(parent,m,x,r,length,name,segments=16){
   const mesh=addMesh(parent,new THREE.CylinderGeometry(r,r,length,segments),m,name,[x,0,0]);mesh.rotation.z=-Math.PI/2;return mesh;
 }
-function axisRing(parent,m,x,r,t,name,segments=48){
-  const mesh=addMesh(parent,new THREE.TorusGeometry(r,t,6,segments),m,name,[x,0,0]);mesh.rotation.y=Math.PI/2;return mesh;
+function axisRing(parent,m,x,r,t,name,segments=48,tubeSegments=6){
+  const mesh=addMesh(parent,new THREE.TorusGeometry(r,t,tubeSegments,segments),m,name,[x,0,0]);mesh.rotation.y=Math.PI/2;return mesh;
 }
 function loft(parent,m,sections,name,segments=8){
   const positions=[],uvs=[],indices=[];
@@ -346,10 +348,10 @@ function habitatShell(pod,m,index,stain){
   }
   // Retain the hatch leaves as continuous surfaces in optional panel studies,
   // including after their meshes have been merged into the habitat batches.
-  pod.userData.panelKeepouts=[-1,1].map(side=>({
+  pod.userData.panelKeepouts=[...(pod.userData.panelKeepouts??[]),...[-1,1].map(side=>({
     min:[side>0?EXTERIOR.podLength/2+1.87:-EXTERIOR.podLength/2-2.05,-1.75,mid-.87],
     max:[side>0?EXTERIOR.podLength/2+2.05:-EXTERIOR.podLength/2-1.87,.75,mid+.87],
-  }));
+  }))];
   label(pod,`HAB / 0${index+1}`,[7,half+1.13,-.20],3.8,.70,{rotation:[-Math.PI/2,0,0]});
   const residue=addMesh(pod,new THREE.PlaneGeometry(5.4,2.4),stain,'Local vent stain',[.5,half+1.26,1.3]);residue.rotation.x=-Math.PI/2;residue.castShadow=false;
   bake(pod);return guides;
@@ -402,6 +404,7 @@ export function createExteriorMothership(){
   // Shoulders, lower chines and the roof change angle independently along the bow.
   const forwardSkin=facetedHull(core,m.paint,[[8.8,-2.8,2.8,3.08,.9],[11,-2.65,2.4,3.0,.85],
     [13.4,-2.2,2.05,2.85,.75],[15.6,-1.7,1.5,2.2,.65],[17.3,-1.15,1.0,1.45,.45]],'Multi-facet forward pressure hull');
+  cutDockPassage(forwardSkin,new THREE.Matrix4(),{centerX:10.4,radius:.63,minY:-3,maxY:-2,normalSign:-1});
   facetedHull(core,m.paint,[[9.3,1.2,2.4,1.95,.30],[10.4,1.15,3.15,2.3,.40],
     [12.8,1.15,3.3,2.3,.48],[14.25,1.05,2.95,2.05,.40],[15.6,.95,2.45,1.65,.35]],'Sloping faceted command module','command');
   for(const side of [-1,1]){
@@ -492,11 +495,24 @@ export function createExteriorMothership(){
   for(let i=0;i<24;i++){
     const a=i*Math.PI/12;box(hub,m.ochre,[0,Math.cos(a)*3.78,Math.sin(a)*3.78],[2.0,.13,.25],'Hub drive teeth').rotation.x=a;
   }
+  for(let index=0;index<3;index++){
+    const seat=new THREE.Group();seat.name='Hub radial spar root saddle';seat.rotation.x=index*Math.PI*2/3;hub.add(seat);
+    for(const x of [-1.75,1.75]){
+      box(seat,m.pipe,[x,3.92,0],[1.35,.20,1.30],'Bearing-hub load-spreader foot');
+      box(seat,m.dark,[x,3.78,0],[1.05,.16,.98],'Hub saddle isolation layer');
+      addMesh(seat,new THREE.CylinderGeometry(.26,.42,.55,8),m.pipe,'Radial spar root socket',[x,4.20,0]);
+      for(const side of [-1,1]){
+        for(const z of [-.46,.46])box(seat,m.pipe,[x+side*.51,4.04,z],[.13,.13,.13],'Hub shoe captive bolt');
+        box(seat,m.pipe,[x+side*.35,3.59,0],[.20,.38,.92],'Hub saddle bearing cheek');
+      }
+    }
+  }
   // An enclosed pressure tunnel around the ring, braced by two separated rails.
-  const tunnel=EXTERIOR.radius-EXTERIOR.podDepth/2-.45;
+  const habitatMount=habitatMountLayout(EXTERIOR),mountSockets=[],mountUpdates=[];
+  const tunnel=habitatMount.ringRadius;
   for(const x of [-2.15,2.15]){
-    axisRing(frame,m.steel,x,tunnel,.15,'Circumferential structural rail');
-    axisRing(frame,m.pipe,x,tunnel+.6,.07,'Ring coolant return');
+    axisRing(frame,m.steel,x,tunnel,.15,'Circumferential structural rail',habitatMount.ringSegments,8);
+    axisRing(frame,m.pipe,x,tunnel+.6,.07,'Ring coolant return',habitatMount.ringSegments,8);
   }
   const ring=axisRing(frame,m.patch,0,tunnel,.42,'Enclosed connecting passage');ring.userData.pressureTunnel=true;
   for(let i=0;i<48;i++){
@@ -509,7 +525,7 @@ export function createExteriorMothership(){
     const angle=i*Math.PI*2/3,pod=new THREE.Group();pod.name=`Gravity section ${i+1}`;
     pod.rotation.x=angle;pod.position.set(0,Math.cos(angle)*EXTERIOR.radius,Math.sin(angle)*EXTERIOR.radius);rotor.add(pod);pods.push(pod);
     const truss=new THREE.Group();truss.name='Adjustable radial support';truss.rotation.x=angle;frame.add(truss);spokes.push(truss);
-    const spokeEnd=EXTERIOR.radius-EXTERIOR.podDepth/2+.30;
+    const spokeEnd=habitatMount.supportRadius;
     for(const x of [-1.75,1.75]){
       rod(truss,m.steel,[x,3.75,0],[x,spokeEnd,0],.19,'Load-bearing radial spar');
       rod(truss,m.pipe,[x,4.1,.34],[x,spokeEnd,.34],.09,'Spoke utilities');
@@ -520,7 +536,9 @@ export function createExteriorMothership(){
       rod(truss,m.steel,[-1.75,y,0],[1.75,y,0],.08,'Spoke crossbeam');
     }
     box(truss,m.white,[0,(spokeEnd+3.7)/2,0],[.68,spokeEnd-3.7,.70],'Radial access tunnel');
-    bake(truss);floorGuides.push(habitatShell(pod,m,i,stain));
+    bake(truss);const sockets=addHabitatFoundation(pod,m,habitatMount,{addMesh,box,rod,pipe,bake});mountSockets.push(...sockets);
+    floorGuides.push(habitatShell(pod,m,i,stain));
+    mountUpdates.push(batchHabitatSockets(pod,sockets,m.steel));
   }
 
   // Exposed machinery is grouped around real interfaces and service bays.
@@ -587,7 +605,12 @@ export function createExteriorMothership(){
       const a=k*Math.PI/4;rod(group,m.pipe,[-.75,Math.cos(a)*r*.62,Math.sin(a)*r*.62],[-1.2-length+.2,Math.cos(a)*(r+.04),Math.sin(a)*(r+.04)],.035,'Bell cooling jacket ribs');
     }
     pipe(group,m.pipe,[[.15,r*.5,0],[-.6,r*.82,0],[-1.5,r*.56,0]],.075,'Turbopump fuel line');
-    for(const a of [0,Math.PI/2,Math.PI,Math.PI*1.5])rod(group,m.steel,[.1,Math.cos(a)*r,Math.sin(a)*r],[-.8,Math.cos(a)*r*.6,Math.sin(a)*r*.6],.09,'Engine mount');
+    for(const a of [0,Math.PI/2,Math.PI,Math.PI*1.5]){
+      const foot=new THREE.Group();foot.name='Engine bulkhead thrust shoe';foot.position.set(-.30,Math.cos(a)*r,Math.sin(a)*r);foot.rotation.x=a;group.add(foot);
+      box(foot,m.steel,[0,0,0],[.18,.58,.72],'Recessed bulkhead anchor plate');
+      for(const z of [-.24,.24])box(foot,m.pipe,[-.12,.16,z],[.08,.11,.11],'Thrust shoe retaining bolt');
+      rod(group,m.steel,[-.39,Math.cos(a)*r,Math.sin(a)*r],[-.8,Math.cos(a)*r*.6,Math.sin(a)*r*.6],.09,'Engine mount');
+    }
   };
   nozzle(0,0,2.22,5.7,0);
   for(let i=0;i<6;i++){const a=i*Math.PI/3;nozzle(Math.sin(a)*3.35,Math.cos(a)*5.9,1.42,3.95,i+1);}
@@ -632,12 +655,15 @@ export function createExteriorMothership(){
   decals.flush();
   const bounds=new THREE.Box3().setFromObject(root),dimensions=bounds.getSize(new THREE.Vector3());
   let coreScale=1;
-  const ship={root,core,rotor,pods,frame,engines,machinery,dimensions,floorGuides,hub,spokes,evaHatches,
+  const ship={root,core,rotor,pods,frame,engines,machinery,dimensions,floorGuides,hub,spokes,evaHatches,mountSockets,
     get dockedLander(){return probe?.lander??null;},get probeDock(){return probe?.dock??null;},get probeThrusters(){return probe?.thrusters??null;},
+    get dockHatches(){return probe?.hatches??[];},
+    setDockTransferOpen(value){probe?.setTransferOpen(Boolean(value));},
     addProbe(factory){
       if(disposed||probe)return ship;
       probe=factory(root,m,{random,addMesh,box,rod,pipe,axisRing,chamferBox,label,bake});
       if(probe)probe.dock.position.set((10.4-EXTERIOR.rotorX)*coreScale+EXTERIOR.rotorX,-2.65*coreScale-7.25,0);
+      probe?.setScale(coreScale);
       bounds.setFromObject(root).getSize(dimensions);return ship;
     },
     prepareProbe(){
@@ -649,12 +675,14 @@ export function createExteriorMothership(){
       core.scale.setScalar(coreScale);core.position.x=EXTERIOR.rotorX*(1-coreScale);
       marks.scale.copy(core.scale);marks.position.copy(core.position);hub.scale.setScalar(coreScale);
       if(probe)probe.dock.position.set((10.4-EXTERIOR.rotorX)*coreScale+EXTERIOR.rotorX,-2.65*coreScale-7.25,0);
-      const end=EXTERIOR.radius-EXTERIOR.podDepth/2+.30;
+      probe?.setScale(coreScale);
+      const end=habitatMount.supportRadius;
       const stretch=(end-3.75*coreScale)/(end-3.75),offset=end*(1-stretch);
       for(const [i,spoke]of spokes.entries()){
         const angle=i*Math.PI*2/3;spoke.scale.set(coreScale,stretch,1);
         spoke.position.set(0,Math.cos(angle)*offset,Math.sin(angle)*offset);
       }
+      for(const update of mountUpdates)update(coreScale);
       bounds.setFromObject(root).getSize(dimensions);return coreScale;
     },
     setFloorGuides(value){floorGuides.forEach(group=>{group.visible=Boolean(value);});},

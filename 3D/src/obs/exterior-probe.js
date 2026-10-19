@@ -3,6 +3,7 @@ import {createLander} from '../js/models.js';
 import {createParabolicAntenna} from './exterior-antenna.js';
 import {createExteriorDecals} from './exterior-decals.js';
 import {createExteriorProbeThrusters} from './exterior-probe-thrusters.js';
+import {addProbeDockPort,addMotherDockPort,cutDockPassage} from './exterior-docking.js';
 
 export function createExteriorProbe(root,m,build){
   const {random,addMesh,box,rod,pipe,axisRing,chamferBox,label,bake}=build;
@@ -125,7 +126,7 @@ function detailDockedProbe(lander,m){
 
 function dockedProbe(root,m){
   const dock=new THREE.Group();dock.name='BARRAMUNDI / underside docking cradle';root.add(dock);
-  const lander=createLander({labels:false,antennaDish:false,lateralFins:false,octagonalBase:true,cabinFixtures:false,landingStruts:false});lander.name='Moonlander game / BARRAMUNDI';dock.add(lander);
+  const lander=createLander({labels:false,antennaDish:false,antennaMasts:false,lateralFins:false,octagonalBase:true,cabinFixtures:false,landingStruts:false});lander.name='Moonlander game / BARRAMUNDI';dock.add(lander);
   lander.userData.flame.visible=false;lander.userData.flame.removeFromParent();
   // Game geometry/materials are module-wide caches. Give this study its own
   // resources so baking and disposal cannot alter a second game instance.
@@ -137,11 +138,18 @@ function dockedProbe(root,m){
     const isolate=material=>{if(!materials.has(material))materials.set(material,material.clone());return materials.get(material);};
     object.material=Array.isArray(object.material)?object.material.map(isolate):isolate(object.material);
   });
-  const paintedMaterials=detailDockedProbe(lander,m);
+  lander.updateWorldMatrix(true,true);const inverse=lander.matrixWorld.clone().invert();
+  lander.traverse(mesh=>{
+    if(mesh.isMesh&&mesh.material.color?.getHex()===0xd7d7cb)
+      cutDockPassage(mesh,inverse.clone().multiply(mesh.matrixWorld),{radius:.63,minY:5.0,maxY:5.4});
+  });
+  const paintedMaterials=detailDockedProbe(lander,m),probeHatch=addProbeDockPort(lander,m,build);
   // Seat the neighboring beacon mast into the sloping roof as well.
-  rod(lander,m.steel,[-.85,4.96,-.8],[-.85,5.26,-.8],.04,'Beacon antenna roof socket');
+  rod(lander,m.steel,[-1.12,4.94,-.65],[-1.12,6.10,-.65],.04,'Outboard beacon mast clear of docking port');
+  box(lander,m.pipe,[-1.12,6.15,-.65],[.10,.10,.10],'Probe beacon head');
+  rod(lander,m.steel,[1.22,4.74,-.55],[1.64,4.95,-.68],.06,'Outboard dish support clear of docking envelope');
   const antenna=createParabolicAntenna({radius:.38,depth:.13,material:m.patch,structureMaterial:m.steel,feedMaterial:m.dark,name:'Probe directional communications antenna'});
-  antenna.position.set(.8,6.15,-.5);antenna.rotation.x=.55;lander.add(antenna);bake(antenna);
+  antenna.position.set(1.64,4.95,-.68);antenna.rotation.x=.55;lander.add(antenna);bake(antenna);
   bake(lander);
   const decals=createExteriorDecals();
   decals.add(lander,'pressure',[0,3.93,1.89],[0,0,1],.65,.26);
@@ -153,15 +161,10 @@ function dockedProbe(root,m){
   decals.flush();
   const thrusters=createExteriorProbeThrusters(lander,{nozzleMaterial:m.dark,rimMaterial:m.pipe});
   const cradle=new THREE.Group();cradle.name='Probe docking hardpoints';dock.add(cradle);
-  chamferBox(cradle,m.steel,[0,7.25,0],[2.8,.22,2.2],'Underside docking plate');
-  const collar=axisRing(cradle,m.pipe,0,.36,.05,'Probe docking collar');collar.rotation.set(Math.PI/2,0,0);collar.position.set(0,5.43,0);
-  rod(cradle,m.steel,[0,5.35,0],[0,7.25,0],.30,'Probe pressure coupling');
-  for(const x of [-1,1])for(const z of [-1,1]){
-    rod(cradle,m.steel,[x*.68,5.32,z*.53],[x*1.2,7.14,z*.9],.07,'Probe retention strut');
-    box(cradle,m.patch,[x*.68,5.33,z*.53],[.38,.14,.32],'Probe roof clamp');
-  }
-  label(cradle,'PROBE / 01',[0,7.25,1.102],1.6,.14,{size:44});
-  bake(cradle);return{dock,lander,cradle,paintedMaterials,thrusters};
+  const motherPort=addMotherDockPort(cradle,m,build);
+  dock.userData.docking={clearDiameter:1.2,mode:'unpressurized until hard-capture and seal check'};
+  return{dock,lander,cradle,paintedMaterials,thrusters,hatches:[probeHatch.hinge,motherPort.hatch.hinge],setScale:motherPort.setScale,
+    setTransferOpen(value){probeHatch.setOpen(value);motherPort.hatch.setOpen(value);}};
 }
 
   return dockedProbe(root,m);
