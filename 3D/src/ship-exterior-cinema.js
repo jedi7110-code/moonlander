@@ -95,7 +95,6 @@ try{
         logoMeasured=true;document.documentElement.dataset.logoPlayback=JSON.stringify(logoPlayback);
       }
     }
-    $('cut').style.opacity=String(shot.fade);
     const number=shot=>String(shot.number).padStart(2,'0');
     $('scene-number').textContent=film.to?`SCENE ${number(film.from)} → ${number(film.to)}`:`SCENE ${number(shot)}`;
     $('time').textContent=shot.cruising?`航行中 ${shot.time.toFixed(1)} 秒`:`${shot.time.toFixed(1)} / ${shot.duration.toFixed(0)} 秒`;

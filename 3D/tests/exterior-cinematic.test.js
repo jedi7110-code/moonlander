@@ -449,7 +449,7 @@ test('03 to 07 dissolves for 0.4 seconds while both views follow the same moving
   assert.equal(sampleExteriorCinemaFrame(boundary+.201,options).to,null);
 });
 
-test('space is visible immediately, and scene changes never fade to black',()=>{
+test('the free view stays immediate and later scene changes never fade to black',()=>{
   assert.equal(sampleExteriorCinema(0).fade,0);assert.equal(sampleExteriorCinema(EXTERIOR_VIEW_DURATION).fade,0);
   assert.equal(sampleExteriorCinema(1).fade,0);
   let start=0;

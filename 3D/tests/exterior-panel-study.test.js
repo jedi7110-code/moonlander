@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Raycaster,Vector3,Mesh,PlaneGeometry,MeshStandardMaterial,DoubleSide} from 'three';
+import {Raycaster,Vector3,Mesh,PlaneGeometry,MeshStandardMaterial,DoubleSide,Color} from 'three';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {createExteriorPanelStudy} from '../src/obs/exterior-panel-study.js';
 import {HABITAT_ENVELOPE} from '../src/obs/habitat-envelope.js';
@@ -18,6 +18,65 @@ test('optional panel version toggles without modifying the approved model geomet
     for(const [mesh,geometry,material]of original){assert.equal(mesh.geometry,geometry);assert.equal(mesh.material,material);}
     study.dispose();assert.ok(overlays.every(group=>!group.parent));
   }finally{ship.dispose();}
+});
+
+test('only the bow beak and its lower transition band are grey while hull and habitat panels retain beige paint',()=>{
+  for(const replaceSkin of [false,true]){
+    const ship=createExteriorShip(),study=createExteriorPanelStudy(ship,{replaceSkin});
+    try{
+      let checked=0,greyVertices=0,bandVertices=0,sideBandVertices=0;
+      const beakPaint=new Color(0x767b72);
+      for(const group of [ship.core,...ship.pods]){
+        const paint=group===ship.core?new Color(0xc7c1ac):new Color(0xe0ded0).multiply(new Color(0xc1baa5));
+        group.traverse(mesh=>{
+          if(mesh.material?.name!=='Study / segmented exterior plates')return;
+          const colors=mesh.geometry.attributes.color,positions=mesh.geometry.attributes.position;
+          for(let index=0;index<colors.count;index++){
+            const beakRed=colors.getX(index)/beakPaint.r,beakGreen=colors.getY(index)/beakPaint.g,beakBlue=colors.getZ(index)/beakPaint.b;
+            const grey=Math.abs(beakRed-beakGreen)<1e-5&&Math.abs(beakRed-beakBlue)<1e-5;
+            if(grey){
+              assert.ok(group===ship.core,'grey never appears on a habitat');
+              const axial=positions.getX(index),height=positions.getY(index);
+              const tip=axial>=15.59&&axial<=17.32&&height<=1.52;
+              const lowerBand=axial>=13.39&&axial<=15.62&&height<=-.49;
+              assert.ok(tip||lowerBand,'grey stays on the beak and the marked lower transition band');
+              if(lowerBand&&axial<15.59)bandVertices++;
+              if(lowerBand&&axial<15.59&&height>-.99)sideBandVertices++;
+              greyVertices++;
+            }
+            const tint=grey?beakPaint:paint;
+            const red=colors.getX(index)/tint.r,green=colors.getY(index)/tint.g,blue=colors.getZ(index)/tint.b;
+            assert.ok(Math.abs(red-green)<1e-5&&Math.abs(red-blue)<1e-5,'all panels retain their specified paint hue');
+            assert.ok(red>=.97-1e-6&&red<=1.02+1e-6,'paint variation stays subtle instead of becoming a contrasting patch');
+          }
+          checked++;
+        });
+      }
+      assert.equal(checked,4,'the fixed hull and all three habitats are covered');
+      assert.ok(greyVertices>0,'the beak uses the requested grey');
+      assert.ok(bandVertices>0,'grey extends onto the lower band behind the beak');
+      assert.ok(sideBandVertices>0,'the narrow strip immediately beneath the inspection cover is grey too');
+      ship.root.updateMatrixWorld(true);
+      const panels=[];ship.core.traverse(mesh=>{if(mesh.material?.name==='Study / segmented exterior plates')panels.push(mesh);});
+      for(const [point,normal,paint=beakPaint]of [
+        [[14.5,-1.95,0],[.22,-.98,0]],
+        [[14.5,-1.6,2.175],[.32,-.67,.67]],
+        [[14.5,-1.6,-2.175],[.32,-.67,-.67]],
+        [[14.5,-.9,2.525],[.28,0,.96]],
+        [[14.5,-.9,-2.525],[.28,0,-.96]],
+        [[15.35,0,2.274],[.28,0,.96],new Color(0xc7c1ac)],
+        [[15.35,0,-2.274],[.28,0,-.96],new Color(0xc7c1ac)],
+      ]){
+        const surface=ship.core.localToWorld(new Vector3(...point));
+        const outward=new Vector3(...normal).normalize().transformDirection(ship.core.matrixWorld);
+        const hit=new Raycaster(surface.clone().addScaledVector(outward,.5),outward.negate(),0,1).intersectObjects(panels,false)[0];
+        assert.ok(hit,'the lower band and both sloping chines retain their real panel surfaces');
+        const colors=hit.object.geometry.attributes.color,index=hit.face.a;
+        const red=colors.getX(index)/paint.r,green=colors.getY(index)/paint.g,blue=colors.getZ(index)/paint.b;
+        assert.ok(Math.abs(red-green)<1e-5&&Math.abs(red-blue)<1e-5,'the marked lower strips are grey while upper side panels remain beige');
+      }
+    }finally{study.dispose();ship.dispose();}
+  }
 });
 
 test('probe plates remain seated on actual painted facets, including tapered cabin surfaces',()=>{
@@ -104,7 +163,7 @@ test('aft wordmark ink clears B plates from frontal and oblique views on both si
         const normal=new Vector3(-slope,0,side).normalize();
         const direction=normal.clone().add(new Vector3(oblique,0,0)).normalize();
         const hit=new Raycaster(point.clone().addScaledVector(direction,3),direction.negate(),0,6).intersectObjects(surfaces,false)[0];
-        assert.equal(hit?.object,logo,'raised panels must not cover the wordmark from an oblique camera');
+        assert.ok(hit?.object===logo,'raised panels must not cover the wordmark from an oblique camera');
       }
     }
     study.setEnabled(false);assert.ok(ink.every(mesh=>!mesh.parent.visible),'A/B switching restores the original ink');

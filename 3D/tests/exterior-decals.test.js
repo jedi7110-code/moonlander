@@ -42,7 +42,7 @@ test('equipment warnings remain on the actual craft surfaces after scaling and r
           const ray=new THREE.Raycaster(point.clone().addScaledVector(normal,.02),normal.negate(),0,.04),hit=ray.intersectObjects(body,false)[0];
           assert.ok(hit&&Math.abs(hit.distance-.02)<.002,`${decal.parent.name}/${entry.key} sits on its physical surface`);
         }
-      });assert.equal(count,29,'both craft and four inspection lids have equipment-specific markings');
+      });assert.equal(count,33,'both craft, six pressurant tanks and four inspection lids have equipment-specific markings');
     }
   }finally{ship.dispose();}
 });

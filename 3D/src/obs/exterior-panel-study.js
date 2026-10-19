@@ -17,6 +17,17 @@ export function clipPanelPolygon(subject,boundary){
 }
 const noise=(a,b,c)=>{const n=Math.sin(a*127.1+b*311.7+c*74.7)*43758.5453;return n-Math.floor(n);};
 
+function clipPaintHeight(polygon,plane,height,lower){
+  const result=[],distance=point=>plane.u.y*point[0]+plane.v.y*point[1]+plane.normal.y*plane.d-height;
+  for(let index=0;index<polygon.length;index++){
+    const start=polygon[index],end=polygon[(index+1)%polygon.length],startDistance=distance(start),endDistance=distance(end);
+    const startInside=lower?startDistance<=0:startDistance>=0,endInside=lower?endDistance<=0:endDistance>=0;
+    if(startInside)result.push(start);
+    if(startInside!==endInside){const amount=startDistance/(startDistance-endDistance);result.push([start[0]+(end[0]-start[0])*amount,start[1]+(end[1]-start[1])*amount]);}
+  }
+  return result;
+}
+
 export function collectPaintPlanes(group){
   group.updateWorldMatrix(true,true);
     const inverse=group.matrixWorld.clone().invert(),planes=new Map(),point=new THREE.Vector3();
@@ -75,6 +86,17 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
     for(const [planeIndex,plane]of [...planes.values()].entries()){
       if(plane.area<(probeOnly?.12:.35))continue;
       const {u,v,normal,d}=plane;
+      const beak=group===ship.core&&plane.triangles.every(triangle=>triangle.every(([horizontal,vertical])=>{
+        const axial=u.x*horizontal+v.x*vertical+normal.x*d,height=u.y*horizontal+v.y*vertical+normal.y*d;
+        const tip=axial>=15.6-1e-5&&height<=1.5+1e-5;
+        const lowerBand=normal.y<-.3&&axial>=13.4-1e-5&&axial<=15.6+1e-5&&height<=-1;
+        return tip||lowerBand;
+      }));
+      const facePaint=beak?new THREE.Color(0x767b72):panelPaint;
+      const sideBand=group===ship.core&&Math.abs(normal.y)<1e-5&&Math.abs(normal.z)>.8&&plane.triangles.every(triangle=>triangle.every(([horizontal,vertical])=>{
+        const axial=u.x*horizontal+v.x*vertical+normal.x*d;
+        return axial>=13.4-1e-5&&axial<=15.6+1e-5;
+      }));
       function vertex(dest,p,z){dest.push(u.x*p[0]+v.x*p[1]+normal.x*(d+z),u.y*p[0]+v.y*p[1]+normal.y*(d+z),u.z*p[0]+v.z*p[1]+normal.z*(d+z));}
       const nx=Math.max(1,Math.ceil((plane.max[0]-plane.min[0])/pitch[0]));
       // Keep the bow end as one continuous face: a central horizontal gap
@@ -96,17 +118,21 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
         const cut=noise(ix,iy,planeIndex+9)>.5;
         const outline=cut?[[l+k,b],[r,b],[r,t-k],[r-k,t],[l,t],[l,b+k]]:
           [[l,b],[r,b],[r,t],[l,t]];
-        const tone=noise(ix,iy,planeIndex+4),dark=tone>.985;
-        const color=(dark?new THREE.Color(0x767b72):panelPaint.clone()).multiplyScalar(.97+tone*.05);
+        const tone=noise(ix,iy,planeIndex+4);
+        const color=facePaint.clone().multiplyScalar(.97+tone*.05);
         let added=false;
         for(const triangle of plane.triangles){
           const polygon=clipPanelPolygon(triangle,outline);if(polygon.length<3)continue;
-          for(let j=1;j<polygon.length-1;j++){
-            if(Math.abs(cross(polygon[0],polygon[j],polygon[j+1]))<1e-8)continue;
-            for(const p of [polygon[0],polygon[j],polygon[j+1]]){
-              vertex(positions,p,depth);colors.push(color.r,color.g,color.b);
+          const surfaces=sideBand?[
+            [clipPaintHeight(polygon,plane,-.5,true),new THREE.Color(0x767b72).multiplyScalar(.97+tone*.05)],
+            [clipPaintHeight(polygon,plane,-.5,false),color],
+          ]:[[polygon,color]];
+          for(const [surface,tint]of surfaces)for(let corner=1;corner<surface.length-1;corner++){
+            if(Math.abs(cross(surface[0],surface[corner],surface[corner+1]))<1e-8)continue;
+            for(const point of [surface[0],surface[corner],surface[corner+1]]){
+              vertex(positions,point,depth);colors.push(tint.r,tint.g,tint.b);
               const tile=Math.floor(noise(ix,iy,planeIndex+31)*4),flip=noise(ix,iy,planeIndex+15)>.5;
-              const pu=(p[0]-l)/(r-l),pv=(p[1]-b)/(t-b);
+              const pu=(point[0]-l)/(r-l),pv=(point[1]-b)/(t-b);
               uvs.push((tile%2+.005+(flip?1-pu:pu)*.99)/2,(Math.floor(tile/2)+.005+pv*.99)/2);
             }
             stats.triangles++;added=true;

@@ -107,7 +107,7 @@ test('mount adjustments reuse the existing steel buffers and restore them exactl
       if(!mesh.isMesh)return;meshes++;triangles+=(mesh.geometry.index?.count??mesh.geometry.attributes.position.count)/3;
     });
     assert.equal(meshes,99,'foundations, hub saddles and engine shoes add no mothership draw batches');
-    assert.ok(triangles<50000,`structural detail stays below the geometry budget: ${triangles} triangles`);
+    assert.ok(triangles<56000,`structural detail including six supported tanks and antenna yokes stays below the geometry budget: ${triangles} triangles`);
     for(const scale of [2.8,1.6,2.6,1])ship.setCoreScale(scale);
     for(const [index,mesh]of batches.entries()){
       assert.equal(mesh.geometry,original[index].geometry);

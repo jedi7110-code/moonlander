@@ -11,7 +11,7 @@ export function createExteriorDissolve(renderer,{samples=0}={}){
   const emptyGas=new THREE.DataTexture(new Uint8Array(4),1,1);emptyGas.needsUpdate=true;
   const size=new THREE.Vector2(),scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
   const material=new THREE.ShaderMaterial({
-    uniforms:{outgoing:{value:targets[0].texture},incoming:{value:targets[0].texture},blend:{value:0},
+    uniforms:{outgoing:{value:targets[0].texture},incoming:{value:targets[0].texture},blend:{value:0},fade:{value:0},fadeColor:{value:new THREE.Color('#030609')},
       outgoingGas:{value:emptyGas},incomingGas:{value:emptyGas}},
     depthTest:false,depthWrite:false,
     vertexShader:`varying vec2 vUv;
@@ -21,6 +21,8 @@ export function createExteriorDissolve(renderer,{samples=0}={}){
       uniform sampler2D outgoingGas;
       uniform sampler2D incomingGas;
       uniform float blend;
+      uniform float fade;
+      uniform vec3 fadeColor;
       varying vec2 vUv;
       void main(){
         vec4 a=texture2D(outgoing,vUv),b=texture2D(incoming,vUv);
@@ -32,7 +34,8 @@ export function createExteriorDissolve(renderer,{samples=0}={}){
         vec4 ga=texture2D(outgoingGas,vUv),gb=texture2D(incomingGas,vUv);
         a.rgb=a.rgb*(1.0-ga.a)+ga.rgb;b.rgb=b.rgb*(1.0-gb.a)+gb.rgb;
         a.a=1.0;b.a=1.0;
-        gl_FragColor=mix(linearToOutputTexel(a),linearToOutputTexel(b),blend);
+        vec4 picture=mix(linearToOutputTexel(a),linearToOutputTexel(b),blend);
+        gl_FragColor=mix(picture,linearToOutputTexel(vec4(fadeColor,1.0)),fade);
       }`,
   });
   material.name='Exterior cinema / graded cross dissolve';
@@ -50,6 +53,7 @@ export function createExteriorDissolve(renderer,{samples=0}={}){
         material.uniforms.incomingGas.value=frame.to?(toGas?gasTargets[1].texture:emptyGas):material.uniforms.outgoingGas.value;
         material.uniforms.incoming.value=frame.to?targets[1].texture:targets[0].texture;
         material.uniforms.blend.value=frame.mix;
+        material.uniforms.fade.value=THREE.MathUtils.clamp(frame.shot?.fade??0,0,1);
         renderer.setRenderTarget(null);renderer.render(scene,camera);
       }finally{renderer.setRenderTarget(null);}
     },

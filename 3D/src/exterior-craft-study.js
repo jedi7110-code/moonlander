@@ -45,11 +45,10 @@ try{
     probeLines?.setEnabled($('probe-lines').checked);
     if(probe){
       const params=new URLSearchParams(location.search);params.set('lines',$('probe-lines').checked?'1':'0');history.replaceState(null,'',`?${params}`);
-      $('detail-note').textContent=$('probe-lines').checked?'Aのパネル配置 / 既存の線だけ濃く':'Aのパネル配置 / 元の線の濃さ';
+      $('detail-note').textContent=$('probe-lines').checked?'現行モデル / 既存の線だけ濃く':'現行モデル / 元の線の濃さ';
     }
   };
   $('probe-lines').onchange=applyProbeLines;
-  if(probe){document.querySelector('[data-detail="enhanced"]').hidden=true;document.querySelector('[data-detail="current"]').textContent='A / 既存パネル';}
   applyProbeLines();
   $('panel-wear').checked=query.get('wear')!=='0';
   const applyPanelWear=()=>{
@@ -58,18 +57,13 @@ try{
     for(const link of document.querySelectorAll('[data-craft]')){const url=new URL(link.href);url.searchParams.set('wear',params.get('wear'));link.href=url;}
   };
   $('panel-wear').onchange=applyPanelWear;applyPanelWear();
-  function panelVersion(version){
-    if(probe)version='current';
-    panelStudy?.setEnabled(version==='enhanced');
-    for(const button of document.querySelectorAll('[data-detail]'))button.setAttribute('aria-pressed',String(button.dataset.detail===version));
-    $('panel-wear-control').hidden=version!=='enhanced';
-    $('detail-note').textContent=version==='enhanced'?'B案：パネルの分割・段差 / 汚しをON・OFFで比較':'現状版';
-    if(probe)applyProbeLines();
-    const params=new URLSearchParams(location.search);params.set('detail',version);history.replaceState(null,'',`?${params}`);
-    for(const link of document.querySelectorAll('[data-craft]')){const url=new URL(link.href);url.searchParams.set('detail',version);link.href=url;}
+  panelStudy?.setEnabled(true);
+  $('panel-wear-control').hidden=probe;
+  if(!probe)$('detail-note').textContent='現行モデル / パネルの分割・段差';
+  const detailParams=new URLSearchParams(location.search);detailParams.set('detail',probe?'current':'enhanced');history.replaceState(null,'',`?${detailParams}`);
+  for(const link of document.querySelectorAll('[data-craft]')){
+    const url=new URL(link.href);url.searchParams.set('detail',link.dataset.craft==='mothership'?'enhanced':'current');link.href=url;
   }
-  for(const button of document.querySelectorAll('[data-detail]'))button.onclick=()=>panelVersion(button.dataset.detail);
-  panelVersion(query.get('detail')==='enhanced'?'enhanced':'current');
   const inspectionBounds=new THREE.Box3().setFromObject(model);
   const camera=new THREE.PerspectiveCamera(38,1,.05,2000),controls=new OrbitControls(camera,$('view'));
   controls.enableDamping=true;controls.dampingFactor=.12;controls.screenSpacePanning=true;
@@ -144,6 +138,11 @@ try{
         .add(new THREE.Vector3(0,8,-12).transformDirection(pod.matrixWorld).multiplyScalar(14));
       camera.up.transformDirection(pod.matrixWorld);
     }
+    else if(name==='engine-base'&&!probe){
+      ship.core.updateWorldMatrix(true,false);
+      controls.target.copy(ship.core.localToWorld(new THREE.Vector3(-18.2,0,0)));
+      camera.position.copy(ship.core.localToWorld(new THREE.Vector3(-42,12,20)));
+    }
     else if(name==='engine-mount'&&!probe){
       const engine=ship.engines[1];engine.updateWorldMatrix(true,false);
       controls.target.copy(engine.localToWorld(new THREE.Vector3(-.5,0,0)));
@@ -180,7 +179,7 @@ try{
   $('nozzle-bounce-control').hidden=probe;
   $('habitat-hatch-view').hidden=probe;
   $('habitat-face-view').hidden=probe;$('bow-face-view').hidden=probe;
-  for(const id of ['service-top-view','service-under-view','service-side-view','service-cover-view','service-cover-left-view','eva-hatch-view','habitat-mount-view','habitat-mount-rear-view','hub-mount-view','engine-mount-view','docking-view','docking-section-view','docking-undocked-view'])$(id).hidden=probe;
+  for(const id of ['service-top-view','service-under-view','service-side-view','service-cover-view','service-cover-left-view','eva-hatch-view','habitat-mount-view','habitat-mount-rear-view','hub-mount-view','engine-base-view','engine-mount-view','docking-view','docking-section-view','docking-undocked-view'])$(id).hidden=probe;
   $('probe-port-view').hidden=!probe;
   $('nozzle-bounce').onchange=()=>ship.setNozzleBounce($('nozzle-bounce').checked);
   $('gas-control').hidden=!probe;$('nozzle-view').hidden=false;$('nozzle-view').textContent=probe?'姿勢制御ノズル':'主エンジン内側';$('foot-view').hidden=!probe;$('bridge-view').hidden=probe;$('front-windows-view').hidden=probe;$('skylights-view').hidden=probe;

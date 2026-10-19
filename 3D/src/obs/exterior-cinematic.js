@@ -207,7 +207,8 @@ function sampleCinemaShot(seconds,{opening=false,aspect=16/9,coreScale=2.6,phase
   eye[0]+=observerX+slide;target[0]+=cameraX+slide;
   // The last fixed observer remains in place indefinitely. There is no
   // reset, closing fade, or automatic entry into the cabin.
-  const fade=0;
+  const openingProgress=Math.min(1,time);
+  const fade=opening?1-openingProgress**2*(3-2*openingProgress):0;
   const logo=sampleExteriorLogo(time);
   const titleOpacity=logo.opacity;
   const approachDuration=CINEMA_SHOTS.find(s=>s.probeStage==='approach').duration*timingScale;

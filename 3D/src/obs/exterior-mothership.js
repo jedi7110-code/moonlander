@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {createParabolicAntenna} from './exterior-antenna.js';
+import {addAntennaFoundation} from './exterior-antenna-mount.js';
 import {createExteriorDecals} from './exterior-decals.js';
 import {addConformalServiceFairings} from './exterior-service-fairing.js';
 import {addHabitatFoundation,batchHabitatSockets,habitatMountLayout} from './exterior-habitat-mount.js';
@@ -569,7 +570,7 @@ export function createExteriorMothership(){
     pipe(machinery,m.pipe,[[-10.2,1.4,side*4.1],[-8.2,1.4,z],[-6.8,1.4,z],[-5.5,1.8,z]],.11,'Coolant plumbing');
     pipe(machinery,m.steel,[[4.8,-1.1,z],[6.0,-1.1,z],[7.4,-.7,z],[9.1,-.7,side*2.92]],.075,'Forward service conduits');
     for(let i=0;i<4;i++){
-      const x=-14.1+i*.75;
+      const x=-14.75+i*.75;
       box(machinery,m.dark,[x,1.5,side*7.3],[.52,2.6,1.2],'Engine heat exchanger');
       for(let j=0;j<6;j++)box(machinery,m.pipe,[x,1.0+j*.34,side*8.01],[.42,.10,.08],'Cooling fins');
     }
@@ -581,21 +582,44 @@ export function createExteriorMothership(){
     shipWordmark(core,[logoX,-.90,side*(logoZ+.006)],3.0,side>0?tilt:Math.PI-tilt);
   }
   // Tanks and their saddles remain behind the rotor sweep.
-  for(const side of [-1,1]){
-    const tank=new THREE.Group();tank.position.set(-12.1,side*5.35,0);machinery.add(tank);
-    axisCylinder(tank,m.white,0,.70,5.1,'Pressurant tank',12);
-    for(const x of [-1.7,1.7])axisRing(tank,m.steel,x,.73,.07,'Tank retaining band',16);
-    pipe(machinery,m.pipe,[[-12.1,side*5.4,.7],[-14.8,side*5.4,.7],[-16.2,side*3.8,.7]],.1,'Pressurant feed');
+  const tankOffsets=[-1.7,0,1.7],tankAxial=-12.65,tankHeight=5.50;
+  const tankProfile=[[0,-2.55],[.46,-2.55],[.70,-2.31],[.70,2.31],[.46,2.55],[0,2.55]].map(([radius,axial])=>new THREE.Vector2(radius,axial));
+  pressureSkin.updateWorldMatrix(true,false);
+  for(const side of [-1,1])for(const offset of tankOffsets){
+    const tank=new THREE.Group();tank.position.set(tankAxial,side*tankHeight,offset);machinery.add(tank);
+    const shell=addMesh(tank,new THREE.LatheGeometry(tankProfile,12),m.white,'Pressurant tank / chamfered end caps');shell.rotation.z=-Math.PI/2;
+    for(const axial of [-1.7,1.7]){
+      axisRing(tank,m.steel,axial,.73,.07,'Tank retaining band',16);
+      const mount=new THREE.Group();mount.name='Pressurant tank saddle foundation';mount.position.x=axial;mount.rotation.x=side>0?0:Math.PI;tank.add(mount);
+      const saddle=new THREE.TorusGeometry(.78,.10,4,12,Math.PI*2/3);saddle.rotateZ(Math.PI*7/6);saddle.rotateY(Math.PI/2);
+      addMesh(mount,saddle,m.steel,'Tank load-bearing saddle');
+      mount.updateWorldMatrix(true,false);
+      for(const lateral of [-.5,.5]){
+        const origin=mount.localToWorld(V(0,0,lateral)),inward=V(0,-1,0).transformDirection(mount.matrixWorld);
+        const hit=new THREE.Raycaster(origin,inward,0,4).intersectObject(pressureSkin,false)[0];
+        if(!hit)throw new Error('Pressurant tank saddle has no hull bearing surface');
+        const contact=mount.worldToLocal(hit.point.clone());
+        const normal=hit.face.normal.clone().transformDirection(pressureSkin.matrixWorld).transformDirection(mount.matrixWorld.clone().invert());
+        const seat=new THREE.Group();seat.name='Tank hull bearing foot';seat.position.copy(contact);seat.quaternion.setFromUnitVectors(V(0,1,0),normal);mount.add(seat);
+        box(seat,m.steel,[0,.04,0],[.68,.12,.42],'Tank hull load-spreading plate');
+        for(const axialOffset of [-.23,.23])addMesh(seat,new THREE.CylinderGeometry(.045,.045,.05,6),m.pipe,'Tank foundation anchor bolt',[axialOffset,.12,0]);
+        const lower=contact.y+.075,upper=-.60;
+        box(mount,m.steel,[0,(lower+upper)/2,lateral],[.34,upper-lower,.20],'Tank saddle standoff');
+      }
+    }
+    pipe(machinery,m.pipe,[[tankAxial,side*(tankHeight+.05),offset+.7],[tankAxial-2.55,side*(tankHeight+.05),offset+.7],[-16.2,side*3.8,offset+.7]],.1,'Pressurant feed');
   }
   // A wide, shallow aft shoulder; the bells themselves stay circular.
   // The forward cap must stop before the pressure hull's x=-15.5 cap;
   // coincident caps were competing for the same depth values.
-  loft(core,m.dark,[[-16.7,4.85,8.5],[-15.55,4.85,8.5]],'Engine mounting bulkhead',16);
+  const bulkheadScale=1.02;
+  loft(core,m.dark,[[-16.7,4.85*bulkheadScale,8.5*bulkheadScale],[-15.55,4.85*bulkheadScale,8.5*bulkheadScale]],'Engine mounting bulkhead',8);
   const engines=[];
   const nozzle=(y,z,r,length,index)=>{
     const group=new THREE.Group();group.name=`Rocket engine ${index}`;group.position.set(-16.4,y,z);core.add(group);engines.push(group);
     group.userData.glowPoint=[-1.73,0,0];group.userData.throatRadius=r*.24;
     group.userData.nozzleLipX=-1.2-length;group.userData.nozzleRadius=r;
+    const mountRadius=r-.20;group.userData.mountRadius=mountRadius;
     axisCylinder(group,m.steel,-.6,r*.64,1.2,'Combustion chamber',12);
     // Lathed bell with a recessed open mouth, not a glowing solid disc.
     const profile=[[r*.33,0],[r*.35,.55],[r*.47,1.05],[r*.77,1.65],[r,length],[r-.08,length],[r*.70,1.65],[r*.40,1.02],[r*.26,.55]];
@@ -610,16 +634,19 @@ export function createExteriorMothership(){
     }
     pipe(group,m.pipe,[[.15,r*.5,0],[-.6,r*.82,0],[-1.5,r*.56,0]],.075,'Turbopump fuel line');
     for(const a of [0,Math.PI/2,Math.PI,Math.PI*1.5]){
-      const foot=new THREE.Group();foot.name='Engine bulkhead thrust shoe';foot.position.set(-.30,Math.cos(a)*r,Math.sin(a)*r);foot.rotation.x=a;group.add(foot);
+      const foot=new THREE.Group();foot.name='Engine bulkhead thrust shoe';foot.position.set(-.30,Math.cos(a)*mountRadius,Math.sin(a)*mountRadius);foot.rotation.x=a;group.add(foot);
       box(foot,m.steel,[0,0,0],[.18,.58,.72],'Recessed bulkhead anchor plate');
       for(const z of [-.24,.24])box(foot,m.pipe,[-.12,.16,z],[.08,.11,.11],'Thrust shoe retaining bolt');
-      rod(group,m.steel,[-.39,Math.cos(a)*r,Math.sin(a)*r],[-.8,Math.cos(a)*r*.6,Math.sin(a)*r*.6],.09,'Engine mount');
+      rod(group,m.steel,[-.39,Math.cos(a)*mountRadius,Math.sin(a)*mountRadius],[-.8,Math.cos(a)*r*.6,Math.sin(a)*r*.6],.09,'Engine mount');
     }
   };
   nozzle(0,0,2.22,5.7,0);
   for(let i=0;i<6;i++){const a=i*Math.PI/3;nozzle(Math.sin(a)*3.35,Math.cos(a)*5.9,1.42,3.95,i+1);}
-  for(let i=0;i<12;i++){
-    const a=i*Math.PI/6;box(machinery,m.ochre,[-16.75,Math.cos(a)*4.7,Math.sin(a)*8.15],[.08,.2,.5],'Engine perimeter service marking').rotation.x=a;
+  const markerInset=Math.cos(Math.PI/8)*.93;
+  for(let index=0;index<8;index++){
+    const angle=index*Math.PI/4;
+    const marker=box(machinery,m.ochre,[-16.735,Math.cos(angle)*4.85*markerInset,Math.sin(angle)*8.5*markerInset],[.08,.2,.5],'Engine perimeter service marking');
+    marker.rotation.x=Math.atan2(4.85*Math.sin(angle),8.5*Math.cos(angle));
   }
   // Directional residue beside aft plumbing and attitude-control outlets.
   for(const side of [-1,1]){
@@ -631,9 +658,9 @@ export function createExteriorMothership(){
   }
   // Small comms dishes mounted on the fixed forward hull.
   for(const [x,z,r]of [[6.8,.65,.7],[8.3,-1.0,.36]]){
-    rod(machinery,m.steel,[x,2.8,z],[x,3.5,z],.08,'Antenna pedestal');
-    const antenna=createParabolicAntenna({radius:r,depth:r*.30,material:m.patch,structureMaterial:m.steel,feedMaterial:m.dark,name:'Mothership directional communications antenna'});
+    const antenna=createParabolicAntenna({radius:r,depth:r*.30,material:m.white,structureMaterial:m.steel,feedMaterial:m.dark,name:'Mothership directional communications antenna'});
     antenna.position.set(x,3.5,z);antenna.rotation.x=.5;
+    addAntennaFoundation(machinery,antenna,pressureSkin,m,{addMesh,box,axisCylinder,pipe});
     // These dishes are fixed: batch their surfaces with the service machinery.
     antenna.userData.bakeBoundary=false;machinery.add(antenna);
   }
@@ -647,7 +674,7 @@ export function createExteriorMothership(){
     decals.add(core,'pressure',[4,.15,side*3.38],[0,0,side],.55,.20);
     decals.add(core,'rotate',[-4.9,-.7,side*3.0],[0,0,side],.85,.26);
     decals.add(core,'exhaust',[-13.5,-1.40,side*7.8],[0,0,side],1.0,.24);
-    decals.add(core,'tank',[-12.1,side*6.06,0],[0,side,0],.65,.22);
+    for(const offset of tankOffsets)decals.add(core,'tank',[tankAxial,side*(tankHeight+.71),offset],[0,side,0],.65,.22);
     // The adjacent solid cheek also clears the raised window frames in oblique views.
     decals.add(core,'sensor',[14.15,-.40,side*2.80],[0,0,side],.65,.22);
   }

@@ -6,13 +6,15 @@ import {createStarCatalog,skyHazeColor,starGlow,srgbByte,linearByte} from './ext
   if(!cover||!canvas)return;
   const query=new URLSearchParams(location.search),isCabin=document.body.dataset.spaceScene==='cabin';
   if(isCabin&&(query.has('preview')||query.get('opening')==='0')){cover.hidden=true;return;}
+  const seconds=Math.max(0,Number(query.get('time'))||0);
+  canvas.style.visibility=(isCabin||query.get('mode')==='opening')&&seconds<1?'hidden':'visible';
   const started=performance.now();document.documentElement.dataset.spaceStartedMs=String(started);
   const context=canvas.getContext('2d'),linear=Array.from({length:256},(_,index)=>linearByte(index));
   let stars=createStarCatalog();
   const normalize=p=>{const l=Math.hypot(...p);return p.map(v=>v/l);},dot=(a,b)=>a.reduce((sum,v,i)=>sum+v*b[i],0);
   // Match scene 01's oblique bearing and pitch, including a paused study seek,
   // so the lightweight loading sky hands over without changing direction.
-  const seconds=Math.max(0,Number(query.get('time'))||0),duration=query.get('mode')==='opening'||isCabin?38:38*4/3;
+  const duration=query.get('mode')==='opening'||isCabin?38:38*4/3;
   const elapsed=Math.max(0,Math.min(duration,seconds));
   const reveal=6.8,rate=.3,ease=1.2,steadyUntil=15*duration/38;
   const advance=t=>t<ease?rate*ease*((t/ease)**3-(t/ease)**4/2):rate*(t-ease/2);

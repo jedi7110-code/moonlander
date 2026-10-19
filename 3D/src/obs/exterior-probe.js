@@ -147,9 +147,10 @@ function dockedProbe(root,m){
   // Seat the neighboring beacon mast into the sloping roof as well.
   rod(lander,m.steel,[-1.12,4.94,-.65],[-1.12,6.10,-.65],.04,'Outboard beacon mast clear of docking port');
   box(lander,m.pipe,[-1.12,6.15,-.65],[.10,.10,.10],'Probe beacon head');
-  rod(lander,m.steel,[1.22,4.74,-.55],[1.64,4.95,-.68],.06,'Outboard dish support clear of docking envelope');
   const antenna=createParabolicAntenna({radius:.38,depth:.13,material:m.patch,structureMaterial:m.steel,feedMaterial:m.dark,name:'Probe directional communications antenna'});
-  antenna.position.set(1.64,4.95,-.68);antenna.rotation.x=.55;lander.add(antenna);bake(antenna);
+  antenna.position.set(1.64,4.95,-.68);antenna.rotation.x=.55;lander.add(antenna);antenna.updateMatrix();
+  const supportTop=new THREE.Vector3(...antenna.userData.antenna.mountPoint).applyMatrix4(antenna.matrix).toArray();
+  rod(lander,m.steel,[1.22,4.74,-.55],supportTop,.06,'Outboard dish support clear of docking envelope');bake(antenna);
   bake(lander);
   const decals=createExteriorDecals();
   decals.add(lander,'pressure',[0,3.93,1.89],[0,0,1],.65,.26);
