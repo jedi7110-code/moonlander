@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export const DOCK_CAPTURE=Object.freeze({delay:.12,swing:.62,preload:.18,pivotRadius:1.14,pivotY:6.042,openAngle:Math.PI*.39,closedAngle:-.022});
+export const DOCK_CAPTURE=Object.freeze({delay:.06,swing:.24,preload:.08,pivotRadius:1.14,pivotY:6.042,openAngle:Math.PI*.39,closedAngle:-.022});
 const clamp=value=>Math.max(0,Math.min(1,value));
 const smooth=value=>value*value*(3-2*value);
 
@@ -10,7 +10,7 @@ export function sampleDockCapture(seconds,timeScale=1){
 
 export function dockCaptureAngle(progress){
   const split=DOCK_CAPTURE.swing/(DOCK_CAPTURE.swing+DOCK_CAPTURE.preload);
-  return DOCK_CAPTURE.openAngle*(1-smooth(clamp(progress/split)))+
+  return DOCK_CAPTURE.openAngle*(1-clamp(progress/split)**1.4)+
     DOCK_CAPTURE.closedAngle*smooth(clamp((progress-split)/(1-split)));
 }
 

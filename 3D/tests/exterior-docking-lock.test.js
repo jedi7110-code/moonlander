@@ -11,7 +11,7 @@ const contactTime=CINEMA_SHOTS.slice(0,CINEMA_SHOTS.findIndex(shot=>shot.id==='l
 
 test('capture waits for seating, lowers the hooks, then draws them tight before the docking shot ends',()=>{
   for(const timeScale of [1,4/3]){
-    assert.equal(sampleDockCapture(-1,timeScale),0);assert.equal(sampleDockCapture(.12*timeScale,timeScale),0);
+    assert.equal(sampleDockCapture(-1,timeScale),0);assert.equal(sampleDockCapture(DOCK_CAPTURE.delay*timeScale,timeScale),0);
     assert.equal(sampleDockCapture(1*timeScale,timeScale),1);
     let previous=0,angle=DOCK_CAPTURE.openAngle;
     for(let seconds=0;seconds<1.2;seconds+=.01){
@@ -26,6 +26,18 @@ test('capture waits for seating, lowers the hooks, then draws them tight before 
       if(offset>=1)assert.equal(shot.probe.dockCapture,1,'the close camera holds long enough to show the completed lock');
     }
   }
+});
+
+test('capture drops briskly into a hard stop and finishes the short pull-in within 0.4 seconds',()=>{
+  assert.equal(DOCK_CAPTURE.swing,.24);assert.equal(DOCK_CAPTURE.preload,.08);
+  assert.equal(sampleDockCapture(.4),1);
+  const swingEnd=DOCK_CAPTURE.delay+DOCK_CAPTURE.swing,step=.0001;
+  const before=dockCaptureAngle(sampleDockCapture(swingEnd-step));
+  const contact=dockCaptureAngle(sampleDockCapture(swingEnd));
+  assert.ok((before-contact)/step>5,'the descent meets a positive mechanical stop instead of slowing softly to a float');
+  assert.ok(Math.abs(contact)<1e-10,'the major descent stops before the small final tightening movement');
+  assert.equal(dockCaptureAngle(sampleDockCapture(.4)),DOCK_CAPTURE.closedAngle);
+  assert.equal(dockCaptureAngle(sampleDockCapture(100)),DOCK_CAPTURE.closedAngle,'there is no elastic wobble or continuing creep after locking');
 });
 
 test('six claws articulate about fixed hinges and their toe seats below each actual probe receiver',()=>{

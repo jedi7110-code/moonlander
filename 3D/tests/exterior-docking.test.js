@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Raycaster,Vector3} from 'three';
+import {Matrix4,Raycaster,Vector3} from 'three';
 import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {createProductionExterior} from '../src/obs/exterior-production.js';
 import {PROBE_DOCK} from '../src/obs/exterior-docking.js';
@@ -70,4 +70,22 @@ test('cutting the exterior docking opening does not cut the shared game lander r
   const roof=()=>new Raycaster(new Vector3(0,6.5,0),new Vector3(0,-1,0)).intersectObjects(meshes,false)[0].point.y;
   const before=roof(),ship=createExteriorShip();
   try{assert.ok(Math.abs(before-5.35)<1e-5);assert.equal(roof(),before);}finally{ship.dispose();}
+});
+
+test('the three angled guide plates are removed while all six operational capture claws remain',()=>{
+  const ship=createExteriorShip();
+  try{
+    ship.setCoreScale(2.6);ship.setDockCapture(0);ship.root.updateMatrixWorld(true);
+    const cradle=ship.probeDock.getObjectByName('Probe docking hardpoints'),surfaces=[];
+    cradle.traverseVisible(mesh=>{if(mesh.isMesh)surfaces.push(mesh);});
+    for(let index=0;index<3;index++){
+      const radial=new Matrix4().makeRotationY(-index*Math.PI*2/3);
+      const normal=new Vector3(Math.cos(.32),-Math.sin(.32),0).transformDirection(radial);
+      const face=new Vector3(1.12+.04*Math.cos(.32),5.65-.04*Math.sin(.32),0).applyMatrix4(radial);
+      const origin=cradle.localToWorld(face).addScaledVector(normal,.06);
+      const hit=new Raycaster(origin,normal.clone().negate(),0,.09).intersectObjects(surfaces,false)[0];
+      assert.equal(hit,undefined,'there is no plate occupying the former angled guide face');
+    }
+    assert.equal(ship.dockCapture.claws.count,6);ship.setDockCapture(1);assert.equal(ship.dockCapture.progress,1);
+  }finally{ship.dispose();}
 });

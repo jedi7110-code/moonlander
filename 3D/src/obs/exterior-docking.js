@@ -96,10 +96,6 @@ export function addMotherDockPort(cradle,m,build){
     for(const y of [5.95,7.20])rod(cradle,m.steel,[x*.64,y,0],[x*.78,y,0],.025,'Handrail stand-off');
   }
   const capture=addDockCaptureClaws(cradle,m,build);
-  for(let index=0;index<3;index++){
-    const angle=index*Math.PI*2/3,guide=new THREE.Group();guide.position.set(Math.cos(angle)*1.04,5.55,Math.sin(angle)*1.04);guide.rotation.y=-angle;cradle.add(guide);
-    const petal=box(guide,m.steel,[.08,.10,0],[.08,.30,.34],'Soft-capture alignment guide');petal.rotation.z=-.32;
-  }
   for(const x of [-1,1])for(const z of [-1,1]){
     rod(cradle,m.steel,[x*.81,5.91,z*.69],[x*.86,7.10,z*.78],.085,'Docking thrust-frame diagonal');
     box(cradle,m.steel,[x*.87,7.10,z*.78],[.34,.24,.32],'Hull docking-frame hardpoint');

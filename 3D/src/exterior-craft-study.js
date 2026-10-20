@@ -11,6 +11,7 @@ import {createProbeLineStudy} from './obs/exterior-probe-line-study.js';
 import {createDockingClearanceStudy} from './obs/exterior-docking-study.js';
 import {createCargoHatchStudy} from './obs/exterior-cargo-hatch-study.js';
 import {sampleExteriorProbeFlight,applyExteriorProbePose} from './obs/exterior-probe-flight.js';
+import {DOCK_CAPTURE} from './obs/exterior-docking-lock.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),probe=query.get('craft')==='probe';
 let cleanup=()=>{};window.addEventListener('pagehide',()=>cleanup(),{once:true});
 try{
@@ -89,7 +90,8 @@ try{
     const pose=sampleExteriorProbeFlight(flightTime);
     applyExteriorProbePose(ship,pose);
     $('docking-lock-time').value=seconds;$('docking-lock-time-label').textContent=seconds.toFixed(2)+'秒';
-    $('docking-lock-state').textContent=pose.dockCapture===1?'ロック完了':pose.dockCapture>0?(pose.dockCapture<.775?'爪を下降':'締め付け'):pose.latched?'着座・爪待機':'接近中';
+    const tightening=DOCK_CAPTURE.swing/(DOCK_CAPTURE.swing+DOCK_CAPTURE.preload);
+    $('docking-lock-state').textContent=pose.dockCapture===1?'ロック完了':pose.dockCapture>0?(pose.dockCapture<tightening?'爪を下降':'締め付け'):pose.latched?'着座・爪待機':'接近中';
   };
   const directions={whole:[1,.35,1.2],front:probe?[0,0,1]:[1,0,0],side:probe?[1,0,0]:[0,0,1],rear:probe?[0,0,-1]:[-1,0,0],under:[.3,-1,.35]};
   function view(name){

@@ -148,9 +148,27 @@ function dockedProbe(root,m){
   rod(lander,m.steel,[-1.12,4.94,-.65],[-1.12,6.10,-.65],.04,'Outboard beacon mast clear of docking port');
   box(lander,m.pipe,[-1.12,6.15,-.65],[.10,.10,.10],'Probe beacon head');
   const antenna=createParabolicAntenna({radius:.38,depth:.13,material:m.patch,structureMaterial:m.steel,feedMaterial:m.dark,name:'Probe directional communications antenna'});
-  antenna.position.set(1.64,4.95,-.68);antenna.rotation.x=.55;lander.add(antenna);antenna.updateMatrix();
-  const supportTop=new THREE.Vector3(...antenna.userData.antenna.mountPoint).applyMatrix4(antenna.matrix).toArray();
-  rod(lander,m.steel,[1.22,4.74,-.55],supportTop,.06,'Outboard dish support clear of docking envelope');bake(antenna);
+  antenna.position.set(1.94,4.95,-.68);antenna.rotation.x=.55;lander.add(antenna);antenna.updateMatrix();
+  const cabinSkin=[];lander.traverse(mesh=>{if(mesh.isMesh&&mesh.material.name==='Probe aged pressure panels')cabinSkin.push(mesh);});
+  lander.updateWorldMatrix(true,true);
+  const direction=new THREE.Vector3(-1,0,0).transformDirection(lander.matrixWorld);
+  const hit=new THREE.Raycaster(lander.localToWorld(new THREE.Vector3(3,4.72,-.30)),direction,0,3).intersectObjects(cabinSkin,false)[0];
+  if(!hit)throw new Error('No cabin facet for probe antenna foundation');
+  const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld).transformDirection(lander.matrixWorld.clone().invert());
+  const right=new THREE.Vector3(0,1,0).cross(normal).normalize(),up=normal.clone().cross(right).normalize();
+  const foundation=new THREE.Group();foundation.name='Probe bolted antenna saddle';lander.add(foundation);
+  foundation.position.copy(lander.worldToLocal(hit.point.clone())).addScaledVector(normal,.025);
+  foundation.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,normal));foundation.updateMatrix();
+  foundation.userData.antennaFoundation={width:.36,height:.38,depth:.075};
+  chamferBox(foundation,m.steel,[0,0,0],[.36,.38,.075],'Probe antenna load-spreading plate');
+  for(const horizontal of [-.12,.12])for(const vertical of [-.13,.13])
+    box(foundation,m.pipe,[horizontal,vertical,.052],[.045,.045,.035],'Probe antenna foundation bolt');
+  for(const side of [-1,1]){
+    const foot=new THREE.Vector3(side*.12,-.08,.065).applyMatrix4(foundation.matrix);
+    const top=new THREE.Vector3(...antenna.userData.antenna.mountPoint);top.x=side*.045;top.applyMatrix4(antenna.matrix);
+    rod(lander,m.steel,foot.toArray(),top.toArray(),.045,'Probe antenna triangulated side brace');
+  }
+  bake(antenna);
   bake(lander);
   const decals=createExteriorDecals();
   decals.add(lander,'pressure',[0,3.93,1.89],[0,0,1],.65,.26);
