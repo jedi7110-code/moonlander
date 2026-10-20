@@ -164,7 +164,7 @@ function dockedProbe(root,m){
   const cradle=new THREE.Group();cradle.name='Probe docking hardpoints';dock.add(cradle);
   const motherPort=addMotherDockPort(cradle,m,build);
   dock.userData.docking={clearDiameter:1.2,mode:'unpressurized until hard-capture and seal check'};
-  return{dock,lander,cradle,paintedMaterials,thrusters,hatches:[probeHatch.hinge,motherPort.hatch.hinge],setScale:motherPort.setScale,
+  return{dock,lander,cradle,paintedMaterials,thrusters,capture:motherPort.capture,setCapture:motherPort.capture.setProgress,hatches:[probeHatch.hinge,motherPort.hatch.hinge],setScale:motherPort.setScale,
     setTransferOpen(value){probeHatch.setOpen(value);motherPort.hatch.setOpen(value);}};
 }
 

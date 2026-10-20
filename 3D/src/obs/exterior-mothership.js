@@ -676,6 +676,8 @@ export function createExteriorMothership(){
   const ship={root,core,rotor,pods,frame,engines,machinery,dimensions,floorGuides,hub,spokes,evaHatches,mountSockets,sideServices,hullCollars,commandSideWindows,bowRadiators,
     get dockedLander(){return probe?.lander??null;},get probeDock(){return probe?.dock??null;},get probeThrusters(){return probe?.thrusters??null;},
     get dockHatches(){return probe?.hatches??[];},
+    get dockCapture(){return probe?.capture??null;},
+    setDockCapture(value){probe?.setCapture(value);},
     setDockTransferOpen(value){probe?.setTransferOpen(Boolean(value));},
     addProbe(factory){
       if(disposed||probe)return ship;

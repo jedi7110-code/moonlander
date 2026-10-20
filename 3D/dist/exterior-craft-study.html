@@ -1,29 +1,30 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>母艦・小型船 / 単独モデルスタディー</title>  <script type="module" crossorigin src="/3D/assets/exteriorCraftStudy-pNV-kT_U.js"></script>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>母艦・小型船 / 単独モデルスタディー</title>  <script type="module" crossorigin src="/3D/assets/exteriorCraftStudy-BXtobDqE.js"></script>
   <link rel="modulepreload" crossorigin href="/3D/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/three-CX__1hAc.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-tkdLQMFk.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/three-BmZlQQoH.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/OrbitControls-DN6uHAMa.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/preload-helper-BRmpjvBv.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-C_fXl5NK.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/BufferGeometryUtils-BNiiveiw.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/layout-B4aEPe7t.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/viewing-wall-profile-Bj-3mBAX.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/habitat-rotation-DV4_2eFX.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/bulkhead-gate-layout-BOid6TaK.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-shadow-C1XVtjvN.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/models-ghvJ5bR8.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-probe-flight-CeTw3Src.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-probe-DjeaOU1K.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/ship-exterior-BGfDtnTH.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-dissolve-DJ5uIzgo.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-gas-pass-BxjXpWg5.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-shadow-BqxGcm8F.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/models-DzsVJTYf.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-probe-flight-mRFdTmH6.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-probe-DZK4PCD5.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/ship-exterior-B69PrcOk.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-dissolve-B7jkiof1.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-gas-pass-apu3vC33.js">
   <link rel="modulepreload" crossorigin href="/3D/assets/exterior-depth-CjZabxrl.js">
-  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-cargo-hatch--i9Jfov8.js">
+  <link rel="modulepreload" crossorigin href="/3D/assets/exterior-cargo-hatch-Bx9vm_Jb.js">
   <link rel="stylesheet" crossorigin href="/3D/assets/exteriorCraftStudy-Cx0zG-1u.css">
 </head><body>
 <header><h1 id="name">モデルスタディー</h1><nav aria-label="機体"><a href="?craft=mothership" data-craft="mothership">母艦</a><a href="?craft=probe" data-craft="probe">小型船</a></nav><p>ドラッグで回転・ホイールで拡大・右ドラッグで移動</p></header>
 <main><canvas id="view" aria-label="機体の単独3D表示"></canvas><div id="status" role="status">準備中…</div></main>
 <footer><div class="row" aria-label="外装"><span id="detail-note">現行モデル / パネルの分割・段差</span><label id="panel-wear-control" hidden><input type="checkbox" id="panel-wear" checked>汚れ・傷・すす</label><label id="probe-lines-control" hidden><input type="checkbox" id="probe-lines" checked>既存のパネル線を濃く</label></div>
 <div class="row" aria-label="視点"><button data-view="whole">全体</button><button data-view="front">前</button><button data-view="side">横</button><button data-view="rear">後ろ</button><button data-view="under">下</button><button data-view="antenna">アンテナ</button><button data-view="bridge" id="bridge-view">操縦区画</button><button data-view="front-windows" id="front-windows-view">正面窓</button><button data-view="skylights" id="skylights-view">天窓</button><button data-view="bow-face" id="bow-face-view">船首パネル</button><button data-view="habitat-face" id="habitat-face-view">居住区端面</button><button data-view="habitat-hatch" id="habitat-hatch-view">居住区ハッチ</button><button data-view="habitat-mount" id="habitat-mount-view">居住区の接続部</button><button data-view="habitat-mount-rear" id="habitat-mount-rear-view">接続部・裏側</button><button data-view="service-side" id="service-side-view">船首側面</button><button data-view="service-cover" id="service-cover-view">点検蓋・右</button><button data-view="service-cover-left" id="service-cover-left-view">点検蓋・左</button><button data-view="service-top" id="service-top-view">船首上面</button><button data-view="service-under" id="service-under-view">船首下面</button><button data-view="eva-hatch" id="eva-hatch-view">EVAハッチ</button><button data-view="markings">整備・警告表示</button><button data-view="nozzle" id="nozzle-view">姿勢制御ノズル</button><button data-view="foot" id="foot-view">着陸脚</button></div>
-<div class="row" aria-label="構造の接続部"><button data-view="hub-mount" id="hub-mount-view">回転ハブの接続部</button><button data-view="engine-base" id="engine-base-view">エンジン台座</button><button data-view="engine-mount" id="engine-mount-view">エンジン取付部</button><button data-view="docking" id="docking-view">ドッキング部</button><button data-view="docking-undocked" id="docking-undocked-view">未ドッキング</button><button data-view="docking-section" id="docking-section-view">有人通路・断面</button><button data-view="probe-port" id="probe-port-view">上部ドッキング口</button></div>
+<div class="row" aria-label="構造の接続部"><button data-view="hub-mount" id="hub-mount-view">回転ハブの接続部</button><button data-view="engine-base" id="engine-base-view">エンジン台座</button><button data-view="engine-mount" id="engine-mount-view">エンジン取付部</button><button data-view="docking" id="docking-view">ドッキング部</button><button data-view="docking-lock" id="docking-lock-view">ロック動作</button><button data-view="docking-undocked" id="docking-undocked-view">未ドッキング</button><button data-view="docking-section" id="docking-section-view">有人通路・断面</button><button data-view="probe-port" id="probe-port-view">上部ドッキング口</button></div>
+<div class="row" id="docking-lock-controls" hidden><button id="docking-lock-play">ロックを再生</button><label>動作位置 <input id="docking-lock-time" type="range" min="0" max="3.6" step=".01" value="0"><output id="docking-lock-time-label">0.00秒</output></label><span id="docking-lock-state">接近中</span></div>
 <p id="docking-dimensions" hidden>有効内径1.20m / 人型1.85m・宇宙服包絡0.80×0.72m / 無重量で手すり移乗。断面は密結合・気密確認後に2枚のハッチを開いた状態です。</p>
 <div class="row"><button data-view="service-cartridges" id="service-cartridges-view">補機カートリッジ列</button><button data-view="pressurant-tanks" id="pressurant-tanks-view">加圧タンク</button><label id="cargo-hatch-control" hidden><input type="checkbox" id="cargo-hatch">搬入口＋人用小扉（採用案）</label></div>
 <p id="cargo-hatch-dimensions" hidden>搬入扉3.38×5.04m / 人用小扉1.30×1.94m。本編も同じ外観を使用します。1.85mの比較人型はスタディー専用です。通路・気密・開閉機構は変更していません。</p>

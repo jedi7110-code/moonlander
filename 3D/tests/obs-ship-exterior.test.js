@@ -103,7 +103,8 @@ test('service equipment can be hidden without losing the pressure hull or engine
     assert.ok(ship.mountSockets.every(socket=>socket.children.length===0),'adjustable clevis geometry stays in the existing habitat steel batches');
     assert.equal(ship.dockHatches.length,2);
     assert.ok(ship.dockHatches.every(hatch=>hatch.children.filter(child=>child.isMesh).length===1),'only the two moving pressure hatches need separate batches');
-    assert.ok(draws-ship.dockHatches.length<120,`hull budget plus two operational pressure hatches uses ${draws} meshes`);
+    assert.equal(ship.dockCapture.group.children.filter(mesh=>mesh.isMesh).length,3,'six capture claws and their actuators share three instanced batches');
+    assert.ok(draws-ship.dockHatches.length-3<120,`hull budget plus two pressure hatches and three capture batches uses ${draws} meshes`);
   }finally{ship.dispose();}
 });
 test('rotation speed and the displayed centrifugal acceleration use the same physical radius',()=>{

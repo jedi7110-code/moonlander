@@ -1,3 +1,5 @@
+import {sampleDockCapture} from './exterior-docking-lock.js';
+
 const clamp=value=>Math.max(0,Math.min(1,value));
 // Brief visual tail so the nozzle cut-off and outward-clearing gas remain
 // readable at normal frame rates. This is not the molecular exhaust speed.
@@ -62,6 +64,7 @@ export function sampleExteriorProbeFlight(seconds,{approachDuration=8,captureDur
   const options={approachDuration,captureDuration,coreScale};
   const pose=sampleControlledPose(controlTime,{...options,advance:controlAdvance});
   const contactTime=approachDuration+captureDuration-controlAdvance;
+  pose.dockCapture=sampleDockCapture(controlTime-contactTime,approachDuration/8);
   if(!pose.latched||controlTime<contactTime+PROBE_EXHAUST_TAIL)
     pose.thrusterClock={seconds:controlTime,advance:controlAdvance,...options};
   return pose;
@@ -83,5 +86,6 @@ export function applyExteriorProbePose(ship,pose){
   ship.dockedLander.visible=pose.visible;
   ship.dockedLander.position.fromArray(pose.position);
   ship.dockedLander.rotation.fromArray(pose.rotation);
+  ship.setDockCapture?.(pose.dockCapture??(pose.visible&&pose.latched?1:0));
   ship.probeThrusters?.update(pose);
 }

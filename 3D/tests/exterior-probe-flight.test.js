@@ -36,7 +36,9 @@ test('the adjusted approach connects to the trimmed close-up, decelerates to con
   }
   const contact=sampleExteriorProbeFlight(20),held=sampleExteriorProbeFlight(100);
   assert.equal(contact.latched,true);assert.deepEqual(contact.position,[0,0,0]);assert.deepEqual(contact.rotation,[0,0,0]);
-  const {thrusterClock,...contactPose}=contact;assert.deepEqual(contactPose,held);
+  const {thrusterClock,dockCapture,...contactPose}=contact;
+  const {dockCapture:heldCapture,...heldPose}=held;assert.deepEqual(contactPose,heldPose);
+  assert.equal(dockCapture,0);assert.equal(heldCapture,1);
   assert.ok(thrusterClock,'capture retains the clock briefly for gas emitted before contact');
   const endVelocity=(position(20)[1]-position(20-epsilon)[1])/epsilon;
   assert.ok(endVelocity<.001,'the probe reaches contact with zero speed');

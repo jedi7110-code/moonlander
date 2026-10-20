@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {addDockCaptureClaws} from './exterior-docking-lock.js';
 
 export const PROBE_DOCK=Object.freeze({clearDiameter:1.20,tubeRadius:.66,coreX:10.4,matingY:5.65,
   probeHatchY:5.15,motherHatchY:7.55,roofY:7.25,suitHeight:1.85,suitWidth:.80,suitDepth:.72});
@@ -94,13 +95,7 @@ export function addMotherDockPort(cradle,m,build){
     rod(cradle,m.pipe,[x*.64,5.88,0],[x*.64,7.28,0],.020,'Crew-transfer internal handrail');
     for(const y of [5.95,7.20])rod(cradle,m.steel,[x*.64,y,0],[x*.78,y,0],.025,'Handrail stand-off');
   }
-  for(let index=0;index<6;index++){
-    const angle=index*Math.PI/3,x=Math.cos(angle),z=Math.sin(angle),latch=new THREE.Group();
-    latch.position.set(x*.98,5.78,z*.98);latch.rotation.y=-angle;cradle.add(latch);
-    box(latch,m.steel,[0,0,0],[.18,.24,.24],'Hard-dock capture latch housing');
-    box(latch,m.steel,[.05,-.12,0],[.14,.09,.13],'Hard-dock latch engagement hook');
-    box(latch,m.ochre,[.10,0,0],[.035,.08,.11],'Hard-dock latch witness marking');
-  }
+  const capture=addDockCaptureClaws(cradle,m,build);
   for(let index=0;index<3;index++){
     const angle=index*Math.PI*2/3,guide=new THREE.Group();guide.position.set(Math.cos(angle)*1.04,5.55,Math.sin(angle)*1.04);guide.rotation.y=-angle;cradle.add(guide);
     const petal=box(guide,m.steel,[.08,.10,0],[.08,.30,.34],'Soft-capture alignment guide');petal.rotation.z=-.32;
@@ -117,7 +112,7 @@ export function addMotherDockPort(cradle,m,build){
     const bottom=hullX<11?-2.8+(hullX-8.8)*.15/2.2:-2.65+(hullX-11)*.45/2.4;
     return scale*(bottom+2.65);
   };
-  return {hatch,setScale(scale){
+  return {hatch,capture,setScale(scale){
     for(const {mesh,rest}of buffers){
       const positions=mesh.geometry.attributes.position;
       for(let index=0;index<positions.count;index++){

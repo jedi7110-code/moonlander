@@ -10,6 +10,7 @@ import {createExteriorPanelStudy} from './obs/exterior-panel-study.js';
 import {createProbeLineStudy} from './obs/exterior-probe-line-study.js';
 import {createDockingClearanceStudy} from './obs/exterior-docking-study.js';
 import {createCargoHatchStudy} from './obs/exterior-cargo-hatch-study.js';
+import {sampleExteriorProbeFlight,applyExteriorProbePose} from './obs/exterior-probe-flight.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),probe=query.get('craft')==='probe';
 let cleanup=()=>{};window.addEventListener('pagehide',()=>cleanup(),{once:true});
 try{
@@ -82,14 +83,25 @@ try{
   controls.minDistance=probe ? .35 : 5;controls.maxDistance=probe?80:700;
   const presentation=createExteriorDissolve(renderer,{samples:4}),gasPass=createExteriorGasPass(renderer,ship.probeThrusters.gas);
   const center=probe?new THREE.Vector3(0,2.7,0):new THREE.Vector3(-1.6,0,0),radius=probe?5:60;
-  let current=query.get('view')||'whole',frame=0,disposed=false;
+  let current=query.get('view')||'whole',frame=0,disposed=false,dockingPlaying=false,dockingStart=0;
+  const applyDockingTime=value=>{
+    const seconds=THREE.MathUtils.clamp(Number(value)||0,0,3.6),flightTime=seconds<2?16+seconds*2:18+seconds;
+    const pose=sampleExteriorProbeFlight(flightTime);
+    applyExteriorProbePose(ship,pose);
+    $('docking-lock-time').value=seconds;$('docking-lock-time-label').textContent=seconds.toFixed(2)+'秒';
+    $('docking-lock-state').textContent=pose.dockCapture===1?'ロック完了':pose.dockCapture>0?(pose.dockCapture<.775?'爪を下降':'締め付け'):pose.latched?'着座・爪待機':'接近中';
+  };
   const directions={whole:[1,.35,1.2],front:probe?[0,0,1]:[1,0,0],side:probe?[1,0,0]:[0,0,1],rear:probe?[0,0,-1]:[-1,0,0],under:[.3,-1,.35]};
   function view(name){
     current=name;controls.target.copy(center);camera.up.set(0,1,0);
     if(!probe){
-      ship.dockedLander.visible=['docking','docking-section','docking-undocked'].includes(name);
+      ship.dockedLander.visible=['docking','docking-lock','docking-section','docking-undocked'].includes(name);
       ship.dockedLander.position.set(0,name==='docking-undocked'?-3.4:0,0);
+      ship.dockedLander.rotation.set(0,0,0);ship.setDockCapture(name==='docking-undocked'?0:1);
     }
+    dockingPlaying=false;$('docking-lock-play').textContent='ロックを再生';
+    $('docking-lock-controls').hidden=probe||name!=='docking-lock';
+    if(!probe&&name==='docking-lock')applyDockingTime($('docking-lock-time').value);
     dockingClearance?.setEnabled(name==='docking-section');
     $('docking-dimensions').hidden=name!=='docking-section';
     if(name==='antenna'){
@@ -173,7 +185,7 @@ try{
       controls.target.copy(ship.probeDock.localToWorld(new THREE.Vector3(0,2.2,0)));
       camera.position.copy(ship.probeDock.localToWorld(new THREE.Vector3(9,1.5,18)));
     }
-    else if((name==='docking'||name==='docking-section')&&!probe){
+    else if((name==='docking'||name==='docking-lock'||name==='docking-section')&&!probe){
       ship.probeDock.updateWorldMatrix(true,false);
       controls.target.copy(ship.probeDock.localToWorld(new THREE.Vector3(0,name==='docking-section'?6.3:5.7,0)));
       camera.position.copy(ship.probeDock.localToWorld(name==='docking-section'?new THREE.Vector3(3.2,6.4,7.5):new THREE.Vector3(6,2.4,8)));
@@ -199,12 +211,17 @@ try{
   $('nozzle-bounce-control').hidden=probe;
   $('habitat-hatch-view').hidden=probe;
   $('habitat-face-view').hidden=probe;$('bow-face-view').hidden=probe;
-  for(const id of ['service-top-view','service-under-view','service-side-view','service-cartridges-view','pressurant-tanks-view','service-cover-view','service-cover-left-view','eva-hatch-view','habitat-mount-view','habitat-mount-rear-view','hub-mount-view','engine-base-view','engine-mount-view','docking-view','docking-section-view','docking-undocked-view'])$(id).hidden=probe;
+  for(const id of ['service-top-view','service-under-view','service-side-view','service-cartridges-view','pressurant-tanks-view','service-cover-view','service-cover-left-view','eva-hatch-view','habitat-mount-view','habitat-mount-rear-view','hub-mount-view','engine-base-view','engine-mount-view','docking-view','docking-lock-view','docking-section-view','docking-undocked-view'])$(id).hidden=probe;
   $('probe-port-view').hidden=!probe;
   $('nozzle-bounce').onchange=()=>ship.setNozzleBounce($('nozzle-bounce').checked);
   $('gas-control').hidden=!probe;$('nozzle-view').hidden=false;$('nozzle-view').textContent=probe?'姿勢制御ノズル':'主エンジン内側';$('foot-view').hidden=!probe;$('bridge-view').hidden=probe;$('front-windows-view').hidden=probe;$('skylights-view').hidden=probe;
   $('note').textContent=probe?'姿勢制御ノズルと取付台を拡大して確認できます。ガスは減速中の噴射を表示します。':'オープニングと同じ母艦モデル。台座は常時表示。「ドッキング部」で小型船も表示します。';
   for(const button of document.querySelectorAll('[data-view]'))button.onclick=()=>view(button.dataset.view);
+  $('docking-lock-time').oninput=()=>{dockingPlaying=false;$('docking-lock-play').textContent='ロックを再生';applyDockingTime($('docking-lock-time').value);};
+  $('docking-lock-play').onclick=()=>{
+    if(dockingPlaying){dockingPlaying=false;$('docking-lock-play').textContent='ロックを再生';return;}
+    applyDockingTime(0);dockingStart=performance.now();dockingPlaying=true;$('docking-lock-play').textContent='一時停止';
+  };
   $('background').onchange=()=>scene.background.set($('background').value);
   $('wire').onchange=()=>model.traverse(mesh=>{for(const material of [].concat(mesh.material??[]))if(!material.isShaderMaterial)material.wireframe=$('wire').checked;});
   $('reset').onclick=()=>view('whole');
@@ -215,6 +232,10 @@ try{
   // The compositor supplies the opaque/depth and gas targets to the draw callback.
   function render(now){
     if(disposed)return;frame=requestAnimationFrame(render);controls.update();
+    if(dockingPlaying){
+      const seconds=Math.min(3.6,(now-dockingStart)/1000);applyDockingTime(seconds);
+      if(seconds===3.6){dockingPlaying=false;$('docking-lock-play').textContent='もう一度再生';}
+    }
     fitExteriorInspectionDepth(camera,controls.target,inspectionBounds);
     ship.probeThrusters.update({visible:probe&&$('gas').checked,thrusterClock:{seconds:6+(now/1000% .28),approachDuration:8,captureDuration:12,coreScale:2.6}});
     presentation.render({from:camera,to:null,mix:0},(_view,target,gasTarget)=>gasPass.render(scene,camera,target,gasTarget));
