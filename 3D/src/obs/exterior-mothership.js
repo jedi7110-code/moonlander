@@ -5,6 +5,10 @@ import {createParabolicAntenna} from './exterior-antenna.js';
 import {addAntennaFoundation} from './exterior-antenna-mount.js';
 import {createExteriorDecals} from './exterior-decals.js';
 import {addConformalServiceFairings} from './exterior-service-fairing.js';
+import {addExteriorSideServices} from './exterior-side-services.js';
+import {addHullCollars} from './exterior-hull-collars.js';
+import {addCommandSideWindows} from './exterior-command-windows.js';
+import {addBowRadiators} from './exterior-bow-radiators.js';
 import {addHabitatFoundation,batchHabitatSockets,habitatMountLayout} from './exterior-habitat-mount.js';
 import {cutDockPassage} from './exterior-docking.js';
 import taraironWordmark from './tarairon-wordmark.js';
@@ -403,17 +407,27 @@ export function createExteriorMothership(){
 
   // A fixed axial spine through a rotating bearing. The aft body grows to
   // contain the propulsion equipment; the bow carries small pressure windows.
-  const pressureSkin=loft(core,m.paint,[[-15.5,4.85,8.5],[-11.8,4.95,8.3],[-8.8,3.45,3.45],[-5.9,3.25,3.25],[6.1,3.25,3.25],[9.0,3.0,3.1]],'Faceted pressure hull');
+  const pressureSections=[[-15.5,4.85,8.5],[-11.8,4.95,8.3],[-8.8,3.45,3.45],[-5.9,3.25,3.25],[6.1,3.25,3.25],[9.0,3.0,3.1]];
+  const pressureSkin=loft(core,m.paint,pressureSections,'Faceted pressure hull');
+  core.userData.panelCreaseRange=[pressureSections[1][0],pressureSections[2][0]];
+  core.userData.panelPatches=[];
+  const pressureVertices=pressureSkin.geometry.attributes.position;
+  for(let facet=0;facet<8;facet++){
+    const start=facet,end=start+9;
+    core.userData.panelPatches.push([start,start+1,end,end+1].map(index=>new THREE.Vector3().fromBufferAttribute(pressureVertices,index).toArray()));
+  }
   // Shoulders, lower chines and the roof change angle independently along the bow.
-  const forwardSkin=facetedHull(core,m.paint,[[8.8,-2.8,2.8,3.08,.9],[11,-2.65,2.4,3.0,.85],
-    [13.4,-2.2,2.05,2.85,.75],[15.6,-1.7,1.5,2.2,.65],[17.3,-1.15,1.0,1.45,.45]],'Multi-facet forward pressure hull');
+  const forwardSections=[[8.8,-2.8,2.8,3.08,.9],[11,-2.65,2.4,3.0,.85],
+    [13.4,-2.2,2.05,2.85,.75],[15.6,-1.7,1.5,2.2,.65],[17.3,-1.15,1.0,1.45,.45]];
+  const forwardSkin=facetedHull(core,m.paint,forwardSections,'Multi-facet forward pressure hull');
   cutDockPassage(forwardSkin,new THREE.Matrix4(),{centerX:10.4,radius:.63,minY:-3,maxY:-2,normalSign:-1});
-  facetedHull(core,m.paint,[[9.3,1.2,2.4,1.95,.30],[10.4,1.15,3.15,2.3,.40],
-    [12.8,1.15,3.3,2.3,.48],[14.25,1.05,2.95,2.05,.40],[15.6,.95,2.45,1.65,.35]],'Sloping faceted command module','command');
+  const commandSections=[[9.3,1.2,2.4,1.95,.30],[10.4,1.15,3.15,2.3,.40],
+    [12.8,1.15,3.3,2.3,.48],[14.25,1.05,2.95,2.05,.40],[15.6,.95,2.45,1.65,.35]];
+  const commandSkin=facetedHull(core,m.paint,commandSections,'Sloping faceted command module','command');
+  const commandSideWindows=addCommandSideWindows(core,{skin:commandSkin,hull:forwardSkin,sections:commandSections,materials:m,addMesh});
   for(const side of [-1,1]){
     chamferBox(core,m.patch,[11.9,-.10,side*3.0],[2.8,2.9,.28],'Rear bridge armour cheek');
     const cheek=chamferBox(core,m.patch,[14.15,.10,side*2.63],[1.9,1.65,.22],'Swept forward armour cheek');cheek.rotation.y=side*.28;
-    pipe(machinery,m.pipe,[[9.5,1.1,side*2.58],[10.3,1.1,side*2.67],[11.6,.65,side*2.73],[12.65,.65,side*2.73]],.08,'Bridge service feed');
   }
   const paneOutline=(Type,center,width,height,cut,left,right)=>{
     const shape=new Type(),l=center-width/2,r=center+width/2,b=-height/2,t=height/2;
@@ -458,22 +472,16 @@ export function createExteriorMothership(){
   const forwardWindows=new THREE.Group();forwardWindows.name='Forward command windows';
   forwardWindows.position.set(15.59,1.95,0);forwardWindows.rotation.y=Math.PI/2;core.add(forwardWindows);
   pressurePanes(forwardWindows,{spacing:.74,width:.64,height:.78,cut:.22,name:'Forward command'});
-  for(const x of [-10.2,-7.2,5.7,8.9]){
-    const collar=axisRing(core,m.steel,x,x<-8?4.3:3.27,.12,'Hull structural collar',16);
-    if(x<-8)collar.scale.x=1.36;
-  }
+  const hullCollars=addHullCollars(core,{pressureSections,forwardSections,material:m.steel,addMesh});
   // Compact inspection lids cover the seam discontinuity halfway through
   // each tapered facet, using the same aged paint as the pressure skin.
   const serviceCovers=addConformalServiceFairings(core,{surfaces:[pressureSkin,forwardSkin],paint:m.paint,metal:m.dark,addMesh});
   // Replaceable cladding, boxed service bays and restrained identification.
+  const bowRadiators=addBowRadiators(machinery,{materials:m,addMesh,box});
   for(const side of [-1,1]){
     // The old flat upper/lower maintenance covers intersected the tapered
     // hull, leaving their edges exposed as disconnected strips. The obsolete
     // covers and buried cooling slots are removed; the pressure skin is intact.
-    for(let i=0;i<4;i++){
-      box(core,m.steel,[11.9,.90-i*.62,side*3.17],[1.92,.40,.10],'Bridge window frame');
-      box(core,m.glass,[11.9,.90-i*.62,side*3.24],[1.66,.24,.055],'Inset bridge glass');
-    }
     label(core,'T / 03',[10.9,-1.25,side*2.98],2.1,.42,{rotation:[0,side>0?0:Math.PI,0]});
   }
   for(const side of [-1,1]){
@@ -546,29 +554,8 @@ export function createExteriorMothership(){
     mountUpdates.push(batchHabitatSockets(pod,sockets,m.steel));
   }
 
-  // Exposed machinery is grouped around real interfaces and service bays.
+  const sideServices=addExteriorSideServices(machinery,{surfaces:[pressureSkin,forwardSkin],materials:m,addMesh,box,chamferBox});
   for(const side of [-1,1]){
-    const z=side*3.08;
-    // Service runs follow the flat hull facets and stop before the EVA frames.
-    pipe(machinery,m.pipe,[[-5.2,-.85,z],[-3.8,-.85,z+side*.16],[-.9,-.85,z+side*.16],[1.6,-.45,z+side*.16]],.065,'External cable conduit');
-    pipe(machinery,m.steel,[[-5.0,.88,z],[-3.9,.88,z+side*.21],[-1.5,1.0,z+side*.21],[1.2,1.0,z+side*.21]],.09,'External coolant branch');
-    for(const x of [-4.2,-2.3,-.6,1.0])box(machinery,m.steel,[x,-.84,z+side*.18],[.10,.26,.22],'Conduit restraint');
-    for(const [x,y,w,h]of [[-4.6,.04,.82,.82],[1.35,-.15,1.14,.74],[-6.8,.30,.68,.95],[6.0,.15,1.0,1.18]]){
-      chamferBox(machinery,m.steel,[x,y,z+side*.10],[w+.12,h+.12,.16],'Recessed service frame');
-      chamferBox(machinery,m.dark,[x,y,z+side*.20],[w,h,.12],'Hull equipment recess');
-      box(machinery,m.patch,[x-w*.17,y+.08,z+side*.29],[w*.43,h*.66,.10],'Replaceable service cartridge');
-      for(let j=0;j<4;j++)box(machinery,m.pipe,[x+w*.30,y-h*.30+j*h*.19,z+side*.29],[w*.16,.045,.08],'Service bay cooling fin');
-    }
-    for(const x of [-5.25,1.35,5.9]){
-      chamferBox(core,m.patch,[x,-1.18,z-side*.13],[.95,.44,.13],'Small replacement hull cover');
-      for(const dx of [-.35,.35])box(core,m.steel,[x+dx,-1.18,z-side*.04],[.055,.055,.06],'Inspection cover bolt');
-    }
-    for(let i=0;i<5;i++){
-      box(machinery,m.dark,[-7.3+i*.7,.6,z],[.45,.85,.25],'Forward utility bay');
-      box(machinery,m.pipe,[-7.3+i*.7,.65,z+side*.2],[.18,.62,.25],'Replaceable pump cartridge');
-    }
-    pipe(machinery,m.pipe,[[-10.2,1.4,side*4.1],[-8.2,1.4,z],[-6.8,1.4,z],[-5.5,1.8,z]],.11,'Coolant plumbing');
-    pipe(machinery,m.steel,[[4.8,-1.1,z],[6.0,-1.1,z],[7.4,-.7,z],[9.1,-.7,side*2.92]],.075,'Forward service conduits');
     for(let i=0;i<4;i++){
       const x=-14.75+i*.75;
       box(machinery,m.dark,[x,1.5,side*7.3],[.52,2.6,1.2],'Engine heat exchanger');
@@ -587,9 +574,9 @@ export function createExteriorMothership(){
   pressureSkin.updateWorldMatrix(true,false);
   for(const side of [-1,1])for(const offset of tankOffsets){
     const tank=new THREE.Group();tank.position.set(tankAxial,side*tankHeight,offset);machinery.add(tank);
-    const shell=addMesh(tank,new THREE.LatheGeometry(tankProfile,12),m.white,'Pressurant tank / chamfered end caps');shell.rotation.z=-Math.PI/2;
+    const shell=addMesh(tank,new THREE.LatheGeometry(tankProfile,24),m.white,'Pressurant tank / chamfered end caps');shell.rotation.z=-Math.PI/2;
     for(const axial of [-1.7,1.7]){
-      axisRing(tank,m.steel,axial,.73,.07,'Tank retaining band',16);
+      axisRing(tank,m.steel,axial,.73,.07,'Tank retaining band',24,4);
       const mount=new THREE.Group();mount.name='Pressurant tank saddle foundation';mount.position.x=axial;mount.rotation.x=side>0?0:Math.PI;tank.add(mount);
       const saddle=new THREE.TorusGeometry(.78,.10,4,12,Math.PI*2/3);saddle.rotateZ(Math.PI*7/6);saddle.rotateY(Math.PI/2);
       addMesh(mount,saddle,m.steel,'Tank load-bearing saddle');
@@ -686,7 +673,7 @@ export function createExteriorMothership(){
   decals.flush();
   const bounds=new THREE.Box3().setFromObject(root),dimensions=bounds.getSize(new THREE.Vector3());
   let coreScale=1;
-  const ship={root,core,rotor,pods,frame,engines,machinery,dimensions,floorGuides,hub,spokes,evaHatches,mountSockets,
+  const ship={root,core,rotor,pods,frame,engines,machinery,dimensions,floorGuides,hub,spokes,evaHatches,mountSockets,sideServices,hullCollars,commandSideWindows,bowRadiators,
     get dockedLander(){return probe?.lander??null;},get probeDock(){return probe?.dock??null;},get probeThrusters(){return probe?.thrusters??null;},
     get dockHatches(){return probe?.hatches??[];},
     setDockTransferOpen(value){probe?.setTransferOpen(Boolean(value));},

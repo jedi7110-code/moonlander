@@ -9,6 +9,7 @@ import {fitExteriorInspectionDepth} from './obs/exterior-depth.js';
 import {createExteriorPanelStudy} from './obs/exterior-panel-study.js';
 import {createProbeLineStudy} from './obs/exterior-probe-line-study.js';
 import {createDockingClearanceStudy} from './obs/exterior-docking-study.js';
+import {createCargoHatchStudy} from './obs/exterior-cargo-hatch-study.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),probe=query.get('craft')==='probe';
 let cleanup=()=>{};window.addEventListener('pagehide',()=>cleanup(),{once:true});
 try{
@@ -65,6 +66,17 @@ try{
     const url=new URL(link.href);url.searchParams.set('detail',link.dataset.craft==='mothership'?'enhanced':'current');link.href=url;
   }
   const inspectionBounds=new THREE.Box3().setFromObject(model);
+  const cargoHatch=probe?null:createCargoHatchStudy(ship);
+  $('cargo-hatch-control').hidden=probe;
+  $('cargo-hatch').checked=!probe&&query.get('hatch')!=='original';
+  const applyCargoHatch=()=>{
+    const enabled=!probe&&$('cargo-hatch').checked;cargoHatch?.setEnabled(enabled);
+    $('cargo-hatch-dimensions').hidden=!enabled;
+    const params=new URLSearchParams(location.search);
+    if(!probe)params.set('hatch',enabled?'cargo':'original');else params.delete('hatch');
+    history.replaceState(null,'',`?${params}`);
+  };
+  $('cargo-hatch').onchange=()=>{applyCargoHatch();if(!probe)view('eva-hatch');};applyCargoHatch();
   const camera=new THREE.PerspectiveCamera(38,1,.05,2000),controls=new OrbitControls(camera,$('view'));
   controls.enableDamping=true;controls.dampingFactor=.12;controls.screenSpacePanning=true;
   controls.minDistance=probe ? .35 : 5;controls.maxDistance=probe?80:700;
@@ -97,6 +109,14 @@ try{
     else if(name==='service-side'&&!probe){
       controls.target.copy(ship.core.localToWorld(new THREE.Vector3(7.3,0,2.8)));
       camera.position.copy(controls.target).add(new THREE.Vector3(-5,4,18));
+    }
+    else if(name==='service-cartridges'&&!probe){
+      controls.target.copy(ship.core.localToWorld(new THREE.Vector3(-5.4,.15,-3.1)));
+      camera.position.copy(controls.target).add(new THREE.Vector3(-3,1.5,-16));
+    }
+    else if(name==='pressurant-tanks'&&!probe){
+      controls.target.copy(ship.core.localToWorld(new THREE.Vector3(-12.65,5.5,0)));
+      camera.position.copy(ship.core.localToWorld(new THREE.Vector3(-19.15,11.5,11.5)));
     }
     else if((name==='service-cover'||name==='service-cover-left')&&!probe){
       const side=name==='service-cover-left'?-1:1;
@@ -179,7 +199,7 @@ try{
   $('nozzle-bounce-control').hidden=probe;
   $('habitat-hatch-view').hidden=probe;
   $('habitat-face-view').hidden=probe;$('bow-face-view').hidden=probe;
-  for(const id of ['service-top-view','service-under-view','service-side-view','service-cover-view','service-cover-left-view','eva-hatch-view','habitat-mount-view','habitat-mount-rear-view','hub-mount-view','engine-base-view','engine-mount-view','docking-view','docking-section-view','docking-undocked-view'])$(id).hidden=probe;
+  for(const id of ['service-top-view','service-under-view','service-side-view','service-cartridges-view','pressurant-tanks-view','service-cover-view','service-cover-left-view','eva-hatch-view','habitat-mount-view','habitat-mount-rear-view','hub-mount-view','engine-base-view','engine-mount-view','docking-view','docking-section-view','docking-undocked-view'])$(id).hidden=probe;
   $('probe-port-view').hidden=!probe;
   $('nozzle-bounce').onchange=()=>ship.setNozzleBounce($('nozzle-bounce').checked);
   $('gas-control').hidden=!probe;$('nozzle-view').hidden=false;$('nozzle-view').textContent=probe?'姿勢制御ノズル':'主エンジン内側';$('foot-view').hidden=!probe;$('bridge-view').hidden=probe;$('front-windows-view').hidden=probe;$('skylights-view').hidden=probe;
@@ -190,7 +210,7 @@ try{
   $('reset').onclick=()=>view('whole');
   const resize=()=>{const rect=$('view').getBoundingClientRect();renderer.setSize(Math.max(1,rect.width),Math.max(1,rect.height),false);camera.aspect=rect.width/Math.max(1,rect.height);camera.updateProjectionMatrix();view(current);};
   const observer=new ResizeObserver(resize);observer.observe($('view'));resize();
-  cleanup=()=>{if(disposed)return;disposed=true;cancelAnimationFrame(frame);observer.disconnect();controls.dispose();presentation.dispose();dockingClearance?.dispose();panelStudy?.dispose();probeLines?.dispose();if(probe){ship.probeDock.add(model);}ship.dispose();renderer.dispose();renderer.forceContextLoss();};
+  cleanup=()=>{if(disposed)return;disposed=true;cancelAnimationFrame(frame);observer.disconnect();controls.dispose();presentation.dispose();dockingClearance?.dispose();cargoHatch?.dispose();panelStudy?.dispose();probeLines?.dispose();if(probe){ship.probeDock.add(model);}ship.dispose();renderer.dispose();renderer.forceContextLoss();};
   await renderer.compileAsync(scene,camera);$('status').hidden=true;
   // The compositor supplies the opaque/depth and gas targets to the draw callback.
   function render(now){

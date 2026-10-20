@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createExteriorMothership} from '../src/obs/exterior-mothership.js';
 import {Raycaster,Vector3} from 'three';
 
-test('three parallel pressurant tanks on each hull face have faceted chamfers at both ends without changing their size or draw batches',()=>{
+test('three parallel pressurant tanks on each hull face have rounder twenty-four-sided shells and chamfers without changing their size or draw batches',()=>{
   const ship=createExteriorMothership();
   try{
     const tanks=[-1,1].flatMap(side=>[-1.7,0,1.7].map(offset=>({
@@ -37,7 +37,7 @@ test('three parallel pressurant tanks on each hull face have faceted chamfers at
           assert.ok(Math.abs(distance-radius)<1e-5,'the chamfer tapers symmetrically to the end cap');
           perimeter.add(point.slice(1).map(value=>value.toFixed(5)).join('/'));
         }
-        assert.equal(perimeter.size,12,'each shoulder retains twelve flat facets');
+        assert.equal(perimeter.size,24,'each shoulder has twenty-four facets while retaining its chamfer profile');
       }
     }
     const markings=[];
@@ -50,6 +50,29 @@ test('three parallel pressurant tanks on each hull face have faceted chamfers at
     ),'each tank has its own surface warning');
     let meshes=0;ship.root.traverse(mesh=>{if(mesh.isMesh)meshes++;});
     assert.equal(meshes,99,'additional tanks add geometry, not draw batches');
+  }finally{ship.dispose();}
+});
+
+test('all retaining bands match the twenty-four-sided tank circumference without increasing their cross-section geometry',()=>{
+  const ship=createExteriorMothership();
+  try{
+    const bands=[];
+    for(const side of [-1,1])for(const lateral of [-1.7,0,1.7])for(const axial of [-14.35,-10.95]){
+      bands.push({height:side*5.50,lateral,axial,perimeter:new Set()});
+    }
+    ship.machinery.traverse(mesh=>{
+      if(!mesh.isMesh||mesh.material.name!=='Unpainted structure')return;
+      const positions=mesh.geometry.attributes.position;
+      for(let index=0;index<positions.count;index++){
+        const axial=positions.getX(index),height=positions.getY(index),lateral=positions.getZ(index);
+        for(const band of bands){
+          if(Math.abs(axial-band.axial)>1e-5)continue;
+          if(Math.abs(Math.hypot(height-band.height,lateral-band.lateral)-.80)>1e-5)continue;
+          band.perimeter.add([height,lateral].map(value=>value.toFixed(5)).join('/'));
+        }
+      }
+    });
+    for(const band of bands)assert.equal(band.perimeter.size,24,'the thin retaining straps follow the rounder shells');
   }finally{ship.dispose();}
 });
 

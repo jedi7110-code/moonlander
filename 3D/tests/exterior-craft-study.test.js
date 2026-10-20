@@ -37,6 +37,13 @@ test('the craft study exposes only the current model, not an A/B comparison',()=
   assert.match(html,/現行モデル/);
 });
 
+test('the auxiliary cartridge row and rounder tanks have close inspection views for the mothership',()=>{
+  assert.match(html,/data-view="service-cartridges" id="service-cartridges-view"/);
+  assert.match(source,/name==='service-cartridges'&&!probe/);
+  assert.match(html,/data-view="pressurant-tanks" id="pressurant-tanks-view"/);
+  assert.match(source,/name==='pressurant-tanks'&&!probe/);
+});
+
 test('default and legacy mothership links always show the adopted panel finish while preserving wear and inspection views',()=>{
   for(const detail of ['', '&detail=current','&detail=enhanced']){
     const study=fixture(`?craft=mothership&view=engine-base&wear=0${detail}`);

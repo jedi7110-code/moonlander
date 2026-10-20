@@ -1,6 +1,7 @@
 import {createExteriorMothership} from './exterior-mothership.js';
 import {createExteriorPanelStudy} from './exterior-panel-study.js';
 import {createProbeLineStudy} from './exterior-probe-line-study.js';
+import {createExteriorCargoHatches} from './exterior-cargo-hatch.js';
 
 // Shared approved seam treatment for the free study and opening film.
 export const EXTERIOR_SOFT_PANEL_LINES=Object.freeze({width:1.5,color:0x73796e,samples:4});
@@ -14,8 +15,21 @@ export function createProductionExterior({original=false,panelLines=null}={}){
   panels.setEnabled(true);panels.setWeathering(true);
   ship.finish={mothership:'B',probe:'A / dark seams',panels:panels.stats,
     panelLines:{width:panelLines?.width??1,color:panelLines?.color??0x50564f}};
-  const prepare=ship.prepareProbe.bind(ship),dispose=ship.dispose.bind(ship),setWear=ship.setWear.bind(ship);
+  const prepare=ship.prepareProbe.bind(ship),dispose=ship.dispose.bind(ship),setWear=ship.setWear.bind(ship),setCoreScale=ship.setCoreScale.bind(ship);
   let probeLines=null,disposed=false,wear=true;
+  ship.cargoHatches=null;
+  ship.finish.cargoHatches=false;
+  ship.setCoreScale=value=>{
+    if(disposed)return ship.coreScale;
+    const previous=ship.coreScale,scale=setCoreScale(value);
+    if(scale!==previous){
+      ship.cargoHatches?.dispose();
+      ship.cargoHatches=scale>=2.3?createExteriorCargoHatches(ship):null;
+      ship.cargoHatches?.setEnabled(true);
+      ship.finish.cargoHatches=Boolean(ship.cargoHatches);
+    }
+    return scale;
+  };
   const finishProbe=()=>{
     if(!disposed&&!probeLines&&ship.dockedLander){probeLines=createProbeLineStudy(ship);probeLines.setEnabled(true);}
   };
@@ -29,6 +43,6 @@ export function createProductionExterior({original=false,panelLines=null}={}){
     wear=Boolean(value);probeLines?.dispose();probeLines=null;
     setWear(wear);panels.setWeathering(wear);finishProbe();
   };
-  ship.dispose=()=>{disposed=true;probeLines?.dispose();panels.dispose();dispose();};
+  ship.dispose=()=>{if(disposed)return;disposed=true;ship.cargoHatches?.dispose();probeLines?.dispose();panels.dispose();dispose();};
   return ship;
 }

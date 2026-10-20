@@ -17,6 +17,22 @@ export function clipPanelPolygon(subject,boundary){
 }
 const noise=(a,b,c)=>{const n=Math.sin(a*127.1+b*311.7+c*74.7)*43758.5453;return n-Math.floor(n);};
 
+const panelPoint=(plane,point)=>plane.u.clone().multiplyScalar(point[0]).addScaledVector(plane.v,point[1]).addScaledVector(plane.normal,plane.d);
+const panelPointKey=point=>point.toArray().map(value=>Math.round(value*1e5)).join('/');
+
+function insetPanelBoundary(triangles,distance){
+  const vertices=[...new Map(triangles.flat().map(point=>[point.map(value=>Math.round(value*1e5)).join('/'),point])).values()];
+  const center=vertices.reduce((total,point)=>[total[0]+point[0]/vertices.length,total[1]+point[1]/vertices.length],[0,0]);
+  vertices.sort((first,second)=>Math.atan2(first[1]-center[1],first[0]-center[0])-Math.atan2(second[1]-center[1],second[0]-center[0]));
+  return vertices.map((point,index)=>{
+    const previous=vertices[(index+vertices.length-1)%vertices.length],next=vertices[(index+1)%vertices.length];
+    const before=new THREE.Vector2(previous[1]-point[1],point[0]-previous[0]).normalize();
+    const after=new THREE.Vector2(point[1]-next[1],next[0]-point[0]).normalize();
+    const offset=before.clone().add(after).multiplyScalar(distance/(1+before.dot(after)));
+    return [point[0]+offset.x,point[1]+offset.y];
+  });
+}
+
 function clipPaintHeight(polygon,plane,height,lower){
   const result=[],distance=point=>plane.u.y*point[0]+plane.v.y*point[1]+plane.normal.y*plane.d-height;
   for(let index=0;index<polygon.length;index++){
@@ -30,6 +46,24 @@ function clipPaintHeight(polygon,plane,height,lower){
 
 export function collectPaintPlanes(group){
   group.updateWorldMatrix(true,true);
+  const triangleKey=vertices=>vertices.map(vertex=>vertex.toArray().map(value=>Math.round(value*1e5)).join('/')).sort().join('|');
+  const patchTriangles=new Map();
+  for(const [patchIndex,points]of (group.userData.panelPatches??[]).entries()){
+    const corners=points.map(point=>new THREE.Vector3(...point));
+    const width=(corners[0].distanceTo(corners[1])+corners[2].distanceTo(corners[3]))/2;
+    const coordinates=[[corners[0].x,0],[corners[1].x,-width],[corners[2].x,0],[corners[3].x,-width]];
+    const normals=[[0,1,2],[2,1,3]].map(indices=>corners[indices[1]].clone().sub(corners[indices[0]]).cross(corners[indices[2]].clone().sub(corners[indices[0]])).normalize());
+    const normal=normals[0].clone().add(normals[1]).normalize(),u=new THREE.Vector3(1,0,0),v=new THREE.Vector3().crossVectors(normal,u).normalize();
+    const layout={key:`patch/${patchIndex}`,normal,u,v,d:normal.dot(corners[0])};
+    for(const indices of [[0,1,2],[2,1,3]]){
+      const vertices=indices.map(index=>corners[index]),triangle=indices.map(index=>coordinates[index]);
+      const determinant=cross(...triangle),first=vertices[1].clone().sub(vertices[0]),second=vertices[2].clone().sub(vertices[0]);
+      const horizontal=first.clone().multiplyScalar(triangle[2][1]-triangle[0][1]).addScaledVector(second,triangle[0][1]-triangle[1][1]).divideScalar(determinant);
+      const vertical=second.clone().multiplyScalar(triangle[1][0]-triangle[0][0]).addScaledVector(first,triangle[0][0]-triangle[2][0]).divideScalar(determinant);
+      const origin=vertices[0].clone().addScaledVector(horizontal,-triangle[0][0]).addScaledVector(vertical,-triangle[0][1]);
+      patchTriangles.set(triangleKey(vertices),{layout,triangle,surface:{origin,horizontal,vertical}});
+    }
+  }
     const inverse=group.matrixWorld.clone().invert(),planes=new Map(),point=new THREE.Vector3();
     group.traverse(mesh=>{
       if(!mesh.isMesh||mesh.material.transparent||!paintNames.has(mesh.material.name))return;
@@ -41,17 +75,18 @@ export function collectPaintPlanes(group){
         if(group.userData.panelKeepouts?.some(box=>xyz.every(p=>p.toArray().every((v,axis)=>v>=box.min[axis]-1e-5&&v<=box.max[axis]+1e-5))))continue;
         const normal=new THREE.Vector3().crossVectors(xyz[1].clone().sub(xyz[0]),xyz[2].clone().sub(xyz[0]));
         const area=normal.length()/2;if(area<1e-7)continue;normal.normalize();
-        const d=normal.dot(xyz[0]),key=[...normal.toArray(),d].map(n=>Math.round(n*1000)).join('/');
+        const patch=patchTriangles.get(triangleKey(xyz));
+        const d=normal.dot(xyz[0]),key=patch?.layout.key??[...normal.toArray(),d].map(n=>Math.round(n*1000)).join('/');
         let plane=planes.get(key);
         if(!plane){
           const u=new THREE.Vector3(1,0,0).addScaledVector(normal,-normal.x);
           if(u.lengthSq()<.01)u.set(0,0,1).addScaledVector(normal,-normal.z);
           u.normalize();const v=new THREE.Vector3().crossVectors(normal,u);
-          plane={normal,u,v,d,triangles:[],sources:[],area:0,min:[Infinity,Infinity],max:[-Infinity,-Infinity]};planes.set(key,plane);
+          plane={...(patch?.layout??{normal,u,v,d}),triangles:[],surfaces:[],sources:[],area:0,min:[Infinity,Infinity],max:[-Infinity,-Infinity]};planes.set(key,plane);
         }
-        const triangle=xyz.map(p=>[p.dot(plane.u),p.dot(plane.v)]);
+        const triangle=patch?.triangle??xyz.map(p=>[p.dot(plane.u),p.dot(plane.v)]);
         if(cross(...triangle)<0)triangle.reverse();
-        plane.triangles.push(triangle);plane.sources.push({mesh,start:i});plane.area+=area;
+        plane.triangles.push(triangle);plane.surfaces.push(patch?.surface);plane.sources.push({mesh,start:i});plane.area+=area;
         for(const p of triangle)for(let axis=0;axis<2;axis++){plane.min[axis]=Math.min(plane.min[axis],p[axis]);plane.max[axis]=Math.max(plane.max[axis],p[axis]);}
       }
     });
@@ -67,6 +102,8 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
   const wearMap=createPanelWearMap(),weathering={value:0};installPanelSoot(faceMaterial,weathering);
   const edgeMaterial=new THREE.MeshStandardMaterial({color:seamColor,roughness:.72,metalness:.50,flatShading:true});
   edgeMaterial.name='Study / recessed joints and retainers';
+  const beakPaint=new THREE.Color(0x7e837a);
+  const neckBackPaint=new THREE.Color(0x252b28);
   const roots=[],resources=[],stats={plates:0,triangles:0,replacedTriangles:0},covered=new Map();
   const oldResidue=[];
   (probeOnly?ship.dockedLander:ship.root).traverse(mesh=>{
@@ -82,22 +119,41 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
     // atlas. Preserve that darker finish on the optional segmented plates.
     const panelPaint=ship.pods.includes(group)?new THREE.Color(0xe0ded0).multiply(new THREE.Color(0xc1baa5)):new THREE.Color(0xc7c1ac);
     const planes=collectPaintPlanes(group);
+    const creaseRange=group.userData.panelCreaseRange;
+    const creasedPlanes=new Set([...planes.values()].filter(plane=>creaseRange&&!plane.surfaces.some(Boolean)&&plane.triangles.every(triangle=>triangle.every(point=>{
+      const axial=panelPoint(plane,point).x;return axial>=creaseRange[0]-1e-5&&axial<=creaseRange[1]+1e-5;
+    }))));
+    const creaseNormals=new Map();
+    for(const plane of creasedPlanes)for(const triangle of plane.triangles)for(const point of triangle){
+      const key=panelPointKey(panelPoint(plane,point));
+      if(!creaseNormals.has(key))creaseNormals.set(key,new THREE.Vector3());
+      creaseNormals.get(key).add(plane.normal);
+    }
+    for(const normal of creaseNormals.values())normal.normalize();
     const positions=[],colors=[],edges=[],uvs=[];
     for(const [planeIndex,plane]of [...planes.values()].entries()){
       if(plane.area<(probeOnly?.12:.35))continue;
       const {u,v,normal,d}=plane;
+      const border=creasedPlanes.has(plane)?insetPanelBoundary(plane.triangles,gap/2):null;
       const beak=group===ship.core&&plane.triangles.every(triangle=>triangle.every(([horizontal,vertical])=>{
         const axial=u.x*horizontal+v.x*vertical+normal.x*d,height=u.y*horizontal+v.y*vertical+normal.y*d;
         const tip=axial>=15.6-1e-5&&height<=1.5+1e-5;
         const lowerBand=normal.y<-.3&&axial>=13.4-1e-5&&axial<=15.6+1e-5&&height<=-1;
         return tip||lowerBand;
       }));
-      const facePaint=beak?new THREE.Color(0x767b72):panelPaint;
+      const neckBack=group===ship.core&&normal.x<-.999&&Math.abs(d+8.8)<.01;
+      const facePaint=neckBack?neckBackPaint:beak?beakPaint:panelPaint;
       const sideBand=group===ship.core&&Math.abs(normal.y)<1e-5&&Math.abs(normal.z)>.8&&plane.triangles.every(triangle=>triangle.every(([horizontal,vertical])=>{
         const axial=u.x*horizontal+v.x*vertical+normal.x*d;
         return axial>=13.4-1e-5&&axial<=15.6+1e-5;
       }));
-      function vertex(dest,p,z){dest.push(u.x*p[0]+v.x*p[1]+normal.x*(d+z),u.y*p[0]+v.y*p[1]+normal.y*(d+z),u.z*p[0]+v.z*p[1]+normal.z*(d+z));}
+      function vertex(dest,p,z,surface,offsetNormal=normal){
+        if(surface){
+          const {origin,horizontal,vertical}=surface;
+          dest.push(origin.x+horizontal.x*p[0]+vertical.x*p[1]+offsetNormal.x*z,
+            origin.y+horizontal.y*p[0]+vertical.y*p[1]+offsetNormal.y*z,origin.z+horizontal.z*p[0]+vertical.z*p[1]+offsetNormal.z*z);
+        }else dest.push(u.x*p[0]+v.x*p[1]+normal.x*d+offsetNormal.x*z,u.y*p[0]+v.y*p[1]+normal.y*d+offsetNormal.y*z,u.z*p[0]+v.z*p[1]+normal.z*d+offsetNormal.z*z);
+      }
       const nx=Math.max(1,Math.ceil((plane.max[0]-plane.min[0])/pitch[0]));
       // Keep the bow end as one continuous face: a central horizontal gap
       // reads as a mouth beneath the command windows.
@@ -110,7 +166,10 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
       }
       // Dark substrate makes actual panel gaps readable. It also prevents the
       // old painted seams from peeking through the new cut lines.
-      for(const triangle of plane.triangles)for(const p of triangle)vertex(edges,p,.0015);
+      for(const [triangleIndex,triangle]of plane.triangles.entries())for(const p of triangle){
+        const backingNormal=border?creaseNormals.get(panelPointKey(panelPoint(plane,p))):normal;
+        vertex(edges,p,.0015,plane.surfaces[triangleIndex],backingNormal);
+      }
       for(let ix=0;ix<nx;ix++)for(let iy=0;iy<ny;iy++){
         const l=plane.min[0]+ix*dx+gap/2,r=l+dx-gap,b=plane.min[1]+iy*dy+gap/2,t=b+dy-gap;
         const k=Math.min(dx,dy)*(.02+noise(ix,iy,planeIndex)*.025);
@@ -121,16 +180,19 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
         const tone=noise(ix,iy,planeIndex+4);
         const color=facePaint.clone().multiplyScalar(.97+tone*.05);
         let added=false;
-        for(const triangle of plane.triangles){
-          const polygon=clipPanelPolygon(triangle,outline);if(polygon.length<3)continue;
+        for(const [triangleIndex,triangle]of plane.triangles.entries()){
+          const surfaceMapping=plane.surfaces[triangleIndex];
+          let polygon=clipPanelPolygon(triangle,outline);
+          if(border)polygon=clipPanelPolygon(polygon,border);
+          if(polygon.length<3)continue;
           const surfaces=sideBand?[
-            [clipPaintHeight(polygon,plane,-.5,true),new THREE.Color(0x767b72).multiplyScalar(.97+tone*.05)],
+            [clipPaintHeight(polygon,plane,-.5,true),beakPaint.clone().multiplyScalar(.97+tone*.05)],
             [clipPaintHeight(polygon,plane,-.5,false),color],
           ]:[[polygon,color]];
           for(const [surface,tint]of surfaces)for(let corner=1;corner<surface.length-1;corner++){
             if(Math.abs(cross(surface[0],surface[corner],surface[corner+1]))<1e-8)continue;
             for(const point of [surface[0],surface[corner],surface[corner+1]]){
-              vertex(positions,point,depth);colors.push(tint.r,tint.g,tint.b);
+              vertex(positions,point,depth,surfaceMapping);colors.push(tint.r,tint.g,tint.b);
               const tile=Math.floor(noise(ix,iy,planeIndex+31)*4),flip=noise(ix,iy,planeIndex+15)>.5;
               const pu=(point[0]-l)/(r-l),pv=(point[1]-b)/(t-b);
               uvs.push((tile%2+.005+(flip?1-pu:pu)*.99)/2,(Math.floor(tile/2)+.005+pv*.99)/2);
@@ -140,8 +202,8 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
           for(let j=0;j<polygon.length;j++){
             const p=polygon[j],q=polygon[(j+1)%polygon.length];
             // Sidewalls only at plate boundaries, never internal triangulation.
-            if(!outline.some((a,i)=>Math.abs(cross(a,outline[(i+1)%outline.length],p))<1e-6&&Math.abs(cross(a,outline[(i+1)%outline.length],q))<1e-6))continue;
-            for(const [coord,z]of [[p,0],[q,0],[q,depth],[p,0],[q,depth],[p,depth]])vertex(edges,coord,z);
+            if(![outline,...(border?[border]:[])].some(boundary=>boundary.some((a,i)=>Math.abs(cross(a,boundary[(i+1)%boundary.length],p))<1e-6&&Math.abs(cross(a,boundary[(i+1)%boundary.length],q))<1e-6)))continue;
+            for(const [coord,z]of [[p,0],[q,0],[q,depth],[p,0],[q,depth],[p,depth]])vertex(edges,coord,z,surfaceMapping);
           }
         }
         if(!added)continue;stats.plates++;
@@ -151,7 +213,13 @@ export function createExteriorPanelStudy(ship,{probeOnly=false,replaceSkin=false
           const w=Math.min(dx*.045,probeOnly?.025:.075),h=w*2.5;
           if(cx-w<l+k||cx+w>r-k||cy-h<b+k||cy+h>t-k)continue;
           const a=[cx-w/2,cy-h/2],bb=[cx+w/2,cy-h/2],c=[cx+w/2,cy+h/2],dd=[cx-w/2,cy+h/2];
-          for(const p of [a,bb,c,a,c,dd])vertex(edges,p,depth+.002);
+          if(border||plane.surfaces.some(Boolean)){
+            for(const [triangleIndex,triangle]of plane.triangles.entries()){
+              let polygon=clipPanelPolygon([a,bb,c,dd],triangle);
+              if(border)polygon=clipPanelPolygon(polygon,border);
+              for(let corner=1;corner<polygon.length-1;corner++)for(const point of [polygon[0],polygon[corner],polygon[corner+1]])vertex(edges,point,depth+.002,plane.surfaces[triangleIndex]);
+            }
+          }else for(const p of [a,bb,c,a,c,dd])vertex(edges,p,depth+.002);
         }
       }
     }
