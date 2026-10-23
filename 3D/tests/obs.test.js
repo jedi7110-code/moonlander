@@ -94,6 +94,19 @@ test('the lounge table clears the seat and its props rest on the top without a g
   assert.ok(center.y<bounds('Table cup').max.y-.02);
   table.traverse(mesh=>mesh.geometry?.dispose());material.dispose();
 });
+test('the exterior button uses an outlined mothership instead of a text label',async()=>{
+  const html=await readFile(new URL('../src/obs.html',import.meta.url),'utf8');
+  const button=html.match(/<button\b[^>]*id="obs-exterior"[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.ok(button);
+  assert.match(button,/aria-haspopup="dialog"/);
+  assert.match(button,/aria-label="船体外観" title="船体外観"/);
+  assert.match(button,/<svg\b[^>]*fill="none"[^>]*stroke="currentColor"[^>]*aria-hidden="true"[^>]*focusable="false"/);
+  assert.doesNotMatch(button,/<span|data-ja=|data-lucide=/);
+  const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');
+  assert.match(main,/const exteriorLabel=words\('船体外観','Ship exterior'\)/);
+  assert.match(main,/\$\('obs-exterior'\)\.title=exteriorLabel/);
+});
+
 test('the rotating habitat belongs to the mothership, while Barramundi remains the lander',async()=>{
   const habitat=await readFile(new URL('../src/obs.html',import.meta.url),'utf8');
   const lander=await readFile(new URL('../src/index.html',import.meta.url),'utf8');

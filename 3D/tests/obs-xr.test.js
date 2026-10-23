@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {ObservationXR,frameXRViewer} from '../src/obs/xr.js';
 import {ObservationView} from '../src/obs/view.js';
@@ -43,6 +44,33 @@ async function start(){
   s.immersive.update(1/72,xrFrame(transform()));
   return s;
 }
+
+test('the immersive toggle uses a compact outlined goggles icon with an accessible button label',()=>{
+  const html=readFileSync(new URL('../src/obs.html',import.meta.url),'utf8');
+  const button=html.match(/<button\b[^>]*id="obs-vr"[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.ok(button);
+  assert.match(button,/aria-label="立体表示 \/ Meta Quest"/);
+  assert.match(button,/aria-pressed="false"/);
+  assert.match(button,/<svg\b[^>]*fill="none"[^>]*stroke="currentColor"[^>]*aria-hidden="true"[^>]*focusable="false"/);
+  assert.equal((button.match(/<circle\b/g)||[]).length,2);
+  const css=readFileSync(new URL('../src/obs.css',import.meta.url),'utf8');
+  assert.match(css,/#obs-vr svg\{width:22px;height:18px;stroke-width:2\.2\}/);
+  assert.doesNotMatch(button,/>3D</);
+});
+
+test('goggles toggle keeps its labels and pressed state through language and session changes',async()=>{
+  const state=setup();await state.immersive.ready;
+  assert.equal(state.button.attributes['aria-label'],'Immersive 3D / Meta Quest');
+  state.immersive.words=japanese=>japanese;state.immersive.localize();
+  assert.equal(state.button.dataset.tip,'立体表示 / Meta Quest');
+  await state.immersive.toggle();
+  assert.equal(state.button.attributes['aria-label'],'立体表示を終了');
+  assert.equal(state.button.attributes['aria-pressed'],'true');
+  await state.immersive.exit();
+  assert.equal(state.button.attributes['aria-label'],'立体表示 / Meta Quest');
+  assert.equal(state.button.attributes['aria-pressed'],'false');
+  state.immersive.dispose();
+});
 
 test('miniature viewing centres an offset, rotated headset without flattening stereo or head motion',()=>{
   const rig=new THREE.Group(),target=new THREE.Vector3(4,5,-1),pose=transform(1,1.7,-2,Math.PI/3),scale=9;

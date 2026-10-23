@@ -57,6 +57,8 @@
 @media(max-width:480px){html[lang=en] .need>.need-row{font-size:9px;gap:2px}}
 @media(max-height:560px) and (min-width:600px) and (max-width:1200px){#observation{grid-template-rows:32px 112px minmax(0,1fr) 67px}}
 .vr-button{font:700 12px/1 Arial,sans-serif;letter-spacing:.02em}.vr-button:disabled{opacity:.4;cursor:wait}
+#obs-vr{background:#080b0ca6;border-radius:6px}#obs-vr:hover{background:#c2d99012}#obs-vr[aria-pressed=true]{background:#bccf9310}#obs-vr svg{width:22px;height:18px;stroke-width:2.2}
+#obs-exterior svg{width:22px;height:22px;stroke-width:2.2}
 /* Hide the headset-only control on mobile, including landscape touch screens.
    An available immersive headset keeps its entry point at any viewport size. */
 @media(max-width:760px),(hover:none) and (pointer:coarse){#obs-vr:not([data-xr-ready="true"]){display:none}}

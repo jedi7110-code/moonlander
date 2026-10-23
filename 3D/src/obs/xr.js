@@ -104,7 +104,7 @@ export class ObservationXR {
     if(this.active){await this.exit();return;}
     if(this.support!=='ready'){
       this.notify(this.support==='insecure'
-        ?this.words('Questのブラウザで、HTTPSのページを開いて「3D」を押してください。MacのローカルHTTPアドレスでは立体表示を開始できません。','Open this page over HTTPS in the Quest browser, then press 3D. A Mac’s local HTTP address cannot start immersive VR.')
+        ?this.words('Questのブラウザで、HTTPSのページを開いてゴーグルアイコンを押してください。MacのローカルHTTPアドレスでは立体表示を開始できません。','Open this page over HTTPS in the Quest browser, then press the goggles icon. A Mac’s local HTTP address cannot start immersive VR.')
         :this.words('立体表示はMeta QuestなどのWebXR対応ヘッドセットで使えます。対応機器でHTTPSのページを開き、VRの利用を許可してください。','Immersive 3D needs a WebXR headset such as Meta Quest. Open this page over HTTPS on the headset and allow VR access.'));
       return;
     }
@@ -126,7 +126,7 @@ export class ObservationXR {
     }catch(error){
       if(session){try{await session.end();}catch{}this.finish(session);}
       if(!this.disposed)this.notify(error?.name==='NotAllowedError'
-        ?this.words('立体表示がキャンセルされました。「3D」から再開できます。','Immersive 3D was cancelled. Press 3D to try again.')
+        ?this.words('立体表示がキャンセルされました。ゴーグルアイコンから再開できます。','Immersive 3D was cancelled. Press the goggles icon to try again.')
         :this.words('立体表示を開始できませんでした。QuestのブラウザでVRの利用許可とHTTPS接続を確認してください。','Could not start immersive 3D. Check HTTPS and VR permission in the Quest browser.'));
     }finally{this.pending=false;if(!this.disposed)this.localize();}
   }

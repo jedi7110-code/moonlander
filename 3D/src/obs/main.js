@@ -223,7 +223,7 @@ function setNeedDetails(key,restoreFocus=false){
 function localize(){
   document.documentElement.lang=getLang();document.querySelectorAll('[data-ja]').forEach(el=>el.textContent=el.dataset[getLang()]);
   $('obs-lang').textContent=words('EN','JA');$('obs-lang').setAttribute('aria-label',words('Switch to English','日本語に切り替え'));
-  $('obs-exterior').setAttribute('aria-label',words('船体外観','Ship exterior'));
+  const exteriorLabel=words('船体外観','Ship exterior');$('obs-exterior').setAttribute('aria-label',exteriorLabel);$('obs-exterior').title=exteriorLabel;
   $('obs-input').placeholder=words('マイロに話しかける','Talk to Milo');$('obs-input').setAttribute('aria-label',$('obs-input').placeholder);
   for(const [id,ja,en]of [['view-all','全景','Wide view'],['view-milo','マイロ','Follow Milo'],['view-cat','ルーシー','Follow Lucy'],['view-droid','ドロイド','Follow Droid'],['zoom-in','拡大','Zoom in'],['zoom-out','縮小','Zoom out'],['hq-message','司令部通信','Headquarters'],['obs-sound','船内音','Cabin audio'],['request-supply','コンソールから配送依頼','Order supplies at console']]){$(id).dataset.tip=words(ja,en);$(id).setAttribute('aria-label',words(ja,en));}
   updateFullscreenUI(document,words,refreshIcons);
