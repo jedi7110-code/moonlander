@@ -3,6 +3,7 @@ import { generateLabels, SVG_SCALE } from './ui-text.js';
 import { attachUiGuide } from './ui-guide.js?v=2';
 import { registerAnimations } from './animations.js?v=2';
 import { createCockpitObjects } from './cockpit.js?v=102';
+import { createShipLadder } from './ship-ladder.js?v=4';
 
 export function create(scene) {
 // Helvetica はシステムフォントなので待機不要
@@ -61,6 +62,7 @@ scene.tippingOver = false; // 転倒中リスタートで固着するとパッ�
 scene.monoHighlights = null; // 破棄済み Graphics への毎フレーム再描画を防ぐ
 scene.spawnEnemy = null;
 scene.shipHatch = null;
+scene.shipLadder = null;
 scene.groundMask = null;
 scene.beamGaugeBg = null;
 scene.beamGaugeFill = null;
@@ -204,6 +206,8 @@ const bodyRadius = Math.floor(scene.spaceship.width / 3);
 scene.spaceship.body.setCircle(bodyRadius);
 scene.spaceship.body.setOffset(scene.spaceship.width / 2 - bodyRadius, scene.spaceship.height / 2 - bodyRadius);
 scene.spaceship.defaultTextureName = 'spaceship';
+// 降下中は収納状態。着陸後に同じハシゴを伸ばす。
+createShipLadder(scene, scene.spaceship.x - 3, scene.spaceship.y + 10, scene.spaceship.y + 56);
 
 // 着陸の影を作成（Graphics で 5 段階の多重楕円ソフトシャドウを描く）
 // ベース横幅 110 で描き、setScale で実サイズに合わせる

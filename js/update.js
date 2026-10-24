@@ -1,5 +1,6 @@
 // Phaser scene の update フック本体。
 import { fadeStopSound, startSoundCancelFade } from './audio.js';
+import { createShipLadder, drawShipLadder, shipLadderRungYs, stowShipLadder } from './ship-ladder.js?v=4';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js?v=3';
 import { enterCockpitMode, updateCockpit } from './cockpit.js?v=102';
@@ -1288,37 +1289,39 @@ if (scene.astronautMode && scene.astronaut) {
                                 scene.astronaut.shadow.destroy();
                                 scene.astronaut.shadow = null;
                             }
-                            // ハッチを閉じる：下から上へ黒い穴が縮んで消える
-                            if (scene.shipHatch) {
-                                const hatchRef = scene.shipHatch;
+                            // 全員が船内に入ってから、ハシゴ収納 → ハッチ閉鎖 → 点火。
+                            const closeHatch = () => {
+                                const hatch = scene.shipHatch;
+                                const ready = () => scene.time.delayedCall(350, launchLander);
+                                if (!hatch) { ready(); return; }
                                 scene.tweens.add({
-                                    targets: hatchRef,
-                                    height: 0,
-                                    duration: 400,
-                                    ease: 'Sine.easeInOut',
-                                    onComplete: () => { hatchRef.destroy(); if (scene.shipHatch === hatchRef) scene.shipHatch = null; }
+                                    targets: hatch, height: 0, duration: 400, ease: 'Sine.easeInOut',
+                                    onComplete: () => {
+                                        hatch.destroy();
+                                        if (scene.shipHatch === hatch) scene.shipHatch = null;
+                                        ready();
+                                    }
                                 });
-                            }
-                            // 登り終えたら徐々にズームアウト（ポッド上昇中も続く）
-                            scene.tweens.add({
-                                targets: scene.cameras.main,
-                                zoom: 1.8,
-                                duration: 5000,
-                                ease: 'Sine.easeInOut'
-                            });
-                            // 発射前2秒：ハッチ開
-                            scene.sound.play('hatchopen', { volume: 0.25 });
-                            // 2秒後：宇宙船上部からポッド打ち上げ
-                            scene.time.delayedCall(2000, () => {
+                            };
+                            const launchLander = () => {
+                                const ship = scene.spaceship;
+                                // 自動上昇中は物理の境界制限を外し、画面外まで飛び去る。
+                                ship.body.stop();
+                                ship.body.enable = false;
+                                const launchX = ship.x;
+                                const launchY = ship.y + ship.displayHeight / 2;
+                                const boardingLadder = scene.shipLadder;
+                                const ladderOffset = boardingLadder && { x: boardingLadder.x - ship.x, y: boardingLadder.y - ship.y };
+                                scene.tweens.add({
+                                    targets: scene.cameras.main, zoom: 1.8,
+                                    duration: 5000, ease: 'Sine.easeInOut'
+                                });
+                                const shadows = [scene.spaceshipShadow, scene.spaceshipShadowGround].filter(Boolean);
+                                scene.tweens.add({ targets: shadows, alpha: 0, duration: 1100, ease: 'Sine.easeIn' });
                                 // 脱出音：点火とジェットを同時再生
                                 scene.sound.play('escape-injection', { volume: 0.8 });
                                 scene.escapeJetSound = scene.sound.add('escape-jet', { loop: true, volume: 0.6 });
                                 scene.escapeJetSound.play();
-                                const podX = scene.spaceship.x;
-                                const podY = scene.spaceship.y - 10;
-                                const pod = scene.add.image(podX, podY, 'pod');
-                                pod.setDisplaySize(24, 24);
-                                pod.setDepth(3); // 宇宙船(5)より下のレイヤーから出現
 
                                 // エイリアンたちは地中へ散り散りに退却
                                 scene.enemiesRetreating = true;
@@ -1354,7 +1357,7 @@ if (scene.astronautMode && scene.astronaut) {
                                 muzzle.setDepth(3); // 宇宙船(5)の背後
                                 const makeSide = (sx, angleRange) => muzzle.createEmitter({
                                     x: sx,
-                                    y: podY + 2,
+                                    y: launchY + 2,
                                     speed: { min: 40, max: 160 },
                                     angle: angleRange,
                                     scale: { start: 0.25, end: 2.2 },
@@ -1364,15 +1367,15 @@ if (scene.astronautMode && scene.astronaut) {
                                     quantity: 1,
                                     on: false
                                 });
-                                const leftEm = makeSide(podX - 10, { min: 155, max: 205 });
-                                const rightEm = makeSide(podX + 10, { min: -25, max: 25 });
+                                const leftEm = makeSide(launchX - 18, { min: 155, max: 205 });
+                                const rightEm = makeSide(launchX + 18, { min: -25, max: 25 });
                                 leftEm.explode(26);
                                 rightEm.explode(26);
                                 // 炎のチラッとした赤味（少量）
                                 const flame = scene.add.particles('jetParticle');
                                 flame.setDepth(3); // 宇宙船(5)の背後
                                 const flameL = flame.createEmitter({
-                                    x: podX - 8, y: podY + 2,
+                                    x: launchX - 12, y: launchY + 2,
                                     speed: { min: 80, max: 200 },
                                     angle: { min: 165, max: 195 },
                                     scale: { start: 0.5, end: 0 },
@@ -1382,7 +1385,7 @@ if (scene.astronautMode && scene.astronaut) {
                                     on: false
                                 });
                                 const flameR = flame.createEmitter({
-                                    x: podX + 8, y: podY + 2,
+                                    x: launchX + 12, y: launchY + 2,
                                     speed: { min: 80, max: 200 },
                                     angle: { min: -15, max: 15 },
                                     scale: { start: 0.5, end: 0 },
@@ -1395,31 +1398,27 @@ if (scene.astronautMode && scene.astronaut) {
                                 flameR.explode(10);
                                 scene.time.delayedCall(1800, () => { muzzle.destroy(); flame.destroy(); });
 
-                                // 下部の噴射ノズル炎（ポッドに追従し、上昇中は常時噴射）
+                                // 下部の噴射ノズル炎（着陸船に追従し、上昇中は常時噴射）
                                 const nozzle = scene.add.graphics();
                                 nozzle.setDepth(3); // 宇宙船(5)の背後
                                 const drawNozzle = () => {
                                     nozzle.clear();
-                                    const nx = pod.x;
-                                    const ny = pod.y + 12;
+                                    const nx = ship.x;
+                                    const ny = ship.y + ship.displayHeight * 0.30; // 脚先ではなく、船底中央のノズル
                                     const flick = Phaser.Math.FloatBetween(0.8, 1.2);
                                     // 外炎（オレンジ）
                                     nozzle.fillStyle(0xff8822, 0.9);
-                                    nozzle.fillTriangle(nx - 5, ny, nx + 5, ny, nx, ny + 14 * flick);
+                                    nozzle.fillTriangle(nx - 5, ny, nx + 5, ny, nx, ny + 26 * flick);
                                     // 内炎（黄）
                                     nozzle.fillStyle(0xffee66, 0.95);
-                                    nozzle.fillTriangle(nx - 3, ny, nx + 3, ny, nx, ny + 9 * flick);
+                                    nozzle.fillTriangle(nx - 3, ny, nx + 3, ny, nx, ny + 18 * flick);
                                     // 芯（白）
                                     nozzle.fillStyle(0xffffff, 1);
-                                    nozzle.fillTriangle(nx - 1.5, ny, nx + 1.5, ny, nx, ny + 5 * flick);
+                                    nozzle.fillTriangle(nx - 1.5, ny, nx + 1.5, ny, nx, ny + 10 * flick);
                                 };
-                                const nozzleTimer = scene.time.addEvent({
-                                    delay: 30,
-                                    loop: true,
-                                    callback: drawNozzle
-                                });
+                                drawNozzle();
 
-                                // カメラも上昇（ポッドより遅い。消えた後もスーッと余韻で減速）
+                                // カメラも上昇（着陸船より遅い。消えた後もスーッと余韻で減速）
                                 scene.cameraRising = true;
                                 scene.tweens.add({
                                     targets: scene.cameras.main,
@@ -1445,18 +1444,24 @@ if (scene.astronautMode && scene.astronaut) {
                                 });
 
                                 scene.tweens.add({
-                                    targets: pod,
-                                    y: pod.y - 1050,
+                                    targets: ship,
+                                    y: ship.y - 1050,
                                     duration: 3000,
                                     ease: 'Cubic.easeIn',
+                                    onUpdate: () => {
+                                        drawNozzle();
+                                        if (boardingLadder?.active) boardingLadder.setPosition(ship.x + ladderOffset.x, ship.y + ladderOffset.y);
+                                    },
                                     onComplete: () => {
-                                        pod.destroy();
-                                        nozzleTimer.remove();
+                                        ship.setVisible(false);
+                                        boardingLadder?.setVisible(false);
                                         nozzle.destroy();
                                         if (scene.escapeJetSound) fadeStopSound(scene, scene.escapeJetSound, 0.6, 300);
                                     }
                                 });
-                            });
+                            };
+                            scene.sound.play('hatchopen', { volume: 0.25 });
+                            stowShipLadder(scene, closeHatch);
                         };
                         scene.playerClimbingManual = true;
                         scene.playerClimbStartY = scene.astronaut.y;
@@ -1464,18 +1469,12 @@ if (scene.astronautMode && scene.astronaut) {
                         const astroDispH = scene.astronaut.displayHeight;
                         scene.playerClimbTopY = climbHatchBottomY - astroDispH / 2;
                         scene.playerClimbCallback = onClimbComplete;
-                        // 登りのステップ位置を「ハシゴの段」と一致させる：
-                        //   index 0: 地面（開始位置）
-                        //   index 1〜8: 8 段の各 rung に足が乗る位置（下から rung 8 → rung 1 へ）
-                        //   index 9: ハッチ内（playerClimbTopY）
-                        const climbNumRungs = 8;
-                        const climbLadderLen = ladderBottom - ladderTop;
-                        const climbPositions = [scene.astronaut.y]; // index 0: ground
-                        for (let k = climbNumRungs; k >= 1; k--) {
-                            const rungFootY = ladderTop + (k / (climbNumRungs + 1)) * climbLadderLen;
+                        // 3段伸縮ハシゴの9本の踏み段に、下から順に足を合わせる。
+                        const climbPositions = [scene.astronaut.y];
+                        for (const rungFootY of shipLadderRungYs(scene.shipLadder).reverse()) {
                             climbPositions.push(rungFootY - astroDispH / 2);
                         }
-                        climbPositions.push(scene.playerClimbTopY); // index 9: in hatch
+                        climbPositions.push(scene.playerClimbTopY);
                         scene.climbStepPositions = climbPositions;
                         scene.climbStepIndex = 0;
                     });
@@ -2036,8 +2035,7 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
         const ladderTop = scene.spaceship.y + 10; // 宇宙船の内部から伸ばす
         const ladderBottom = scene.spaceship.y + 56; // プレイヤー足元の少し上まで
         const astronautDestY = scene.spaceship.y + 50; // 着地中心位置（地面）は据え置き
-        const ladder = scene.add.graphics({ lineStyle: { width: 1, color: 0xcccccc } });
-        ladder.setDepth(7);
+        const ladder = createShipLadder(scene, ladderX, ladderTop, ladderBottom);
 
         // ハッチ（出入り口の黒い四角）を作成。下から上へ広がる開き方
         const hatchW = 8;
@@ -2061,7 +2059,6 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
         scene.cameras.main.zoomTo(4.5, 2000, 'Sine.easeInOut');
 
         // ハシゴがスッと伸びるアニメーション（ハッチが完全に開いてから開始）
-        let ladderProgress = 0;
         const ladderTween = scene.tweens.addCounter({
             from: 0,
             to: 1,
@@ -2069,21 +2066,7 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
             delay: 400, // ハッチオープン (400ms) 完了後にハシゴ伸展を開始
             ease: 'Sine.easeInOut',
             onUpdate: (tween) => {
-                ladderProgress = tween.getValue();
-                const currentBottom = ladderTop + (ladderBottom - ladderTop) * ladderProgress;
-                ladder.clear();
-                ladder.lineStyle(1, 0xcccccc);
-                // 2本の縦線
-                ladder.lineBetween(ladderX - 3, ladderTop, ladderX - 3, currentBottom);
-                ladder.lineBetween(ladderX + 3, ladderTop, ladderX + 3, currentBottom);
-                // 横棒：始端と終端は閉じない（H形）。コマ数 +2
-                const steps = 9;
-                for (let s = 1; s < steps; s++) {
-                    const stepY = ladderTop + (currentBottom - ladderTop) * (s / steps);
-                    if (stepY <= currentBottom) {
-                        ladder.lineBetween(ladderX - 3, stepY, ladderX + 3, stepY);
-                    }
-                }
+                drawShipLadder(ladder, tween.getValue());
             },
             onComplete: () => {
                 // ハシゴが伸びきったら宇宙飛行士が降りてくる（後ろ向き、足から）
@@ -2430,18 +2413,12 @@ if (padTouchdown && (!isSlow || !isLevel) && !scene.tippingOver && scene.gameSta
                             scene.time.delayedCall(500, showArrow);
                         }
                 };
-                // 降下のステップ位置を「ハシゴの段」と一致させる：
-                //   index 0: 初期スポーン位置（ハッチ内）
-                //   index 1〜8: 8 段の各 rung に足が乗る位置
-                //   index 9: 月面（ladderBottom より少し下、astronautDestY）
-                const numRungs = 8;
-                const ladderLen = ladderBottom - ladderTop;
-                const stepPositions = [astronaut.y]; // index 0: spawn
-                for (let k = 1; k <= numRungs; k++) {
-                    const rungFootY = ladderTop + (k / (numRungs + 1)) * ladderLen;
+                // 描画と同じ9本の踏み段の上面へ、足を順に下ろす。
+                const stepPositions = [astronaut.y];
+                for (const rungFootY of shipLadderRungYs(ladder)) {
                     stepPositions.push(rungFootY - astroH / 2);
                 }
-                stepPositions.push(astronautDestY); // index 9: 地面
+                stepPositions.push(astronautDestY);
                 scene.descendStepPositions = stepPositions;
                 scene.descendStepIndex = 0;
                 scene.descendStartY = astronaut.y;
