@@ -33,7 +33,7 @@ try{
   let gasPass=null;
   const optics=createExteriorOptics(ship),stars=createDistantStars();scene.add(stars.haze,stars.field,new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
   const planet=createExteriorPlanet({variant:query.get('planetVariant')});scene.add(planet.body);
-  const sun=new THREE.DirectionalLight(0xffffff,3.15),shadows=createExteriorShadow(sun,ship);
+  const sun=new THREE.DirectionalLight(new THREE.Color(0xffffff).lerp(new THREE.Color(0xfff2d4),.5),3.15),shadows=createExteriorShadow(sun,ship);
   const bounce=new THREE.DirectionalLight(0x8ca7bd,.65);scene.add(sun,bounce,sun.target,bounce.target);
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),target=new THREE.Vector3(),size=new THREE.Vector2();
   let time=Math.max(0,Number(query.get('time'))||0),running=query.get('paused')!=='1',last=0,frame=0,disposed=false;
