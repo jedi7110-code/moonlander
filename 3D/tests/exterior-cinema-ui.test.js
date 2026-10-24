@@ -52,7 +52,9 @@ test('loading completion reveals the entry cue while the opening remains open',t
 test('deferred opening shows entry without loading and releases the film before cabin boot',async t=>{
   const f=fixture(t);f.ui.show({opening:true,waitForHost:true,waitForEntry:true});
   assert.equal(f.ui.closeButton.hidden,false);assert.equal(f.ui.closeButton.textContent,'船内映像に接続');
-  assert.equal(f.ui.loadingIndicator,null);assert.equal(f.document.activeElement,f.ui.closeButton);
+  assert.equal(f.ui.loadingIndicator,null);assert.equal(f.document.activeElement,f.ui.shell);
+  f.ui.key({key:'Tab',target:f.ui.shell,preventDefault(){}});
+  assert.equal(f.document.activeElement,f.ui.closeButton,'Tab still selects the entry button');
   let entered=false;const entry=f.ui.whenEntryRequested().then(()=>{
     assert.equal(f.ui.frame,null);assert.equal(f.ui.open,false);entered=true;
   });
@@ -129,6 +131,14 @@ test('the explicit study movie still opens the numbered cinematic viewer',t=>{
   assert.equal(url.searchParams.get('approach'),'bow');assert.equal(url.searchParams.get('ending'),'underside');
   assert.equal(url.searchParams.get('docking'),'probe-follow');assert.equal(url.searchParams.has('transition'),false);
   assert.equal(f.ui.closeButton.textContent,'戻る');
+});
+test('only the Moonlander arrival suppresses the opening logo',t=>{
+  const f=fixture(t);location.search='?from=moonlander';
+  f.ui.show({opening:true,waitForHost:true,waitForEntry:true});
+  assert.equal(new URL(f.ui.frame.src).searchParams.get('logo'),'0');
+  f.ui.closeButton.onclick();location.search='';
+  f.ui.show({opening:true,waitForHost:true,waitForEntry:true});
+  assert.equal(new URL(f.ui.frame.src).searchParams.has('logo'),false);
 });
 
 test('paced cabin assembly begins after the full logo is presented while probe preparation stays behind the fade',async t=>{

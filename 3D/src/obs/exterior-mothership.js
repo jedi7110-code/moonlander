@@ -677,6 +677,7 @@ export function createExteriorMothership(){
     get dockedLander(){return probe?.lander??null;},get probeDock(){return probe?.dock??null;},get probeThrusters(){return probe?.thrusters??null;},
     get dockHatches(){return probe?.hatches??[];},
     get dockCapture(){return probe?.capture??null;},
+    get probeLadder(){return probe?.ladder??null;},
     setDockCapture(value){probe?.setCapture(value);},
     setDockTransferOpen(value){probe?.setTransferOpen(Boolean(value));},
     addProbe(factory){

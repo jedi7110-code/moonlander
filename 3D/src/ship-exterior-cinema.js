@@ -38,6 +38,8 @@ try{
   const camera=new THREE.PerspectiveCamera(38,1,.1,2400),target=new THREE.Vector3(),size=new THREE.Vector2();
   let time=Math.max(0,Number(query.get('time'))||0),running=query.get('paused')!=='1',last=0,frame=0,disposed=false;
   const freshOpening=opening&&time===0&&running;
+  const hideLogo=opening&&query.get('logo')==='0';
+  if(hideLogo&&!query.has('time'))time=EXTERIOR_LOGO.end;
   let probeReady=false,probeLoading=null,playingFrames=0,logoResolvedFrames=0,introFinishedFrames=0;
   const openingFrames={};
   // Opt-in measurement for comparing the approved finish with the original
@@ -83,7 +85,7 @@ try{
   function draw(){
     const film=sampleExteriorCinemaFrame(time,{...options,aspect:camera.aspect}),shot=film.shot;
     dissolve.render(film,drawView);
-    identity.style.opacity=String(shot.titleOpacity*.88);
+    identity.style.opacity=hideLogo?'0':String(shot.titleOpacity*.88);
     // The first dial-up band starts after 120ms. Keep the glow hidden until
     // that band exists, and sample every band from the film's own clock.
     logoReveal.style.visibility=shot.logoReveal>0?'visible':'hidden';
@@ -108,7 +110,7 @@ try{
     const current=new URLSearchParams(location.search);current.set('time',time.toFixed(3));
     if(next)current.delete('paused');else current.set('paused','1');history.replaceState(null,'',`?${current}`);
   }
-  $('play').onclick=()=>play(!running);$('restart').onclick=()=>{time=0;play(true);};play(running);
+  $('play').onclick=()=>play(!running);$('restart').onclick=()=>{time=hideLogo?EXTERIOR_LOGO.end:0;play(true);};play(running);
   $('timeline').oninput=()=>{time=Number($('timeline').value);play(false);};
   // Keep the lightweight sky over the renderer until the first real frames settle.
   // A seek into the probe shots needs the complete model before its first draw.

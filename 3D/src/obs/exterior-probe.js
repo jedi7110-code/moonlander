@@ -4,6 +4,7 @@ import {createParabolicAntenna} from './exterior-antenna.js';
 import {createExteriorDecals} from './exterior-decals.js';
 import {createExteriorProbeThrusters} from './exterior-probe-thrusters.js';
 import {addProbeDockPort,addMotherDockPort,cutDockPassage} from './exterior-docking.js';
+import {createProbeLadder} from './exterior-probe-ladder.js';
 
 export function createExteriorProbe(root,m,build){
   const {random,addMesh,box,rod,pipe,axisRing,chamferBox,label,bake}=build;
@@ -97,7 +98,9 @@ function detailDockedProbe(lander,m){
     chamferBox(bay,m.steel,[0,0,0],[1.1,.85,.10],'Probe exposed service bay');
     box(bay,m.patch,[.19,.02,.085],[.45,.64,.08],'Probe service electronics');
     for(let k=0;k<5;k++)box(bay,m.pipe,[-.30,-.25+k*.12,.10],[.23,.035,.07],'Probe cooling fin');
-    pipe(lander,m.pipe,[[side*1.79,2.43,.35],[side*2.25,2.35,.35],[side*2.25,1.45,-.15]],.033,'Probe coolant feed');
+    // Keep the feed inboard of the service-panel back (x=±2.15),
+    // so it cannot pierce the fins or removable electronics cover.
+    pipe(lander,m.pipe,[[side*1.79,2.16,.35],[side*2.06,2.16,.35],[side*2.06,1.45,-.15]],.033,'Probe coolant feed');
   }
   const bay=new THREE.Group();bay.position.set(0,1.76,1.86);lander.add(bay);
   chamferBox(bay,m.steel,[0,0,0],[1.60,.88,.12],'Descent-stage inspection frame');
@@ -168,21 +171,24 @@ function dockedProbe(root,m){
     const top=new THREE.Vector3(...antenna.userData.antenna.mountPoint);top.x=side*.045;top.applyMatrix4(antenna.matrix);
     rod(lander,m.steel,foot.toArray(),top.toArray(),.045,'Probe antenna triangulated side brace');
   }
+  const ladder=createProbeLadder(lander,m,build);
   bake(antenna);
   bake(lander);
   const decals=createExteriorDecals();
   decals.add(lander,'pressure',[0,3.93,1.89],[0,0,1],.65,.26);
   decals.add(lander,'service',[0,1.63,2.03],[0,0,1],1.10,.31);
   for(const side of [-1,1]){
-    decals.add(lander,'rcs',[side*1.87,3.1,0],[side,0,0],.38,.23);
-    decals.add(lander,'connector',[side*2.30,1.83,.12],[side,0,0],.72,.25);
+    decals.add(lander,'rcs',[side*1.87,3.1,0],[side,0,0],.38,.38*192/512,{up:[0,1,0]});
+    // The electronics cover is only .45m wide. Project inside that face,
+    // rather than centring a bay-wide label across its left edge and fins.
+    decals.add(lander,'connector',[side*2.35,1.87,.12-side*.19],[side,0,0],.35,.35*192/512,{up:[0,1,0]});
   }
   decals.flush();
   const thrusters=createExteriorProbeThrusters(lander,{nozzleMaterial:m.dark,rimMaterial:m.pipe});
   const cradle=new THREE.Group();cradle.name='Probe docking hardpoints';dock.add(cradle);
   const motherPort=addMotherDockPort(cradle,m,build);
   dock.userData.docking={clearDiameter:1.2,mode:'unpressurized until hard-capture and seal check'};
-  return{dock,lander,cradle,paintedMaterials,thrusters,capture:motherPort.capture,setCapture:motherPort.capture.setProgress,hatches:[probeHatch.hinge,motherPort.hatch.hinge],setScale:motherPort.setScale,
+  return{dock,lander,cradle,paintedMaterials,thrusters,ladder,capture:motherPort.capture,setCapture:motherPort.capture.setProgress,hatches:[probeHatch.hinge,motherPort.hatch.hinge],setScale:motherPort.setScale,
     setTransferOpen(value){probeHatch.setOpen(value);motherPort.hatch.setOpen(value);}};
 }
 

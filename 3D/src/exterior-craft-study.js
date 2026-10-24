@@ -80,6 +80,18 @@ try{
   };
   $('cargo-hatch').onchange=()=>{applyCargoHatch();if(!probe)view('eva-hatch');};applyCargoHatch();
   const camera=new THREE.PerspectiveCamera(38,1,.05,2000),controls=new OrbitControls(camera,$('view'));
+  $('ladder-controls').hidden=!probe;
+  const applyLadder=value=>{
+    const extension=ship.probeLadder.setExtension(value);
+    $('ladder-extension').value=extension;
+    $('ladder-label').textContent=extension===0?'格納':extension===1?'展開':Math.round(extension*100)+'%';
+    const params=new URLSearchParams(location.search);params.set('ladder',String(extension));history.replaceState(null,'',`?${params}`);
+  };
+  if(probe){
+    applyLadder(query.get('ladder'));
+    $('ladder-extension').oninput=()=>applyLadder($('ladder-extension').value);
+    $('ladder-stow').onclick=()=>applyLadder(0);$('ladder-deploy').onclick=()=>applyLadder(1);
+  }
   controls.enableDamping=true;controls.dampingFactor=.12;controls.screenSpacePanning=true;
   controls.minDistance=probe ? .35 : 5;controls.maxDistance=probe?80:700;
   const presentation=createExteriorDissolve(renderer,{samples:4}),gasPass=createExteriorGasPass(renderer,ship.probeThrusters.gas);
@@ -106,7 +118,11 @@ try{
     if(!probe&&name==='docking-lock')applyDockingTime($('docking-lock-time').value);
     dockingClearance?.setEnabled(name==='docking-section');
     $('docking-dimensions').hidden=name!=='docking-section';
-    if(name==='antenna'){
+    if(probe&&['ladder','ladder-side','ladder-under'].includes(name)){
+      controls.target.set(0,1.80,2.28);
+      camera.position.copy(new THREE.Vector3(...(name==='ladder-side'?[3.5,2.2,3.2]:name==='ladder-under'?[1.8,.5,4.6]:[2.4,3.1,5.6])));
+    }
+    else if(name==='antenna'){
       controls.target.copy(probe?new THREE.Vector3(.8,6.3,-.4):new THREE.Vector3(22,11.5,-.45));
       camera.position.copy(probe?new THREE.Vector3(2.4,8,1.8):new THREE.Vector3(31,19,15));
     }

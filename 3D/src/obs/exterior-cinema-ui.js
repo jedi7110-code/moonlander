@@ -50,6 +50,7 @@ export class ExteriorCinemaUI{
     const query=new URLSearchParams({embedded:'1',core:String(core),phase:String(phase)});if(rpm!==undefined)query.set('rpm',String(rpm));
     if(this.cinematic){
       query.set('mode',opening?'opening':'view');
+      if(opening&&new URLSearchParams(location.search).get('from')==='moonlander')query.set('logo','0');
       // Adopt the approved study take in OBS and the cabin's movie viewer.
       query.set('approach','bow');query.set('ending','underside');query.set('docking','probe-follow');
     }else{
@@ -81,7 +82,7 @@ export class ExteriorCinemaUI{
     }
     this.inert=[...this.parent.children].map(element=>[element,element.inert]);this.inert.forEach(([el])=>{el.inert=true;});
     this.shell.append(this.frame,this.closeButton);if(this.loadingIndicator)this.shell.append(this.loadingIndicator);this.parent.append(this.shell);
-    (this.hostIsReady||this.waitForEntry?this.closeButton:this.shell).focus({preventScroll:true});this.onChange(true);
+    (opening?this.shell:this.hostIsReady?this.closeButton:this.shell).focus({preventScroll:true});this.onChange(true);
   }
   hostProgress(value){
     if(this.hostIsReady||!Number.isFinite(value))return;

@@ -42,7 +42,7 @@ test('the probe antenna rests on a conformal bolted foundation and keeps the exi
       assert.ok(hit.face.normal.clone().transformDirection(hit.object.matrixWorld).dot(normal)>.999);
     }
     let meshes=0;ship.probeDock.add(probe);ship.root.traverse(mesh=>{if(mesh.isMesh)meshes++;});
-    assert.equal(meshes,124,'both braces, plate and bolts use the existing material batches');
+    assert.equal(meshes,137,'antenna fittings stay batched; the telescopic ladder adds thirteen draw batches');
   }finally{ship.probeDock.add(probe);ship.dispose();}
 });
 

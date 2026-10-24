@@ -5,6 +5,50 @@ import {createExteriorShip} from '../src/obs/ship-exterior.js';
 import {EXTERIOR_DECAL_CLEARANCE} from '../src/obs/exterior-decals.js';
 import {HABITAT_ENVELOPE} from '../src/obs/habitat-envelope.js';
 
+test('probe DANGER labels preserve the printed atlas aspect ratio on both sides',()=>{
+  const ship=createExteriorShip();let checked=0;
+  try{
+    ship.dockedLander.traverse(mesh=>{
+      if(!mesh.userData.exteriorDecal)return;
+      for(const entry of mesh.userData.markings){
+        if(entry.key!=='rcs')continue;
+        const bounds=new THREE.Box3();
+        for(let i=entry.vertexStart;i<entry.vertexStart+entry.vertexCount;i++)
+          bounds.expandByPoint(new THREE.Vector3().fromBufferAttribute(mesh.geometry.attributes.position,i));
+        const size=bounds.getSize(new THREE.Vector3());
+        assert.ok(Math.abs(size.z-.38)<1e-5);
+        assert.ok(Math.abs(size.z/size.y-512/192)<1e-4);
+        checked++;
+      }
+    });
+    assert.equal(checked,2);
+  }finally{ship.dispose();}
+});
+
+test('probe connector labels fit completely on both electronics covers',()=>{
+  const ship=createExteriorShip();let checked=0;
+  try{
+    ship.dockedLander.traverse(mesh=>{
+      if(!mesh.userData.exteriorDecal)return;
+      for(const entry of mesh.userData.markings){
+        if(entry.key!=='connector')continue;
+        const bounds=new THREE.Box3();
+        for(let i=entry.vertexStart;i<entry.vertexStart+entry.vertexCount;i++)
+          bounds.expandByPoint(new THREE.Vector3().fromBufferAttribute(mesh.geometry.attributes.position,i));
+        const size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3()),side=Math.sign(center.x);
+        assert.ok(Math.abs(size.z-.35)<1e-5,'all of the label width survives projection');
+        assert.ok(Math.abs(size.y-.35*192/512)<1e-5,'all three printed rows survive projection');
+        assert.ok(Math.abs(size.z/size.y-512/192)<1e-4,'the original atlas cell aspect ratio is preserved');
+        assert.ok(Math.abs(center.z-(.12-side*.19))<1e-5);
+        assert.ok(Math.abs(center.y-1.87)<1e-5);
+        assert.ok(Math.abs(center.x)>2.32,'ink is on the cover face rather than its edge or cooling fins');
+        checked++;
+      }
+    });
+    assert.equal(checked,2);
+  }finally{ship.dispose();}
+});
+
 test('habitat hatch warnings stay centered and their printed rows follow the door edges',()=>{
   const ship=createExteriorShip(),centerZ=(-HABITAT_ENVELOPE.front+HABITAT_ENVELOPE.rearRoomBack)/2;
   try{
