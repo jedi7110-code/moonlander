@@ -39,7 +39,7 @@ try{
   const optics=createExteriorOptics(ship),bufferSize=new THREE.Vector2();
   const planetProjection=new THREE.Vector3();
   scene.add(new THREE.HemisphereLight(0xc4d5e1,0x394b53,.68));
-  const sun=new THREE.DirectionalLight(0xfff2d4,3.15),shadows=createExteriorShadow(sun,ship);
+  const sun=new THREE.DirectionalLight(0xffffff,3.15),shadows=createExteriorShadow(sun,ship);
   shadows.update({id:'whole'});scene.add(sun);
   const bounce=new THREE.DirectionalLight(0x8ca7bd,.65);bounce.position.set(-38,-15,-30);scene.add(bounce,sun.target,bounce.target);
   const stars=createDistantStars({radius:50000});scene.add(stars.haze,stars.field);

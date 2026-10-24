@@ -25,19 +25,23 @@ try{
   const ship=createExteriorShip();ship.setCoreScale(2.6);ship.setAngle(55*Math.PI/180);
   const shadows=createExteriorShadow(key,ship);scene.add(key.target,fill.target);
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  function lighting(space){
+  function lighting(mode){
+    const space=mode==='space'||mode==='space-warm';
     ambient.color.set(space?0xc4d5e1:0xe3edf5);ambient.groundColor.set(space?0x394b53:0x6e7480);ambient.intensity=space?.68:1.25;
-    key.color.set(space?0xfff2d4:0xfff6e8);key.intensity=space?3.15:2.8;
+    key.color.set(space?(mode==='space-warm'?0xfff2d4:0xffffff):0xfff6e8);key.intensity=space?3.15:2.8;
     fill.color.set(space?0x8ca7bd:0xbacfe2);fill.intensity=space?.65:1;
     renderer.shadowMap.enabled=space;
     if(space){shadows.update({id:'study'});fill.position.set(-38,-15,-30);}
     else{key.position.set(35,50,40);key.target.position.set(0,0,0);fill.position.set(-35,15,-30);}
     fill.target.position.set(0,0,0);
   }
-  $('lighting').value=query.get('lighting')==='space'?'space':'studio';
-  if(query.get('lighting')==='space'){$('background').value='#000000';scene.background.set('#000000');}
-  lighting($('lighting').value==='space');
-  $('lighting').onchange=()=>lighting($('lighting').value==='space');
+  $('lighting').value=['space','space-warm'].includes(query.get('lighting'))?query.get('lighting'):'studio';
+  if($('lighting').value!=='studio'){$('background').value='#000000';scene.background.set('#000000');}
+  lighting($('lighting').value);
+  $('lighting').onchange=()=>{
+    lighting($('lighting').value);
+    const params=new URLSearchParams(location.search);params.set('lighting',$('lighting').value);history.replaceState(null,'',`?${params}`);
+  };
   const model=probe?ship.dockedLander:ship.root;
   if(probe){model.removeFromParent();scene.add(model);}else{ship.probeDock.visible=true;ship.dockedLander.visible=false;scene.add(model);}
   const panelStudy=probe?null:createExteriorPanelStudy(ship);
