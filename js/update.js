@@ -3,7 +3,6 @@ import { fadeStopSound, startSoundCancelFade } from './audio.js';
 import { steppedClimb, spawnDissolveStain, createGroundShadow } from './shadows.js';
 import { gameOver } from './gameover.js?v=3';
 import { enterCockpitMode, updateCockpit } from './cockpit.js?v=102';
-import { startCredits } from './preload.js?v=23';
 
 // ローカル開発環境判定（localhost / 127.x / 192.168.x.x / 10.x / 172.16-31.x）
 // または本番環境でコナミコマンド (window.__testMode) で起動したテストモードでも
@@ -1434,69 +1433,12 @@ if (scene.astronautMode && scene.astronaut) {
                                             duration: 1600,
                                             ease: 'Cubic.easeOut',
                                             onComplete: () => {
-                                                // カメラ停止後にエンディングメッセージ表示 → Enterでタイトルへ
-                                                const camW = scene.cameras.main.width;
-                                                const camH = scene.cameras.main.height;
-                                                // 文字間に hair space (U+200A) を挟んで字間を空ける
-                                                // (Phaser 3.55 の Text は letterSpacing 未対応で context 直設定もリセットされるため)
-                                                const spaceText = (str) => str;  // 字間挿入は廃止（Helvetica は標準字間で良いため）
-                                                const toBeContinued = scene.add.text(camW / 2, camH / 2, spaceText('Other crew are still out there...'), {
-                                                    fontSize: '32px',
-                                                    fill: '#FFF',
-                                                    fontFamily: "Courier New, Menlo, monospace"
-                                                }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
-                                                const pressEnter = scene.add.text(camW / 2, camH / 2 + 50, spaceText('Press ENTER to return to title'), {
-                                                    fontSize: '18px',
-                                                    fill: '#AAA',
-                                                    fontFamily: "Courier New, Menlo, monospace"
-                                                }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
-                                                const pressSpace = scene.add.text(camW / 2, camH / 2 + 80, spaceText('Press SPACE for credits'), {
-                                                    fontSize: '18px',
-                                                    fill: '#AAA',
-                                                    fontFamily: "Courier New, Menlo, monospace"
-                                                }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
-                                                scene.tweens.add({
-                                                    targets: [toBeContinued, pressEnter, pressSpace],
-                                                    alpha: 1,
-                                                    duration: 1500,
-                                                    ease: 'Sine.easeIn',
-                                                    onComplete: () => {
-                                                        const cleanup = () => {
-                                                            scene.input.keyboard.off('keydown-ENTER', advance);
-                                                            scene.input.keyboard.off('keydown-SPACE', toCredits);
-                                                            scene.input.off('pointerdown', advance);
-                                                            document.removeEventListener('touchend', docAdvance, true);
-                                                        };
-                                                        const advance = () => {
-                                                            cleanup();
-                                                            scene.playthroughCount++;
-                                                            scene.scene.restart();
-                                                        };
-                                                        const toCredits = () => {
-                                                            cleanup();
-                                                            const loadingScreen = document.getElementById('loading-screen');
-                                                            if (!loadingScreen) {
-                                                                // フォールバック：DOM が無ければそのままタイトルへ
-                                                                scene.playthroughCount++;
-                                                                scene.scene.restart();
-                                                                return;
-                                                            }
-                                                            startCredits(loadingScreen, () => {
-                                                                scene.playthroughCount++;
-                                                                scene.scene.restart();
-                                                            }, scene);
-                                                        };
-                                                        const docAdvance = (e) => {
-                                                            // タッチコントロール上のタップは無視
-                                                            if (e.target && e.target.closest && e.target.closest('.touch-btn')) return;
-                                                            advance();
-                                                        };
-                                                        scene.input.keyboard.once('keydown-ENTER', advance);
-                                                        scene.input.keyboard.once('keydown-SPACE', toCredits);
-                                                        scene.input.once('pointerdown', advance);
-                                                        document.addEventListener('touchend', docAdvance, { capture: true, passive: true });
-                                                    }
+                                                // 離陸とカメラの余韻が終わったら、OBS のオープニングへ。
+                                                scene.cameras.main.once('camerafadeoutcomplete', () => {
+                                                    scene.sound.stopAll();
+                                                    window.location.assign(new URL('./3D/obs.html', window.location.href).href);
                                                 });
+                                                scene.cameras.main.fadeOut(600, 0, 0, 0);
                                             }
                                         });
                                     }
