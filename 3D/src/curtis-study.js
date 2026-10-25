@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials} from './obs/materials.js';
 import {buildShipInBackground} from './obs/ship.js?v=print08';
-import {CurtisRoutine} from './obs/curtis-routine.js?v=coffee03';
+import {CurtisRoutine} from './obs/curtis-routine.js?v=table12';
 import {CurtisView} from './obs/curtis-view.js?v=coffee06';
 import {createCurtis} from './obs/curtis-model.js?v=print10';
 import {createMiloToonSteps} from './obs/milo-toon.js';
@@ -60,7 +60,11 @@ try{
   }
   function choose(){
     const name=$('action').value;
-    if(name==='visit')steps=all;
+    if(name==='ladderCoffee'){
+      const route=new CurtisRoutine({random:()=>.25});
+      route.climbTo(1,{enter:true});route.coffee();
+      steps=structuredClone(route.steps);
+    }else if(name==='visit')steps=all;
     else{
       const match=all.find(s=>name==='leave'?s.leave:s.kind===name);
       steps=[match];
@@ -96,7 +100,7 @@ try{
   $('timeline').oninput=()=>{playing=false;const target=Number($('timeline').value);reset();advance(target);frameView();updateUI();};
   document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>frameView(b.dataset.view));
   for(const id of ['action','play','restart','frame','timeline'])$(id).disabled=false;
-  $('action').value='sit';choose();status.hidden=true;
+  $('action').value='ladderCoffee';choose();status.hidden=true;
   renderer.setAnimationLoop(now=>{
     const dt=Math.min((now-last)/1000,.08);last=now;
     if(!document.hidden&&playing){if(elapsed>=total){if($('loop').checked)reset();else playing=false;}advance(dt*Number($('speed').value));}

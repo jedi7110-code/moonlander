@@ -1,5 +1,5 @@
 import {worldActor,worldCat,close,approaches,nextActor,nextDroid,CREW_CLEARANCE,CAT_CLEARANCE} from './curtis-traffic.js';
-import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,ladderApproachDepth} from './layout.js';
+import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,ladderApproachDepth} from './layout.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
 
@@ -7,6 +7,16 @@ export const CURTIS_TIMING={first:[90,150],between:[180,360],prepareAhead:35};
 export const CURTIS={top:13.4,seatX:6.05,coffeeX:10.085,roomX:-1.88,roomZ:-4.37};
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
+
+// Keep the body and swinging arms in front of the table, with turns outside
+// its inflated footprint. The same route works in both directions.
+export function curtisWalkway(x,floor){
+  const base=crewWalkway(x,floor).z;
+  if(floor!==1)return base;
+  const half=LOUNGE_TABLE.width/2+.45+.20;
+  const blend=1-smooth((Math.abs(x-LOUNGE_TABLE.x)-half)/.65);
+  return base+(LOUNGE_TABLE.z+LOUNGE_TABLE.depth/2+.45-base)*blend;
+}
 
 // Only this small schedule is part of startup. Appearance and its texture are
 // imported later, and a failed load never interrupts the cabin simulation.
@@ -39,10 +49,10 @@ export class CurtisRoutine {
   aisleTo(x,floor){
     const y=FLOORS[floor],last=this.steps.at(-1)?.to??this.position;
     // Follow the same solid bridge as Milo at the open ladder well.
-    this.walk(last.x,y,crewWalkway(last.x,floor).z);
+    this.walk(last.x,y,curtisWalkway(last.x,floor));
     const direction=Math.sign(x-last.x)||1;
-    for(let p=last.x+direction*.25;direction*(x-p)>0;p+=direction*.25)this.walk(p,y,crewWalkway(p,floor).z);
-    this.walk(x,y,crewWalkway(x,floor).z);
+    for(let p=last.x+direction*.25;direction*(x-p)>0;p+=direction*.25)this.walk(p,y,curtisWalkway(p,floor));
+    this.walk(x,y,curtisWalkway(x,floor));
   }
   climbTo(floor,{enter=false,leave=false}={}){
     const from=this.steps.at(-1)?.to??this.position,y=leave?CURTIS.top:FLOORS[floor];
@@ -164,7 +174,7 @@ export class CurtisRoutine {
         const laneFree=z=>nearby.every(o=>Math.abs(o.p.z-z)>o.r+.03);
         const current=this.position.z+(this.passOffset??0);
         if(!laneFree(this.position.z))offset=laneFree(2.18)?2.18-this.position.z:(this.passOffset??0);
-        else if(nearby.length&&laneFree(current))offset=this.passOffset??0;
+        else if(nearby.length&&laneFree(current))offset=Math.min(this.passOffset??0,Math.max(0,2.18-this.position.z));
       }
       const shift=Math.sign(offset-(this.passOffset??0))*Math.min(Math.abs(offset-(this.passOffset??0)),dt*.85);
       const lateral={...p,z:p.z+shift};

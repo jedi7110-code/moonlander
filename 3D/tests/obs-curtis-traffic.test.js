@@ -43,3 +43,17 @@ test('Curtis and an oncoming droid both clear their separate lanes',()=>{
   }
   assert.equal(c.active,false);assert.equal(d.age,7);
 });
+test('both visit orders keep the whole walking route in front of the table',()=>{
+  for(const random of [()=>0,()=>.99]){
+    const c=new CurtisRoutine({random});c.beginVisit();
+    let samples=0;
+    for(const step of c.steps){
+      if(step.kind!=='walk'||Math.abs(step.from.y-3.392)>.01)continue;
+      for(let i=0;i<=100;i++){
+        const u=i/100,x=step.from.x+(step.to.x-step.from.x)*u,z=step.from.z+(step.to.z-step.from.z)*u;
+        if(Math.abs(x-8.25)<1.51/2+.45){assert.ok(z>=1.03+.80/2+.44,`table clearance at ${x}, ${z}`);samples++;}
+      }
+    }
+    assert.ok(samples>0);
+  }
+});
