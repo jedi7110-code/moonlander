@@ -19,6 +19,7 @@ import {AirlockPassage} from './airlock.js';
 import {Sprout} from 'lucide';
 import {healthDisplay} from './health-display.js';
 import {DroidRoutine} from './droid-routine.js';
+import {CurtisRoutine} from './curtis-routine.js';
 import {Eye} from 'lucide';
 import {updateCharacterCameraUI,updateFirstPersonOverlay} from './character-camera-ui.js';
 import {updateFullscreenUI} from './fullscreen-ui.js';
@@ -365,6 +366,8 @@ async function start(){
     view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,onProgress:value=>exterior.hostProgress(.15+value*.6)});
     view.audio=audio;
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
+    const curtis=new CurtisRoutine({prepare:()=>view.prepareCurtis()});
+    view.curtisRoutine=curtis;droid.visitor=curtis;cat.motion.visitor=curtis;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
     view.onModeChange=mode=>{idleCamera.modeChanged();immersive?.focus(mode);updateHUD(true);};
@@ -430,7 +433,10 @@ async function start(){
         accumulator+=dt;
         if(openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);
+          if(!view.startupLighting?.waiting)curtis.update(step,{actor,droid,cat,brain});
+          actor.waitingForVisitor=curtis.blocksCrew(actor,step);
+          actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
       if(visible){view.startupLighting?.update(paused||games.open||firstVisibleFrame?0:frameDt);feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);firstVisibleFrame=false;if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}

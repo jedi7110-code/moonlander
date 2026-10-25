@@ -1,0 +1,1 @@
+const e={dayMs:9e5,needDecay:.35,catDecay:.6,autonomousNeedThreshold:65},s=Object.freeze({speed:.58,period:1.4,stance:.64}),o=s.speed*s.period,D=1.2,c={height:.42,slowFrom:.65,seconds:3},t={height:.4,seconds:3},a={seconds:3,miloHeight:.42,droidHeight:.4};export{e as C,s as D,a as L,o as a,t as b,D as c,c as d};

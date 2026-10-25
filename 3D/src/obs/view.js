@@ -145,6 +145,14 @@ export class ObservationView {
     this.listeners=[];this.bindControls();
     limitShadowCasters(this.scene);
   }
+  async prepareCurtis(){
+    if(this.curtis||this.disposed)return;
+    const {CurtisView}=await import('./curtis-view.js');
+    if(this.disposed)return;
+    const visitor=await CurtisView.create(this);
+    if(this.disposed){visitor.dispose();return;}
+    this.curtis=visitor;this.scene.add(visitor.root);
+  }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
   // Shader submission is synchronous even with compileAsync. Pace submission
   // as well as assembly; keep clipping and shadow program variants intact.
@@ -399,7 +407,7 @@ export class ObservationView {
       const passage=brain.loungeEntry?loungeExitPose(loungeEntryAge(brain.loungeEntry.age)):brain.loungeExit?loungeExitPose(brain.loungeExit.age):{x:0,depth:LOUNGE_SEAT.depth};
       this.milo.position.x=positionX(getStation('lounge').x)+passage.x;this.milo.position.z=passage.depth;
     }
-    if(!brain.grooming)animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair});
+    if(!brain.grooming)animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForVisitor||actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair});
     if(this.cabinClimb)applyCabinLadder(this.milo,this.cabinClimb);
     this.harvestDelivery.update(this.milo,brain);
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
@@ -456,6 +464,7 @@ export class ObservationView {
     animateDelivery(this.ship,care,this.reducedMotion);
     this.ship.foodGroup.visible=(this.droidRoutine?care.catBowl>0:care.has('catfood'))||catRoutine.mode==='eat';
     if(this.droidRoutine)this.droidService.update(this.droidRoutine);
+    if(this.curtis&&this.curtisRoutine)this.curtis.render(this.curtisRoutine,paused?0:dt,{actor});
     for(const [id,{group,material}]of Object.entries(this.ship.indicators)){
       const shipment=id==='hatch'&&care.delivery&&!['queued','transmitting'].includes(care.phase);
       const signal=shipment?{color:care.phase==='unloading'?0x85e3af:0xf3bd62,intensity:this.reducedMotion?1:.75+.25*Math.sin(time*3)}:this.feedback?.signal(id,this.reducedMotion)||(id==='gym'&&action==='gym'?{color:0x85e3af,intensity:1}:null);group.visible=Boolean(signal);
@@ -479,5 +488,5 @@ export class ObservationView {
     try{this.renderer.render(this.scene,this.camera);}
     finally{quality?.endFrame();}
   }
-  dispose(){this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.emergencyLighting?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.disposed=true;this.curtisRoutine?.dispose();this.curtis?.dispose();this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.emergencyLighting?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

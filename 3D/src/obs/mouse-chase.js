@@ -66,6 +66,11 @@ export class CabinMouseChase {
       if(this.wait<=0)this.appear(cat);
       return this.controlled;
     }
+    // Chasing bypasses CatMotion.update, so reserve its running clearance too.
+    if(this.controlled&&cat.motion.visitor?.active){
+      const p=cat.motion.visitor.trafficPosition,m=cat.motion,x=toWorld(m.x);
+      if(Math.abs(p.y-(870-m.y)*.016)<1.4&&Math.abs(p.z-m.z)<.65&&(p.x-x)*this.direction>0&&Math.abs(p.x-x)<.7+Math.max(2,this.sim.cat.speed??0)*dt)return true;
+    }
     const wasControlled=this.controlled,previous=this.sim.cat.distance;
     this.sim.update(dt);
     if(this.overtaking&&this.mouse.x>=toWorld(cat.motion.x)+.65){

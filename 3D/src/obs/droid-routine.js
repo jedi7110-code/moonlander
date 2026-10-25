@@ -260,10 +260,12 @@ export class DroidRoutine {
     this.waiting=false;this.waitingForCat=false;
     if(this.docked){if(this.time>=this.restUntil){const job=this.choose();if(job)this.request(job);}return;}
     const s=this.step;if(!s)return;
+    if(this.visitor?.blocksDroid?.(this,dt)){this.waiting=true;return;}
     this.waitingForCat=Boolean(this.cat?.motion?.blocksDroid(this,dt));
     if(this.waitingForCat){this.waiting=true;return;}
     if(s.guard&&this.occupied(this.job)){this.waiting=true;return;}
     if(s.ladderEntry&&!this.ladderClaim){
+      if(this.visitor?.ladderClaim&&ladderPathsConflict(s.ladderPath,this.visitor.ladderPath)){this.waiting=true;return;}
       const crewNear=this.actor?.climbing||Math.abs((this.actor?.x??0)-LADDER_X)*.022<DROID_LADDER_TRAFFIC.crewClearX;
       if(crewNear&&ladderPathsConflict(s.ladderPath,crewLadderPath(this.actor))){this.waiting=true;return;}
       // Reserve only this remaining route. Separate decks can be used together,

@@ -354,8 +354,12 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
       if(Math.abs(xx)<1.265)continue;
       box(staticRoot,m.dark,xx,y+2.96,-.25,1.43,.17,3.14,.025);
     }
-    for(const zz of [-1.25,-.94])pipe(staticRoot,zz===-1.25?m.red:m.metal,[[-12.8,y+2.6,zz],[-6,y+2.6,zz],[0,y+2.6,zz],[6,y+2.6,zz],[12.8,y+2.6,zz]],zz===-1.25?.055:.075);
-    for(let xx=-12;xx<=12;xx+=2.4){box(staticRoot,m.dark,xx,y+2.60,-1.08,.052,.29,.55);}
+    // Route behind the shaft panel; leave the rails, rungs and climb path clear.
+    for(const zz of [-1.25,-.94]){
+      const rear=zz===-1.25?-1.92:-1.72;
+      pipe(staticRoot,zz===-1.25?m.red:m.metal,[[-12.8,y+2.6,zz],[-.95,y+2.6,zz],[-.78,y+2.6,rear],[.78,y+2.6,rear],[.95,y+2.6,zz],[12.8,y+2.6,zz]],zz===-1.25?.055:.075);
+    }
+    for(let xx=-12;xx<=12;xx+=2.4){if(Math.abs(xx)<.8)continue;box(staticRoot,m.dark,xx,y+2.60,-1.08,.052,.29,.55);}
     for(const xx of [-12.83,-3.1,7.1,12.83]){
       // Both pressure-hatch assemblies occupy these former trim/rib positions.
       if(level===DECK.OPERATIONS&&(xx===7.1||xx===12.83))continue;
@@ -490,13 +494,15 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
   const gateFinish=finishGateFrames(staticRoot,REAR_ROOM_GATES);
   staticRoot.updateMatrixWorld(true);
   const washerDoor=staticRoot.getObjectByName('Washer service door'),washerClothes=staticRoot.getObjectByName('Washer rotating clothes');
+  const coffeeMug=staticRoot.getObjectByName('Coffee / TARAIRON mug');
+  if(coffeeMug)animated.attach(coffeeMug);
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
   animated.add(createRearWindowStars(staticRoot,{rotating:true}));
   yield;
   const staticMesh=mergeStatic?(yield* batchStaticSteps(staticRoot,{xrLOD:true})):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
-  return {staticMesh,animated,targets,indicators,cargo,catFoodPackage,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
+  return {staticMesh,animated,targets,indicators,cargo,catFoodPackage,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,coffeeMug,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
 }
 
 // Synchronous studies/tests and the paced startup share the exact same builder.

@@ -89,9 +89,9 @@ export function equipmentCase(root,m,paint,x,y,z,w=.66,h=.48,wallZ=null){
 export function createLoungeCoffeeStation(m,casePaint,titanium){
   const root=new THREE.Group();root.name='Lounge coffee station';
   const machine=createCoffeeMachine(m,titanium);machine.position.set(0,.82,-1.12);root.add(machine);
-  // Retain the original case and its label. Stow it below the wall-mounted
-  // machine, outside both the mug bay and the crew's walking lane.
-  const hardCase=equipmentCase(root,m,casePaint,.06,.04,-.72,.83,.43);
+  // Stow the case in front of the poster cupboard to the right (world x=11.55).
+  // Leave the floor below the coffee machine clear for the visitor's reach.
+  const hardCase=equipmentCase(root,m,casePaint,1.35,.04,-.46,.83,.43);
   hardCase.rotation.y=.12;hardCase.name='Lounge protective equipment case';
   const spray=createMaintenanceSprayCan(m,machine.getObjectByName('Coffee / machined side cheek').material);
   // Rest on the flat top of the case body, outside the handle and its mounts.

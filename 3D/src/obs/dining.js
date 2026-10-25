@@ -98,7 +98,7 @@ function dockProp(root,prop,dock,hold,defaultPosition){
   prop.quaternion.slerpQuaternions(rotation,prop.quaternion.clone(),hold);
 }
 
-function reachCup(root,mug,reach,grasp){
+export function reachCup(root,mug,reach,grasp){
   const rig=root.userData.arms[1],{arm,elbow,hand,fingers,thumb}=rig;
   setCupHandFit(root,reach);
   relaxMiloHand(rig);

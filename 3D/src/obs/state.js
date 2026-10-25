@@ -14,7 +14,7 @@ const CAT_WAKE_PREP_SECONDS=.3,CAT_WAKE_LAND_SECONDS=.45;
 export function advanceCabinTraffic(actor,cat,dt,droid=null){
   if(dt<=0)return;
   actor.waitingForCat=cat.motion.blocksCrew(actor,dt);
-  if(!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid)actor.update(dt);
+  if(!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid&&!actor.waitingForVisitor)actor.update(dt);
   cat.update(dt,actor,droid);
 }
 
@@ -156,6 +156,7 @@ export class CatMotion extends CrewMotion {
   blocksDroid(droid,dt){return Boolean(this.crossing?.active&&this.droidInCrossing(droid,dt));}
   update(dt,actor=null,droid=null){
     if(dt<=0)return;
+    if(this.visitor?.blocksCat(this,dt))return;
     if(this.turn){
       this.turn.age=Math.min(this.turn.duration,this.turn.age+dt);this.heading=sampleCatTurn(this.turn).yaw;
       if(this.turn.age===this.turn.duration){
