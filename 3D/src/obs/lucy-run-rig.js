@@ -13,34 +13,37 @@ function* createRunCoatSteps(coat){
   // The original belly bridge has bilateral limb weights. When both forelegs
   // reach, it drags a sheet of abdomen down with the upper arms. Keep this soft
   // underside on the trunk; retain the actual one-sided legs and their shape.
-  for(let i=0;i<a.position.count;i++){
-    if(i%512===0)yield;
-    const x=a.position.getX(i),y=a.position.getY(i),z=a.position.getZ(i);
-    let left=0,right=0,trunk=0;
-    for(let k=0;k<4;k++){
-      const name=coat.skeleton.bones[a.skinIndex.getComponent(i,k)].name,w=a.skinWeight.getComponent(i,k);
-      if(name.endsWith('_L'))left+=w;else if(name.endsWith('_R'))right+=w;
-      else if(['pelvis','Bone001','Bone002'].includes(name))trunk+=w;
+  let complete=false;
+  try{
+    for(let i=0;i<a.position.count;i++){
+      if(i%512===0)yield;
+      const x=a.position.getX(i),y=a.position.getY(i),z=a.position.getZ(i);
+      let left=0,right=0,trunk=0;
+      for(let k=0;k<4;k++){
+        const name=coat.skeleton.bones[a.skinIndex.getComponent(i,k)].name,w=a.skinWeight.getComponent(i,k);
+        if(name.endsWith('_L'))left+=w;else if(name.endsWith('_R'))right+=w;
+        else if(['pelvis','Bone001','Bone002'].includes(name))trunk+=w;
+      }
+      const bellyHeight=.098-.023*smooth(-.055,.080,z);
+      const amount=(1-smooth(.030,.063,Math.abs(x)))*(1-smooth(.115,.155,y))
+        *smooth(-.075,-.032,z)*(1-smooth(.105,.135,z))
+        *smooth(bellyHeight-.010,bellyHeight+.002,y)*smooth(.12,.32,trunk+Math.min(left,right));
+      if(amount<=0)continue;
+      const weights=new Map();
+      for(let k=0;k<4;k++){const bone=a.skinIndex.getComponent(i,k);weights.set(bone,(weights.get(bone)??0)+a.skinWeight.getComponent(i,k)*(1-amount));}
+      const front=smooth(.005,.085,z);
+      weights.set(pelvis,(weights.get(pelvis)??0)+amount*(1-front));weights.set(spine,(weights.get(spine)??0)+amount*front);
+      const selected=[...weights].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=selected.reduce((n,[,w])=>n+w,0);
+      for(let k=0;k<4;k++){a.skinIndex.setComponent(i,k,selected[k]?.[0]??0);a.skinWeight.setComponent(i,k,(selected[k]?.[1]??0)/sum);}
     }
-    const bellyHeight=.098-.023*smooth(-.055,.080,z);
-    const amount=(1-smooth(.030,.063,Math.abs(x)))*(1-smooth(.115,.155,y))
-      *smooth(-.075,-.032,z)*(1-smooth(.105,.135,z))
-      *smooth(bellyHeight-.010,bellyHeight+.002,y)*smooth(.12,.32,trunk+Math.min(left,right));
-    if(amount<=0)continue;
-    const weights=new Map();
-    for(let k=0;k<4;k++){const bone=a.skinIndex.getComponent(i,k);weights.set(bone,(weights.get(bone)??0)+a.skinWeight.getComponent(i,k)*(1-amount));}
-    const front=smooth(.005,.085,z);
-    weights.set(pelvis,(weights.get(pelvis)??0)+amount*(1-front));weights.set(spine,(weights.get(spine)??0)+amount*front);
-    const selected=[...weights].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=selected.reduce((n,[,w])=>n+w,0);
-    for(let k=0;k<4;k++){a.skinIndex.setComponent(i,k,selected[k]?.[0]??0);a.skinWeight.setComponent(i,k,(selected[k]?.[1]??0)/sum);}
-  }
-  return geometry;
+    complete=true;return geometry;
+  }finally{if(!complete)geometry.dispose();}
 }
 export function createLucyRunRig(root){return finishPreparationSteps(createLucyRunRigSteps(root));}
 export function* createLucyRunRigSteps(root){
   root.updateMatrixWorld(true);
   const scale=root.scale.x,rest=[],get=name=>root.getObjectByName(name);
-  const coat=root.userData.cabin.coat,baseGeometry=coat.geometry,runGeometry=yield* createRunCoatSteps(coat);
+  const coat=root.userData.cabin.coat,baseGeometry=coat.geometry;
   root.traverse(b=>{if(b.isBone)rest.push({b,p:b.position.clone(),q:b.quaternion.clone()});});
   const feet=root.userData.cabin.turnRig.feet;
   const basePoint=name=>root.worldToLocal(get(name).getWorldPosition(v())).multiplyScalar(scale);
@@ -53,6 +56,7 @@ export function* createLucyRunRigSteps(root){
     lengths['front'+side]=[basePoint('paw1_'+side).distanceTo(basePoint('paw2_'+side)),basePoint('paw2_'+side).distanceTo(basePoint('Lucy contact paw3_'+side))];
     lengths['rear'+side]=[basePoint('leg1_'+side).distanceTo(basePoint('leg2_'+side)),basePoint('leg2_'+side).distanceTo(basePoint('leg3_'+side)),basePoint('leg3_'+side).distanceTo(basePoint('Lucy contact feet_'+side))];
   }
+  const runGeometry=yield* createRunCoatSteps(coat);
   function world(p){return root.localToWorld(p.clone().divideScalar(scale));}
   function place(bone,point){bone.position.copy(bone.parent.worldToLocal(point.clone()));root.updateMatrixWorld(true);}
   function rotate(name,angle){

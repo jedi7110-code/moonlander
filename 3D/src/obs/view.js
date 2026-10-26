@@ -46,39 +46,40 @@ import {createMachinedMetals} from './machined-metals.js';
 import {CharacterCamera} from './character-camera.js';
 import {createMetalDeckStyle} from './metal-deck.js';
 import {nextPreparationFrame,runPreparationSteps} from './background-preparation.js';
+import {visibleInScene} from './deferred-preparation.js';
 
 export class ObservationView {
-  static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false,onProgress=()=>{}}={}){
+  static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false,deferOptional=false,nextFrame=nextPreparationFrame,onProgress=()=>{}}={}){
     let loaded=0;
     const assets=[materials(),loadMiloHead(),loadLucy({deferGroomCache}),loadEVAGarment(),loadMiloBody()];
     const [m,head,lucy]=await Promise.all(assets.map(asset=>asset.then(value=>{onProgress(.4*++loaded/assets.length);return value;})));
     head.userData.setAppearance({hair:'crop',beard:'none'});
     const deckStyle=floorBuilder?null:createMetalDeckStyle();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
-    const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor});
+    const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor,nextFrame});
     onProgress(.6);
-    const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip,deferSetup:true});
+    const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip,deferSetup:true,deferOptional});
     const preparation=[];
-    await runPreparationSteps(view.preparationSteps,{onStep:(label,ms)=>{preparation.push({name:typeof label==='string'?label:'batch',ms:Math.round(ms)});document.documentElement.dataset.cabinAssemblyMs=JSON.stringify(preparation);}});
+    await runPreparationSteps(view.preparationSteps,{nextFrame,onStep:(label,ms)=>{preparation.push({name:typeof label==='string'?label:'batch',ms:Math.round(ms)});document.documentElement.dataset.cabinAssemblyMs=JSON.stringify(preparation);}});
     delete view.preparationSteps;
     onProgress(.8);
     view.deckStyle=deckStyle;
     try{
-      await nextPreparationFrame();
+      await nextFrame();
       finishCabinFixtures(view);
-      await nextPreparationFrame();
+      await nextFrame();
       const roots=[view.ship.staticMesh,view.ship.animated,view.droidBay.root,view.droidService.root,view.harvestDelivery.root];
       view.cabinSignage=await createCabinSignage(roots);
-      await nextPreparationFrame();
+      await nextFrame();
       view.cabinToon=createCabinToon(roots);
       view.cabinToon.setStyle(cabinStyle);
-      await nextPreparationFrame();
+      await nextFrame();
       // Practical lighting also exists in studies that don't replay startup.
       view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,start:false});
       const workCenter=new THREE.Vector3(HATCH_SERVICE_POINT.x-.12,positionY(FLOORS[getStation('innerHatch').floor].y)+HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z);
-      await nextPreparationFrame();
+      await nextFrame();
       view.emergencyLighting=new CabinEmergencyLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,workCenter});
-      await nextPreparationFrame();
+      await nextFrame();
       if(characterViews)view.characterCamera=new CharacterCamera(view);
       onProgress(1);
       return view;
@@ -89,7 +90,7 @@ export class ObservationView {
     if(deferSetup)this.preparationSteps=steps;
     else while(!steps.next().done){};
   }
-  *setupSteps(canvas,m,head,lucy,{floorBuilder,builtShip}={}){
+  *setupSteps(canvas,m,head,lucy,{floorBuilder,builtShip,deferOptional=false}={}){
     this.canvas=canvas;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x090d0f);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,stencil:true,powerPreference:'high-performance'});
     this.renderer.localClippingEnabled=true;
@@ -117,13 +118,16 @@ export class ObservationView {
     yield;
     this.cat=yield* createLucySteps(lucy);this.scene.add(this.cat);
     yield;
-    this.catRun=yield* createLucyRunRigSteps(this.cat);this.mouse=createCabinMouse({clipAtStudyWalls:false});this.mouse.root.visible=false;this.scene.add(this.mouse.root);
+    if(deferOptional){
+      this.catRunPreparation=createLucyRunRigSteps(this.cat);this.catRunPreparation.next();
+    }else this.catRun=yield* createLucyRunRigSteps(this.cat);
+    this.mouse=createCabinMouse({clipAtStudyWalls:false});this.mouse.root.visible=false;this.scene.add(this.mouse.root);
     yield;
     this.harvestDelivery=createHarvestDelivery(m,this.scene);
     yield;
     this.groomingTools=createGroomingTools(this.milo.userData.body,m,createMachinedMetals());
     yield;
-    this.groomingMotion=prepareGroomingMotion(this.milo,this.ship.groomingStation,this.groomingTools,{origin:this.ship.groomingStation.origin});
+    if(!deferOptional)this.prepareGroomingMotion();
     yield;
     this.characterToon=[yield* createMiloToonSteps(this.milo)];
     yield;
@@ -133,10 +137,10 @@ export class ObservationView {
       tool.visible=false;
       tool.traverse(part=>{if(part.material?.anisotropy>0)part.material.defines.USE_UV='';});
     }
-    this.groomingMirror=createDirectMirror({room:this.ship.groomingStation.mirrorRoom});
     this.restingMirror=new THREE.Mesh(new THREE.PlaneGeometry(.72,.89),new THREE.MeshStandardMaterial({color:0xa8b5b5,metalness:1,roughness:.08}));
     this.restingMirror.material.userData.cabinKeepSurface=true;
-    this.ship.groomingStation.mirror.add(this.groomingMirror,this.restingMirror);
+    this.ship.groomingStation.mirror.add(this.restingMirror);
+    if(!deferOptional)this.prepareMirror();
     this.camera=new THREE.PerspectiveCamera(24,1,.1,150);
     this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -153,49 +157,73 @@ export class ObservationView {
     if(this.disposed){visitor.dispose();return;}
     this.curtis=visitor;this.scene.add(visitor.root);
   }
+  prepareGroomingMotion(){
+    this.groomingMotion??=prepareGroomingMotion(this.milo,this.ship.groomingStation,this.groomingTools,{origin:this.ship.groomingStation.origin});
+  }
+  prepareMirror(){
+    if(this.groomingMirror||this.disposed)return;
+    this.groomingMirror=createDirectMirror({room:this.ship.groomingStation.mirrorRoom});
+    this.ship.groomingStation.mirror.add(this.groomingMirror);
+  }
+  async prepareDeferredDetails(nextFrame=nextPreparationFrame){
+    if(this.catRunPreparation){
+      const rig=await runPreparationSteps(this.catRunPreparation,{nextFrame});
+      if(this.disposed){rig.dispose();return;}
+      this.catRun=rig;this.catRunPreparation=null;
+    }
+    await nextFrame();if(this.disposed)return;
+    this.prepareGroomingMotion();
+  }
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
   // Shader submission is synchronous even with compileAsync. Pace submission
   // as well as assembly; keep clipping and shadow program variants intact.
-  async compilePrograms(){
+  async compilePrograms({visibleOnly=false,nextFrame=nextPreparationFrame}={}){
     const {renderer,scene,camera}=this;
     const planeCount=material=>Math.max(...(Array.isArray(material)?material:[material]).map(m=>m?.clipIntersection?0:(m?.clippingPlanes?.length||0)));
     const group=(map,key,value)=>{if(!map.has(key))map.set(key,[]);map.get(key).push(value);};
-    const clipped=new Map(),depth=new Map();
-    scene.traverse(object=>{if(object.material){const count=planeCount(object.material);if(count)group(clipped,count,object);}});
+    const clipped=new Map(),depth=new Map(),selected=new Set();
+    this.preparedMeshes??=new WeakSet();
+    scene.traverse(object=>{if(object.material&&!this.preparedMeshes.has(object)&&(!visibleOnly||visibleInScene(object)))selected.add(object);});
+    const included=object=>selected.has(object);
+    scene.traverse(object=>{if(object.material&&included(object)){const count=planeCount(object.material);if(count)group(clipped,count,object);}});
     // The characters toggle eyelids, eyes and tools per frame, so all of their
     // parts count as shadow casters; elsewhere only visible casters do.
     const characters=new Set([this.milo,this.cat].filter(Boolean));
     const underCharacter=object=>{for(let o=object;o;o=o.parent)if(characters.has(o))return true;return false;};
-    const casting=object=>{if(underCharacter(object))return true;for(let o=object;o;o=o.parent)if(!o.visible)return false;return true;};
+    const casting=object=>included(object)&&(underCharacter(object)||visibleInScene(object));
     for(const probe of this.shadowDepthProbes(casting))group(depth,probe.userData.clippingCount,probe);
     const target=new THREE.WebGLRenderTarget(1,1),pending=[];
-    let batchStart=performance.now();
-    const submit=async object=>{
-      pending.push(renderer.compileAsync(object,camera,scene));
-      if(performance.now()-batchStart>=4){await nextPreparationFrame();batchStart=performance.now();}
+    this.depthProbeMaterials??=[];
+    this.depthProbeMaterials.push(...[...depth.values()].flat().filter(probe=>probe.userData.ownsMaterial).map(probe=>probe.material));
+    let batchStart=performance.now(),primed=null;
+    const submit=async(object,count,shadow=false)=>{
+      const previous=renderer.getRenderTarget();
+      try{
+        if(primed!==count){this.primeClipping(count,target);primed=count;}
+        renderer.setRenderTarget(shadow?target:null);
+        pending.push(renderer.compileAsync(object,camera,scene));
+      }finally{renderer.setRenderTarget(previous);}
+      if(performance.now()-batchStart>=4){await nextFrame();batchStart=performance.now();primed=null;}
     };
-    for(const count of new Set([0,...clipped.keys(),...depth.keys()])){
-      this.primeClipping(count,target);
-      // The shadow pass renders into a target, which is part of the program key.
-      for(const probe of depth.get(count)??[])await submit(probe);
-      renderer.setRenderTarget(null);
-      if(count){for(const object of clipped.get(count)??[])await submit(object);continue;}
-      // Compile leaves, using the real scene for lights and environment. Passing
-      // the whole scene submits hundreds of programs in one uninterrupted task.
-      const objects=[];
-      scene.traverse(object=>{if(object.material&&!planeCount(object.material))objects.push(object);});
-      for(const object of objects)await submit(object);
-
-    }
-    target.dispose();
+    try{
+      for(const count of new Set([0,...clipped.keys(),...depth.keys()])){
+        // The shadow pass renders into a target, which is part of the program key.
+        for(const probe of depth.get(count)??[])await submit(probe,count,true);
+        if(count){for(const object of clipped.get(count)??[])await submit(object,count);continue;}
+        // Compile leaves, using the real scene for lights and environment. Passing
+        // the whole scene submits hundreds of programs in one uninterrupted task.
+        for(const object of selected)if(!planeCount(object.material))await submit(object,count);
+      }
+    }finally{target.dispose();}
     // Keep the probes' depth materials until dispose(): they hold the programs
     // for casters that only appear later (eyelids, grooming tools).
-    this.depthProbeMaterials=[...depth.values()].flat().filter(probe=>probe.userData.ownsMaterial).map(probe=>probe.material);
     await Promise.all(pending);
     // Upload textures individually; leaving them for the first cabin draw makes
     // that single frame block the movie even after shader compilation finishes.
     const textures=new Set();
+    this.preparedTextures??=new WeakSet();
     scene.traverse(object=>{
+      if(!included(object))return;
       for(const material of (Array.isArray(object.material)?object.material:[object.material]).filter(Boolean)){
         for(const value of Object.values(material))if(value?.isTexture&&!value.isRenderTargetTexture)textures.add(value);
         for(const uniform of Object.values(material.uniforms??{}))if(uniform.value?.isTexture&&!uniform.value.isRenderTargetTexture)textures.add(uniform.value);
@@ -203,6 +231,7 @@ export class ObservationView {
     });
     const uploads=[],decoded=new WeakMap();
     for(const texture of textures){
+      if(this.preparedTextures.has(texture))continue;
       const image=texture.image;
       if(typeof createImageBitmap==='function'&&['IMG','CANVAS'].includes(image?.tagName)){
         let variants=decoded.get(texture.source);if(!variants)decoded.set(texture.source,variants=new Map());
@@ -216,13 +245,15 @@ export class ObservationView {
         texture.source=variants.get(key);texture.needsUpdate=true;
       }
       const start=performance.now();renderer.initTexture(texture);
-      uploads.push(Math.round(performance.now()-start));await nextPreparationFrame();
+      this.preparedTextures.add(texture);
+      uploads.push(Math.round(performance.now()-start));await nextFrame();
     }
-    document.documentElement.dataset.cabinTextureUploadMs=JSON.stringify(uploads);
+    if(globalThis.document?.documentElement)document.documentElement.dataset[visibleOnly?'cabinTextureUploadMs':'cabinDeferredTextureUploadMs']=JSON.stringify(uploads);
+    for(const object of selected)this.preparedMeshes.add(object);
   }
-  async warmDraws(){
+  async warmDraws({visibleOnly=false}={}){
     const {scene,camera,renderer}=this,objects=[];
-    scene.traverse(object=>{if(object.material)objects.push({object,mask:object.layers.mask,culled:object.frustumCulled});});
+    scene.traverse(object=>{if(object.material&&(!visibleOnly||visibleInScene(object)))objects.push({object,mask:object.layers.mask,culled:object.frustumCulled});});
     const autoUpdate=renderer.shadowMap.autoUpdate;
     renderer.shadowMap.autoUpdate=false;
     for(const {object}of objects){object.layers.mask=0;object.frustumCulled=false;}
@@ -439,7 +470,7 @@ export class ObservationView {
     }
     animateLucy(this.cat,{time,dt:paused?0:dt,moving:catMoving,facing:catMotion.facing,yaw:catRoutine.poseYaw,headingControlled:catMotion.turns,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance+catMotion.depthWalkDistance,passage,hop:wakeHop??hop,turn,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
     const pursuit=catRoutine.mouseChase,run=pursuit?.pose,mouse=pursuit?.mouse;
-    if(!paused&&run&&run.speed>.45)this.catRun.update({distance:run.distance,speed:run.speed});
+    if(!paused&&run&&run.speed>.45)this.catRun?.update({distance:run.distance,speed:run.speed});
     this.mouse.root.visible=Boolean(mouse?.visible);
     if(mouse?.visible){
       this.mouse.root.position.set(mouse.x,positionY(FLOORS[mouse.floor].y),mouse.z);this.mouse.root.rotation.y=mouse.yaw;
@@ -451,6 +482,7 @@ export class ObservationView {
     updateTableLeisureProps(this.ship.loungeProps,this.milo.userData.leisure);
     const grooming=brain.grooming;
     if(grooming){
+      this.prepareGroomingMotion();
       if(grooming.startYaw===null){grooming.startYaw=this.milo.rotation.y;this.groomingMotion.beginVisit();}
       const pose=grooming.pose;
       this.groomingMotion.update(grooming.time,{...pose,health:brain.health});this.hairGrowth.setGrowth(pose.hair,pose.beard);
@@ -458,8 +490,10 @@ export class ObservationView {
     for(const tool of Object.values(this.groomingTools))tool.visible=Boolean(grooming);
     // The mirror is useful only through Milo's eyes; other cameras and XR
     // keep the inexpensive metal surface. Offscreen reflections are culled.
-    this.groomingMirror.visible=isMiloMirrorView(this.characterCamera,this.renderer.xr.isPresenting);
-    this.restingMirror.visible=!this.groomingMirror.visible;
+    const mirrorVisible=isMiloMirrorView(this.characterCamera,this.renderer.xr.isPresenting);
+    if(mirrorVisible)this.prepareMirror();
+    if(this.groomingMirror)this.groomingMirror.visible=mirrorVisible;
+    this.restingMirror.visible=!mirrorVisible;
     if(!paused)this.ship.fan.rotation.z+=dt*3.0;
     animateDelivery(this.ship,care,this.reducedMotion);
     this.ship.foodGroup.visible=(this.droidRoutine?care.catBowl>0:care.has('catfood'))||catRoutine.mode==='eat';
@@ -488,5 +522,5 @@ export class ObservationView {
     try{this.renderer.render(this.scene,this.camera);}
     finally{quality?.endFrame();}
   }
-  dispose(){this.disposed=true;this.curtisRoutine?.dispose();this.curtis?.dispose();this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.emergencyLighting?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  dispose(){this.disposed=true;this.catRunPreparation?.return();this.catRunPreparation=null;this.curtisRoutine?.dispose();this.curtis?.dispose();this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.emergencyLighting?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

@@ -4,6 +4,34 @@ import {CurtisRoutine,CURTIS,CURTIS_TIMING} from '../src/obs/curtis-routine.js';
 import {CrewMotion,Supplies,advanceCabinTraffic} from '../src/obs/state.js';
 import {DroidRoutine} from '../src/obs/droid-routine.js';
 import fs from 'node:fs';
+import {Group,MeshStandardMaterial} from 'three';
+import {createMiloBoot} from '../src/obs/characters.js';
+import {finishCurtisBoots} from '../src/obs/curtis-model.js';
+
+test('Curtis has black grain leather and dark laces without recoloring Milo or sharing extra lace materials',()=>{
+  const material={cloth:new MeshStandardMaterial(),rubber:new MeshStandardMaterial(),metal:new MeshStandardMaterial()};
+  const visitor=new Group(),milo=new Group();
+  createMiloBoot(visitor,material,-1);createMiloBoot(visitor,material,1);createMiloBoot(milo,material,1);
+  const original=milo.getObjectByName('Continuous leather boot upper').material.color.getHexString();
+  finishCurtisBoots(visitor);
+  const laces=new Set();let uppers=0;
+  visitor.traverse(object=>{
+    if(object.name==='Continuous leather boot upper'){
+      uppers++;assert.equal(object.material.color.getHexString(),'151719');
+      assert.equal(object.material.roughness,.62);assert.equal(object.material.metalness,0);
+      assert.ok(object.material.bumpMap);assert.ok(object.material.bumpScale>0);
+    }
+    if(object.name==='Foot-shaped stitched boot welt')assert.equal(object.material.color.getHexString(),'151719');
+    if(object.name==='Crossed boot lace'){
+      assert.equal(object.material.color.getHexString(),'202123');laces.add(object.material);
+    }
+  });
+  assert.equal(uppers,2);assert.equal(laces.size,2);
+  assert.equal(milo.getObjectByName('Continuous leather boot upper').material.color.getHexString(),original);
+  const geometries=new Set(),materials=new Set(Object.values(material));
+  for(const root of [visitor,milo])root.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
+  geometries.forEach(geometry=>geometry.dispose());materials.forEach(value=>value.dispose());
+});
 
 test('Curtis does not load at startup, loads once before his visit, and pauses with simulation time',async()=>{
   let calls=0,release;

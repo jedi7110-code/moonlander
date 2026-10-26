@@ -136,23 +136,35 @@ function addLongHem(parent,map){
 }
 
 
+export function finishCurtisBoots(visitor){
+  const materials=new Map();
+  const leatherParts=new Set(['Continuous leather boot upper','Foot-shaped stitched boot welt']);
+  const laceParts=new Set(['Crossed boot lace','Tightened top lace','Tied boot lace loop','Boot lace end']);
+  visitor.traverse(object=>{
+    const leather=leatherParts.has(object.name);
+    if(!object.isMesh||(!leather&&!laceParts.has(object.name)))return;
+    const source=object.material;
+    if(!materials.has(source)){
+      const material=source.clone();material.color.set(leather?'#151719':'#202123');
+      material.roughness=leather?.62:.96;material.metalness=0;materials.set(source,material);
+    }
+    object.material=materials.get(source);
+  });
+}
+
 export async function createCurtis(){
   const [m,head,,map]=await Promise.all([materials(),loadMiloHead(),loadMiloBody(),
     new THREE.TextureLoader().loadAsync(`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/curtis-space-print-no-rockets.png`)]);
   map.colorSpace=THREE.SRGBColorSpace;
   map.wrapS=map.wrapT=THREE.RepeatWrapping;map.anisotropy=8;
   await nextPreparationFrame();
-  m.skin=m.skin.clone();m.skin.color.set('#613c29');
+  m.skin=m.skin.clone();m.skin.color.set('#76513b');
   head.userData.setAppearance({hair:'crop',beard:'none'});
-  head.traverse(o=>{if(o.isMesh&&o.material?.map){o.material=o.material.clone();o.material.map=null;o.material.color.set('#613c29');o.material.needsUpdate=true;}});
+  head.traverse(o=>{if(o.isMesh&&o.material?.map){o.material=o.material.clone();o.material.map=null;o.material.color.set('#76513b');o.material.needsUpdate=true;}});
   reshapeVisitorNose(head);
   addAfro(head);
   const visitor=await runPreparationSteps(createMiloSteps(m,head));visitor.name='Curtis';
-  visitor.traverse(object=>{
-    if(!object.isMesh||!['Crossed boot lace','Tightened top lace','Tied boot lace loop','Boot lace end'].includes(object.name))return;
-    object.material=object.material.clone();object.material.color.set('#624129');
-    object.material.roughness=.96;
-  });
+  finishCurtisBoots(visitor);
   animateMilo(visitor,{moving:false,climbing:false,facing:1,time:0});visitor.rotation.y=0;
   const skin=visitor.userData.bodySkin;
   const original=skin.material.onBeforeCompile;

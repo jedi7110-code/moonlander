@@ -20,6 +20,8 @@ import {Sprout} from 'lucide';
 import {healthDisplay} from './health-display.js';
 import {DroidRoutine} from './droid-routine.js';
 import {CurtisRoutine} from './curtis-routine.js';
+import {runDeferredPreparation} from './deferred-preparation.js';
+import {createPreparationScheduler} from './background-preparation.js';
 import {Eye} from 'lucide';
 import {updateCharacterCameraUI,updateFirstPersonOverlay} from './character-camera-ui.js';
 import {updateFullscreenUI} from './fullscreen-ui.js';
@@ -359,11 +361,13 @@ refreshIcons();localize();
 
 async function start(){
   try{
+    const nextStartupFrame=createPreparationScheduler({budgetMs:8,frameCount:1});
     // Decode beside the 3D startup so the first lighting/bed stroke is ready.
     // The mixer remains silent until a real input gesture unlocks it.
     if(audio.enabled){try{audio.prepare();void audio.load();}catch(error){console.warn('Cabin audio preparation failed.',error);}}
     exterior.hostProgress(.15);
-    view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,onProgress:value=>exterior.hostProgress(.15+value*.6)});
+    view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,deferOptional:true,nextFrame:nextStartupFrame,onProgress:value=>exterior.hostProgress(.15+value*.6)});
+    document.documentElement.dataset.cabinViewReadyMs=performance.now().toFixed(1);
     view.audio=audio;
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     const curtis=new CurtisRoutine({prepare:()=>view.prepareCurtis()});
@@ -406,21 +410,22 @@ async function start(){
       view.viewHeight=view.targetHeight=2.8;view.zoom=view.fitHeight/2.8;
     }
     view.startLighting({waitForActivation:true});
+    view.render(0,elapsed,actor,brain,cat,care,true,airlock,null,true);
     // Compile every cabin program behind the connection screen. With
     // KHR_parallel_shader_compile the driver links them on worker threads and
     // the page stays responsive, instead of the first draw stalling on each one.
-    await view.compilePrograms();
+    await view.compilePrograms({visibleOnly:true,nextFrame:nextStartupFrame});
+    document.documentElement.dataset.cabinProgramsReadyMs=performance.now().toFixed(1);
     exterior.hostProgress(.9);
     view.render(0,elapsed,actor,brain,cat,care,true,airlock,null,true);
-    await view.warmDraws();
     exterior.hostProgress(.96);
     await revealStartupScene({
       draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),
       reveal:()=>{$('loading').hidden=true;},
     });
+    document.documentElement.dataset.cabinFirstDrawReadyMs=performance.now().toFixed(1);
     exterior.hostProgress(.98);
     $('lighting-hint').hidden=false;
-    loadCabinLucyGroomCache(view.cat).then(()=>{cat.groomAvailable=true;},error=>console.warn('Lucy grooming correction unavailable; grooming stays off.',error));
     view.onSceneActivate=()=>{try{audio.unlock();}catch(error){console.warn('Cabin audio activation failed.',error);}return activateStartupLighting(view.startupLighting,{audio,onActivate:()=>{brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}});};
     unbindStartupLighting=bindStartupLightingInput($('ship-view'),()=>view.onSceneActivate());
     previous=performance.now();
@@ -431,7 +436,7 @@ async function start(){
       idleCamera.update(now,{blocked:immersive.active||paused||!visible||games.open||document.activeElement?.matches('input,textarea,[contenteditable="true"]')});
       if(!paused&&visible&&!games.open){
         accumulator+=dt;
-        if(openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
+        if(view.catRun&&openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
         while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);
           if(!view.startupLighting?.waiting)curtis.update(step,{actor,droid,cat,brain});
@@ -449,6 +454,13 @@ async function start(){
     view.renderer.setAnimationLoop(tick);
     document.documentElement.dataset.cabinReadyMs=performance.now().toFixed(1);
     exterior.hostReady();
+    void runDeferredPreparation([
+      nextFrame=>view.prepareDeferredDetails(nextFrame),
+      nextFrame=>view.compilePrograms({nextFrame}),
+      async()=>{try{await loadCabinLucyGroomCache(view.cat);if(!view.disposed)cat.groomAvailable=true;}catch(error){console.warn('Lucy grooming correction unavailable; grooming stays off.',error);}},
+    ],{cancelled:()=>view.disposed,canPrepare:()=>!document.hidden&&!exterior.open&&!games.open&&!immersive.active&&(view.startupLighting.waiting||view.startupLighting.done)})
+      .then(done=>{if(done)document.documentElement.dataset.cabinDeferredReadyMs=performance.now().toFixed(1);})
+      .catch(error=>console.warn('Optional cabin preparation unavailable.',error));
   }catch(error){console.error(error);exterior.hostReady();$('space-boot').hidden=true;$('loading').hidden=true;$('obs-error').hidden=false;$('obs-error').textContent=words('船内映像を開けませんでした。WebGLが有効なブラウザで再読み込みしてください。','The habitat view could not load. Reload in a browser with WebGL enabled.');}
 }
 $('ship-view').addEventListener('webglcontextlost',event=>{event.preventDefault();setPause(true);$('obs-error').hidden=false;$('obs-error').textContent=words('映像接続が中断されました。ページを再読み込みしてください。','Graphics connection interrupted. Please reload the page.');});

@@ -5,6 +5,7 @@ import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
 
 export const CURTIS_TIMING={first:[90,150],between:[180,360],prepareAhead:35};
 export const CURTIS={top:13.4,seatX:6.05,coffeeX:10.085,roomX:-1.88,roomZ:-4.37};
+export const CURTIS_LADDER_TRAFFIC=Object.freeze({waitX:2.2,crewWaitX:2.3,clearX:2.1,mergeX:1.75,bridgeX:.85,passZ:2.18});
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
 
@@ -30,6 +31,15 @@ export class CurtisRoutine {
   range([a,b]){return a+(b-a)*this.random();}
   get step(){return this.steps[0]??null;}
   get ladderPath(){return this.ladderClaim?{from:this.position.y,to:this.claimEnd}:null;}
+  get approachingLadderPath(){
+    let crosses=false;
+    for(const step of this.steps){
+      if(step.kind==='climb')return{from:step.from.y,to:step.to.y};
+      if(step.kind!=='walk')break;
+      crosses||=Math.min(Math.abs(step.from.x),Math.abs(step.to.x))<CURTIS_LADDER_TRAFFIC.bridgeX||step.from.x*step.to.x<0;
+    }
+    return crosses?{from:this.position.y,to:this.position.y}:null;
+  }
   get floor(){return FLOORS.reduce((best,y,i)=>Math.abs(y-this.position.y)<Math.abs(FLOORS[best]-this.position.y)?i:best,0);}
   load(){
     if(this.loading||this.ready||this.disposed)return;
@@ -74,7 +84,7 @@ export class CurtisRoutine {
     this.walk(CURTIS.coffeeX,FLOORS[1],CABIN_AISLE.crewZ);
   }
   beginVisit(){
-    this.active=true;this.visits++;this.age=0;this.position={x:0,y:CURTIS.top,z:ladderApproachDepth(0)};
+    this.active=true;this.visits++;this.age=0;this.passOffset=0;this.position={x:0,y:CURTIS.top,z:ladderApproachDepth(0)};
     this.climbTo(1,{enter:true});
     if(this.random()<.5){this.lounge();this.coffee();}else{this.coffee();this.lounge();}
     this.aisleTo(0,1);this.climbTo(0);this.aisleTo(CURTIS.roomX,0);
@@ -115,8 +125,8 @@ export class CurtisRoutine {
     const walk=actor.queue?.[0];if(walk?.type!=='walk')return false;
     const from=(actor.x-700)*.022,to=(walk.x-700)*.022;
     if(from*to>0&&Math.abs(to)>=Math.abs(from))return false;
-    if(from*to>0&&Math.abs(to)>1.35)return false;
-    return Math.max(0,Math.abs(from)-actor.walkSpeed*.022*dt)<=1.35;
+    if(from*to>0&&Math.abs(to)>CURTIS_LADDER_TRAFFIC.crewWaitX)return false;
+    return Math.max(0,Math.abs(from)-actor.walkSpeed*.022*dt)<=CURTIS_LADDER_TRAFFIC.crewWaitX;
   }
   update(dt,{actor=null,droid=null,cat=null,brain=null}={}){
     if(dt<=0||this.disposed)return;
@@ -128,15 +138,35 @@ export class CurtisRoutine {
     }
     const s=this.step;if(!s)return;
     this.waiting=false;
-    if(s.kind==='climb'&&!this.ladderClaim){
-      const path={from:s.from.y,to:s.to.y};
+    const obstacles=[];
+    if(actor){
+      const position=worldActor(actor);
+      if(brain&&(brain.loungeEntry||brain.loungeExit||brain.loungeStow||brain.actStation==='lounge')&&!actor.busy){position.x=CURTIS.seatX;position.z=.06;}
+      obstacles.push({p:position,r:CREW_CLEARANCE});
+    }
+    if(droid?.position)obstacles.push({p:droid.position,r:.64});
+    if(cat?.motion&&!cat.motion.hidden)obstacles.push({p:worldCat(cat.motion),r:CAT_CLEARANCE});
+    const path=this.approachingLadderPath;
+    const approaching=s.kind==='walk'&&Math.abs(this.position.x)<=CURTIS_LADDER_TRAFFIC.waitX&&Math.abs(s.to.x)<=Math.abs(this.position.x);
+    const entering=s.kind==='climb'||approaching;
+    if(path&&entering&&!this.ladderClaim){
       const crewNear=actor&&(actor.climbing||Math.abs((actor.x-700)*.022)<1.5);
       if((crewNear&&ladderPathsConflict(path,crewLadderPath(actor)))||
-          (droid?.ladderClaim&&ladderPathsConflict(path,droid.ladderPath))){this.waiting=true;return;}
-      this.ladderClaim=true;this.claimEnd=s.to.y;
+          (droid?.ladderClaim&&ladderPathsConflict(path,droid.ladderPath))){
+        this.waiting=true;
+        if(Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.bridgeX){
+          const position=this.trafficPosition,shift=Math.max(0,Math.min(CURTIS_LADDER_TRAFFIC.passZ-position.z,dt*.85));
+          const next={...position,z:position.z+shift};
+          if(shift>0&&!obstacles.some(obstacle=>approaches(position,next,obstacle.p,obstacle.r))){
+            this.passOffset=(this.passOffset??0)+shift;this.walkDistance+=shift;this.yaw=0;this.waiting=false;
+          }
+        }
+        return;
+      }
+      this.ladderClaim=true;this.claimEnd=path.to;
     }
     // Keep the shaft reserved until the arriving visitor has cleared its bridge.
-    if(this.ladderClaim&&s.kind!=='climb'&&Math.abs(this.position.x)>1.5)this.ladderClaim=false;
+    if(this.ladderClaim&&s.kind!=='climb'&&Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.clearX)this.ladderClaim=false;
     if(s.kind==='walk'){
       const near=(x,y,z,r)=>Math.abs(y-this.position.y)<1&&Math.hypot(x-this.position.x,z-this.position.z)<r;
       const cm=cat?.motion;
@@ -145,14 +175,6 @@ export class CurtisRoutine {
         this.waiting=true;return;
       }
     }
-    const obstacles=[];
-    if(actor){
-      const p=worldActor(actor);
-      if(brain&&(brain.loungeEntry||brain.loungeExit||brain.loungeStow||brain.actStation==='lounge')&&!actor.busy){p.x=CURTIS.seatX;p.z=.06;}
-      obstacles.push({p,r:CREW_CLEARANCE});
-    }
-    if(droid?.position)obstacles.push({p:droid.position,r:.64});
-    if(cat?.motion&&!cat.motion.hidden)obstacles.push({p:worldCat(cat.motion),r:CAT_CLEARANCE});
     // Check the full seated footprint before leaving the aisle.
     const approachingSeat=s.kind==='walk'&&s.to.x===CURTIS.seatX&&s.to.z===.43;
     if((approachingSeat||s.kind==='sit')&&((actor?.floor===1&&Math.abs((actor.x-700)*.022-CURTIS.seatX)<1.7)||
@@ -167,21 +189,28 @@ export class CurtisRoutine {
     }
     if(s.kind==='walk'){
       const p=this.trafficPosition;
-      const aisle=Math.abs(this.position.x)>2&&s.from.z>=.65&&s.to.z>=.65;
+      const onAisle=Math.abs(this.position.x)>2&&s.from.z>=.65&&s.to.z>=.65;
+      const leavingBridge=this.ladderClaim&&Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.bridgeX&&s.from.z>=.2&&s.to.z>=.2;
+      const aisle=onAisle||leavingBridge;
       let offset=0;
       if(aisle){
         const nearby=obstacles.filter(o=>Math.abs(o.p.y-p.y)<1.4&&Math.abs(o.p.x-p.x)<2.2);
         const laneFree=z=>nearby.every(o=>Math.abs(o.p.z-z)>o.r+.03);
         const current=this.position.z+(this.passOffset??0);
-        if(!laneFree(this.position.z))offset=laneFree(2.18)?2.18-this.position.z:(this.passOffset??0);
-        else if(nearby.length&&laneFree(current))offset=Math.min(this.passOffset??0,Math.max(0,2.18-this.position.z));
+        if(!laneFree(this.position.z))offset=laneFree(CURTIS_LADDER_TRAFFIC.passZ)?CURTIS_LADDER_TRAFFIC.passZ-this.position.z:(this.passOffset??0);
+        else if(nearby.length&&laneFree(current))offset=Math.min(this.passOffset??0,Math.max(0,CURTIS_LADDER_TRAFFIC.passZ-this.position.z));
       }
+      if(this.ladderClaim&&Math.abs(this.position.x)<CURTIS_LADDER_TRAFFIC.mergeX&&Math.abs(s.to.x)<Math.abs(this.position.x))offset=0;
       const shift=Math.sign(offset-(this.passOffset??0))*Math.min(Math.abs(offset-(this.passOffset??0)),dt*.85);
       const lateral={...p,z:p.z+shift};
-      if(!obstacles.some(o=>approaches(p,lateral,o.p,o.r)))this.passOffset=(this.passOffset??0)+shift;
+      const movingAside=Math.abs(shift)>1e-8&&!obstacles.some(o=>approaches(p,lateral,o.p,o.r));
+      if(movingAside){this.passOffset=(this.passOffset??0)+shift;this.walkDistance+=Math.abs(shift);}
       const u=Math.min(1,(this.age+dt)/s.duration);
       const next={x:s.from.x+(s.to.x-s.from.x)*u,y:s.from.y+(s.to.y-s.from.y)*u,z:s.from.z+(s.to.z-s.from.z)*u+(this.passOffset??0)};
-      if(Math.abs((this.passOffset??0)-offset)>.02||obstacles.some(o=>approaches(this.trafficPosition,next,o.p,o.r+.06))){this.waiting=true;return;}
+      const needsBridge=Math.abs(next.x)<=CURTIS_LADDER_TRAFFIC.bridgeX&&Math.abs(this.passOffset??0)>.02;
+      if(needsBridge||obstacles.some(o=>approaches(this.trafficPosition,next,o.p,o.r+.06))){
+        this.waiting=!movingAside;if(movingAside)this.yaw=shift>0?0:Math.PI;return;
+      }
     }
     const before={...this.position};this.age=Math.min(s.duration,this.age+dt);
     let u=this.age/s.duration;

@@ -6,6 +6,8 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createCabinLucy,animateCabinLucy,decodeGroomCache} from '../src/obs/lucy-cabin.js';
 import {MouseChase,mousePose,runCycle,RUN_STRIDE,RUN_SPEED,MOUSE_RUN_SPEED,MOUSE_WALK_SPEED,MOUSE_TIMING,CHASE_PREVIEW_DURATION} from '../studies/lucy/chase-motion.js';
 import {createLucyRunRig} from '../studies/lucy/run-rig.js';
+import {createLucyRunRigSteps} from '../src/obs/lucy-run-rig.js';
+import {runPreparationSteps} from '../src/obs/background-preparation.js';
 import {createStudyMouse} from '../studies/lucy/mouse-model.js';
 import {mouseRunCycle,MOUSE_STRIDE} from '../studies/lucy/mouse-gait.js';
 
@@ -161,6 +163,29 @@ test('forepaw swing is continuous through the cycle and touches down without a p
     }
   }
 });
+test('deferred run preparation keeps the original standing rig while the live cat changes pose',async()=>{
+  const bytes=fs.readFileSync(new URL('../public/assets/obs/lucy/lucy-cabin.glb',import.meta.url));
+  const poses=JSON.parse(fs.readFileSync(new URL('../public/assets/obs/lucy/lucy-approved.json',import.meta.url),'utf8'));
+  const roots=[];
+  for(let index=0;index<2;index++){
+    const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+    roots.push(createCabinLucy({gltf,poses},{random:()=>.5}));
+  }
+  const immediate=createLucyRunRig(roots[0]),steps=createLucyRunRigSteps(roots[1]);
+  steps.next();
+  const deferred=await runPreparationSteps(steps,{nextFrame:async()=>animateCabinLucy(roots[1],{dt:1/60,time:3,mode:'sleep',actionTime:3})});
+  try{
+    for(const root of roots)animateCabinLucy(root,{dt:1/60,time:0,mode:'idle',yaw:0,headingControlled:true});
+    for(const rig of [immediate,deferred])rig.update({distance:.27,speed:RUN_SPEED,weight:1});
+    roots[0].traverse(bone=>{
+      if(!bone.isBone)return;
+      const other=roots[1].getObjectByName(bone.name);
+      assert.ok(bone.position.distanceTo(other.position)<1e-7,`${bone.name}: ${bone.position.toArray()} / ${other.position.toArray()}`);
+      assert.ok(bone.quaternion.clone().normalize().angleTo(other.quaternion.clone().normalize())<1e-6,bone.name);
+    });
+  }finally{immediate.dispose();deferred.dispose();}
+});
+
 test('the actual Lucy rig reaches past the nose without stretching limbs, detaching paws or piercing the deck',async()=>{
   const read=name=>fs.readFileSync(new URL('../public/assets/obs/lucy/'+name,import.meta.url));
   const bytes=read('lucy-cabin.glb'),bin=read('lucy-groom.bin'),poses=JSON.parse(read('lucy-approved.json'));
