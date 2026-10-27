@@ -1,5 +1,6 @@
 // Slow physiological depletion, not walking, handling props or recovery animations.
 export const CABIN_PACE={dayMs:15*60*1000,needDecay:.35,catDecay:.60,autonomousNeedThreshold:65};
+export const CREW_WALK_SPEED=54;
 // Authored droid gait. Motion and contact sounds share the same full L/R cycle;
 // DROID_PACE scales travel speed, not the distance between foot landings.
 export const DROID_GAIT=Object.freeze({speed:.58,period:1.4,stance:.64});

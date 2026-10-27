@@ -8,10 +8,11 @@ const smooth=value=>{const t=clamp(value);return t*t*(3-2*t);};
 const plantFan={x:(PLANT.x-700)*.022+2.03,y:(870-FLOORS[PLANT.floor].y)*.016+2.18,z:-.65};
 
 export class CabinAudio {
-  constructor({createContext=()=>{const Context=globalThis.AudioContext||globalThis.webkitAudioContext;return Context?new Context():null;},fetchAudio=(...args)=>fetch(...args),ambience=true,enabled=false,library=CABIN_SOUNDS,playbackSession=new CabinPlaybackSession()}={}){
+  constructor({createContext=()=>{const Context=globalThis.AudioContext||globalThis.webkitAudioContext;return Context?new Context():null;},fetchAudio=(...args)=>fetch(...args),ambience=true,enabled=false,library=CABIN_SOUNDS,defer=[],playbackSession=new CabinPlaybackSession()}={}){
     this.enabled=enabled;this.unlocked=false;this.paused=false;this.context=null;this.createContext=createContext;this.fetchAudio=fetchAudio;
     this.playbackSession=playbackSession;
     this.library=library;this.gameActive=false;this.gameVoices=new Set();this.gameBuffers=new Map();
+    this.deferred=new Set(defer);this.pendingDeferred=new Map();
     this.buffers=new Map();this.voices=new Set();this.loops=new Map();this.failures=[];this.disposed=false;
     this.ambience=ambience;
     this.listener={x:0,y:3.4,z:1,rightX:1,rightY:0,rightZ:0,overview:true,focus:0};
@@ -70,7 +71,7 @@ export class CabinAudio {
   // Three concurrent fetches, one decode per local file, no delayed one-shot queue.
   load(){
     if(this.loading)return this.loading;
-    this.abort=new AbortController();const pending=Object.entries(this.library);
+    this.abort??=new AbortController();const pending=Object.entries(this.library).filter(([id])=>!this.deferred.has(id));
     const worker=async()=>{
       while(pending.length&&!this.disposed){
         const [id,definition]=pending.shift();
@@ -83,6 +84,23 @@ export class CabinAudio {
       }
     };
     this.loading=Promise.all([worker(),worker(),worker()]);return this.loading;
+  }
+  loadDeferred(id){
+    if(this.disposed||!this.library[id])return Promise.resolve(false);
+    if(this.buffers.has(id))return Promise.resolve(true);
+    if(this.pendingDeferred.has(id))return this.pendingDeferred.get(id);
+    const pending=Promise.resolve().then(async()=>{
+      try{
+        this.prepare();this.abort??=new AbortController();
+        const response=await this.fetchAudio(CABIN_AUDIO_BASE+this.library[id].file,{signal:this.abort.signal});
+        if(!response.ok)throw Error(`HTTP ${response.status}`);
+        const data=await response.arrayBuffer();if(this.disposed)return false;
+        const buffer=await this.context.decodeAudioData(data);if(this.disposed)return false;
+        this.buffers.set(id,buffer);return true;
+      }catch(error){if(!this.disposed)this.failures.push({id,message:String(error.message??error)});return false;}
+      finally{this.pendingDeferred.delete(id);this.onChange?.();}
+    });
+    this.pendingDeferred.set(id,pending);return pending;
   }
   get audible(){return this.enabled&&this.unlocked&&!this.paused&&!this.disposed&&this.context?.state==='running';}
   get stats(){return{loaded:this.buffers.size,total:Object.keys(this.library).length,active:this.voices.size,loops:this.loops.size,failed:this.failures.length};}
@@ -146,9 +164,10 @@ export class CabinAudio {
     voice.gain.gain.setTargetAtTime(voice.volume*spatial.gain,now,.04);
     voice.pan?.pan.setTargetAtTime(spatial.pan,now,.04);
   }
-  play(id,{position=null,volume=1,rate=1,loop=false,key=null}={}){
+  play(id,{position=null,volume=1,rate=1,loop=false,key=null,offset=0}={}){
     const definition=this.library[id],buffer=this.buffers.get(id);
     if(!definition||!buffer||!this.audible||this.voices.size>=12)return null;
+    if(!Number.isFinite(offset)||offset<0||offset>=buffer.duration)return null;
     if([...this.voices].filter(v=>v.id===id&&!v.stopping).length>=3)return null;
     if(this.spatial(position).gain*definition.gain*volume<.003)return null;
     const source=this.context.createBufferSource(),gain=this.context.createGain(),pan=this.context.createStereoPanner?.();
@@ -157,7 +176,7 @@ export class CabinAudio {
     const voice={id,source,gain,pan,position:position?{...position}:null,volume:definition.gain*volume,key,stopping:false,startedAt:this.context.currentTime};
     this.voices.add(voice);this.positionVoice(voice);
     source.onended=()=>{source.disconnect();gain.disconnect();pan?.disconnect();this.voices.delete(voice);if(key&&this.loops.get(key)===voice)this.loops.delete(key);this.onChange?.();};
-    source.start(voice.startedAt);return voice;
+    source.start(voice.startedAt,offset);return voice;
   }
   // The running audio clock is authoritative for visuals that follow a loop.
   // A new voice after mute/pause starts a fresh phase; stopped/locked audio

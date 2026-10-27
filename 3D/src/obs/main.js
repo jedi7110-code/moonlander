@@ -50,7 +50,7 @@ const needOrders={
   bladder:{station:'toilet',icon:'toilet',label:['トイレへ行く','Use the toilet'],detail:['トイレを使用して回復します。','Restore this level by using the toilet.']},
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
-const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true});
+const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine']});
 const soundEvents=new CabinSoundEvents(audio);
 // Lucy's grooming correction cache arrives after the cabin is on screen.
 cat.groomAvailable=false;
@@ -370,7 +370,7 @@ async function start(){
     document.documentElement.dataset.cabinViewReadyMs=performance.now().toFixed(1);
     view.audio=audio;
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
-    const curtis=new CurtisRoutine({prepare:()=>view.prepareCurtis()});
+    const curtis=new CurtisRoutine({prepare:()=>Promise.all([view.prepareCurtis(),audio.loadDeferred('coffeeMachine')])});
     view.curtisRoutine=curtis;droid.visitor=curtis;cat.motion.visitor=curtis;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
@@ -441,7 +441,7 @@ async function start(){
         while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);
           if(!view.startupLighting?.waiting)curtis.update(step,{actor,droid,cat,brain});
           actor.waitingForVisitor=curtis.blocksCrew(actor,step);
-          actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
+          actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat,curtis});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
       if(visible){view.startupLighting?.update(paused||games.open||firstVisibleFrame?0:frameDt);feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);firstVisibleFrame=false;if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}

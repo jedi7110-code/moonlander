@@ -17,11 +17,14 @@ import {sampleDroidServicePose} from '../src/obs/droid-service.js';
 import {CabinEnvironment} from '../src/obs/environment.js';
 import {diningPhase,mealSpoonPhase} from '../src/obs/dining-timing.js';
 import {GroomingVisit,GROOMING_VISIT_SECONDS} from '../src/obs/grooming-visit.js';
+import {CurtisRoutine} from '../src/obs/curtis-routine.js';
+import {CURTIS_COFFEE} from '../src/obs/curtis-coffee.js';
+import walkCycle from '../src/obs/milo-walk-cycle.json' with {type:'json'};
 
 function context(){
   const parameter=()=>({value:0,setValueAtTime(v){this.value=v;},setTargetAtTime(v){this.value=v;},exponentialRampToValueAtTime(v){this.value=v;},cancelScheduledValues(){}});
   const ctx={state:'suspended',currentTime:0,sampleRate:22050,created:[],destination:{},async resume(){this.state='running';},async close(){this.state='closed';},async decodeAudioData(){return{duration:1};},createBuffer:(_channels,length)=>({getChannelData:()=>new Float32Array(length)})};
-  const node=()=>({gain:parameter(),pan:parameter(),frequency:parameter(),playbackRate:parameter(),connect(to){return to;},disconnect(){this.disconnected=true;},start(){this.started=true;},stop(){this.stopped=true;}});
+  const node=()=>({gain:parameter(),pan:parameter(),frequency:parameter(),playbackRate:parameter(),connect(to){return to;},disconnect(){this.disconnected=true;},start(...args){this.started=true;this.startArgs=args;},stop(){this.stopped=true;}});
   for(const method of ['createGain','createOscillator','createBufferSource','createBiquadFilter','createStereoPanner'])ctx[method]=()=>{const n=node();ctx.created.push(n);return n;};
   return ctx;
 }
@@ -125,10 +128,12 @@ test('local assets are compact mono PCM, finite, non-silent, bounded and loop se
     assert.equal(file.toString('ascii',0,4),'RIFF');assert.equal(file.readUInt16LE(22),1);assert.equal(file.readUInt32LE(24),22050);
     assert.equal(file.readUInt16LE(34),16);assert.equal(file.length-44,file.readUInt32LE(40));assert.ok(credits.includes(definition.file));
     const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
-    const peak=Math.max(...data.map(Math.abs));assert.ok(peak>.3&&peak<.36);
+    const peak=data.reduce((maximum,sample)=>Math.max(maximum,Math.abs(sample)),0);
+    if(definition===CABIN_SOUNDS.coffeeMachine)assert.ok(peak>.05&&peak<.51);else assert.ok(peak>.3&&peak<.36);
     if(definition.loop)assert.ok(Math.abs(data[0]-data.at(-1))<.15,`${definition.file} seam`);
   }
-  assert.ok(total<1800000,`ships ${total} bytes, including the compact cutlery and two 88 KB grooming loops, not entire source packs`);
+  const deferred=(await stat(new URL('../public/assets/obs/audio/coffee-machine-a-20s.wav',import.meta.url))).size;
+  assert.equal(deferred,882044);assert.ok(total-deferred<1800000,`initial clips use ${total-deferred} bytes; the selected twenty-second coffee clip is deferred`);
 });
 test('bed piston and slide are short faded recordings, without live loops or filters',async()=>{
   const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
@@ -237,6 +242,32 @@ test('ambient updates follow camera focus but never synthesize pitched water dro
   await audio.toggle();audio.update();assert.equal(ctx.created.length,initialNodes);
   assert.equal(audio.stats.active,0);
   audio.tone(740,.07,.009);assert.ok(ctx.created.length>initialNodes,'notification tones are retained');
+  audio.dispose();
+});
+test('coffee stays out of initial loading, decodes once on demand and never unlocks audio by loading',async()=>{
+  const ctx=context(),urls=[],audio=new CabinAudio({createContext:()=>ctx,ambience:false,defer:['coffeeMachine'],fetchAudio:async url=>{urls.push(url);return response();}});
+  try{
+    audio.prepare();await audio.load();assert.equal(audio.buffers.size,soundCount-1);
+    assert.equal(urls.some(url=>url.includes('coffee-machine')),false);assert.equal(audio.unlocked,false);
+    await Promise.all([audio.loadDeferred('coffeeMachine'),audio.loadDeferred('coffeeMachine')]);
+    assert.equal(urls.filter(url=>url.includes('coffee-machine')).length,1);assert.equal(audio.buffers.size,soundCount);assert.equal(audio.unlocked,false);
+    await audio.loadDeferred('coffeeMachine');assert.equal(urls.filter(url=>url.includes('coffee-machine')).length,1);
+    const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');
+    assert.match(main,/defer:\['coffeeMachine'\]/);assert.match(main,/audio\.loadDeferred\('coffeeMachine'\)/);
+  }finally{audio.dispose();}
+});
+test('finite coffee playback can resume at the current offset without looping or changing pitch',async()=>{
+  const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,ambience:false,fetchAudio:async()=>response()});
+  try{
+    await audio.toggle();await audio.load();audio.buffers.set('coffeeMachine',{duration:20});
+    const voice=audio.play('coffeeMachine',{offset:7.25});assert.deepEqual(voice.source.startArgs,[0,7.25]);
+    assert.equal(voice.source.loop,false);assert.equal(voice.source.playbackRate.value,1);
+    for(const offset of [-1,20,Infinity,NaN])assert.equal(audio.play('coffeeMachine',{offset}),null);
+  }finally{audio.dispose();}
+});
+test('unavailable Web Audio cannot reject the optional coffee preparation',async()=>{
+  const audio=new CabinAudio({createContext:()=>null,ambience:false});
+  assert.equal(await audio.loadDeferred('coffeeMachine'),false);assert.equal(audio.failures.length,1);
   audio.dispose();
 });
 test('hatches contain only one short air burst, with no trailing motor',async()=>{
@@ -418,7 +449,7 @@ test('camera focus changes active loop and one-shot gains without restarting or 
   audio.dispose();
 });
 function harness(options){
-  const events=[],loops=new Map(),audio={enabled:true,play(id,options){if(this.enabled)events.push({id,...options});},setLoop(key,id,active,options){loops.set(key,{id,active,...options});},tone(){}};
+  const events=[],loops=new Map(),audio={enabled:true,play(id,options){if(this.enabled){events.push({id,...options});return{id,stopping:false};}return null;},stopVoice(voice){voice.stopping=true;},setLoop(key,id,active,options){loops.set(key,{id,active,...options});},tone(){}};
   const state={actor:{x:700,y:650,floor:1,walkDistance:0,queue:[],busy:false},brain:{},care:{phase:'idle'},airlock:{opening:0}};
   return{audio,events,loops,state,driver:new CabinSoundEvents(audio,options)};
 }
@@ -796,6 +827,58 @@ test('footfalls follow distance, stop at waits, ignore teleports and vary their 
   assert.ok(h.events.every(event=>event.rate===1),'walking uses the same base tuning as the direct sound preview');
   const count=h.events.length;actor.waitingForDroid=true;for(let i=0;i<100;i++)h.driver.update(1/60,h.state);assert.equal(h.events.length,count);
   actor.waitingForDroid=false;actor.walkDistance+=1000;h.driver.update(1/60,h.state);assert.equal(h.events.length,count);
+});
+test('Curtis uses the same recorded boots at gait contacts and his own position at 30, 60 and 120 fps',()=>{
+  for(const fps of [30,60,120]){
+    const state=harness(),curtis=state.state.curtis=new CurtisRoutine(),tickSeconds=1/fps;
+    curtis.active=true;curtis.position={x:3,y:3.392,z:.78};curtis.walk(10,3.392,.78);curtis.hold('relax',1);
+    state.driver.update(tickSeconds,state.state);
+    for(let frame=0;frame<5*fps;frame++){curtis.update(tickSeconds);state.driver.update(tickSeconds,state.state);}
+    assert.equal(state.events.length,Math.floor(curtis.walkDistance/(walkCycle.cycleDistance/2)));
+    assert.equal(new Set(state.events.map(event=>event.id)).size,3);
+    for(const event of state.events){
+      assert.match(event.id,/^step[123]$/);assert.equal(event.rate,1);assert.equal(event.volume,1);
+      assert.ok(event.position.x>3&&event.position.x<10);assert.equal(event.position.y,3.492);assert.equal(event.position.z,.78);
+    }
+  }
+});
+test('Curtis waits, pauses, muted walking, jumps and new visits never replay missed contacts',()=>{
+  const state=harness(),tickSeconds=1/60;
+  const curtis=state.state.curtis={active:true,step:{kind:'walk'},walkDistance:0,position:{x:3,y:3.392,z:.78},age:0,waiting:false};
+  const advance=(frames=1,seconds=tickSeconds)=>{
+    for(let frame=0;frame<frames;frame++){curtis.walkDistance+=.02;curtis.age+=seconds;state.driver.update(seconds,state.state);}
+  };
+  state.driver.update(tickSeconds,state.state);advance(100);assert.ok(state.events.length>0);
+  let count=state.events.length;curtis.waiting=true;advance(100);assert.equal(state.events.length,count);
+  curtis.waiting=false;advance();assert.equal(state.events.length,count,'no extra contact when resuming');
+  advance(30,0);assert.equal(state.events.length,count,'pause does not emit');
+  advance();count=state.events.length;state.audio.enabled=false;advance(100);state.audio.enabled=true;
+  state.driver.update(tickSeconds,state.state);assert.equal(state.events.length,count,'unmuting does not replay footsteps');
+  curtis.walkDistance+=100;state.driver.update(tickSeconds,state.state);assert.equal(state.events.length,count,'teleport is silent');
+  advance(1,.5);assert.equal(state.events.length,count,'a long frame cannot catch up');
+  for(const kind of ['relax','coffee','work','window']){curtis.step={kind};advance(30);assert.equal(state.events.filter(event=>event.id!=='coffeeMachine').length,count);}
+  curtis.active=false;state.driver.update(tickSeconds,state.state);curtis.active=true;curtis.step={kind:'walk'};
+  advance();assert.equal(state.events.filter(event=>event.id!=='coffeeMachine').length,count,'a new visit establishes the gait before emitting');
+  state.state.curtis=null;state.driver.update(tickSeconds,state.state);assert.equal(state.events.filter(event=>event.id!=='coffeeMachine').length,count);
+});
+test('Curtis ladder contacts follow both directions, use the ladder clips and stop after landing',()=>{
+  for(const [from,to] of [[1,0],[0,1]]){
+    const state=harness(),curtis=state.state.curtis=new CurtisRoutine();
+    curtis.active=true;curtis.position={x:0,y:from*3.392,z:.23};curtis.climbTo(to);curtis.hold('relax',1);
+    state.driver.update(1/60,state.state);
+    for(let frame=0;frame<1200&&curtis.active;frame++){curtis.update(1/60);state.driver.update(1/60,state.state);}
+    assert.ok(state.events.length>=10);
+    assert.ok(state.events.every(event=>/^ladderStep[123]$/.test(event.id)&&event.rate===1));
+    const count=state.events.length;for(let frame=0;frame<120;frame++)state.driver.update(1/60,state.state);
+    assert.equal(state.events.length,count);
+  }
+});
+test('OBS and the sound study forward the live Curtis routine and reuse the existing boots',async()=>{
+  const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');
+  assert.match(main,/soundEvents\.update\(step,\{actor,brain,droid,airlock,care,cat,curtis\}\)/);
+  const study=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
+  assert.match(study,/new CurtisRoutine\(/);assert.match(study,/s\.curtis\.update\(dt\)/);
+  assert.ok(!Object.keys(CABIN_SOUNDS).some(id=>/curtis/i.test(id)));
 });
 test('droid rubber footfalls, Milo ladder contacts and cargo impacts stay separate',()=>{
   const h=harness(),droid={position:{x:0,y:3,z:0},step:{kind:'walk'},walkDistance:0,age:0,time:0,washingUntil:0};h.state.droid=droid;

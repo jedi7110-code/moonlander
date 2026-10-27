@@ -3,8 +3,8 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials} from './obs/materials.js';
 import {buildShipInBackground} from './obs/ship.js?v=print08';
-import {CurtisRoutine} from './obs/curtis-routine.js?v=table12';
-import {CurtisView} from './obs/curtis-view.js?v=coffee06';
+import {CurtisRoutine} from './obs/curtis-routine.js?v=coffee14';
+import {CurtisView} from './obs/curtis-view.js?v=coffee07';
 import {createCurtis} from './obs/curtis-model.js?v=print10';
 import {createMiloToonSteps} from './obs/milo-toon.js';
 import {runPreparationSteps} from './obs/background-preparation.js';
@@ -12,8 +12,13 @@ import {createMetalDeckStyle} from './obs/metal-deck.js';
 import {finishCabinFixtures} from './obs/cabin-fixtures.js';
 import {createCabinSignage} from './obs/cabin-signage.js';
 import {createCabinToon} from './obs/cabin-toon.js';
+import {CabinAudio} from './obs/audio.js';
+import {CabinSoundEvents} from './obs/sound-events.js';
+import {CABIN_SOUNDS} from './obs/sound-library.js';
 
 const $=id=>document.getElementById(id),status=$('status');
+const audio=new CabinAudio({ambience:false,library:Object.fromEntries(Object.entries(CABIN_SOUNDS).filter(([id])=>/^(step[123]|ladderStep[123]|coffeeMachine)$/.test(id)))});
+const sounds=new CabinSoundEvents(audio);
 try{
   const canvas=document.querySelector('canvas'),scene=new THREE.Scene();scene.background=new THREE.Color('#141c20');
   const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
@@ -51,10 +56,11 @@ try{
     lastFocus=focus();$('follow').checked=name!=='wide';
   }
   function reset(){
+    audio.stopAll();
     routine?.dispose();routine=new CurtisRoutine({random:()=>.25});routine.ready=true;routine.active=true;
     routine.steps=structuredClone(steps);routine.position={...steps[0].from};routine.yaw=Math.PI/2;
     routine.time=0;elapsed=0;
-    const kind=steps[0].kind,yaw=['relax','stand'].includes(kind)?.15:['coffee','brew','work','window','climb'].includes(kind)?Math.PI:Math.PI/2;
+    const kind=steps[0].kind,yaw=['relax','stand'].includes(kind)?.15:['coffee','work','window','climb'].includes(kind)?Math.PI:Math.PI/2;
     visitor.root.rotation.set(0,yaw,0);
     visitor.render(routine,1/60);lastFocus=focus();
   }
@@ -68,7 +74,6 @@ try{
     else{
       const match=all.find(s=>name==='leave'?s.leave:s.kind===name);
       steps=[match];
-      if(name==='brew')steps=all.slice(all.indexOf(match),all.indexOf(match)+2);
       if(name==='sit'){
         const end=all.indexOf(match);let start=end;
         while(start>0&&all[start-1].kind==='walk')start--;
@@ -78,13 +83,14 @@ try{
     total=steps.reduce((sum,s)=>sum+s.duration,0);$('timeline').max=total;
     reset();frameView();playing=true;updateUI();
   }
-  function advance(seconds){
+  function advance(seconds,withSound=true){
     // Fixed small steps preserve the same transfers and pose blending as OBS.
     while(seconds>1e-7&&elapsed<total-1e-7){
       const dt=Math.min(1/60,seconds,total-elapsed,routine.step.duration-routine.age);
       // Retain the final visible pose instead of hiding it when the visit ends.
-      if(total-elapsed<=dt+1e-7){routine.age+=dt;routine.time+=dt;routine.position={...routine.step.to};visitor.render(routine,dt);elapsed=total;break;}
+      if(total-elapsed<=dt+1e-7){routine.age+=dt;routine.time+=dt;routine.position={...routine.step.to};visitor.render(routine,dt);if(withSound){sounds.curtisFootfalls(dt,routine);sounds.curtisCoffee(dt,routine);}elapsed=total;break;}
       routine.update(dt);visitor.render(routine,dt);elapsed+=dt;seconds-=dt;
+      if(withSound){sounds.curtisFootfalls(dt,routine);sounds.curtisCoffee(dt,routine);}
     }
   }
   function updateUI(){
@@ -93,22 +99,26 @@ try{
   }
   function resize(){const rect=canvas.getBoundingClientRect();view.width=Math.max(1,rect.width);view.height=Math.max(1,rect.height);renderer.setSize(view.width,view.height,false);camera.aspect=view.width/view.height;camera.updateProjectionMatrix();}
   const observer=new ResizeObserver(resize);observer.observe(canvas);resize();
-  $('action').addEventListener('change',choose);
-  $('play').onclick=()=>{if(elapsed>=total)reset();playing=!playing;updateUI();};
+  $('action').addEventListener('change',()=>{choose();audio.pause(false);audio.unlock();});
+  $('play').onclick=()=>{if(elapsed>=total)reset();playing=!playing;audio.pause(!playing);if(playing)audio.unlock();updateUI();};
   $('restart').onclick=()=>{reset();frameView();updateUI();};
-  $('frame').onclick=()=>{playing=false;advance(1/60);updateUI();};
-  $('timeline').oninput=()=>{playing=false;const target=Number($('timeline').value);reset();advance(target);frameView();updateUI();};
+  $('frame').onclick=()=>{playing=false;audio.pause(true);advance(1/60,false);updateUI();};
+  $('timeline').oninput=()=>{playing=false;audio.pause(true);const target=Number($('timeline').value);reset();advance(target,false);frameView();updateUI();};
+  $('sound').onclick=async()=>{await audio.toggle();audio.pause(!playing);if(playing)audio.unlock();$('sound').textContent=audio.enabled?'音声オフ':'音声オン';$('sound').setAttribute('aria-pressed',String(audio.enabled));};
   document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>frameView(b.dataset.view));
   for(const id of ['action','play','restart','frame','timeline'])$(id).disabled=false;
   $('action').value='ladderCoffee';choose();status.hidden=true;
   renderer.setAnimationLoop(now=>{
     const dt=Math.min((now-last)/1000,.08);last=now;
+    audio.pause(document.hidden||!playing||Number($('speed').value)!==1);
     if(!document.hidden&&playing){if(elapsed>=total){if($('loop').checked)reset();else playing=false;}advance(dt*Number($('speed').value));}
     const current=focus();if($('follow').checked&&lastFocus){const delta=current.clone().sub(lastFocus);camera.position.add(delta);controls.target.add(delta);}lastFocus=current;
     controls.update();updateUI();
+    audio.setViewListener(camera,{center:controls.target},true);
     const visibleHeight=2*camera.position.distanceTo(controls.target)*Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
     cabinToon.update(view.width,view.height,visibleHeight,15);
     renderer.render(scene,camera);
   });
-  window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);observer.disconnect();controls.dispose();routine.dispose();visitor.dispose();cabinToon.dispose();signage?.dispose?.();env.dispose();renderer.dispose();},{once:true});
+  document.addEventListener('visibilitychange',()=>audio.pause(document.hidden||!playing));
+  window.addEventListener('pagehide',()=>{audio.dispose();renderer.setAnimationLoop(null);observer.disconnect();controls.dispose();routine.dispose();visitor.dispose();cabinToon.dispose();signage?.dispose?.();env.dispose();renderer.dispose();},{once:true});
 }catch(error){status.hidden=false;status.textContent=`読み込みに失敗しました: ${error.message}`;console.error(error);}

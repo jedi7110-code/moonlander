@@ -1,6 +1,6 @@
 import {FLOORS,LADDER_X,getStation,CAT_PORT,CAT_BOWL,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE} from './layout.js';
 import {CAT_RISE_TIME} from './cat-rest.js';
-import {CABIN_PACE,LADDER_PACE,LADDER_LANDING,LADDER_ENTRY} from './pace.js';
+import {CABIN_PACE,CREW_WALK_SPEED,LADDER_PACE,LADDER_LANDING,LADDER_ENTRY} from './pace.js';
 import {createCatTurn,sampleCatTurn,angleDelta} from './cat-turn.js';
 import {APPROVED_RESTS,approvedRestRelease} from './cat-approved-rest.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
@@ -19,7 +19,7 @@ export function advanceCabinTraffic(actor,cat,dt,droid=null){
 }
 
 export class CrewMotion {
-  constructor({floor=getStation('console').floor,x=360,walkSpeed=54,climbSpeed=38*LADDER_PACE}={}) {
+  constructor({floor=getStation('console').floor,x=360,walkSpeed=CREW_WALK_SPEED,climbSpeed=38*LADDER_PACE}={}) {
     this.floor=floor;this.x=x;this.y=FLOORS[floor].y;this.walkSpeed=walkSpeed;this.climbSpeed=climbSpeed;
     this.walkDistance=0;
     this.queue=[];this.onArrive=null;this.facing=1;this.symbol='';this.knockTime=0;this.commandVersion=0;

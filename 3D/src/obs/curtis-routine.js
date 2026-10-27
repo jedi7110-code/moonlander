@@ -2,8 +2,11 @@ import {worldActor,worldCat,close,approaches,nextActor,nextDroid,CREW_CLEARANCE,
 import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,ladderApproachDepth} from './layout.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
+import {CREW_WALK_SPEED} from './pace.js';
+import {CURTIS_COFFEE} from './curtis-coffee.js';
 
 export const CURTIS_TIMING={first:[90,150],between:[180,360],prepareAhead:35};
+export const CURTIS_WALK_SPEED=CREW_WALK_SPEED*.022;
 export const CURTIS={top:13.4,seatX:6.05,coffeeX:10.085,roomX:-1.88,roomZ:-4.37};
 export const CURTIS_LADDER_TRAFFIC=Object.freeze({waitX:2.2,crewWaitX:2.3,clearX:2.1,mergeX:1.75,bridgeX:.85,passZ:2.18});
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
@@ -52,7 +55,7 @@ export class CurtisRoutine {
   add(kind,to,seconds,extra={}){
     const from={...(this.steps.at(-1)?.to??this.position)};
     if(kind==='walk'&&distance(from,to)<1e-7)return;
-    this.steps.push({kind,from,to:{...(to??from)},duration:seconds??distance(from,to)/.78,...extra});
+    this.steps.push({kind,from,to:{...(to??from)},duration:seconds??distance(from,to)/CURTIS_WALK_SPEED,...extra});
   }
   walk(x,y,z,extra={}){this.add('walk',{x,y,z},null,extra);}
   hold(kind,seconds,extra={}){this.add(kind,null,seconds,extra);}
@@ -79,8 +82,7 @@ export class CurtisRoutine {
   coffee(){
     this.aisleTo(CURTIS.coffeeX,1);
     this.walk(CURTIS.coffeeX,FLOORS[1],-.38);
-    this.hold('brew',8,{yaw:Math.PI});
-    this.hold('coffee',18,{yaw:Math.PI});
+    this.hold('coffee',CURTIS_COFFEE.duration,{yaw:Math.PI});
     this.walk(CURTIS.coffeeX,FLOORS[1],CABIN_AISLE.crewZ);
   }
   beginVisit(){
@@ -183,7 +185,7 @@ export class CurtisRoutine {
       const end=this.steps.findIndex(step=>step.kind==='stand');
       if(end>=0&&this.steps[end+1]){
         this.steps.splice(0,end+1);this.age=0;
-        const exit=this.step;exit.from={...this.position};exit.duration=Math.max(.1,distance(exit.from,exit.to)/.78);
+        const exit=this.step;exit.from={...this.position};exit.duration=Math.max(.1,distance(exit.from,exit.to)/CURTIS_WALK_SPEED);
       }
       this.waiting=true;return;
     }

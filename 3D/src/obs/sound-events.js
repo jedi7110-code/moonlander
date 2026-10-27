@@ -6,6 +6,7 @@ import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {CABIN_SOUNDS} from './sound-library.js';
 import {KIBBLE_STREAM,KIBBLE_CONTACT_DELAY} from './kibble-timing.js';
 import {diningPhase,MEAL_SPOON_CONTACTS} from './dining-timing.js';
+import {curtisCoffeePose} from './curtis-coffee.js';
 import walkCycle from './milo-walk-cycle.json' with {type:'json'};
 
 const station=(id,z=-1.5)=>{const s=getStation(id);return{x:(s.x-700)*.022,y:(870-FLOORS[s.floor].y)*.016+1,z};};
@@ -135,14 +136,43 @@ export class CabinSoundEvents {
     }
     this.lids.set(key,opening);
   }
-  stride(key,distance,moving,spacing,position,surface='boots'){
+  stride(key,distance,moving,spacing,position,surface='boots',contactOnly=false){
     const previous=this.steps.get(key),index=Math.floor(distance/spacing);
-    if(previous&&moving&&distance>previous.distance&&distance-previous.distance<1.2&&(!previous.moving||index!==previous.index)){
+    const contact=previous&&(contactOnly?previous.moving&&index===previous.index+1&&distance-previous.distance<spacing:!previous.moving||index!==previous.index);
+    if(previous&&moving&&distance>previous.distance&&distance-previous.distance<1.2&&contact){
       this.variant=(this.variant+1)%3;
       const id=`${surface==='ladder'?'ladderStep':'step'}${this.variant+1}`;
       this.audio.play(id,{position,volume:1,rate:1});
     }
     this.steps.set(key,{distance,index,moving});
+  }
+  curtisFootfalls(dt,curtis){
+    const point=curtis?.trafficPosition??curtis?.position;
+    if(!curtis?.active||!point){
+      this.steps.delete('curtis');this.steps.delete('curtis-rungs');this.previousCurtis=null;this.curtisLadderDistance=0;return;
+    }
+    const previous=this.previousCurtis,step=curtis.step;
+    const continuous=dt<=.1&&previous?.routine===curtis;
+    const position={x:point.x,y:point.y+.1,z:point.z};
+    const walking=step?.kind==='walk'&&!curtis.waiting;
+    this.stride('curtis',curtis.walkDistance??0,walking&&continuous,walkCycle.cycleDistance/2,position,'boots',true);
+    const climbing=continuous&&step?.kind==='climb'&&previous.step===step&&!curtis.waiting&&
+      curtis.age>previous.age&&curtis.age-previous.age<=dt+1e-6&&Math.abs(point.y-previous.y)<.2;
+    if(climbing)this.curtisLadderDistance=(this.curtisLadderDistance??0)+Math.abs(point.y-previous.y);
+    this.stride('curtis-rungs',this.curtisLadderDistance??0,Boolean(climbing),.28,position,'ladder',true);
+    this.previousCurtis={routine:curtis,step,age:curtis.age,y:point.y};
+  }
+  curtisCoffee(dt,curtis){
+    const step=curtis?.step,age=curtis?.age??0,previous=this.previousCoffee;
+    const pose=step?.kind==='coffee'?curtisCoffeePose(age):null;
+    const active=Boolean(curtis?.active&&pose?.machineActive&&!curtis.waiting&&dt<=.1);
+    const changed=previous&&(previous.routine!==curtis||previous.step!==step||age<previous.age||age-previous.age>dt+1e-5);
+    if(this.coffeeVoice&&(!active||changed||this.coffeeVoice.stopping)){
+      if(!this.coffeeVoice.stopping)this.audio.stopVoice(this.coffeeVoice);
+      this.coffeeVoice=null;
+    }
+    if(active&&!this.coffeeVoice)this.coffeeVoice=this.audio.play('coffeeMachine',{position:{x:10.135,y:4.6,z:-.9},offset:pose.machineTime});
+    this.previousCoffee={routine:curtis,step,age};
   }
   droidFootfall(distance,moving,position){
     // Numerical tolerance keeps an exact landing from slipping one frame late.
@@ -160,7 +190,7 @@ export class CabinSoundEvents {
     if(active&&previous&&previous.token===token&&index>previous.index)this.audio.play(id,{position,volume});
     this.beats.set(key,{token,index});
   }
-  update(dt,{actor,brain,droid,airlock,care,cat}){
+  update(dt,{actor,brain,droid,airlock,care,cat,curtis}){
     if(!(dt>0))return;
     const audio=this.audio,bathroom=brain.bathroom,pose=bathroom?.pose;
     // Cabin-wide safety alarm: no camera/deck attenuation. Repair must be
@@ -200,6 +230,8 @@ export class CabinSoundEvents {
       this.stride('rungs',this.ladderDistance,true,.28,milo,'ladder');
     }else this.stride('rungs',this.ladderDistance??0,false,.28,milo,'ladder');
     this.lastY=actor.y;
+    this.curtisFootfalls(dt,curtis);
+    this.curtisCoffee(dt,curtis);
     if(droid!==this.lidDroid){this.lids.clear();this.lidDroid=droid;}
     if(droid){
       const step=droid.step,p=droid.position,position={x:p.x,y:p.y+.65,z:p.z};

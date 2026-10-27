@@ -1,12 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CurtisRoutine,CURTIS,CURTIS_TIMING} from '../src/obs/curtis-routine.js';
+import {CurtisRoutine,CURTIS,CURTIS_TIMING,CURTIS_WALK_SPEED} from '../src/obs/curtis-routine.js';
 import {CrewMotion,Supplies,advanceCabinTraffic} from '../src/obs/state.js';
 import {DroidRoutine} from '../src/obs/droid-routine.js';
 import fs from 'node:fs';
 import {Group,MeshStandardMaterial} from 'three';
 import {createMiloBoot} from '../src/obs/characters.js';
 import {finishCurtisBoots} from '../src/obs/curtis-model.js';
+
+test('Curtis walks at Milo\'s normal speed without speeding up ladder transfers',()=>{
+  for(const tickSeconds of [1/30,1/60,.05]){
+    const actor=new CrewMotion({floor:1,x:700+3/.022});actor.goTo({floor:1,x:700+10/.022});
+    const curtis=new CurtisRoutine();curtis.active=true;curtis.position={x:3,y:3.392,z:.78};curtis.walk(10,3.392,.78);
+    assert.equal(CURTIS_WALK_SPEED,actor.walkSpeed*.022);
+    assert.equal(curtis.step.duration,7/CURTIS_WALK_SPEED);
+    for(let frame=0;frame<3/tickSeconds;frame++){actor.update(tickSeconds);curtis.update(tickSeconds);}
+    assert.ok(Math.abs(curtis.position.x-(actor.x-700)*.022)<1e-8);
+    curtis.steps=[];curtis.climbTo(0);assert.equal(curtis.step.duration,3.392/.46+2.4);
+  }
+});
 
 test('Curtis has black grain leather and dark laces without recoloring Milo or sharing extra lace materials',()=>{
   const material={cloth:new MeshStandardMaterial(),rubber:new MeshStandardMaterial(),metal:new MeshStandardMaterial()};
@@ -57,7 +69,8 @@ test('a visit descends, visits all four activities through the room portal, leav
       if(c.visits===1&&!c.active)break;
     }
     assert.equal(c.visits,1);assert.equal(c.active,false);assert.equal(c.ladderClaim,false);
-    for(const a of ['climb','relax','brew','coffee','work','window'])assert.ok(activities.has(a),a);
+    for(const a of ['climb','relax','coffee','work','window'])assert.ok(activities.has(a),a);
+    assert.equal(activities.has('brew'),false);
     assert.ok(positions.some(p=>p.x===CURTIS.roomX&&p.z<-4));
     assert.equal(c.position.y,CURTIS.top);
     const until=c.due-c.time;assert.ok(until>=180-1e-9&&until<=360+1e-9);

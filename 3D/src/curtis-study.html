@@ -7,16 +7,16 @@
 </style>
 <canvas aria-label="カーティスの3D動作プレビュー"></canvas>
 <aside>
-<h1>CURTIS</h1><p>動作スタディー · ハシゴ → コーヒー13</p>
+<h1>CURTIS</h1><p>動作スタディー · コーヒーを淹れて飲む</p>
 <label for="action">動作</label><select id="action" disabled>
-<option value="ladderCoffee">ハシゴからコーヒーまで</option><option value="visit">来訪から退出まで</option><option value="climb">ハシゴを降りる</option><option value="walk">歩く</option><option value="sit">ソファーに座る</option><option value="relax">くつろぐ</option><option value="stand">ソファーから立つ</option><option value="brew">コーヒーを淹れる</option><option value="coffee">コーヒーを飲む</option><option value="work">奥の部屋で作業</option><option value="window">窓から宇宙を見る</option><option value="leave">ハシゴで退出</option>
+<option value="ladderCoffee">ハシゴからコーヒーまで</option><option value="visit">来訪から退出まで</option><option value="climb">ハシゴを降りる</option><option value="walk">歩く</option><option value="sit">ソファーに座る</option><option value="relax">くつろぐ</option><option value="stand">ソファーから立つ</option><option value="coffee">コーヒーを淹れて飲む（抽出20秒）</option><option value="work">奥の部屋で作業</option><option value="window">窓から宇宙を見る</option><option value="leave">ハシゴで退出</option>
 </select>
-<div class="row"><button id="play" disabled>一時停止</button><button id="restart" disabled>最初から</button><button id="frame" disabled>1コマ</button></div>
+<div class="row"><button id="play" disabled>一時停止</button><button id="restart" disabled>最初から</button><button id="frame" disabled>1コマ</button><button id="sound" aria-pressed="false">音声オン</button></div>
 <label for="timeline">再生位置 <output id="elapsed">0.0 / 0.0 秒</output></label><input id="timeline" aria-label="再生位置" type="range" min="0" max="1" step="0.0166667" value="0" disabled>
 <label for="speed">再生速度</label><select id="speed"><option value="0.25">0.25倍</option><option value="0.5">0.5倍</option><option value="1" selected>1倍</option><option value="2">2倍</option><option value="4">4倍</option></select>
 <label><input id="loop" type="checkbox" checked> 繰り返す</label><label><input id="follow" type="checkbox" checked> カーティスを追う</label>
 <div class="row"><button data-view="front">正面</button><button data-view="side">横</button><button data-view="back">背面</button><button data-view="wide">全景</button></div>
 <p><small>ドラッグ：回転／ホイール：拡大<br>右ドラッグ：視点移動</small></p><a href="./obs.html">OBS本編へ</a>
 </aside><div id="status" role="status">船内を読み込み中…</div>
-<script type="module" src="./curtis-study.js?v=route13"></script>
+<script type="module" src="./curtis-study.js?v=route15"></script>
 </html>

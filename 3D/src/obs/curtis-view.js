@@ -12,6 +12,8 @@ import {limitShadowCasters} from './lighting.js';
 import {runPreparationSteps,nextPreparationFrame} from './background-preparation.js';
 import {CURTIS} from './curtis-routine.js';
 import {solveHingeArm} from './arm-ik.js';
+import {curtisCoffeePose} from './curtis-coffee.js';
+import {updateCupWater} from './cup-water.js';
 
 export class CurtisView {
   static async create(view){
@@ -54,8 +56,9 @@ export class CurtisView {
     this.stream.visible=false;
     if(!routine.active||!s){root.visible=false;if(this.view.ship.coffeeMug)this.view.ship.coffeeMug.visible=true;return;}
     const p=routine.trafficPosition??routine.position,age=routine.age;
+    const coffee=s.kind==='coffee'?curtisCoffeePose(age):null;
     this.dock.position.copy(this.cupHome);
-    if(s.kind==='coffee')this.dock.position.copy(this.cupPour).lerp(this.cupHome,THREE.MathUtils.smoothstep(age/s.duration,.74,.90));
+    if(coffee)this.dock.position.copy(this.cupPour).lerp(this.cupHome,coffee.returning);
     root.position.set(p.x,p.y,p.z);
     const seated=['sit','relax','stand'].includes(s.kind);
     // Reuse only the vertical sit/rise phase, without the table-side shuffle
@@ -72,7 +75,7 @@ export class CurtisView {
     animateMilo(root,{moving:s.kind==='walk',waiting:routine.waiting,climbing:false,
       facing:Math.sign(Math.sin(routine.yaw))||1,walkYaw:routine.yaw,walkDistance:routine.walkDistance,
       action:seated?'lounge':s.kind==='coffee'?'hydro':null,
-      time:routine.time,dt,actionTime:age,actionDuration:s.duration,
+      time:routine.time,dt,actionTime:coffee?(coffee.brewing?0:coffee.drinkTime):age,actionDuration:coffee?coffee.drinkDuration:s.duration,
       loungeExit:exit,diningDocks:s.kind==='coffee'?{mug:this.dock}:null});
     if(seated){
       if(s.kind==='sit')root.rotation.y+=Math.PI*(1-THREE.MathUtils.smoothstep(age,0,.6));
@@ -91,8 +94,8 @@ export class CurtisView {
     }else if(s.kind==='relax'){
       // Rest on the thighs; the visitor's seat is left of Milo and Lucy.
       root.userData.head.rotation.y=.17*Math.sin(age*.16);
-    }else if(['work','window','brew'].includes(s.kind)){
-      root.rotation.y+=Math.atan2(Math.sin(Math.PI-root.rotation.y),Math.cos(Math.PI-root.rotation.y))*(1-Math.exp(-5*dt));
+    }else if(['work','window'].includes(s.kind)||coffee?.brewing){
+      if(!coffee)root.rotation.y+=Math.atan2(Math.sin(Math.PI-root.rotation.y),Math.cos(Math.PI-root.rotation.y))*(1-Math.exp(-5*dt));
       const ease=THREE.MathUtils.smoothstep(Math.min(age,s.duration-age),0,1.5);
       if(s.kind==='work'){
         applyLeisurePose(root,'tablet',age,s.duration);setTabletHandFit(root,true);
@@ -102,7 +105,7 @@ export class CurtisView {
         root.userData.head.rotation.set(-.08*ease,.16*Math.sin(age*.12)*ease,0);
       }else{
         const {body,dining}=root.userData,{mug,water}=dining;
-        const reach=THREE.MathUtils.smoothstep(age,0,1.4),transfer=THREE.MathUtils.smoothstep(age,1.4,3);
+        const {reach,transfer,press}=coffee;
         const position=this.cupHome.clone().lerp(this.cupPour,transfer);
         position.y+=.07*Math.sin(Math.PI*transfer);
         root.updateWorldMatrix(true,true);
@@ -110,7 +113,6 @@ export class CurtisView {
         mug.quaternion.copy(body.getWorldQuaternion(new THREE.Quaternion())).invert().multiply(this.dock.quaternion);
         reachCup(root,mug,reach,cupGripPose(0));
         // The left hand stays on the cup while the free hand presses ESPRESSO.
-        const press=THREE.MathUtils.smoothstep(age,3,3.6)*(1-THREE.MathUtils.smoothstep(age,4,4.6));
         const rig=root.userData.arms[0],rest=body.worldToLocal(rig.hand.getWorldPosition(new THREE.Vector3()));
         const button=body.worldToLocal(this.cupHome.clone().add(new THREE.Vector3(.066,.551,.173)));
         // Solve fingertip contact with a straight wrist. The palm follows the
@@ -129,14 +131,14 @@ export class CurtisView {
           rig.arm.quaternion.copy(pose.upper);rig.elbow.quaternion.copy(pose.lower);
           rig.hand.quaternion.copy(straight);
         }
-        this.stream.visible=age>=3.8&&age<7;
-        water.visible=age>=3.8;water.scale.y=THREE.MathUtils.lerp(.2,1,THREE.MathUtils.smoothstep(age,3.8,7));
+        this.stream.visible=coffee.pouring;
+        water.scale.y=1;updateCupWater(water,THREE.MathUtils.lerp(-.05,.047,coffee.fill));water.visible=age>=3.8;
         root.userData.updateWristTwists?.();
       }
     }
     root.visible=true;
-    if(s.kind!=='brew'){root.userData.dining.water.scale.y=1;root.userData.dining.water.visible=true;}
-    if(this.view.ship.coffeeMug)this.view.ship.coffeeMug.visible=!['brew','coffee'].includes(s.kind);
+    if(!coffee?.brewing){root.userData.dining.water.scale.y=1;root.userData.dining.water.visible=true;}
+    if(this.view.ship.coffeeMug)this.view.ship.coffeeMug.visible=!coffee;
     this.toon.update(this.view.width,this.view.height);
     root.updateMatrixWorld(true);
   }

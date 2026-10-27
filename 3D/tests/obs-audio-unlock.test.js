@@ -75,7 +75,7 @@ test('capture gesture handlers retry iOS touchend without intercepting taps or t
 test('OBS starts enabled, preloads without resuming, and binds page restoration and cleanup',async()=>{
   const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');
   const html=await readFile(new URL('../src/obs.html',import.meta.url),'utf8');
-  assert.match(main,/new CabinAudio\(\{enabled:true\}\)/);
+  assert.match(main,/new CabinAudio\(\{enabled:true,defer:\['coffeeMachine'\]\}\)/);
   assert.match(main,/audio\.prepare\(\);void audio\.load\(\)/);
   assert.match(main,/bindCabinAudioGestures\(audio/);
   assert.match(main,/addEventListener\('pageshow',visibilityChanged\)/);

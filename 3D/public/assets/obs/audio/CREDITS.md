@@ -7,6 +7,33 @@ The user-supplied power-on edit below has an unverified license.
 No remotely streamed audio. Do not describe the complete library as CC0.
 Attribution is retained here voluntarily, including the exact source and edit recipe.
 
+## Coffee machine — approved A, 2026-10-27
+
+- Author: bassimat, **Nespresso Machine Making Coffee and Coffee Drops**, #832445.
+- Source and explicit CC0: https://freesound.org/people/bassimat/sounds/832445/
+- Public preview: https://cdn.freesound.org/previews/832/832445_15636277-hq.mp3
+- Source MP3 SHA-256: `f5310446a82c685432bd4d047b505d86dfbb6e17f1be0536d3d698bbfd70978e`.
+- The user selected audition A, then requested its first 20 seconds. The audition
+  recipe and hash are in `studies/audio/coffee-samples/SOURCES.md`.
+- `coffee-machine-a-20s.wav`: exactly 20 seconds, mono 22,050 Hz PCM16,
+  882,044 bytes, SHA-256 `3755c641df7fa0343607b9de0b0901f334433b80d4d3e0b8c26fc87dfc6504d4`.
+- Preserve the audition's pitch, speed and level; add only an 80 ms end fade.
+  No repeating loop, stretched extraction or synthetic layer. Playback gain .18,
+  reduced from .24 at the user's request (25% lower, approximately -2.5 dB).
+- One continuous coffee section includes 3.6 seconds of cup preparation, then
+  exactly 20 seconds from button contact to extraction finishing. The cup remains
+  under the spout until extraction and its sound stop. A 0.4-second settling pause
+  leads into 11.6 seconds of drinking and returning the cup, without a section
+  change or a grip reset. Drinking is silent. Sound originates at the machine,
+  not the drinker's moving hand.
+- Initial OBS loading skips this clip. It is loaded alongside Curtis's appearance
+  before his visit. Pause/mute stop the voice; resuming an active operation uses
+  its current source offset, never a replay from the button. Leaving or completing
+  the section stops it. Normal camera/deck attenuation applies.
+- Rebuild: `node studies/audio/pack-coffee.mjs [APPROVED_A_WAV]`.
+- Preview: `curtis-study.html`, select the combined coffee section and enable sound;
+  or `cabin-audio-study.html?scenario=curtisCoffee` for the audio-only scenario.
+
 ## Factory Warning Buzzer — qubodup / Freesound, 2026-10-10
 
 - User-selected **Factory Warning Buzzer**, sound #832414, a recorded bridge-crane warning.

@@ -104,7 +104,7 @@ test('Cat approaching Curtis stops and resumes after he clears',()=>{
 test('Curtis and an oncoming droid both clear their separate lanes',()=>{
   const c=visitor();const from={x:9,y:3.392,z:1.48},to={...from,x:2};
   const d={position:{...from},age:0,step:{from,to,duration:7}};
-  for(let i=0;i<1800&&c.active;i++){
+  for(let i=0;i<1800&&(c.active||d.age<7);i++){
     c.update(dt,{droid:d});
     if(!c.blocksDroid(d,dt)){d.age=Math.min(7,d.age+dt);d.position.x=9-d.age;}
     assert.ok(Math.hypot(c.trafficPosition.x-d.position.x,c.trafficPosition.z-d.position.z)>=.63);

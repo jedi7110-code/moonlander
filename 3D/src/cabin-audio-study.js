@@ -8,7 +8,9 @@ import {CatMotion,CatRoutine,CrewMotion,Supplies} from './obs/state.js';
 import {CAT_PORT,CAT_BOWL,FLOORS,LADDER_X,getStation} from './obs/layout.js';
 import {planDroidTurn} from './obs/droid-turn.js';
 import {DroidRoutine,DROID_PACE} from './obs/droid-routine.js';
-import {DROID_GAIT} from './obs/pace.js';
+import {DROID_GAIT,CREW_WALK_SPEED} from './obs/pace.js';
+import {CurtisRoutine,CURTIS} from './obs/curtis-routine.js';
+import {CURTIS_COFFEE} from './obs/curtis-coffee.js';
 import {bindCabinAudioGestures} from './obs/audio-unlock.js';
 const $=id=>document.getElementById(id),audio=new CabinAudio({ambience:false});
 const requestedScenario=new URLSearchParams(location.search).get('scenario');
@@ -73,6 +75,13 @@ function start(){
     const from=kind==='miloClimbUp'?1:0;
     state.actor=new CrewMotion({floor:from,x:LADDER_X});state.actor.goTo({floor:1-from,x:LADDER_X});
   }
+  if(kind.startsWith('curtis')){
+    const visitor=state.curtis=new CurtisRoutine(),from=kind==='curtisClimbUp'?0:1;
+    visitor.active=true;visitor.position={x:kind==='curtisCoffee'?CURTIS.coffeeX:kind==='curtisWalk'?-3:0,y:(870-FLOORS[from].y)*.016,z:kind==='curtisCoffee'?-.38:.78};
+    if(kind==='curtisCoffee')visitor.hold('coffee',CURTIS_COFFEE.duration);
+    else if(kind==='curtisWalk')visitor.walk(3,visitor.position.y,.78);else visitor.climbTo(1-from);
+    visitor.hold('relax',1);driver.update(1/60,state);
+  }
   if(['droidTurn','droidClimb'].includes(kind)){
     const turn=planDroidTurn(0,Math.PI);turn.duration/=DROID_PACE;
     state.droid={position:{x:0,y:0,z:.34},step:kind==='droidTurn'?{kind:'turn',turn,duration:turn.duration}:{kind:'climb',from:{y:0},duration:6},age:0,time:0,washingUntil:0};
@@ -95,15 +104,17 @@ function tick(now){
   if(s.brain.bunkVisit){if(t>.5)s.brain.bunkVisit.requestExit();s.brain.bunkVisit.update(dt);}
   if(s.brain.grooming)s.brain.grooming.update(dt);
   if(s.brain.bathroom){s.brain.bathroom.update(dt);if(t>9)s.brain.bathroom.requestExit();}
-  if(r.kind==='walk'){s.actor.busy=t<4;if(s.actor.busy){s.actor.walkDistance+=dt*48;s.actor.x+=dt*48;}}
+  if(r.kind==='walk'){s.actor.busy=t<4;if(s.actor.busy){s.actor.walkDistance+=dt*CREW_WALK_SPEED;s.actor.x+=dt*CREW_WALK_SPEED;}}
   if(r.kind.startsWith('miloClimb'))s.actor.update(dt);
+  if(s.curtis)s.curtis.update(dt);
   if(r.kind==='droidWalk'){s.droid.waiting=t>=4;if(!s.droid.waiting){const travel=dt*DROID_GAIT.speed*DROID_PACE;s.droid.walkDistance+=travel;s.droid.position.x+=travel;}}
   if(['washerDoor','feed','simmer'].includes(r.kind))s.droid.update(dt);
   else if(s.droid){s.droid.time=t;s.droid.age=Math.min(t,s.droid.step?.duration??6);if(r.kind==='droidClimb')s.droid.position.y=Math.min(3.392,t*.40*DROID_PACE);if(t>=(s.droid.step?.duration??6))s.droid.step=null;}
   if(r.kind==='mouseChase')s.cat.update(dt);
   else if(s.cat)s.cat.motion.update(dt);
   if(s.care.delivery){s.care.delivery.age=t;if(t>3.3)s.care.phase='idle';}
-  r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.cat?.mouseChase?.pose?.phase??s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.grooming?.pose.label??s.brain.bathroom?.phase??s.droid?.step?.action??(r.kind==='meal'?(s.brain.state==='performing'?'食事中':'食事終了'):s.care.phase)}`;
+  r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.curtis?.step?.kind??s.cat?.mouseChase?.pose?.phase??s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.grooming?.pose.label??s.brain.bathroom?.phase??s.droid?.step?.action??(r.kind==='meal'?(s.brain.state==='performing'?'食事中':'食事終了'):s.care.phase)}`;
+  if(s.curtis){if(!s.curtis.active){stop();return;}frame=requestAnimationFrame(tick);return;}
   if(['washerDoor','feed','simmer'].includes(r.kind)&&!s.droid.step){stop();return;}
   if(r.kind==='simmer'){frame=requestAnimationFrame(tick);return;}
   if(r.kind==='meal'){if(t>s.brain.curDurSec+.5){stop();return;}frame=requestAnimationFrame(tick);return;}

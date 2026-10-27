@@ -36,5 +36,6 @@ export const CABIN_SOUNDS=Object.freeze({
   cutlery2:{file:'meal-cutlery-2.wav',label:'食事 / スプーン 2',description:'別の接触テイク / すくう・器へ戻す時だけ',gain:.12},
   cutlery3:{file:'meal-cutlery-3.wav',label:'食事 / スプーン 3',description:'別の接触テイク / 原速・短い減衰',gain:.11},
   simmer:{file:'pot-simmer.wav',label:'調理 / 鍋で煮込む',description:'実録の静かな煮込み / コトコト・原速・かき混ぜる間だけ',gain:.18,loop:true},
+  coffeeMachine:{file:'coffee-machine-a-20s.wav',label:'コーヒーマシン / A・20秒',description:'選択された実録Aの冒頭20秒 / ボタン押下から抽出完了まで・原速',gain:.18,duration:20},
 });
 export const CABIN_AUDIO_BASE='/3D/assets/obs/audio/';
