@@ -2,7 +2,7 @@ import {BufferGeometry,Mesh} from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {limitShadowCasters} from './lighting.js';
 
-const details=new Set(['Combat boot sole lug','Metal boot eyelet','Crossed boot lace',
+const details=new Set(['Metal boot eyelet','Crossed boot lace',
   'Tightened top lace','Tied boot lace loop','Boot lace end']);
 
 // These details never move relative to their boot. Preserve every triangle,

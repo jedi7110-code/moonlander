@@ -100,15 +100,10 @@ export function createMiloBoot(parent,m,side){
   const leather=bootLeather(),welt=leather.clone(),laces=m.cloth.clone();
   welt.color.setHex(0x736249);laces.color.setHex(0xc4b995);laces.roughness=.88;
 
-  shapedSole(boot,m.rubber,side,{depth:.024,bevel:.003,y:-.073,name:'Anatomical combat boot sole'});
+  // A continuous sole reaches the former tread's contact plane. Keep the
+  // overall boot height and authored foot contacts without separate lugs.
+  shapedSole(boot,m.rubber,side,{depth:.031,bevel:.003,y:-.073,name:'Anatomical combat boot sole'});
   shapedSole(boot,welt,side,{depth:.008,bevel:.0015,y:-.064,name:'Foot-shaped stitched boot welt',scale:.985});
-  const lugRows=[[-.073,.021],[-.045,.032],[.046,.047],[.077,.044],[.109,.036],[.137,.026],[.162,.012]];
-  for(const [z,width]of lugRows)for(const x of [-width,0,width]){
-    if(x===0&&Math.abs(z)<.03)continue;
-    if(width<.02&&x!==0)continue; // The narrow toe fits one lug, not three intersecting lugs.
-    const lug=box(boot,m.rubber,x,-.102,z,x===0?.024:.020,.010,.024,.002);lug.name='Combat boot sole lug';
-    lug.rotation.y=x===0?0:-Math.sign(x)*THREE.MathUtils.lerp(.08,.34,THREE.MathUtils.clamp((z+.09)/.23,0,1));
-  }
 
   const upper=surface(boot,leather,56,64,(t,u)=>{
     const y=-.064+t*.150,[width,front,rear]=bootSection(y),angle=u*Math.PI*2;

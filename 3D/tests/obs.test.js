@@ -264,11 +264,8 @@ test('Milo wears structured lace-up combat boots instead of plain pull-on boots'
     sole.geometry.computeBoundingBox();
     const welt=boot.getObjectByName('Foot-shaped stitched boot welt');welt.geometry.computeBoundingBox();
     assert.ok(sole.geometry.boundingBox.max.y-welt.geometry.boundingBox.min.y>.003,'sole slightly overlaps the welt');
-    for(const lug of boot.getObjectsByProperty('name','Combat boot sole lug')){
-      lug.geometry.computeBoundingBox();
-      assert.ok(lug.position.y+lug.geometry.boundingBox.max.y-sole.geometry.boundingBox.min.y>.002,'tread is embedded in the sole');
-      assert.ok(Math.abs(lug.position.y+lug.geometry.boundingBox.min.y+.107)<1e-6,'tread contact height stays unchanged');
-    }
+    assert.equal(boot.getObjectsByProperty('name','Combat boot sole lug').length,0,'both characters use a treadless sole');
+    assert.ok(Math.abs(sole.geometry.boundingBox.min.y+.107)<1e-6,'the continuous sole preserves the former tread contact plane');
     const toeMargin=sole.geometry.boundingBox.max.z-upper.geometry.boundingBox.max.z;
     const heelMargin=upper.geometry.boundingBox.min.z-sole.geometry.boundingBox.min.z;
     assert.ok(toeMargin>.004&&toeMargin<.010,'sole has only a narrow lip ahead of the leather toe');
@@ -281,7 +278,6 @@ test('Milo wears structured lace-up combat boots instead of plain pull-on boots'
     assert.equal(boot.getObjectsByProperty('name','Metal boot eyelet').length,14);
     assert.equal(boot.getObjectsByProperty('name','Crossed boot lace').length,12);
     assert.equal(boot.getObjectsByProperty('name','Tied boot lace loop').length,2);
-    assert.ok(boot.getObjectsByProperty('name','Combat boot sole lug').length>=18);
   }
 });
 test('lounge thighs and shins clear the cushion while hips remain supported and boots stay grounded',()=>{

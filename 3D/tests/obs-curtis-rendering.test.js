@@ -13,7 +13,7 @@ import {createLocalNormalUpdater} from '../src/obs/local-vertex-normals.js';
 const data=await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url));
 await loadMiloBody(`data:application/json;base64,${data.toString('base64')}`);
 const materials=()=>new Proxy({},{get:(o,key)=>o[key]??=new MeshStandardMaterial()});
-const details=new Set(['Combat boot sole lug','Metal boot eyelet','Crossed boot lace','Tightened top lace','Tied boot lace loop','Boot lace end','Curtis boot lace details']);
+const details=new Set(['Metal boot eyelet','Crossed boot lace','Tightened top lace','Tied boot lace loop','Boot lace end','Curtis boot lace details']);
 function surfaces(boot){
   const groups=new Map(),p=new Vector3(),n=new Vector3();
   for(const mesh of boot.children.filter(o=>details.has(o.name))){
