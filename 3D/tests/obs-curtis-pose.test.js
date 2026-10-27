@@ -12,6 +12,23 @@ import {mouthPosition} from '../src/obs/dining.js';
 const bytes=await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url));
 await loadMiloBody(`data:application/json;base64,${bytes.toString('base64')}`);
 
+test('the visitor prepares ladder geometry and contact caches before appearing without advancing his live visit',()=>{
+  const root=createMilo(new Proxy({},{get:(o,k)=>o[k]??=new MeshStandardMaterial()}));
+  const scene=new Scene(),view={scene,ship:{coffeeMug:new Object3D()},width:1200,height:800};scene.add(root);
+  const visitor=new CurtisView(root,view);visitor.toon={update(){},dispose(){}};
+  const live=new CurtisRoutine({random:()=>0}),due=live.due;
+  try{
+    visitor.prepareLadderPose();
+    assert.equal(root.visible,false);assert.equal(visitor.stream.visible,false);
+    const fit=root.userData.ladderHandFit;assert.ok(fit.geometry);assert.ok(fit.watch);
+    assert.equal(fit.corrections.size,2);assert.equal(typeof fit.updateContactNormals,'function');
+    assert.equal(live.active,false);assert.equal(live.time,0);assert.equal(live.due,due);
+    live.active=true;live.position={x:0,y:13.4,z:.23};live.climbTo(1,{enter:true});
+    visitor.render(live,1/60);assert.equal(root.visible,true);assert.equal(root.userData.ladderHandFit,fit);
+    root.traverse(node=>assert.ok(node.matrixWorld.elements.every(Number.isFinite),node.name));
+  }finally{visitor.dispose();}
+});
+
 test('visit poses use the real body rig, remain finite, and restore the parked mug',()=>{
   const root=createMilo(new Proxy({},{get:(o,k)=>o[k]??=new MeshStandardMaterial()}));
   const scene=new Scene();scene.add(root);

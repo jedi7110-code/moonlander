@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {createCurtis} from './curtis-model.js?v=print10';
+import {createCurtis} from './curtis-model.js?v=print11';
 import {animateMilo} from './characters.js';
 import {applyCabinLadder} from './cabin-ladder.js';
 import {loungeExitPose} from './lounge-exit.js';
@@ -10,7 +10,7 @@ import {createMiloToonSteps} from './milo-toon.js';
 import {CabinStartupLighting} from './startup-lighting.js';
 import {limitShadowCasters} from './lighting.js';
 import {runPreparationSteps,nextPreparationFrame} from './background-preparation.js';
-import {CURTIS} from './curtis-routine.js';
+import {CURTIS,CurtisRoutine} from './curtis-routine.js';
 import {solveHingeArm} from './arm-ik.js';
 import {curtisCoffeePose} from './curtis-coffee.js';
 import {updateCupWater} from './cup-water.js';
@@ -29,6 +29,9 @@ export class CurtisView {
         }
       });
       limitShadowCasters(root);
+      await nextPreparationFrame();
+      result.prepareLadderPose();
+      await nextPreparationFrame();
       // Prepare only Curtis's programs after the first scene is already usable.
       // Submission is spread over frames, not added to cabin startup compilation.
       const pending=[],leaves=[];root.traverse(mesh=>{if(mesh.material)leaves.push(mesh);});
@@ -50,6 +53,14 @@ export class CurtisView {
     this.stream=new THREE.Mesh(new THREE.CylinderGeometry(.005,.006,.09,8),new THREE.MeshBasicMaterial({color:0x482311}));
     this.stream.position.copy(this.cupPour).add(new THREE.Vector3(0,.112,0));
     this.stream.visible=false;view.scene.add(this.stream);
+  }
+  prepareLadderPose(){
+    // Hand fitting and its first contact cache belong to the deferred visitor
+    // preparation, before he becomes visible at the top of the shaft.
+    const routine=new CurtisRoutine({random:()=>0});
+    routine.active=true;routine.position={x:0,y:CURTIS.top,z:.23};routine.climbTo(1,{enter:true});
+    routine.update(routine.step.duration*.5);this.render(routine,0);
+    this.root.visible=false;this.stream.visible=false;
   }
   render(routine,dt,{actor}={}){
     const root=this.root,s=routine.step;

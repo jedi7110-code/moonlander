@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {cloneMiloSkinGeometry} from './milo-elbow.js';
+import {createLocalNormalUpdater} from './local-vertex-normals.js';
 
 // The imported fingers are longer and more widely spaced than the animation
 // rig. Fit a reversible mesh copy before bending it; never change source data.
@@ -96,7 +97,7 @@ export function fitLadderWatch(root){
 // finger pads outside the rung. It fades out when the hand releases the bar.
 export function fitLadderGripContact(root,contacts,radius,poseGrip){
   const skin=root.userData.bodySkin,fit=root.userData.ladderHandFit;if(!fit)return;
-  const hands=contacts.filter(c=>c.hand),grips=hands.map(c=>c.grip);
+  const hands=contacts.filter(c=>c.hand),grips=hands.map(c=>THREE.MathUtils.smoothstep(c.grip,.65,1));
   if(fit.lastGrips&&grips.every((g,i)=>g===fit.lastGrips[i]))return;
   const {position,skinIndex,skinWeight,armRegion}=fit.geometry.attributes;
   position.array.set(fit.base);
@@ -138,5 +139,6 @@ export function fitLadderGripContact(root,contacts,radius,poseGrip){
     for(const [i,x,y,z]of fit.corrections.get(c.side)||[]){position.array[i*3]+=x*blend;position.array[i*3+1]+=y*blend;position.array[i*3+2]+=z*blend;}
   }
   fit.lastGrips=grips;
-  position.needsUpdate=true;fit.geometry.computeVertexNormals();
+  fit.updateContactNormals??=createLocalNormalUpdater(fit.geometry,[...fit.corrections.values()].flatMap(corrections=>corrections.map(([i])=>i)));
+  position.needsUpdate=true;fit.updateContactNormals();
 }

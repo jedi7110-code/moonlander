@@ -4,8 +4,8 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials} from './obs/materials.js';
 import {buildShipInBackground} from './obs/ship.js?v=print08';
 import {CurtisRoutine} from './obs/curtis-routine.js?v=coffee14';
-import {CurtisView} from './obs/curtis-view.js?v=coffee07';
-import {createCurtis} from './obs/curtis-model.js?v=print10';
+import {CurtisView} from './obs/curtis-view.js?v=render08';
+import {createCurtis} from './obs/curtis-model.js?v=print11';
 import {createMiloToonSteps} from './obs/milo-toon.js';
 import {runPreparationSteps} from './obs/background-preparation.js';
 import {createMetalDeckStyle} from './obs/metal-deck.js';
@@ -40,6 +40,7 @@ try{
   // Standalone playback does not need the live cabin's per-mesh background warmup.
   const visitor=new CurtisView(await createCurtis(),view);
   visitor.toon=await runPreparationSteps(createMiloToonSteps(visitor.root));scene.add(visitor.root);
+  visitor.prepareLadderPose();
   finishCabinFixtures({...view,milo:visitor.root});
   const cabinRoots=[ship.staticMesh,ship.animated];
   const signage=await createCabinSignage(cabinRoots);

@@ -4,6 +4,7 @@ import {loadMiloHead} from './head.js';
 import {loadMiloBody} from './milo-body.js';
 import {createMiloSteps,animateMilo} from './characters.js';
 import {runPreparationSteps,nextPreparationFrame} from './background-preparation.js';
+import {batchCurtisBootDetails,createCurtisShirtGeometry} from './curtis-rendering.js';
 
 function reshapeVisitorNose(head){
   const mesh=head.getObjectByName('Milo scanned head');
@@ -165,6 +166,7 @@ export async function createCurtis(){
   addAfro(head);
   const visitor=await runPreparationSteps(createMiloSteps(m,head));visitor.name='Curtis';
   finishCurtisBoots(visitor);
+  batchCurtisBootDetails(visitor);
   animateMilo(visitor,{moving:false,climbing:false,facing:1,time:0});visitor.rotation.y=0;
   const skin=visitor.userData.bodySkin;
   const original=skin.material.onBeforeCompile;
@@ -172,6 +174,7 @@ export async function createCurtis(){
   skin.material.customProgramCacheKey=()=> 'visitor-white-tee-v1';
 
   const garment=skin.clone();garment.name='Open space-print aloha shirt';garment.material=skin.material.clone();garment.skeleton=skin.skeleton;garment.bindMatrix.copy(skin.bindMatrix);garment.bindMatrixInverse.copy(skin.bindMatrixInverse);
+  garment.geometry=createCurtisShirtGeometry(skin.geometry);
   garment.material.side=THREE.DoubleSide;
   garment.material.onBeforeCompile=function(shader,...rest){
     original.call(this,shader,...rest);shader.uniforms.tattooStrength.value=0;shader.uniforms.shirtBackPrintStrength.value=0;shader.uniforms.spacePrint={value:map};
