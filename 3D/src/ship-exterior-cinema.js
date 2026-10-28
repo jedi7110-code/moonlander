@@ -60,7 +60,7 @@ try{
       ship.dockedLander.visible=false;
       gasPass=createExteriorGasPass(renderer,ship.probeThrusters.gas);
       await renderer.compileAsync(scene,camera);if(disposed)return;
-      probeReady=true;document.documentElement.dataset.probeReadyMs=performance.now().toFixed(1);
+      probeReady=true;document.documentElement.dataset.probeReadyMs=performance.now().toFixed(1);tell('probe-ready');
     })();
   }
   if(!freshOpening)document.body.classList.remove('waiting-for-film');
@@ -172,7 +172,7 @@ try{
       document.documentElement.dataset.logoResolvedMs=performance.now().toFixed(1);tell('logo-resolved');
     }
     // Present two frames with the logo fully faded before releasing expensive
-    // CPU/GPU preparation. The network preloads already run in the parent.
+    // CPU/GPU preparation. The parent starts its cabin prefetch after the probe.
     if(running&&freshOpening&&time>=EXTERIOR_LOGO.end&&++introFinishedFrames===2){
       document.documentElement.dataset.introFinishedMs=performance.now().toFixed(1);tell('intro-finished');
       void prepareProbe().catch(error=>{

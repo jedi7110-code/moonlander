@@ -17,8 +17,11 @@ export class ExteriorCinemaUI{
       if(event.data.action==='intro-finished'){
         document.documentElement.dataset.openingIntroFinishedMs=performance.now().toFixed(1);this.resolveIntroFinished?.();
       }
+      if(event.data.action==='probe-ready'){
+        document.documentElement.dataset.openingProbeReadyMs=performance.now().toFixed(1);this.resolveProbeReady?.();
+      }
       if(event.data.action==='failed'){
-        const error=new Error('Opening renderer could not start');this.rejectPlaying?.(error);this.rejectLogoResolved?.(error);this.rejectIntroFinished?.(error);
+        const error=new Error('Opening renderer could not start');this.rejectPlaying?.(error);this.rejectLogoResolved?.(error);this.rejectIntroFinished?.(error);this.rejectProbeReady?.(error);
       }
       if(event.data.action==='exit')this.close();
     }};
@@ -41,6 +44,9 @@ export class ExteriorCinemaUI{
     this.logoResolvedPromise=new Promise((resolve,reject)=>{this.resolveLogoResolved=resolve;this.rejectLogoResolved=reject;});
     this.logoResolvedPromise.catch(()=>{});
     this.introFinishedPromise=new Promise((resolve,reject)=>{this.resolveIntroFinished=resolve;this.rejectIntroFinished=reject;});
+    // The film's last own download; cabin prefetching may follow it.
+    this.probeReadyPromise=new Promise((resolve,reject)=>{this.resolveProbeReady=resolve;this.rejectProbeReady=reject;});
+    this.probeReadyPromise.catch(()=>{});
     // A free exterior view has no boot consumer waiting for this promise.
     this.playingPromise.catch(()=>{});
     this.introFinishedPromise.catch(()=>{});
@@ -102,6 +108,7 @@ export class ExteriorCinemaUI{
   whenEntryRequested(){return this.entryRequestedPromise;}
   whenLogoResolved(){return this.logoResolvedPromise;}
   whenIntroFinished(){return this.introFinishedPromise;}
+  whenProbeReady(){return this.probeReadyPromise;}
   close({force=false}={}){
     if(!this.open)return;
     if(!force&&!this.hostIsReady)return;

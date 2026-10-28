@@ -18,6 +18,7 @@ async function bootFixture(t,opening){
   const source=bootSource
     .replace("import {exteriorCinema} from './exterior-session.js';",'const {exteriorCinema,shouldPlayExteriorOpening,loadCabin}=globalThis.testOpeningBoot;')
     .replace("import {shouldPlayExteriorOpening} from './exterior-cinema-policy.js';",'')
+    .replace("import {CABIN_SOUNDS,CABIN_AUDIO_BASE} from './sound-library.js';",'const CABIN_SOUNDS={},CABIN_AUDIO_BASE="/3D/assets/obs/audio/";')
     .replace("await import('./main.js');",'await loadCabin();');
   await import(`data:text/javascript,${encodeURIComponent(source+`\n// opening=${opening}`)}`);
   return{events,play,intro,enter,mainLoaded,progress};

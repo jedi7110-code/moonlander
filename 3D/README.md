@@ -329,6 +329,8 @@ OBSのエナメル・金属・綿生地・毛並みには、画像生成した�
 
 起動時の組み立ては `createPreparationScheduler({budgetMs:48,frameCount:1})` で 1 フレームあたり最大 48ms まで進めます（オープニング映像は入室クリックで既に破棄済みなので、長めの予算でも映像は止まりません）。マイロのブーツの鳩目・靴紐はカーティスと同じ `batchCurtisBootDetails` で材質・影フラグごとに結合し、三角形・法線・UV を変えずに片足 30 描画を 2 描画にしています。`?debug` を付けて開くと `globalThis.cabinView` から `shadowProxies.report()`（結合から外れた部品）と `fixtureInstances.enabled`（インスタンス化の切替）で検証できます。
 
+オープニング映像の間は `obs/prefetch-worker.js`（Web Worker）が船内のチャンクと素材を HTTP キャッシュへ先読みします。映像側が探査機の読み込みを終えて `probe-ready` を送ってから開始し、`priority:'low'` で 1 本ずつ直列に取得するので、映像の描画や自前の読み込みと競合しません（以前 `<link rel=preload>` を映像中に出したときは映像がカクついた経緯があり、メインスレッドでは一切デコード・コンパイルしません）。対象は順に、`assets/obs-manifest.json`（Vite の build.manifest）から辿った `obs/main.js` の全チャンク・CSS、`#cabin-preloads` の 29 素材、`#cabin-prefetch` の壁の写真・ポスター、`sound-library.js` の全効果音、最後に遅延読込の `lucy-groom.bin`（計 122 ファイル・約 61 MB）。入室後の 115 リクエストはロゴ SVG 1 件を除きすべてキャッシュ（再検証 304）で済みます。入室クリックで停止要求を送り、転送中の 1 本だけ完了させます。`?prefetch=0` で無効化、`?prefetch=reload` でキャッシュを無視して再取得（計測用）。結果は `data-cabin-prefetch`（件数・バイト数・所要 ms・失敗 URL）に記録されます。
+
 バンプマップの強さは three.js r158 で式が変わりましたが（UV縮尺に依存しない正規化）、船内の各 `bumpScale` は旧式で調整済みのため、`obs/bump-scale-compat.js` が旧式を維持しています。three.js を再度更新するときはこのシムとシェーダー差し替え38箇所の目印文字列を確認してください。
 
 ## 引き継いだルール

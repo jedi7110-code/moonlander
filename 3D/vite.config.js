@@ -10,6 +10,8 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
+    // Read by the opening-film prefetch worker to warm the cabin's chunks.
+    manifest: 'assets/obs-manifest.json',
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./src/index.html', import.meta.url)),
