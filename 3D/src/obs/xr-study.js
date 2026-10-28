@@ -33,9 +33,7 @@ try{
     view.center.copy(view.targetCenter);view.viewHeight=view.targetHeight;view.setFrustum();
     view.characterToon.forEach(toon=>toon.update(view.width,view.height));
     view.cabinToon.update(view.width,view.height,view.viewHeight,view.fitHeight);
-    if($('quality').value==='vr')quality.beginFrame(view.mode);
-    try{view.renderer.render(view.scene,view.camera);}
-    finally{quality.endFrame();}
+    view.renderScene(view.camera,$('quality').value==='vr'?quality:null);
     const {calls,triangles}=view.renderer.info.render;
     const text=`描画 ${calls.toLocaleString()} 回 / 三角形 ${triangles.toLocaleString()}`;
     if($('stats').textContent!==text)$('stats').textContent=text;

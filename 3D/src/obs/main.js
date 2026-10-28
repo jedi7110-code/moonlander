@@ -361,13 +361,14 @@ refreshIcons();localize();
 
 async function start(){
   try{
-    const nextStartupFrame=createPreparationScheduler({budgetMs:8,frameCount:1});
+    const nextStartupFrame=createPreparationScheduler({budgetMs:48,frameCount:1});
     // Decode beside the 3D startup so the first lighting/bed stroke is ready.
     // The mixer remains silent until a real input gesture unlocks it.
     if(audio.enabled){try{audio.prepare();void audio.load();}catch(error){console.warn('Cabin audio preparation failed.',error);}}
     exterior.hostProgress(.15);
     view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,deferOptional:true,nextFrame:nextStartupFrame,onProgress:value=>exterior.hostProgress(.15+value*.6)});
     document.documentElement.dataset.cabinViewReadyMs=performance.now().toFixed(1);
+    if(new URLSearchParams(location.search).has('debug'))globalThis.cabinView=view;
     view.audio=audio;
     const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
     const curtis=new CurtisRoutine({prepare:()=>Promise.all([view.prepareCurtis(),audio.loadDeferred('coffeeMachine')])});

@@ -7,7 +7,7 @@ const details=new Set(['Metal boot eyelet','Crossed boot lace',
 
 // These details never move relative to their boot. Preserve every triangle,
 // material, UV and shadow flag, but submit matching surfaces together.
-export function batchCurtisBootDetails(root){
+export function batchCurtisBootDetails(root,{label='Curtis boot lace details'}={}){
   limitShadowCasters(root);
   for(const boot of root.getObjectsByProperty('name','Laced combat boot')){
     const batches=new Map();
@@ -26,7 +26,7 @@ export function batchCurtisBootDetails(root){
       });
       const geometry=mergeGeometries(parts,false);parts.forEach(part=>part.dispose());
       const first=meshes[0],batch=new Mesh(geometry,first.material);
-      batch.name=meshes.every(mesh=>mesh.name===first.name)?first.name:'Curtis boot lace details';
+      batch.name=meshes.every(mesh=>mesh.name===first.name)?first.name:label;
       batch.castShadow=first.castShadow;batch.receiveShadow=first.receiveShadow;
       boot.add(batch);meshes.forEach(mesh=>mesh.removeFromParent());
       // Original helper geometry is shared with Milo and must stay alive.

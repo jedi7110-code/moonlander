@@ -8,6 +8,17 @@ const down=new THREE.Vector3(0,-1,0),xAxis=new THREE.Vector3(1,0,0);
 const hipPivot=new THREE.Vector3(0,.970,0),neckPivot=new THREE.Vector3(0,1.607,0);
 const support=[[-.04,-.107,-.09],[.04,-.107,-.09],[-.055,-.107,.105],[.055,-.107,.105],[-.02,-.107,.175],[.02,-.107,.175]];
 
+function soleSupport(boot){
+  if(boot.userData.walkSoleSupport)return boot.userData.walkSoleSupport;
+  const sole=boot.getObjectByName('Anatomical combat boot sole');
+  if(!sole)return support;
+  if(!sole.geometry.boundingBox)sole.geometry.computeBoundingBox();
+  const {min,max}=sole.geometry.boundingBox;
+  // The continuous treadless sole reaches beyond the old, separate tread
+  // contacts at the toe and heel. Include those ends when the foot rolls.
+  return boot.userData.walkSoleSupport=[min.x,max.x].flatMap(x=>[min.z,max.z].map(z=>[x,min.y,z]));
+}
+
 // Periodic cubic interpolation preserves velocity through the loop boundary.
 export function sampleWalk(data,time){
   const phase=((time/data.duration)%1+1)%1*data.count,index=Math.floor(phase),t=phase-index;
@@ -66,7 +77,7 @@ export function applyMocapWalk(root,data,time){
     const foot=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,new THREE.Vector3().crossVectors(forward,right),forward));
     // The BVH toe offset slopes downward even in a flat-footed rest pose.
     foot.multiply(new THREE.Quaternion().setFromAxisAngle(xAxis,Math.atan2(-1.39921,5.47975)));
-    const bottom=Math.min(...support.map(a=>new THREE.Vector3(...a).applyQuaternion(foot).y));
+    const bottom=Math.min(...soleSupport(boot).map(a=>new THREE.Vector3(...a).applyQuaternion(foot).y));
     const clearance=Math.max(0,Math.min(ankle.y-data.ankleHeight,toe.y-data.toeHeight)-.003);
     const target=ankle.clone();target.y=.006+clearance-bottom;
     target.sub(body.position).applyQuaternion(inversePelvis);

@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_AMBIENCE,limitCabinLights,limitShadowCasters} from './lighting.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {materials,createStaticShadowProxySteps} from './materials.js';
+import {batchCurtisBootDetails} from './curtis-rendering.js';
+import {FixtureInstances} from './fixture-instances.js';
+import {createGroupShadowProxySteps} from './group-shadow-proxy.js';
 import {buildShip,buildShipInBackground,positionX,positionY,HABITAT_VIEW} from './ship.js';
 import {createMiloSteps,animateMilo} from './characters.js';
 import {loadCabinLucy as loadLucy,createCabinLucySteps as createLucySteps,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
@@ -115,6 +118,9 @@ export class ObservationView {
     yield;
     this.hairGrowth=yield* attachHairGrowthSteps(head);this.hairGrowth.setGrowth(0);
     this.milo=yield* createMiloSteps(m,head);this.scene.add(this.milo);
+    // Milo's eyelets and laces share Curtis's per-boot batches: 60 fewer draws
+    // per frame with the same triangles, normals and materials.
+    batchCurtisBootDetails(this.milo,{label:'Milo boot lace details'});
     yield;
     this.cat=yield* createLucySteps(lucy);this.scene.add(this.cat);
     yield;
@@ -148,6 +154,10 @@ export class ObservationView {
     this.observer=new ResizeObserver(this.resize);this.observer.observe(canvas);this.resize();this.viewHeight=this.targetHeight;this.setFrustum();
     this.listeners=[];this.bindControls();
     limitShadowCasters(this.scene);
+    // Rigid parts of moving fixtures cast through one merged proxy per group and
+    // repeated fittings share instanced draws; both verify themselves per frame.
+    this.shadowProxies=yield* createGroupShadowProxySteps(this.ship.animated);
+    this.fixtureInstances=new FixtureInstances(this.ship.animated,this.scene);
   }
   async prepareCurtis(){
     if(this.curtis||this.disposed)return;
@@ -287,7 +297,7 @@ export class ObservationView {
     const {renderer,scene}=this,probes=[],seen=new Set();
     const shadowSide={[THREE.FrontSide]:THREE.BackSide,[THREE.BackSide]:THREE.FrontSide,[THREE.DoubleSide]:THREE.DoubleSide};
     scene.traverse(object=>{
-      if(!object.isMesh||!object.castShadow||!visible(object)||Array.isArray(object.material))return;
+      if(!object.isMesh||!(object.castShadow||object.userData.mayCastShadow)||!visible(object)||Array.isArray(object.material))return;
       const material=object.material,geometry=object.geometry;
       const clippingCount=renderer.localClippingEnabled&&material.clipShadows===true&&Array.isArray(material.clippingPlanes)&&material.clippingPlanes.length?material.clippingPlanes.length:0;
       const rig=[!!object.isSkinnedMesh,!!object.isInstancedMesh,geometry.morphAttributes.position?.length??0,geometry.morphAttributes.normal?.length??0,geometry.morphAttributes.color?.length??0].join('|');
@@ -517,10 +527,17 @@ export class ObservationView {
     this.characterToon.forEach(toon=>toon.update(width,height));
     this.cabinToon?.update(width,height,this.viewHeight,this.fitHeight);
     if(prepareOnly)return;
-    const quality=this.immersive?.active?this.immersive.quality:null;
-    quality?.beginFrame(this.mode);
-    try{this.renderer.render(this.scene,this.camera);}
-    finally{quality?.endFrame();}
+    this.renderScene(this.camera,this.immersive?.active?this.immersive.quality:null);
   }
-  dispose(){this.disposed=true;this.catRunPreparation?.return();this.catRunPreparation=null;this.curtisRoutine?.dispose();this.curtis?.dispose();this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.emergencyLighting?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
+  // Every draw of the cabin, including studies that render the scene
+  // themselves, verifies the group shadow proxies and refreshes the instanced
+  // fittings first; both are undone again once the frame is submitted.
+  renderScene(camera=this.camera,quality=null){
+    this.scene.updateMatrixWorld();this.shadowProxies?.update();
+    quality?.beginFrame(this.mode);
+    this.fixtureInstances?.beginFrame(camera);
+    try{this.renderer.render(this.scene,camera);}
+    finally{this.fixtureInstances?.endFrame();quality?.endFrame();}
+  }
+  dispose(){this.disposed=true;this.catRunPreparation?.return();this.catRunPreparation=null;this.fixtureInstances?.dispose();this.shadowProxies?.dispose();this.curtisRoutine?.dispose();this.curtis?.dispose();this.depthProbeMaterials?.forEach(material=>material.dispose());this.shadowProxy?.geometry.dispose();this.shadowProxy?.material.dispose();this.characterCamera?.dispose();this.catRun?.dispose();this.emergencyLighting?.dispose();this.startupLighting?.dispose();this.renderer.setAnimationLoop(null);this.groomingMotion?.dispose();this.groomingMirror?.dispose();this.immersive?.dispose();this.cabinToon?.dispose();this.cabinSignage?.dispose();this.characterToon.forEach(toon=>toon.dispose());this.milo.userData.bodySkin?.skeleton.dispose();disposeLucy(this.cat);this.observer.disconnect();this.listeners.forEach(([type,fn,options])=>this.canvas.removeEventListener(type,fn,options));const geometries=new Set(),mats=new Set(),textures=new Set();this.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});for(const fit of [this.milo.userData.tabletHandFit,this.milo.userData.ladderHandFit])if(fit){geometries.add(fit.original);geometries.add(fit.geometry);if(fit.watch){geometries.add(fit.watch.original);geometries.add(fit.watch.geometry);}}mats.forEach(m=>Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);}));geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.envTarget.dispose();this.renderer.dispose();}
 }

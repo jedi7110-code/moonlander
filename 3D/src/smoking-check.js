@@ -34,7 +34,7 @@ function frame(now){
   if(document.getElementById('camera').value==='hands'){camera.position.set(-12.58,y+1.86,-.15);camera.lookAt(-11.80,y+1.40,-.66);camera.fov=58;}
   else{camera.position.set(-12.2,y+2.14,3.1);camera.lookAt(-11.35,y+1.1,-.5);camera.fov=42;}
   camera.aspect=width/height;camera.near=.025;camera.updateProjectionMatrix();view.renderer.setSize(width,height,false);
-  view.characterToon.forEach(toon=>toon.update(width,height));view.cabinToon.update(width,height,3.1,15);view.renderer.render(view.scene,camera);
+  view.characterToon.forEach(toon=>toon.update(width,height));view.cabinToon.update(width,height,3.1,15);view.renderScene(camera);
   status.value=`${elapsed.toFixed(1)}秒 ／ ${visit.pose.gesture?.label??(visit.done?'一服を終える':visit.pose.moving?'歩く':'向きを変える')}`;
   requestAnimationFrame(frame);
 }

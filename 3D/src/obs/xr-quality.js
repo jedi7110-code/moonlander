@@ -22,7 +22,8 @@ export class ObservationXRQuality {
       const size=mesh.geometry.boundingBox.getSize(new Vector3()).multiply(mesh.getWorldScale(new Vector3()));
       if(size.length()<.10)this.details.push(mesh);
     });
-    this.batches=createXRInstances(view.ship?.animated,view.scene);
+    // The desktop instancer already shares these draws on every platform.
+    this.batches=view.fixtureInstances?[]:createXRInstances(view.ship?.animated,view.scene);
   }
   set(object,key,value){
     if(object[key]===value)return;

@@ -88,7 +88,7 @@ try{
     view.center.lerp(view.targetCenter,1-Math.exp(-dt*12));view.viewHeight+=(view.targetHeight-view.viewHeight)*(1-Math.exp(-dt*12));view.setFrustum();
     view.characterToon.forEach(toon=>toon.update(view.width,view.height));
     view.cabinToon.update(view.width,view.height,view.viewHeight,view.fitHeight);
-    view.renderer.render(view.scene,view.camera);
+    view.renderScene();
     $('phase').value=effect.time;$('phase-value').textContent=`${effect.time.toFixed(2)} / ${EMERGENCY_LIGHT_PERIOD.toFixed(2)} 秒`;
   });
   document.addEventListener('visibilitychange',()=>{previous=performance.now();syncAlarm();updateAudioUI();});
