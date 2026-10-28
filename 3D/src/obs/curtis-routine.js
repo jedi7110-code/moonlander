@@ -8,7 +8,7 @@ import {CURTIS_COFFEE} from './curtis-coffee.js';
 export const CURTIS_TIMING={first:[90,150],between:[180,360],prepareAhead:35};
 export const CURTIS_WALK_SPEED=CREW_WALK_SPEED*.022;
 export const CURTIS={top:13.4,seatX:6.05,coffeeX:10.085,roomX:-1.88,roomZ:-4.37};
-export const CURTIS_LADDER_TRAFFIC=Object.freeze({waitX:2.2,crewWaitX:2.3,clearX:2.1,mergeX:1.75,bridgeX:.85,passZ:2.18});
+export const CURTIS_LADDER_TRAFFIC=Object.freeze({waitX:2.2,crewWaitX:2.85,clearX:2.1,mergeX:1.75,bridgeX:.85,passZ:2.18});
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
 
@@ -101,8 +101,20 @@ export class CurtisRoutine {
     this.aisleTo(0,0);this.climbTo(0,{leave:true});
   }
   get trafficPosition(){return {...this.position,z:this.position.z+(this.passOffset??0)};}
+  passageObstacle(from,clearance){
+    const s=this.step,p=this.trafficPosition;
+    if(s?.kind==='walk'&&Math.abs(s.to.x-s.from.x)<1e-8&&Math.abs(s.to.z-s.from.z)>.1){
+      const low=Math.min(p.z,s.to.z),high=Math.max(p.z,s.to.z);
+      const corridor={...p,z:Math.max(low,Math.min(high,from.z))};
+      // Someone already passing the doorway finishes first. The real body
+      // still blocks collisions, while Curtis waits inside the rear room.
+      if(close(from,corridor,clearance)&&!close(from,p,clearance+.06))return p;
+      return corridor;
+    }
+    return p;
+  }
   blocksDroid(droid,dt=1/60){
-    return this.active&&approaches(droid.position,nextDroid(droid,dt),this.trafficPosition,.64);
+    return this.active&&approaches(droid.position,nextDroid(droid,dt),this.passageObstacle(droid.position,.64),.64);
   }
   blocksCat(m,dt=1/60){
     if(!this.active||m.hidden)return false;
@@ -111,7 +123,7 @@ export class CurtisRoutine {
     if(s?.type==='depth')next.z+=Math.sign(s.z-m.z)*Math.min(Math.abs(s.z-m.z),m.walkSpeed*.022*dt);
     // Reserve a sofa landing before a jump starts; a jump in progress has priority.
     if(m.hop?.phase==='prepare'&&!m.hop.started&&close(p,this.trafficPosition,1.4))return true;
-    if(m.crossing&&!m.crossing.active&&Math.abs(p.y-this.position.y)<.8&&Math.abs(p.x-this.position.x)<1.2)return true;
+    if(m.crossing&&!m.crossing.active&&Math.abs(p.y-this.position.y)<.8&&Math.abs(p.x-this.position.x)<CAT_CLEARANCE+.06)return true;
     return approaches(p,next,this.trafficPosition,CAT_CLEARANCE);
   }
   blocksCrew(actor,dt=1/60){
@@ -120,7 +132,7 @@ export class CurtisRoutine {
       // Hold Milo outside the sofa approach until Curtis has stood and cleared it.
       if(this.floor===1&&['sit','relax','stand'].includes(this.step?.kind)&&actor.floor===1&&
           Math.abs(to.x-CURTIS.seatX)<1.5&&Math.abs(to.x-CURTIS.seatX)<Math.abs(from.x-CURTIS.seatX))return true;
-      if(approaches(from,to,this.trafficPosition,CREW_CLEARANCE))return true;
+      if(approaches(from,to,this.passageObstacle(from,CREW_CLEARANCE),CREW_CLEARANCE))return true;
     }
     if(!this.ladderClaim||!ladderPathsConflict(this.ladderPath,crewLadderPath(actor)))return false;
     if(actor.climbing)return true;
@@ -149,18 +161,30 @@ export class CurtisRoutine {
     if(droid?.position)obstacles.push({p:droid.position,r:.64});
     if(cat?.motion&&!cat.motion.hidden)obstacles.push({p:worldCat(cat.motion),r:CAT_CLEARANCE});
     const path=this.approachingLadderPath;
-    const approaching=s.kind==='walk'&&Math.abs(this.position.x)<=CURTIS_LADDER_TRAFFIC.waitX&&Math.abs(s.to.x)<=Math.abs(this.position.x);
+    // Walking through the rear-room doorway does not enter the ladder shaft.
+    const approaching=s.kind==='walk'&&Math.abs(this.position.x)<=CURTIS_LADDER_TRAFFIC.waitX&&Math.abs(s.to.x)<Math.abs(this.position.x)-1e-8;
     const entering=s.kind==='climb'||approaching;
     if(path&&entering&&!this.ladderClaim){
       const crewNear=actor&&(actor.climbing||Math.abs((actor.x-700)*.022)<1.5);
+      const droidAtLanding=droid?.position&&Math.abs(droid.position.y-this.position.y)<1.4&&
+        Math.abs(droid.position.x)<CURTIS_LADDER_TRAFFIC.clearX;
       if((crewNear&&ladderPathsConflict(path,crewLadderPath(actor)))||
-          (droid?.ladderClaim&&ladderPathsConflict(path,droid.ladderPath))){
+          (droid?.ladderClaim&&ladderPathsConflict(path,droid.ladderPath))||droidAtLanding){
         this.waiting=true;
         if(Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.bridgeX){
           const position=this.trafficPosition,shift=Math.max(0,Math.min(CURTIS_LADDER_TRAFFIC.passZ-position.z,dt*.85));
           const next={...position,z:position.z+shift};
           if(shift>0&&!obstacles.some(obstacle=>approaches(position,next,obstacle.p,obstacle.r))){
             this.passOffset=(this.passOffset??0)+shift;this.walkDistance+=shift;this.yaw=0;this.waiting=false;
+          }else if(shift>0&&s.kind==='walk'&&this.floor===0&&(s.roomDeparture||Math.abs(s.from.x-CURTIS.roomX)<1e-8)&&Math.abs(position.x)<CURTIS_LADDER_TRAFFIC.crewWaitX){
+            // If the exiting droid occupies the side-step, back away from the
+            // landing first. Every step still obeys the normal body clearance.
+            const retreat={...position,x:position.x+Math.sign(position.x)*dt*.85};
+            if(!obstacles.some(obstacle=>approaches(position,retreat,obstacle.p,obstacle.r+.06))){
+              this.position={...retreat};this.passOffset=0;s.from={...retreat};s.roomDeparture=true;this.age=0;
+              s.duration=Math.max(.01,distance(s.from,s.to)/CURTIS_WALK_SPEED);
+              this.walkDistance+=dt*.85;this.yaw=Math.sign(position.x)*Math.PI/2;this.waiting=false;
+            }
           }
         }
         return;
@@ -168,13 +192,19 @@ export class CurtisRoutine {
       this.ladderClaim=true;this.claimEnd=path.to;
     }
     // Keep the shaft reserved until the arriving visitor has cleared its bridge.
-    if(this.ladderClaim&&s.kind!=='climb'&&Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.clearX)this.ladderClaim=false;
+    if(this.ladderClaim&&s.kind!=='climb'&&(Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.clearX||
+      (!path&&Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.mergeX)))this.ladderClaim=false;
     if(s.kind==='walk'){
       const near=(x,y,z,r)=>Math.abs(y-this.position.y)<1&&Math.hypot(x-this.position.x,z-this.position.z)<r;
       const cm=cat?.motion;
       // Only wait for crossings already in progress, so the other actor can finish.
-      if(cm?.crossing?.active&&near((cm.x-700)*.022,(870-cm.y)*.016,cm.z,.65)){
-        this.waiting=true;return;
+      if(cm?.crossing?.active){
+        const p=this.trafficPosition,u=Math.min(1,(this.age+dt)/s.duration);
+        const next={x:s.from.x+(s.to.x-s.from.x)*u,y:s.from.y+(s.to.y-s.from.y)*u,z:s.from.z+(s.to.z-s.from.z)*u+(this.passOffset??0)};
+        const crossing={x:(cm.x-700)*.022,y:(870-cm.y)*.016,z:p.z};
+        if(approaches(p,next,crossing,CAT_CLEARANCE+.12)||near(crossing.x,crossing.y,cm.z,.65)){
+          this.waiting=true;return;
+        }
       }
     }
     // Check the full seated footprint before leaving the aisle.
@@ -190,16 +220,22 @@ export class CurtisRoutine {
       this.waiting=true;return;
     }
     if(s.kind==='walk'){
+      // Leave the temporary passing lane through a real depth walk. Carrying
+      // its offset into the room made the visible and authored paths disagree.
+      if(!s.depthTransfer&&Math.abs(s.to.x-s.from.x)<1e-8&&Math.abs(s.to.z-s.from.z)>.1){
+        s.depthTransfer=true;s.from={...this.trafficPosition};this.position={...s.from};this.passOffset=0;
+        s.duration=Math.max(.01,distance(s.from,s.to)/CURTIS_WALK_SPEED);this.age=0;
+      }
       const p=this.trafficPosition;
-      const onAisle=Math.abs(this.position.x)>2&&s.from.z>=.65&&s.to.z>=.65;
+      const onAisle=Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.mergeX&&s.from.z>=.65&&s.to.z>=.65;
       const leavingBridge=this.ladderClaim&&Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.bridgeX&&s.from.z>=.2&&s.to.z>=.2;
       const aisle=onAisle||leavingBridge;
       let offset=0;
       if(aisle){
         const nearby=obstacles.filter(o=>Math.abs(o.p.y-p.y)<1.4&&Math.abs(o.p.x-p.x)<2.2);
-        const laneFree=z=>nearby.every(o=>Math.abs(o.p.z-z)>o.r+.03);
+        const laneFree=z=>nearby.every(o=>!close({...p,z},o.p,o.r+(o.r===CREW_CLEARANCE?.08:.03)));
         const current=this.position.z+(this.passOffset??0);
-        if(!laneFree(this.position.z))offset=laneFree(CURTIS_LADDER_TRAFFIC.passZ)?CURTIS_LADDER_TRAFFIC.passZ-this.position.z:(this.passOffset??0);
+        if(!laneFree(this.position.z))offset=CURTIS_LADDER_TRAFFIC.passZ-this.position.z;
         else if(nearby.length&&laneFree(current))offset=Math.min(this.passOffset??0,Math.max(0,CURTIS_LADDER_TRAFFIC.passZ-this.position.z));
       }
       if(this.ladderClaim&&Math.abs(this.position.x)<CURTIS_LADDER_TRAFFIC.mergeX&&Math.abs(s.to.x)<Math.abs(this.position.x))offset=0;

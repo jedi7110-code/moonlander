@@ -1,0 +1,50 @@
+/* A single CRT shutdown: the connection frame becomes a line, then a point.
+   Only the loader animates; the prepared cabin stays still behind it. */
+.loading.is-switching{
+  animation:cabin-signal-reveal .7s linear both;
+}
+.loading.is-switching .loading-frame{
+  transform-origin:center;
+  animation:cabin-signal-collapse .7s cubic-bezier(.55,0,.8,.35) both;
+}
+.loading.is-switching::before{
+  inset:50% auto auto 50%;width:4px;height:4px;margin:-2px;
+  border-radius:50%;background:#efffe5;
+  box-shadow:0 0 6px 2px #e0ffc9,0 0 18px 5px #a7d77d80;
+  animation:cabin-signal-dot .7s linear both;
+}
+.loading.is-switching::after{
+  content:"";
+  position:absolute;
+  left:10%;right:10%;top:50%;height:2px;margin-top:-1px;
+  border-radius:50%;pointer-events:none;
+  background:#efffe5;
+  box-shadow:0 0 5px 1px #e0ffc9,0 0 15px 3px #a7d77d99;
+  transform-origin:center;
+  animation:cabin-signal-line .7s linear both;
+}
+@keyframes cabin-signal-collapse{
+  0%,12%{transform:scale(1);opacity:1}
+  42%{transform:scale(1.06,.015);opacity:.9}
+  62%,100%{transform:scale(.003,.008);opacity:0}
+}
+@keyframes cabin-signal-line{
+  0%,28%{transform:scale(1,.25);opacity:0}
+  43%{transform:scale(1,1);opacity:1}
+  65%{transform:scale(.005,1);opacity:0}
+  80%,100%{transform:scale(.001,.5);opacity:0}
+}
+@keyframes cabin-signal-dot{
+  0%,56%{transform:scale(1.5);opacity:0}
+  65%{transform:scale(1);opacity:1}
+  80%,100%{transform:scale(.2);opacity:0}
+}
+@keyframes cabin-signal-reveal{
+  0%,80%{opacity:1}
+  100%{opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .loading.is-switching{animation:cabin-signal-reveal .12s linear both}
+  .loading.is-switching .loading-frame{animation:none}
+  .loading.is-switching::before,.loading.is-switching::after{display:none;animation:none}
+}

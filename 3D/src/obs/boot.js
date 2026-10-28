@@ -52,6 +52,8 @@ async function boot(){
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }else document.getElementById('space-boot').hidden=true;
   document.documentElement.dataset.cabinLoadStartedMs=performance.now().toFixed(1);
+  // The gauge follows real milestones from here; show the first step at once.
+  document.getElementById('loading')?.style?.setProperty('--cabin-load-progress','.04');
   const preloads=document.getElementById('cabin-preloads');
   if(preloads)document.head.append(preloads.content.cloneNode(true));
   document.documentElement.dataset.cabinBuildStartedMs=performance.now().toFixed(1);

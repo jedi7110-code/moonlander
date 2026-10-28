@@ -510,11 +510,11 @@ export function buildShip(sourceMaterials,options){
   const steps=buildShipSteps(sourceMaterials,options);
   let step;do{step=steps.next();}while(!step.done);return step.value;
 }
-export async function buildShipInBackground(sourceMaterials,{nextFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))),...options}={}){
+export async function buildShipInBackground(sourceMaterials,{nextFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))),onStep=()=>{},...options}={}){
   const steps=buildShipSteps(sourceMaterials,options);
   const timings=[];
   for(;;){
-    const start=performance.now(),step=steps.next();timings.push(Math.round(performance.now()-start));
+    const start=performance.now(),step=steps.next();timings.push(Math.round(performance.now()-start));onStep(timings.length);
     if(globalThis.document?.documentElement)document.documentElement.dataset.cabinShipAssemblyMs=JSON.stringify(timings);
     if(step.done)return step.value;await nextFrame();
   }

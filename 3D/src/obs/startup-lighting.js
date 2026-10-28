@@ -18,7 +18,7 @@ export const circuitDelay=id=>random(id)*.065;
 export async function revealStartupScene({draw,reveal,nextFrame=()=>new Promise(resolve=>requestAnimationFrame(resolve))}){
   draw();
   await nextFrame();
-  draw();reveal();
+  draw();await reveal();
   await nextFrame();
 }
 

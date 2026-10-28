@@ -22,6 +22,8 @@ export class CurtisView {
     try{
       result.toon=await runPreparationSteps(createMiloToonSteps(root));
       result.lighting=new CabinStartupLighting([root],{start:false});
+      // Join the live alarm circuit before compiling the deferred visitor.
+      view.emergencyLighting?.addRoots([root]);
       const clip=new THREE.Plane(new THREE.Vector3(0,-1,0),13.3);
       root.traverse(mesh=>{
         for(const material of (Array.isArray(mesh.material)?mesh.material:[mesh.material]).filter(Boolean)){

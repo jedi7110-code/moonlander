@@ -52,18 +52,25 @@ import {nextPreparationFrame,runPreparationSteps} from './background-preparation
 import {visibleInScene} from './deferred-preparation.js';
 
 export class ObservationView {
+  // Typical step counts of the two sliced assembly phases, so the connection
+  // gauge moves through them; a drift only makes it reach a milestone early.
+  static SHIP_BUILD_STEPS=92;static PREPARATION_STEPS=300;
   static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false,deferOptional=false,nextFrame=nextPreparationFrame,onProgress=()=>{}}={}){
-    let loaded=0;
-    const assets=[materials(),loadMiloHead(),loadLucy({deferGroomCache}),loadEVAGarment(),loadMiloBody()];
-    const [m,head,lucy]=await Promise.all(assets.map(asset=>asset.then(value=>{onProgress(.4*++loaded/assets.length);return value;})));
+    const phase=(from,to,expected)=>count=>onProgress(from+(to-from)*Math.min(1,count/expected));
+    // The head takes most of this phase (its hair and eyes are built here), so
+    // it weighs more and reports its own stages; the rest count when resolved.
+    const assetNames=['materials','head','lucy','eva','body'],weights=[1,6,1,1,1],done=[0,0,0,0,0],assetTimes={},assetStart=performance.now();
+    const total=weights.reduce((a,b)=>a+b,0),report=()=>onProgress(.4*done.reduce((sum,fraction,i)=>sum+fraction*weights[i],0)/total);
+    const assets=[materials(),loadMiloHead(undefined,{onProgress:fraction=>{done[1]=Math.max(done[1],fraction);report();}}),loadLucy({deferGroomCache}),loadEVAGarment(),loadMiloBody()];
+    const [m,head,lucy]=await Promise.all(assets.map((asset,i)=>asset.then(value=>{done[i]=1;report();assetTimes[assetNames[i]]=Math.round(performance.now()-assetStart);if(globalThis.document?.documentElement)document.documentElement.dataset.cabinAssetsMs=JSON.stringify(assetTimes);return value;})));
     head.userData.setAppearance({hair:'crop',beard:'none'});
     const deckStyle=floorBuilder?null:createMetalDeckStyle();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
-    const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor,nextFrame});
+    const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor,nextFrame,onStep:phase(.4,.6,ObservationView.SHIP_BUILD_STEPS)});
     onProgress(.6);
     const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip,deferSetup:true,deferOptional});
-    const preparation=[];
-    await runPreparationSteps(view.preparationSteps,{nextFrame,onStep:(label,ms)=>{preparation.push({name:typeof label==='string'?label:'batch',ms:Math.round(ms)});document.documentElement.dataset.cabinAssemblyMs=JSON.stringify(preparation);}});
+    const preparation=[],prepared=phase(.6,.8,ObservationView.PREPARATION_STEPS);
+    await runPreparationSteps(view.preparationSteps,{nextFrame,onStep:(label,ms)=>{preparation.push({name:typeof label==='string'?label:'batch',ms:Math.round(ms)});document.documentElement.dataset.cabinAssemblyMs=JSON.stringify(preparation);prepared(preparation.length);}});
     delete view.preparationSteps;
     onProgress(.8);
     view.deckStyle=deckStyle;
@@ -73,15 +80,18 @@ export class ObservationView {
       await nextFrame();
       const roots=[view.ship.staticMesh,view.ship.animated,view.droidBay.root,view.droidService.root,view.harvestDelivery.root];
       view.cabinSignage=await createCabinSignage(roots);
+      onProgress(.86);
       await nextFrame();
       view.cabinToon=createCabinToon(roots);
       view.cabinToon.setStyle(cabinStyle);
+      onProgress(.92);
       await nextFrame();
       // Practical lighting also exists in studies that don't replay startup.
       view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,start:false});
       const workCenter=new THREE.Vector3(HATCH_SERVICE_POINT.x-.12,positionY(FLOORS[getStation('innerHatch').floor].y)+HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z);
       await nextFrame();
       view.emergencyLighting=new CabinEmergencyLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,workCenter});
+      onProgress(.97);
       await nextFrame();
       if(characterViews)view.characterCamera=new CharacterCamera(view);
       onProgress(1);
@@ -187,7 +197,7 @@ export class ObservationView {
   bind(type,fn,options){this.canvas.addEventListener(type,fn,options);this.listeners.push([type,fn,options]);}
   // Shader submission is synchronous even with compileAsync. Pace submission
   // as well as assembly; keep clipping and shadow program variants intact.
-  async compilePrograms({visibleOnly=false,nextFrame=nextPreparationFrame}={}){
+  async compilePrograms({visibleOnly=false,nextFrame=nextPreparationFrame,onProgress=()=>{}}={}){
     const {renderer,scene,camera}=this;
     const planeCount=material=>Math.max(...(Array.isArray(material)?material:[material]).map(m=>m?.clipIntersection?0:(m?.clippingPlanes?.length||0)));
     const group=(map,key,value)=>{if(!map.has(key))map.set(key,[]);map.get(key).push(value);};
@@ -205,7 +215,9 @@ export class ObservationView {
     const target=new THREE.WebGLRenderTarget(1,1),pending=[];
     this.depthProbeMaterials??=[];
     this.depthProbeMaterials.push(...[...depth.values()].flat().filter(probe=>probe.userData.ownsMaterial).map(probe=>probe.material));
-    let batchStart=performance.now(),primed=null;
+    let batchStart=performance.now(),primed=null,submitted=0;
+    // Programs are four fifths of this phase for the gauge; uploads the rest.
+    const submits=[...depth.values()].flat().length+[...clipped.values()].flat().length+[...selected].filter(object=>!planeCount(object.material)).length;
     const submit=async(object,count,shadow=false)=>{
       const previous=renderer.getRenderTarget();
       try{
@@ -213,6 +225,7 @@ export class ObservationView {
         renderer.setRenderTarget(shadow?target:null);
         pending.push(renderer.compileAsync(object,camera,scene));
       }finally{renderer.setRenderTarget(previous);}
+      onProgress(.8*++submitted/Math.max(1,submits));
       if(performance.now()-batchStart>=4){await nextFrame();batchStart=performance.now();primed=null;}
     };
     try{
@@ -239,9 +252,8 @@ export class ObservationView {
         for(const uniform of Object.values(material.uniforms??{}))if(uniform.value?.isTexture&&!uniform.value.isRenderTargetTexture)textures.add(uniform.value);
       }
     });
-    const uploads=[],decoded=new WeakMap();
-    for(const texture of textures){
-      if(this.preparedTextures.has(texture))continue;
+    const uploads=[],decoded=new WeakMap(),queue=[...textures].filter(texture=>!this.preparedTextures.has(texture));
+    for(const texture of queue){
       const image=texture.image;
       if(typeof createImageBitmap==='function'&&['IMG','CANVAS'].includes(image?.tagName)){
         let variants=decoded.get(texture.source);if(!variants)decoded.set(texture.source,variants=new Map());
@@ -256,7 +268,7 @@ export class ObservationView {
       }
       const start=performance.now();renderer.initTexture(texture);
       this.preparedTextures.add(texture);
-      uploads.push(Math.round(performance.now()-start));await nextFrame();
+      uploads.push(Math.round(performance.now()-start));onProgress(.8+.2*uploads.length/queue.length);await nextFrame();
     }
     if(globalThis.document?.documentElement)document.documentElement.dataset[visibleOnly?'cabinTextureUploadMs':'cabinDeferredTextureUploadMs']=JSON.stringify(uploads);
     for(const object of selected)this.preparedMeshes.add(object);

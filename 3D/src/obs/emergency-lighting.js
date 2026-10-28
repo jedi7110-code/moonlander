@@ -21,16 +21,22 @@ export class CabinEmergencyLighting {
   constructor(roots,{reducedMotion=false,workCenter=null}={}){
     this.reducedMotion=reducedMotion;this.time=0;this.level=0;this.fault=false;this.disposed=false;
     this.amount={value:0};this.power={value:emergencyLightPower(0,reducedMotion)};this.workCenter={value:workCenter?.clone()};this.materials=[];
+    this.registeredMaterials=new Set();
+    this.addRoots(roots);
+  }
+  addRoots(roots){
+    if(this.disposed)return;
     const materials=new Set();
     for(const root of roots)root?.traverse(mesh=>{
       if(!mesh.isMesh||/toon outline$/.test(mesh.name))return;
       for(const material of [].concat(mesh.material??[]))materials.add(material);
     });
     for(const material of materials){
+      if(this.registeredMaterials.has(material))continue;
       const fixture=material.emissiveIntensity>1||/diffuser|light lens/i.test(material.name);
       const surface=material.isMeshStandardMaterial||material.isMeshToonMaterial;
       if(!surface&&!(material.isMeshBasicMaterial&&fixture))continue;
-      const workLight=Boolean(workCenter)&&surface&&!fixture;
+      const workLight=Boolean(this.workCenter.value)&&surface&&!fixture;
       const compile=material.onBeforeCompile,key=material.customProgramCacheKey,baseKey=key.call(material),effect=this;
       const wrapped=function(shader,renderer){
         compile.call(this,shader,renderer);
@@ -72,6 +78,7 @@ export class CabinEmergencyLighting {
       };
       material.onBeforeCompile=wrapped;material.customProgramCacheKey=()=>baseKey+'-cabin-emergency-v2-'+Number(fixture)+'-'+Number(workLight);material.needsUpdate=true;
       this.materials.push({material,compile,key,wrapped});
+      this.registeredMaterials.add(material);
     }
   }
   update(dt,environment,audioPhase=null){
@@ -91,5 +98,6 @@ export class CabinEmergencyLighting {
       material.onBeforeCompile=compile;material.customProgramCacheKey=key;material.needsUpdate=true;
     }
     this.materials=[];
+    this.registeredMaterials.clear();
   }
 }

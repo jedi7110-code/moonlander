@@ -88,6 +88,6 @@ test('OBS starts optional preparation after its loop is live and gates the openi
   assert.ok(main.indexOf('runDeferredPreparation([',main.indexOf('async function start()'))>main.indexOf('view.renderer.setAnimationLoop(tick)'));
   assert.match(main,/deferOptional:true/);
   assert.match(main,/view\.catRun&&openingMousePending/);
-  assert.match(main,/compilePrograms\(\{visibleOnly:true,nextFrame:nextStartupFrame\}\)/);
+  assert.match(main,/compilePrograms\(\{visibleOnly:true,nextFrame:nextStartupFrame,onProgress:[^}]*\}\)/);
   assert.doesNotMatch(main,/await view\.warmDraws\(/);
 });

@@ -51,6 +51,24 @@ test('an audio phase overrides render time without drifting and pause keeps the 
   environment.fault=null;effect.update(.1,environment,1);assert.equal(effect.time,0,'recovery keeps its previous red level');
 });
 
+test('a deferred visitor joins the current warning circuit before compiling, without a second pulse clock',()=>{
+  const effect=new CabinEmergencyLighting([]),root=new Group(),material=new MeshStandardMaterial();
+  root.add(new Mesh(new BoxGeometry(),material));
+  const startup=new CabinStartupLighting([root],{start:false});
+  effect.update(.35,{fault:{}},.3);
+  effect.addRoots([root]);const compile=material.onBeforeCompile,version=material.version;
+  effect.addRoots([root]);assert.equal(material.onBeforeCompile,compile);assert.equal(material.version,version);
+  const shader={uniforms:{},vertexShader:ShaderLib.standard.vertexShader,fragmentShader:ShaderLib.standard.fragmentShader};
+  material.onBeforeCompile(shader);
+  assert.equal(shader.uniforms.cabinEmergencyAmount,effect.amount);
+  assert.equal(shader.uniforms.cabinEmergencyPower,effect.power);
+  assert.equal(shader.uniforms.cabinBootActive,startup.active);
+  assert.equal(shader.uniforms.cabinEmergencyAmount.value,1);assert.equal(shader.uniforms.cabinEmergencyPower.value,1.25);
+  effect.update(.1,{fault:{}},2.2);assert.equal(shader.uniforms.cabinEmergencyPower.value,.15);
+  assert.equal(material.version,version,'pulses do not recompile Curtis');
+  effect.dispose();startup.dispose();root.children[0].geometry.dispose();material.dispose();
+});
+
 test('pause freezes both the pulse and recovery; a renewed fault reverses the fade without a jump',()=>{
   const effect=new CabinEmergencyLighting([]),environment={fault:{}};
   effect.update(.7,environment);const before=[effect.time,effect.amount.value,effect.power.value];

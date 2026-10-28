@@ -9,6 +9,8 @@ import {ObservationView} from './view.js';
 import {loadCabinLucyGroomCache} from './lucy-cabin.js';
 import {ObservationXR} from './xr.js';
 import {revealStartupScene} from './startup-lighting.js';
+import {createLoadingGauge} from './loading-gauge.js';
+import {closeLoadingScreen} from './loading-transition.js';
 import {bindStartupLightingInput,activateStartupLighting} from './startup-input.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
@@ -365,8 +367,9 @@ async function start(){
     // Decode beside the 3D startup so the first lighting/bed stroke is ready.
     // The mixer remains silent until a real input gesture unlocks it.
     if(audio.enabled){try{audio.prepare();void audio.load();}catch(error){console.warn('Cabin audio preparation failed.',error);}}
-    exterior.hostProgress(.15);
-    view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,deferOptional:true,nextFrame:nextStartupFrame,onProgress:value=>exterior.hostProgress(.15+value*.6)});
+    const gauge=createLoadingGauge($('loading')),progress=value=>{gauge.set(value);exterior.hostProgress(value);};
+    progress(.1);
+    view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,deferOptional:true,nextFrame:nextStartupFrame,onProgress:value=>progress(.1+value*.62)});
     document.documentElement.dataset.cabinViewReadyMs=performance.now().toFixed(1);
     if(new URLSearchParams(location.search).has('debug'))globalThis.cabinView=view;
     view.audio=audio;
@@ -415,14 +418,14 @@ async function start(){
     // Compile every cabin program behind the connection screen. With
     // KHR_parallel_shader_compile the driver links them on worker threads and
     // the page stays responsive, instead of the first draw stalling on each one.
-    await view.compilePrograms({visibleOnly:true,nextFrame:nextStartupFrame});
+    await view.compilePrograms({visibleOnly:true,nextFrame:nextStartupFrame,onProgress:fraction=>progress(.72+.2*fraction)});
     document.documentElement.dataset.cabinProgramsReadyMs=performance.now().toFixed(1);
-    exterior.hostProgress(.9);
+    progress(.92);
     view.render(0,elapsed,actor,brain,cat,care,true,airlock,null,true);
-    exterior.hostProgress(.96);
+    progress(.96);
     await revealStartupScene({
       draw:()=>view.render(0,elapsed,actor,brain,cat,care,true,airlock),
-      reveal:()=>{$('loading').hidden=true;},
+      reveal:async()=>{progress(1);await gauge.finish();await closeLoadingScreen($('loading'));},
     });
     document.documentElement.dataset.cabinFirstDrawReadyMs=performance.now().toFixed(1);
     exterior.hostProgress(.98);

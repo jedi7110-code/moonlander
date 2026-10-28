@@ -268,10 +268,13 @@ export const NAPE_TATTOO_GLSL=`
   }
 `;
 
-export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/head/`){
+// `onProgress` reports this loader's own 0..1 after each sliced stage; the
+// connection gauge otherwise waits through the longest startup asset.
+export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}assets/obs/head/`,{onProgress=()=>{}}={}){
   const loader=new THREE.TextureLoader();
   // Request the supplied hair alongside the scan; it must not wait for the scan to finish.
   const [gltf,map,normalMap,napeTattoo,suppliedHair]=await Promise.all([new GLTFLoader().loadAsync(base+'LeePerrySmith.glb'),loader.loadAsync(base+'Map-COL.jpg'),loader.loadAsync(base+'Infinite-Level_02_Tangent_SmoothUV.jpg'),loader.loadAsync(base+'tattoo-naval-barcode.webp'),loadSuppliedHair(base+'supplied-hair/')]);
+  onProgress(.15);
   napeTattoo.colorSpace=THREE.NoColorSpace;napeTattoo.anisotropy=4;
   map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;normalMap.anisotropy=4;
   const material=new THREE.MeshStandardMaterial({color:0xd2c8bd,map,normalMap,normalScale:new THREE.Vector2(.45,.45),roughness:.74,metalness:0,envMapIntensity:.3});
@@ -313,7 +316,9 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
   const source=gltf.scene.getObjectByName('LeePerrySmith');
   if(!source?.isMesh)throw new Error('Milo head mesh is missing');
   const forward=MILO_HEAD_FORWARD/.055,hairSource=await runPreparationSteps(headGeometrySteps(source.geometry));
-  const group=new THREE.Group(),mesh=new THREE.Mesh(await runPreparationSteps(headGeometrySteps(source.geometry,forward)),material);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);
+  onProgress(.4);
+  const group=new THREE.Group(),mesh=new THREE.Mesh(await runPreparationSteps(headGeometrySteps(source.geometry,forward)),material);
+  onProgress(.6);mesh.name='Milo scanned head';mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);group.scale.setScalar(.055);
   group.userData.faceForward=MILO_HEAD_FORWARD;
   mesh.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});
   mesh.customDepthMaterial.onBeforeCompile=shader=>{
@@ -325,6 +330,7 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
   mesh.customDepthMaterial.customProgramCacheKey=()=> 'milo-open-eyelid-shadow-v3-anchored-neck';
   await nextPreparationFrame();
   let hair=createHair(hairSource);hair.position.z=forward;group.add(hair);
+  onProgress(.7);
   const mouth=new THREE.Mesh(new THREE.SphereGeometry(1,24,12),new THREE.MeshStandardMaterial({color:0x25140f,roughness:1}));
   mouth.position.set(-.11,.405,2.285+forward);mouth.visible=false;group.add(mouth);
   group.userData.setMouthMotion=(open,chew)=>{mouthMotion.value=open+chew*.28;mouth.visible=open>.04;mouth.scale.set(.43,.075*open,.025);};
@@ -341,7 +347,7 @@ export async function loadMiloHead(base=`${import.meta.env?.BASE_URL??'/3D/'}ass
     facialHairStrength.value=MILO_BEARD_STYLES[beard].strength;
     group.userData.appearance={hair:nextHair,beard};
   };
-  for(const opening of MILO_EYE_OPENINGS){await nextPreparationFrame();const eye=createMiloEye(source.geometry,opening);eye.position.z=forward;group.add(eye);}
+  for(const [index,opening] of MILO_EYE_OPENINGS.entries()){await nextPreparationFrame();const eye=createMiloEye(source.geometry,opening);eye.position.z=forward;group.add(eye);onProgress(.7+.3*(index+1)/MILO_EYE_OPENINGS.length);}
   gltf.scene.traverse(object=>{object.geometry?.dispose();if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(m=>m.dispose());});
   return group;
 }

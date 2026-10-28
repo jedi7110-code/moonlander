@@ -56,8 +56,20 @@ test('cold rendering stays behind the loader and a zero-power frame is presented
   wallTime+=5000;frames.shift()();await Promise.resolve();
   assert.deepEqual(events,[['draw',false,0],['draw',false,0],['reveal',0]]);
   assert.equal(started,false);assert.equal(effect.time,0);assert.ok(wallTime>STARTUP_LIGHT_SECONDS*1000);
+  await Promise.resolve();
   frames.shift()();await ready;assert.equal(started,true);
   effect.update(1/60);assert.ok(effect.time<.02);assert.equal(effect.done,false);effect.dispose();
+});
+
+test('startup waits for the loader reveal to finish before releasing the scene',async()=>{
+  const frames=[];let finishReveal,done=false;
+  const revealFinished=new Promise(resolve=>{finishReveal=resolve;});
+  const ready=revealStartupScene({draw:()=>{},reveal:()=>revealFinished,nextFrame:()=>new Promise(resolve=>frames.push(resolve))}).then(()=>{done=true;});
+  frames.shift()();await Promise.resolve();
+  assert.equal(frames.length,0);assert.equal(done,false);
+  finishReveal();await Promise.resolve();
+  assert.equal(frames.length,1);assert.equal(done,false);
+  frames.shift()();await ready;assert.equal(done,true);
 });
 
 test('ceilings wait one second, then settle over 1.6 seconds from ignition',()=>{
