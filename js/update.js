@@ -1435,7 +1435,7 @@ if (scene.astronautMode && scene.astronaut) {
                                                 // 離陸とカメラの余韻が終わったら、OBS のオープニングへ。
                                                 scene.cameras.main.once('camerafadeoutcomplete', () => {
                                                     scene.sound.stopAll();
-                                                    window.location.assign(new URL('./3D/obs.html?from=moonlander', window.location.href).href);
+                                                    window.location.assign(new URL('./obs/obs.html?from=moonlander', window.location.href).href);
                                                 });
                                                 scene.cameras.main.fadeOut(600, 0, 0, 0);
                                             }

@@ -1,49 +1,61 @@
 {
-  "rewrites": [
+  "redirects": [
     {
       "source": "/3D",
-      "destination": "/3D/dist/index.html"
+      "destination": "/obs/",
+      "permanent": true
     },
     {
-      "source": "/3D/",
-      "destination": "/3D/dist/index.html"
+      "source": "/3D/:path*",
+      "destination": "/obs/:path*",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/obs",
+      "destination": "/obs/dist/index.html"
     },
     {
-      "source": "/3D/index.html",
-      "destination": "/3D/dist/index.html"
+      "source": "/obs/",
+      "destination": "/obs/dist/index.html"
     },
     {
-      "source": "/3D/obs.html",
-      "destination": "/3D/dist/obs.html"
+      "source": "/obs/index.html",
+      "destination": "/obs/dist/index.html"
     },
     {
-      "source": "/3D/obs",
-      "destination": "/3D/dist/obs.html"
+      "source": "/obs/obs.html",
+      "destination": "/obs/dist/obs.html"
     },
     {
-      "source": "/3D/ship-exterior-cinema.html",
-      "destination": "/3D/dist/ship-exterior-cinema.html"
+      "source": "/obs/obs",
+      "destination": "/obs/dist/obs.html"
     },
     {
-      "source": "/3D/ship-exterior-study.html",
-      "destination": "/3D/dist/ship-exterior-study.html"
+      "source": "/obs/ship-exterior-cinema.html",
+      "destination": "/obs/dist/ship-exterior-cinema.html"
     },
     {
-      "source": "/3D/sofa-study.html",
-      "destination": "/3D/dist/sofa-study.html"
+      "source": "/obs/ship-exterior-study.html",
+      "destination": "/obs/dist/ship-exterior-study.html"
     },
     {
-      "source": "/3D/gate-frame-study.html",
-      "destination": "/3D/dist/gate-frame-study.html"
+      "source": "/obs/sofa-study.html",
+      "destination": "/obs/dist/sofa-study.html"
     },
     {
-      "source": "/3D/assets/:path*",
-      "destination": "/3D/dist/assets/:path*"
+      "source": "/obs/gate-frame-study.html",
+      "destination": "/obs/dist/gate-frame-study.html"
+    },
+    {
+      "source": "/obs/assets/:path*",
+      "destination": "/obs/dist/assets/:path*"
     }
   ],
   "headers": [
     {
-      "source": "/3D/assets/([A-Za-z0-9_-]+-[A-Za-z0-9_-]{8})\\.(js|css)",
+      "source": "/obs/assets/([A-Za-z0-9_-]+-[A-Za-z0-9_-]{8})\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",

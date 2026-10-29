@@ -4,9 +4,22 @@
     {
       "name": "moon-dev",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8080"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8080"
+      ],
       "port": 8080,
       "autoPort": true
+    },
+    {
+      "name": "moon-obs-preview",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd obs && exec npx vite preview --host 127.0.0.1 --port 4299 --strictPort"
+      ],
+      "port": 4299
     }
   ]
 }

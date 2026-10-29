@@ -1,0 +1,268 @@
+import {finishPreparationSteps} from './background-preparation.js';
+import * as THREE from 'three';
+import './bump-scale-compat.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {makeXRWideGeometry} from './xr-geometry.js';
+import {CAT_FOOD_PRINT,createCatFoodMaterial} from './cat-food-package.js';
+import {registerMirrorSections} from './mirror-batches.js';
+
+export async function materials() {
+  const loader = new THREE.TextureLoader();
+  const base=import.meta.env?.BASE_URL??'/obs/';
+  const [maps,sweatshirtPrint,workShirtPatchLeft,workShirtPatchRight,rackWiring,taraironLogo,catFoodPrint]=await Promise.all([
+    Promise.all(['enamel','steel','twill','fur','industrial-paint','hoist-safety-paint'].map(name => loader.loadAsync(`${base}assets/obs/${name}.webp`))),
+    loader.loadAsync(`${base}assets/obs/paxcreation-sports-print.webp`),
+    loader.loadAsync(`${base}assets/obs/workshirt-patch-left.webp`),
+    loader.loadAsync(`${base}assets/obs/workshirt-patch-right.webp`),
+    loader.loadAsync(`${base}assets/obs/ai-rack-wiring.webp`),
+    loader.loadAsync(`${base}assets/obs/tarairon-logo.svg`),
+    loader.loadAsync(`${base}${CAT_FOOD_PRINT}`),
+  ]);
+  maps.forEach(map => { map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=4; });
+  maps[5].name='Hoist / worn yellow and black safety paint';
+  maps[5].wrapS=maps[5].wrapT=THREE.ClampToEdgeWrapping;
+  sweatshirtPrint.colorSpace=THREE.SRGBColorSpace;sweatshirtPrint.anisotropy=4;
+  rackWiring.colorSpace=THREE.SRGBColorSpace;rackWiring.anisotropy=4;
+  taraironLogo.colorSpace=THREE.SRGBColorSpace;taraironLogo.anisotropy=4;
+  for(const map of [workShirtPatchLeft,workShirtPatchRight]){
+    // Keep the original artwork on disk; the small sewn patches need only 512px.
+    const image=map.image,canvas=document.createElement('canvas');
+    canvas.width=Math.min(512,image.width);canvas.height=Math.round(canvas.width*image.height/image.width);
+    const context=canvas.getContext('2d');context.imageSmoothingQuality='high';context.drawImage(image,0,0,canvas.width,canvas.height);
+    map.image=canvas;map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;map.needsUpdate=true;
+  }
+  const standard = (color, roughness=.65, metalness=.15, more={}) => new THREE.MeshStandardMaterial({color,roughness,metalness,...more});
+  const fur=standard(0x252b31,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.003});
+  const furLight=standard(0xd8d6cc,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.003});
+  const furGinger=standard(0xa86735,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.002});
+  const furBody=furLight.clone();
+  furBody.onBeforeCompile=shader=>{
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 coatPosition;\nvarying vec3 vCoatPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvCoatPosition = coatPosition;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vCoatPosition;').replace('#include <map_fragment>',`#include <map_fragment>
+      vec3 p = vCoatPosition;
+      float edge = 0.075 * sin(p.y * 48.0 + p.z * 32.0) * sin(p.x * 43.0 - p.z * 19.0);
+      float gingerDistance = min(length((p - vec3(-0.13, 0.39, -0.27)) / vec3(0.22, 0.20, 0.18)), length((p - vec3(0.14, 0.43, -0.015)) / vec3(0.21, 0.19, 0.18)));
+      float blackDistance = min(length((p - vec3(-0.13, 0.43, 0.045)) / vec3(0.21, 0.17, 0.145)), length((p - vec3(0.14, 0.44, -0.28)) / vec3(0.20, 0.19, 0.15)));
+      float ginger = 1.0 - smoothstep(0.94, 1.04, gingerDistance + edge);
+      float black = 1.0 - smoothstep(0.94, 1.04, blackDistance - edge);
+      diffuseColor.rgb *= mix(mix(vec3(1.0), vec3(0.53, 0.245, 0.080), ginger), vec3(0.028, 0.031, 0.030), black);
+    `);
+  };
+  furBody.customProgramCacheKey=()=> 'obs-calico-body-v1';
+  const furFace=furLight.clone();
+  const faceTexture=maps[3].clone();faceTexture.repeat.set(3,3);faceTexture.needsUpdate=true;
+  furFace.map=faceTexture;furFace.bumpMap=faceTexture;furFace.bumpScale=.0005;
+  // The tapered white blaze follows the head, including when it turns.
+  furFace.onBeforeCompile=shader=>{
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 facePosition;\nvarying vec3 vCoatPosition;').replace('#include <begin_vertex>','#include <begin_vertex>\nvCoatPosition = facePosition;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vCoatPosition;').replace('#include <map_fragment>',`#include <map_fragment>
+      vec3 p = vCoatPosition;
+      float edge = 0.025 * sin(p.y * 23.0 + p.x * 17.0);
+      float blazeWidth = 0.065 + 0.20 * (1.0 - smoothstep(-0.30, 0.92, p.y));
+      float blaze = (1.0 - smoothstep(blazeWidth - 0.03, blazeWidth + 0.03, abs(p.x + 0.02))) * smoothstep(0.04, 0.28, p.z);
+      float muzzle = (1.0 - smoothstep(-0.47, -0.23, p.y + 0.12 * abs(p.x) + edge)) * smoothstep(-0.10, 0.35, p.z);
+      float black = (1.0 - smoothstep(-0.40, -0.22, p.x + edge)) * smoothstep(-0.12, 0.25, p.y + edge);
+      vec3 coat = mix(vec3(0.53, 0.245, 0.080), vec3(0.028, 0.031, 0.030), black);
+      diffuseColor.rgb *= mix(coat, vec3(1.0), max(blaze, muzzle));
+    `);
+  };
+  furFace.customProgramCacheKey=()=> 'obs-calico-face-v2';
+  const furTail=furGinger.clone();
+  furTail.onBeforeCompile=shader=>{
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 vTailUv;').replace('#include <begin_vertex>','#include <begin_vertex>\nvTailUv = uv;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec2 vTailUv;').replace('#include <map_fragment>',`#include <map_fragment>
+      float darkTip = smoothstep(0.64, 0.70, vTailUv.x + 0.035 * sin(vTailUv.y * 18.85));
+      diffuseColor.rgb *= mix(vec3(1.0), vec3(0.055, 0.095, 0.18), darkTip);
+    `);
+  };
+  furTail.customProgramCacheKey=()=> 'obs-calico-tail-v1';
+  return {
+    catFoodPackage:createCatFoodMaterial(catFoodPrint),
+    taraironLogo:new THREE.MeshBasicMaterial({name:'TARAIRON / black wall logo',map:taraironLogo,color:0x000000,transparent:true,depthWrite:false,toneMapped:false}),
+    aiWiring:new THREE.MeshBasicMaterial({name:'AI rack / baked wiring',map:rackWiring,color:0xb1bab4,toneMapped:false}),
+    shipPaint:standard(0xd3d2c5,.86,.30,{map:maps[4]}),
+    hoistSafetyPaint:standard(0xffffff,.84,.12,{name:'Industrial / hoist safety paint',map:maps[5],userData:{cabinKeepSurface:true}}),
+    enamel: standard(0xd9dedb,.64,.35,{map:maps[0],bumpMap:maps[0],bumpScale:.009}),
+    dark:standard(0x343d3e,.66,.6,{map:maps[1]}),
+    metal:standard(0xaab8ba,.38,.83,{map:maps[1]}),
+    white:standard(0xcbd1c8,.83,.05),
+    rubber:standard(0x151c1d,.93,.02),
+    olive:standard(0x859273,.93,0,{map:maps[2],bumpMap:maps[2],bumpScale:.005}),
+    cloth:standard(0xe1ded1,.95,0,{bumpMap:maps[2],bumpScale:.002}),
+    sweatshirtPrint:standard(0xffffff,.98,0,{name:'Laundry / PAXCREATION chest print',map:sweatshirtPrint,alphaTest:.12,side:THREE.DoubleSide}),
+    workShirtPatchLeft:standard(0xffffff,1,0,{name:'Laundry / PAX CREATION left chest patch',map:workShirtPatchLeft,alphaTest:.12,side:THREE.DoubleSide}),
+    workShirtPatchRight:standard(0xffffff,1,0,{name:'Laundry / PXC right chest patch',map:workShirtPatchRight,alphaTest:.12,side:THREE.DoubleSide}),
+    evaCloth:standard(0xd8dad0,.91,.02,{bumpMap:maps[2],bumpScale:.004}),
+    evaHelmet:standard(0xbcc5c4,.29,.72),
+    evaVisor:new THREE.MeshPhysicalMaterial({color:0x0b1217,roughness:.13,metalness:.58,clearcoat:1,clearcoatRoughness:.10}),
+    evaWindow:new THREE.MeshBasicMaterial({color:0x020406}),
+    cushion:standard(0x4b5957,.9,.01,{bumpMap:maps[2],bumpScale:.014}),
+    skin:standard(0xb8896e,.75,0),
+    hair:standard(0x332e28,.98,0),
+    fur,
+    furBody,
+    furGinger,
+    furTail,
+    furEar:standard(0xffffff,.97,0,{map:maps[3],bumpMap:maps[3],bumpScale:.0006,vertexColors:true}),
+    furFace,
+    furLight,
+    catEye:standard(0xc3a351,.25,0),
+    pink:standard(0xbc8b87,.88,0),
+    eye:standard(0x899b60,.24,0),
+    black:standard(0x080d0d,.36,.1),
+    red:standard(0x963f32,.56,.25),
+    yellow:standard(0xc0a349,.7,.2),
+    teal:standard(0x406c68,.72,.2),
+    amber:standard(0xb89646,.4,.1,{emissive:0xffae4b,emissiveIntensity:.7}),
+    green:standard(0x4b9982,.3,.1,{emissive:0x6fddaa,emissiveIntensity:.6}),
+    lamp:standard(0xe3eddf,.35,0,{emissive:0xeaffdd,emissiveIntensity:2.2}),
+    coolLamp:standard(0xc6e0de,.35,0,{emissive:0xbdeaf3,emissiveIntensity:1.8}),
+    glass:new THREE.MeshPhysicalMaterial({color:0x98bbc0,metalness:.1,roughness:.25,transparent:true,opacity:.2,depthWrite:false}),
+  };
+}
+
+const boxGeo = new THREE.BoxGeometry();
+const ballGeo = new THREE.SphereGeometry(1,24,16);
+// Identical dimensions share one geometry: the cabin repeats the same rivets,
+// rungs and plates thousands of times, and building a rounded box costs more
+// than placing it. Code that edits a helper geometry in place clones it first.
+const roundedBoxes=new Map(),cylinders=new Map(),tubes=new Map();
+function shared(cache,key,build){let geometry=cache.get(key);if(!geometry){geometry=build();cache.set(key,geometry);}return geometry;}
+export function box(parent,mat,x,y,z,w,h,d,r=0) {
+  const mesh=new THREE.Mesh(r ? shared(roundedBoxes,`${w},${h},${d},${r}`,()=>new RoundedBoxGeometry(w,h,d,2,r)) : boxGeo,mat);
+  if(!r)mesh.scale.set(w,h,d);
+  mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+}
+export function ball(parent,mat,x,y,z,w,h,d) {
+  const mesh=new THREE.Mesh(ballGeo,mat);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+}
+export function cylinder(parent,mat,x,y,z,r,h,top=r,segments=16) {
+  const mesh=new THREE.Mesh(shared(cylinders,`${top},${r},${h},${segments}`,()=>new THREE.CylinderGeometry(top,r,h,segments)),mat);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+}
+export function pipe(parent,mat,points,r=.04) {
+  const geometry=shared(tubes,`${r}|${points.map(p=>[...p].join(',')).join(';')}`,()=>{
+    const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
+    return new THREE.TubeGeometry(curve,Math.max(8,points.length*5),r,8,false);
+  });
+  const mesh=new THREE.Mesh(geometry,mat);mesh.castShadow=true;parent.add(mesh);return mesh;
+}
+export function rod(parent,mat,a,b,r=.035) {
+  const from=new THREE.Vector3(...a),to=new THREE.Vector3(...b),length=from.distanceTo(to);
+  const mesh=new THREE.Mesh(shared(cylinders,`${r},${r},${length},10`,()=>new THREE.CylinderGeometry(r,r,length,10)),mat);
+  mesh.position.copy(from).add(to).multiplyScalar(.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.sub(from).normalize());mesh.castShadow=true;parent.add(mesh);return mesh;
+}
+export function label(parent,text,x,y,z,w,h,{fg='#d4dbcc',bg='#232b2b',size=48}={}) {
+  // Match the physical plate's aspect ratio; a minimum canvas height alone squashes lettering.
+  const density=Math.max(1024/w,128/h),canvas=document.createElement('canvas');
+  canvas.width=Math.round(w*density);canvas.height=Math.round(h*density);const ctx=canvas.getContext('2d');
+  const lines=text.split('\n'),width=canvas.width*.92,height=canvas.height*.78;
+  let fontSize=height/(lines.length*1.2)*Math.min(size/48,1);
+  ctx.font=`600 ${fontSize}px monospace`;
+  fontSize*=Math.min(1,width/Math.max(...lines.map(line=>ctx.measureText(line).width)));
+  ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=fg;ctx.font=`600 ${fontSize}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+  lines.forEach((line,i)=>ctx.fillText(line,canvas.width/2,canvas.height/2+(i-(lines.length-1)/2)*fontSize*1.2));
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=4;
+  // Three.js inserts the material name into a single-line shader directive.
+  const material=new THREE.MeshBasicMaterial({map:texture,toneMapped:false});material.name=`Sign: ${text.replace(/\s+/g,' ')}`;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),material);mesh.name=material.name;mesh.position.set(x,y,z);parent.add(mesh);return mesh;
+}
+export function screen(parent,x,y,z,w=.85,h=.58,seed=0) {
+  const canvas=document.createElement('canvas');canvas.width=384;canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle='#081c19';ctx.fillRect(0,0,384,256);ctx.strokeStyle='#7bdbc0';ctx.lineWidth=2;
+  ctx.font='14px monospace';ctx.fillStyle='#93d4b2';ctx.fillText(seed%2?'TARAIRON / HABITAT':'UAC 7710 / TELEMETRY',18,25);
+  for(let row=0;row<9;row++){ctx.fillStyle=row%3?'#558879':'#a8c892';ctx.fillText(`${String(seed+row).padStart(2,'0')}  ${['LINK: NOMINAL','BUS  28.4 V','O2   21.0 %','TEMP 294.5 K','COOLANT LOOP','PUMP 14 ACTIVE'][row%6]}`,18,56+row*19);}
+  ctx.strokeRect(235,44,128,150);for(let row=0;row<5;row++){ctx.beginPath();for(let i=0;i<125;i++){const py=65+row*26+Math.sin(i*.14+row+seed)*9; i?ctx.lineTo(237+i,py):ctx.moveTo(237+i,py);}ctx.stroke();}
+  ctx.fillStyle='#00000040';for(let y0=0;y0<256;y0+=3)ctx.fillRect(0,y0,384,1);
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+  const material=new THREE.MeshBasicMaterial({name:'Powered telemetry screen',map:texture});
+  material.userData.cabinAlwaysPowered=true;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),material);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
+}
+
+// Batches keep their indices: copying each mesh's buffers is far cheaper than
+// expanding 1.4M triangles, and the merged mesh uploads fewer vertices. The
+// triangles, their order and every vertex value are unchanged.
+function indexedCopy(source){
+  const geometry=new THREE.BufferGeometry();
+  for(const [name,attribute] of Object.entries(source.attributes))geometry.setAttribute(name,attribute.clone());
+  if(source.index)geometry.setIndex(source.index.clone());
+  else{
+    const count=source.attributes.position.count,index=count>65535?new Uint32Array(count):new Uint16Array(count);
+    for(let i=0;i<count;i++)index[i]=i;
+    geometry.setIndex(new THREE.BufferAttribute(index,1));
+  }
+  return geometry;
+}
+
+// Ship fixtures are static; merge by material so rivets and switches stay inexpensive.
+export function batchStatic(root,options){return finishPreparationSteps(batchStaticSteps(root,options));}
+export function* batchStaticSteps(root,{xrLOD=false}={}) {
+  root.updateMatrixWorld(true);
+  const grouped=new Map();
+  const sources=[];root.traverse(mesh=>{if(mesh.isMesh&&!Array.isArray(mesh.material))sources.push(mesh);});
+  let batchStart=performance.now();
+  for(const mesh of sources){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
+    const geometry=indexedCopy(mesh.geometry);geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
+    if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[],wide:[]});
+    const group=grouped.get(key);group.geometries.push(geometry);
+    if(xrLOD){
+      geometry.computeBoundingBox();
+      // At model-scale viewing, sub-16 cm bolts, beads and droplets add very
+      // little to the silhouette. Keep labels and thin but long structural parts.
+      if(geometry.boundingBox.getSize(new THREE.Vector3()).length()>=.16||mesh.material.name.startsWith('Sign:'))group.wide.push({source:mesh.geometry,matrix:mesh.matrixWorld.clone()});
+    }
+  }
+  yield;
+  batchStart=performance.now();
+  const merged=new THREE.Group();for(const {mat,geometries,wide} of grouped.values()){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}const geometry=mergeGeometries(geometries,false);if(!geometry)throw new Error('Invalid ship geometry');const mesh=new THREE.Mesh(geometry,mat);mesh.name=mat.name;mesh.castShadow=!mat.name.startsWith('Sign:')&&mat.userData.castShadow!==false;mesh.receiveShadow=mesh.castShadow;
+    registerMirrorSections(geometry,geometries);
+    if(xrLOD)deferXRWideGeometry(mesh,wide);
+    merged.add(mesh);geometries.forEach(g=>g.dispose());}return merged;
+}
+
+// Only Quest's wide view swaps in the coarse cabin, so build it on first use
+// instead of during startup. Reading `userData.xrWideGeometry` builds it once.
+function deferXRWideGeometry(mesh,sources){
+  let built=null;
+  const build=()=>{
+    const parts=sources.map(({source,matrix})=>{
+      const coarse=makeXRWideGeometry(source),wide=indexedCopy(coarse);coarse.dispose();
+      wide.applyMatrix4(matrix);wide.deleteAttribute('uv2');return wide;
+    });
+    const geometry=parts.length?mergeGeometries(parts,false):new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([],3));
+    if(!geometry)throw new Error('Invalid XR ship geometry');
+    parts.forEach(g=>g.dispose());sources.length=0;
+    return geometry;
+  };
+  Object.defineProperty(mesh.userData,'xrWideGeometry',{configurable:true,enumerable:true,get(){return built??=build();}});
+  mesh.geometry.addEventListener('dispose',()=>built?.dispose());
+}
+
+// The shadow pass costs one draw per material batch (135 in the cabin); triangles
+// barely matter. One position-only copy of every opaque front-sided batch casts the
+// identical shadow in a single draw, while the batches keep receiving shadows.
+// Three (r158) calls onBeforeRender in every visible pass but not in its shadow pass,
+// so an empty draw range there keeps the proxy out of all visible views.
+export function createStaticShadowProxy(batches){return finishPreparationSteps(createStaticShadowProxySteps(batches));}
+export function* createStaticShadowProxySteps(batches){
+  const casters=batches.children.filter(({isMesh,castShadow,material:mat})=>isMesh&&castShadow&&!Array.isArray(mat)&&
+    mat.side===THREE.FrontSide&&mat.shadowSide==null&&!mat.transparent&&!(mat.alphaTest>0)&&!mat.alphaMap);
+  if(!casters.length)return null;
+  batches.updateMatrixWorld(true);
+  const parts=[];let batchStart=performance.now();
+  for(const mesh of casters){
+    if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
+    parts.push(new THREE.BufferGeometry().setAttribute('position',mesh.geometry.attributes.position.clone()).setIndex(mesh.geometry.index.clone()).applyMatrix4(mesh.matrixWorld));
+  }
+  yield;
+  const geometry=mergeGeometries(parts,false);parts.forEach(part=>part.dispose());
+  for(const mesh of casters)mesh.castShadow=false;
+  const proxy=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial());
+  proxy.name='Cabin shadow proxy';proxy.castShadow=true;proxy.frustumCulled=false;
+  proxy.onBeforeRender=()=>{geometry.drawRange.count=0;};
+  proxy.onAfterRender=()=>{geometry.drawRange.count=Infinity;};
+  return proxy;
+}
