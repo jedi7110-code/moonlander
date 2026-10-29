@@ -61,6 +61,7 @@ test('public JS and CSS files cannot accidentally inherit the immutable policy',
 test('the retired /3D/ prefix permanently redirects to /obs/ and nothing else is served under it',()=>{
   assert.deepEqual(config.redirects,[
     {source:'/3D',destination:'/obs/',permanent:true},
+    {source:'/3D/',destination:'/obs/',permanent:true},
     {source:'/3D/:path*',destination:'/obs/:path*',permanent:true},
   ]);
   for(const rule of [...config.rewrites,...config.headers]){

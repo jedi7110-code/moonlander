@@ -6,6 +6,11 @@
       "permanent": true
     },
     {
+      "source": "/3D/",
+      "destination": "/obs/",
+      "permanent": true
+    },
+    {
       "source": "/3D/:path*",
       "destination": "/obs/:path*",
       "permanent": true
