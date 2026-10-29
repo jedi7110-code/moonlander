@@ -20,6 +20,20 @@
         "cd obs && exec npx vite preview --host 127.0.0.1 --port 4299 --strictPort"
       ],
       "port": 4299
+    },
+    {
+      "name": "pax-check",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8090",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "pax-upload"
+      ],
+      "port": 8090
     }
   ]
 }

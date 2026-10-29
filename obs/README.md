@@ -16,6 +16,12 @@ npm run dev
 配布用の静的ファイルは `npm run build` で `dist/` に生成します。`npm run preview` で配布版を起動できます。
 親サイトでは、ルートの `vercel.json` が `/obs/` をこの `dist/` へ振り分けます。
 
+paxcreation.com（`https://www.paxcreation.com/moon/`、nginx）には振り分け設定がなく、存在しないパスにも会社トップのHTMLが200で返ります。
+そのためFTP用の一式は、親ディレクトリで `node tools/package-pax.mjs` を実行して `pax-upload/moon/` に作ります。
+obsは公開パス `/moon/obs/` で `dist-pax/` にビルドし、そのまま `moon/obs/` に置くので、すべてのURLが実ファイルに届きます。
+ゲームとstoryは、git管理下のうちブラウザが読む種類のファイルとライセンス表記だけを複製します。制作メモ・原稿・スクリプトは入りません。
+出力先が既にある場合、スクリプトは上書きせずに止まります。
+
 ## オープニング
 
 オープニング・外観自由視点・単独モデルスタディーの「本番・中間色（現在）」は、太陽の主光源を白（`0xffffff`）と以前の暖色（`0xfff2d4`）のリニアRGBでの50%混合で共用します。スタディーには比較用の白色と「本番・暖色（以前）」も残し、同じ画角と強度で主光源の色だけを切り替えます。NASAの[太陽スペクトルの解説](https://science.nasa.gov/image-article/apod-2023-june-11-the-sun-and-its-missing-colors/)を参考に、太陽光にホワイトバランスを合わせた画面上の近似です。スペクトル計算による再現ではありません。[NASA/TM-20240016463](https://ntrs.nasa.gov/citations/20240016463)の2700–6500 Kは人工の作業用照明の規定であり、太陽光のRGB指定としては使いません。主光源の強度・方向・船体色・補助光は維持しています。

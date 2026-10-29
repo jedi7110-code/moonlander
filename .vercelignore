@@ -6,4 +6,8 @@ NOTES.md
 stargate.html
 story/review-notes.md
 story/fall-line_story_social_structure.txt
-story/以前作ったこの感じがいいんですよね.md
+story/以前作ったこの感じがいいんですよね。.md
+
+# paxcreation.com 向けの FTP 一式を作るスクリプトと、その出力
+tools/
+pax-upload/
