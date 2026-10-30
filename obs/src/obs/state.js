@@ -4,6 +4,7 @@ import {CABIN_PACE,CREW_WALK_SPEED,LADDER_PACE,LADDER_LANDING,LADDER_ENTRY} from
 import {createCatTurn,sampleCatTurn,angleDelta} from './cat-turn.js';
 import {APPROVED_RESTS,approvedRestRelease} from './cat-approved-rest.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
+import {crewWalkway} from './cabin-walkway.js';
 import {CabinMouseChase} from './mouse-chase.js';
 
 export const CAT_WALK_SPEED=18;
@@ -43,6 +44,17 @@ export class CrewMotion {
     }
     queue.push({type:'walk',x:target.x});this.queue=queue;this.onArrive=onArrive||null;
   }
+  walkStep(dt){
+    const s=this.queue[0],step=this.walkSpeed*Math.max(0,dt);
+    if(s?.type!=='walk'||!this.loungeAvoidance)return step;
+    const dx=Math.sign(s.x-this.x)*Math.min(Math.abs(s.x-this.x),step);
+    if(!dx)return 0;
+    const x=(this.x-700)*.022;
+    const from=crewWalkway(x,this.floor,this.facing,this.loungeAvoidance).z;
+    const to=crewWalkway(x+dx*.022,this.floor,this.facing,this.loungeAvoidance).z;
+    // Keep walking speed and footfalls tied to distance along the curve.
+    return step/Math.hypot(1,(to-from)/(dx*.022));
+  }
   update(dt) {
     this.knockTime=Math.max(0,this.knockTime-dt);
     const seg=this.queue[0];if(!seg)return;
@@ -55,8 +67,13 @@ export class CrewMotion {
       landingSpeed=finalSpeed+(1-finalSpeed)*t*t*(3-2*t);
     }
     const mounting=seg.type==='climb'&&seg.mounting&&Math.abs(this.y-seg.startY)*.016<LADDER_ENTRY.miloHeight-1e-8;
-    const step=mounting?Math.min(LADDER_ENTRY.miloHeight/.016-Math.abs(this.y-seg.startY),LADDER_ENTRY.miloHeight/.016/LADDER_ENTRY.seconds*dt):speed*landingSpeed*dt;
-    if(key==='x')this.walkDistance+=Math.min(Math.abs(delta),step);
+    const step=mounting?Math.min(LADDER_ENTRY.miloHeight/.016-Math.abs(this.y-seg.startY),LADDER_ENTRY.miloHeight/.016/LADDER_ENTRY.seconds*dt):(seg.type==='walk'?this.walkStep(dt):speed*landingSpeed*dt);
+    if(key==='x'){
+      const dx=Math.sign(delta)*Math.min(Math.abs(delta),step),x=(this.x-700)*.022;
+      const from=crewWalkway(x,this.floor,this.facing,this.loungeAvoidance).z;
+      const to=crewWalkway(x+dx*.022,this.floor,this.facing,this.loungeAvoidance).z;
+      this.walkDistance+=this.loungeAvoidance?Math.hypot(dx,(to-from)/.022):Math.abs(dx);
+    }
     if(key==='x'&&Math.abs(delta)>.01)this.facing=Math.sign(delta);
     if(Math.abs(delta)<=step){this[key]=seg[key];if(seg.type==='climb')this.floor=seg.floor;this.queue.shift();if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}}
     else this[key]+=Math.sign(delta)*step;

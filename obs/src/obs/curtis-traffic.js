@@ -1,7 +1,7 @@
 import {crewWalkway} from './cabin-walkway.js';
 
 export const CREW_CLEARANCE=.72,CAT_CLEARANCE=.62;
-export const worldActor=a=>({x:(a.x-700)*.022,y:(870-a.y)*.016,z:crewWalkway((a.x-700)*.022,a.floor).z});
+export const worldActor=a=>({x:(a.x-700)*.022,y:(870-a.y)*.016,z:crewWalkway((a.x-700)*.022,a.floor,a.facing,a.loungeAvoidance).z});
 export const worldCat=m=>({x:(m.x-700)*.022,y:(870-m.y)*.016,z:m.z});
 export const close=(a,b,r)=>Math.abs(a.y-b.y)<1.4&&Math.hypot(a.x-b.x,a.z-b.z)<r;
 // Permit an already-close actor to leave, but never to move farther into a body.
@@ -13,7 +13,7 @@ export function approaches(from,to,obstacle,r){
 export function nextActor(a,dt){
   const from=worldActor(a),s=a.queue?.[0];
   if(s?.type!=='walk')return from;
-  const x=a.x+Math.sign(s.x-a.x)*Math.min(Math.abs(s.x-a.x),a.walkSpeed*dt);
+  const x=a.x+Math.sign(s.x-a.x)*Math.min(Math.abs(s.x-a.x),a.walkStep?.(dt)??a.walkSpeed*dt);
   return worldActor({...a,x});
 }
 export function nextDroid(d,dt){

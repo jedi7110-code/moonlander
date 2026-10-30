@@ -2,6 +2,7 @@ import {FLOORS,LADDER_X,CAT_BOWL,WASTE_INCINERATOR as WASTE,ACCESS_LADDER,ladder
 import {planDroidTurn,sampleDroidTurn} from './droid-turn.js';
 import {DROID_STARTUP_SECONDS} from './droid-startup.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
+import {worldActor,nextActor,nextDroid} from './curtis-traffic.js';
 import {DROID_LADDER_LANDING,LADDER_ENTRY,DROID_GAIT} from './pace.js';
 
 export const DROID_JOBS=Object.freeze({
@@ -74,6 +75,14 @@ export class DroidRoutine {
     this.crewRequest=callback;return true;
   }
   blocksCrew(actor,dt=1/60){
+    const route=actor?.loungeAvoidance;
+    if(route&&route.floor===actor.floor){
+      const from=worldActor(actor),to=nextActor(actor,dt);
+      // Let a robot already passing the sofa clear the detour before Milo
+      // leaves his usual aisle, where the two original lanes stay separate.
+      if(Math.abs(from.x-route.x)>=route.halfWidth&&Math.abs(to.x-route.x)<route.halfWidth&&
+        Math.abs(this.position.y-from.y)<1.4&&Math.abs(this.position.x-route.x)<route.halfWidth+.70)return true;
+    }
     if(!this.ladderClaim)return false;
     if(!ladderPathsConflict(this.ladderPath,crewLadderPath(actor)))return false;
     if(actor.climbing)return true;
@@ -260,6 +269,15 @@ export class DroidRoutine {
     this.waiting=false;this.waitingForCat=false;
     if(this.docked){if(this.time>=this.restUntil){const job=this.choose();if(job)this.request(job);}return;}
     const s=this.step;if(!s)return;
+    const route=this.actor?.loungeAvoidance;
+    if(s.kind==='walk'&&route&&route.floor===this.actor.floor){
+      const crew=worldActor(this.actor),next=nextDroid(this,dt);
+      const from=Math.abs(this.position.x-route.x),to=Math.abs(next.x-route.x);
+      // Once Milo is in the detour, hold an approaching robot outside it.
+      // Moving away is always allowed, so a previous occupant can finish.
+      if(Math.abs(crew.x-route.x)<route.halfWidth&&Math.abs(crew.y-this.position.y)<1.4&&
+        to<route.halfWidth+.70&&to<from){this.waiting=true;return;}
+    }
     if(this.visitor?.blocksDroid?.(this,dt)){this.waiting=true;return;}
     this.waitingForCat=Boolean(this.cat?.motion?.blocksDroid(this,dt));
     if(this.waitingForCat){this.waiting=true;return;}

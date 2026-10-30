@@ -1,13 +1,16 @@
 import {worldActor,worldCat,close,approaches,nextActor,nextDroid,CREW_CLEARANCE,CAT_CLEARANCE} from './curtis-traffic.js';
-import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,ladderApproachDepth} from './layout.js';
+import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,LOUNGE_ACCESS,LOUNGE_SEAT,getStation,ladderApproachDepth} from './layout.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
 import {CREW_WALK_SPEED} from './pace.js';
 import {CURTIS_COFFEE} from './curtis-coffee.js';
+import {loungeEntryAge,loungeExitPose} from './lounge-exit.js';
 
 export const CURTIS_TIMING={first:[90,150],between:[180,360],prepareAhead:35};
 export const CURTIS_WALK_SPEED=CREW_WALK_SPEED*.022;
 export const CURTIS={top:13.4,seatX:6.05,coffeeX:10.085,roomX:-1.88,roomZ:-4.37};
+export const CURTIS_LOUNGE_PASSAGE=Object.freeze({floor:1,x:CURTIS.seatX,
+  halfWidth:(getStation('lounge').x-700)*.022+LOUNGE_ACCESS.sideX-CURTIS.seatX,depth:1.35});
 export const CURTIS_LADDER_TRAFFIC=Object.freeze({waitX:2.2,crewWaitX:2.85,clearX:2.1,mergeX:1.75,bridgeX:.85,passZ:2.18});
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
@@ -127,11 +130,15 @@ export class CurtisRoutine {
     return approaches(p,next,this.trafficPosition,CAT_CLEARANCE);
   }
   blocksCrew(actor,dt=1/60){
+    if(actor){
+      const seated=this.active&&this.floor===1&&['sit','relax','stand'].includes(this.step?.kind);
+      const x=(actor.x-700)*.022;
+      if(seated&&actor.floor===1)actor.loungeAvoidance??=CURTIS_LOUNGE_PASSAGE;
+      // Keep a route already in use until Milo is clear, even if Curtis rises.
+      else if(actor.loungeAvoidance&&Math.abs(x-actor.loungeAvoidance.x)>=actor.loungeAvoidance.halfWidth)actor.loungeAvoidance=null;
+    }
     if(this.active&&actor){
       const from=worldActor(actor),to=nextActor(actor,dt);
-      // Hold Milo outside the sofa approach until Curtis has stood and cleared it.
-      if(this.floor===1&&['sit','relax','stand'].includes(this.step?.kind)&&actor.floor===1&&
-          Math.abs(to.x-CURTIS.seatX)<1.5&&Math.abs(to.x-CURTIS.seatX)<Math.abs(from.x-CURTIS.seatX))return true;
       if(approaches(from,to,this.passageObstacle(from,CREW_CLEARANCE),CREW_CLEARANCE))return true;
     }
     if(!this.ladderClaim||!ladderPathsConflict(this.ladderPath,crewLadderPath(actor)))return false;
@@ -155,7 +162,11 @@ export class CurtisRoutine {
     const obstacles=[];
     if(actor){
       const position=worldActor(actor);
-      if(brain&&(brain.loungeEntry||brain.loungeExit||brain.loungeStow||brain.actStation==='lounge')&&!actor.busy){position.x=CURTIS.seatX;position.z=.06;}
+      if(brain&&(brain.loungeEntry||brain.loungeExit||brain.loungeStow||brain.actStation==='lounge')&&!actor.busy){
+        const passage=brain.loungeEntry?loungeExitPose(loungeEntryAge(brain.loungeEntry.age)):
+          brain.loungeExit?loungeExitPose(brain.loungeExit.age):{x:0,depth:LOUNGE_SEAT.depth};
+        position.x=(getStation('lounge').x-700)*.022+passage.x;position.z=passage.depth;
+      }
       obstacles.push({p:position,r:CREW_CLEARANCE});
     }
     if(droid?.position)obstacles.push({p:droid.position,r:.64});

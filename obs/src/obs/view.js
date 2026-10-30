@@ -442,7 +442,7 @@ export class ObservationView {
     animateGym(this.ship.gym,brain.gymVisit?.pedalTime??brain.gymPedalTime??0);
     animateBunk(this.ship.bunk,brain.bunkVisit?.pose);
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
-    const walkway=crewWalkway(positionX(actor.x),actor.floor,actor.facing);
+    const walkway=crewWalkway(positionX(actor.x),actor.floor,actor.facing,actor.loungeAvoidance);
     this.milo.position.set(positionX(actor.x),positionY(actor.y),walkway.z);
     const climb=actor.climbing?actor.queue[0]:null,nextX=actor.queue[1]?.x??actor.x;
     this.cabinClimb=updateCabinClimb(this.cabinClimb,climb?{
