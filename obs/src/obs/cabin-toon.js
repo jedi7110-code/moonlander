@@ -17,7 +17,7 @@ function toonMaterial(source){
     side:source.side,alphaMap:source.alphaMap,alphaTest:source.alphaTest,
     emissive:source.emissive,emissiveMap:source.emissiveMap,emissiveIntensity:source.emissiveIntensity,
     lightMap:source.lightMap,lightMapIntensity:source.lightMapIntensity,
-    clippingPlanes:source.clippingPlanes,depthWrite:source.depthWrite,
+    clippingPlanes:source.clippingPlanes,clipIntersection:source.clipIntersection,clipShadows:source.clipShadows,depthWrite:source.depthWrite,
   });
   material.onBeforeCompile=shader=>{
     shader.fragmentShader=shader.fragmentShader.replace('#include <lights_toon_pars_fragment>',`
@@ -85,15 +85,28 @@ function inkMaterial(width=1){
 
 export function createCabinToon(roots){
   const originals=[],materials=new Map(),outlines=[],ink=inkMaterial(),fixedInks=new Map();
-  function meshInk(mesh){
+  const clippedInks=[];
+  function meshInk(mesh,source){
+    let base=ink;
     // Character roots keep a fixed CSS-pixel width, independent of cabin zoom.
     for(let node=mesh;node;node=node.parent){
       const width=node.userData.toonOutlineWidth;
       if(!Number.isFinite(width)||width<0)continue;
       if(!fixedInks.has(width))fixedInks.set(width,inkMaterial(width));
-      return fixedInks.get(width);
+      base=fixedInks.get(width);break;
     }
-    return ink;
+    const planes=source.clippingPlanes;
+    if(!planes?.length)return base;
+    let clipped=clippedInks.find(item=>item.base===base&&item.planes===planes&&item.intersection===source.clipIntersection);
+    if(!clipped){
+      const material=base.clone();material.name='Cabin study ink / clipped';
+      // The shell and door share fixed world-space jamb planes. Moving the
+      // door must never move the clipping boundary into the wall pocket.
+      material.uniforms=base.uniforms;material.clipping=true;material.clippingPlanes=planes;
+      material.clipIntersection=source.clipIntersection;material.clipShadows=source.clipShadows;
+      clipped={base,planes,intersection:source.clipIntersection,material};clippedInks.push(clipped);
+    }
+    return clipped.material;
   }
   for(const root of roots){root.updateMatrixWorld(true);root.traverse(mesh=>{if(mesh.isMesh)originals.push({mesh,source:mesh.material});});}
   for(const {mesh,source} of originals){
@@ -110,7 +123,7 @@ export function createCabinToon(roots){
       (box.max.y-box.min.y)*Math.hypot(scale[4],scale[5],scale[6]),
       (box.max.z-box.min.z)*Math.hypot(scale[8],scale[9],scale[10]));
     if(extent<.24)continue;
-    const material=meshInk(mesh);
+    const material=meshInk(mesh,source);
     const shell=mesh.isSkinnedMesh?new SkinnedMesh(mesh.geometry,material):new Mesh(mesh.geometry,material);shell.name='Cabin toon outline';shell.matrixAutoUpdate=false;
     if(mesh.isSkinnedMesh){shell.skeleton=mesh.skeleton;shell.bindMode=mesh.bindMode;shell.bindMatrix.copy(mesh.bindMatrix);shell.bindMatrixInverse.copy(mesh.bindMatrixInverse);shell.frustumCulled=false;}
     shell.matrix=mesh.matrix;shell.renderOrder=mesh.renderOrder+1;shell.raycast=()=>{};
@@ -135,6 +148,6 @@ export function createCabinToon(roots){
   setStyle('current');
   return {setStyle,update,get width(){return mode==='cartoon'?ink.uniforms.width.value:0;},dispose(){
     for(const {mesh,source} of originals)mesh.material=source;
-    outlines.forEach(({shell})=>shell.removeFromParent());materials.forEach(material=>material.dispose());ink.dispose();fixedInks.forEach(material=>material.dispose());
+    outlines.forEach(({shell})=>shell.removeFromParent());materials.forEach(material=>material.dispose());ink.dispose();fixedInks.forEach(material=>material.dispose());clippedInks.forEach(({material})=>material.dispose());
   }};
 }

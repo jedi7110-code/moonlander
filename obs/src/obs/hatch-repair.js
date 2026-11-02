@@ -4,38 +4,44 @@ import {angleDelta,headingEase} from './heading.js';
 // Keep the working shoulder beside the new lock, on the crew-lane side.
 export const HATCH_REPAIR_DEPTH=CABIN_AISLE.crewZ+.14;
 export const HATCH_REPAIR_PHASES={turnIn:1.4,approach:2.0,align:1.4,inspect:4,repair:10,verify:4,release:1.2,turnOut:1.4,return:2.0,alignOut:1.4};
-const order=Object.keys(HATCH_REPAIR_PHASES);
+// The outer hatch is already straight ahead on the normal walking lane.
+// Begin inspection on arrival; do not turn toward camera depth and sidestep.
+export const OUTER_HATCH_REPAIR_PHASES={inspect:4,repair:10,verify:4,release:1.2};
+const order=Object.keys(HATCH_REPAIR_PHASES),outerOrder=Object.keys(OUTER_HATCH_REPAIR_PHASES);
 const clamp=t=>Math.max(0,Math.min(1,t));
 const smooth=t=>{t=clamp(t);return t*t*(3-2*t);};
 const mix=(a,b,t)=>a+(b-a)*t;
 export const HATCH_REPAIR_LABELS={
-  turnIn:['船内ハッチを点検に向かう','Approaching the inner hatch'],approach:['船内ハッチを点検に向かう','Approaching the inner hatch'],align:['船内ハッチを点検に向かう','Approaching the inner hatch'],
-  inspect:['扉のロックを点検中','Inspecting the hatch lock'],repair:['扉のロックを修理中','Repairing the hatch lock'],verify:['ロックの復旧を確認中','Checking the repaired lock'],
+  turnIn:['奥の船外ハッチへ向かう','Approaching the outer hatch'],approach:['奥の船外ハッチへ向かう','Approaching the outer hatch'],align:['奥の船外ハッチへ向かう','Approaching the outer hatch'],
+  inspect:['船外ハッチのシールを点検中','Inspecting the outer hatch seal'],repair:['船外ハッチを修理中','Repairing the outer hatch seal'],verify:['修理後の気密を確認中','Verifying the repaired seal'],
   release:['工具をしまう','Putting the tool away'],turnOut:['ハッチの点検を終える','Finishing the hatch check'],return:['通路に戻る','Returning to the aisle'],alignOut:['通路に戻る','Returning to the aisle'],done:['点検完了','Inspection complete'],
 };
 
 export class HatchRepairVisit {
-  constructor(serial){this.serial=serial;this.phase='turnIn';this.age=0;this.startYaw=null;this.cancelled=false;this.repaired=false;this.releaseFrom=null;}
+  constructor(serial,{hatch='inner'}={}){this.serial=serial;this.hatch=hatch;this.phase=hatch==='outer'?'inspect':'turnIn';this.age=0;this.startYaw=null;this.cancelled=false;this.repaired=false;this.releaseFrom=null;}
   requestExit(){
     if(this.done||['release','turnOut','return','alignOut'].includes(this.phase))return;
     this.cancelled=true;
     // Finish any step/turn first. Hands always withdraw before walking away.
     if(['inspect','repair','verify'].includes(this.phase)){this.releaseFrom=this.pose;this.phase='release';this.age=0;}
   }
-  update(dt){
+  update(dt,{canVerify=true}={}){
     if(!Number.isFinite(dt)||dt<=0)return;
     while(dt>0&&!this.done){
-      const duration=HATCH_REPAIR_PHASES[this.phase],step=Math.min(dt,duration-this.age);
+      const phases=this.hatch==='outer'?OUTER_HATCH_REPAIR_PHASES:HATCH_REPAIR_PHASES;
+      const sequence=this.hatch==='outer'?outerOrder:order;
+      const duration=phases[this.phase],step=Math.min(dt,duration-this.age);
       this.age+=step;dt-=step;
       if(this.age<duration-1e-8)break;
+      if(this.phase==='verify'&&!this.cancelled&&!canVerify)break;
       if(this.phase==='verify'&&!this.cancelled)this.repaired=true;
       if(['verify','align'].includes(this.phase))this.releaseFrom=this.pose;
-      this.phase=this.phase==='align'&&this.cancelled?'release':order[order.indexOf(this.phase)+1]??'done';this.age=0;
+      this.phase=this.phase==='align'&&this.cancelled?'release':sequence[sequence.indexOf(this.phase)+1]??'done';this.age=0;
     }
   }
   get done(){return this.phase==='done';}
   get pose(){
-    const phase=this.phase,duration=HATCH_REPAIR_PHASES[phase]??1,u=clamp(this.age/duration);
+    const phase=this.phase,duration=(this.hatch==='outer'?OUTER_HATCH_REPAIR_PHASES:HATCH_REPAIR_PHASES)[phase]??1,u=clamp(this.age/duration);
     // Milo faces local +Z. The approach moves toward greater depth; the return
     // moves toward smaller depth, so each walking phase must face its travel.
     const approachYaw=Math.atan2(0,HATCH_REPAIR_DEPTH-CABIN_AISLE.crewZ),returnYaw=Math.atan2(0,CABIN_AISLE.crewZ-HATCH_REPAIR_DEPTH);
@@ -56,6 +62,7 @@ export class HatchRepairVisit {
     const moving=['approach','return'].includes(phase);
     let grip=phase==='repair'?1:phase==='inspect'?smooth((this.age-(HATCH_REPAIR_PHASES.inspect-.45))/.45):phase==='verify'?1-smooth(this.age/.45):0;
     if(phase==='release'&&this.releaseFrom)grip=(this.releaseFrom.grip??0)*(1-smooth((this.age-.65)/.55));
+    if(this.hatch==='outer')return{phase,depth:CABIN_AISLE.crewZ,yaw:Math.PI/2,turn:null,reach,tool,twist,grip,moving:false,walkDistance:0,walkWeight:0};
     return{phase,depth,yaw,turn,reach,tool,twist,grip,moving,
       walkDistance:Math.abs(CABIN_AISLE.crewZ-HATCH_REPAIR_DEPTH)*smooth(u),
       walkWeight:moving?smooth(this.age/.3)*smooth((duration-this.age)/.3):0};

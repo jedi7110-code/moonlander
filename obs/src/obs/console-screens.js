@@ -26,7 +26,7 @@ export function consoleTelemetry({brain,care,airlock,droid,clock=0}={}){
   return{clock:Math.max(0,finite(environment?.clock,clock)),
     shipTime:`${String(Math.floor(minutes/60)%24).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`,
     temperature:finite(environment?.temperature,21.4),pressure:finite(environment?.pressure,101.3),
-    fault:Boolean(environment?.fault),faultStage:environment?.fault?.stage??null,
+    bayPressure:finite(environment?.bayPressure,101.3),fault:Boolean(environment?.fault),faultStage:environment?.fault?.stage??null,
     innerDoor:airlock?.opening>.01?'OPEN':'CLOSED',loads,voltage,watts,amps:watts/voltage,
     freight:care?.phase??'idle',stock:{food:care?.supplies?.food??3,water:care?.supplies?.water??4,catfood:care?.supplies?.catfood??3}};
 }
@@ -124,11 +124,12 @@ function atmosphere(ctx,t,history){
   box(ctx,607,244,102,33,C.green);text(ctx,'EVA',658,267,20,C.green,'center');
   line(ctx,719,243,719,279,C.green,4);
   text(ctx,'INNER',602,313,16,t.fault?C.red:C.muted);text(ctx,t.innerDoor,602,338,20,C.text);
-  footer(ctx,t.fault?'INNER LOCK / FAULT':'OUTER HATCH / SEALED','LOCAL SENSOR FEED',t.fault?C.red:C.green);
+  text(ctx,`BAY ${t.bayPressure.toFixed(1)} kPa`,470,374,18,t.fault?C.red:C.text);
+  footer(ctx,t.fault?'EVA BAY / PRESSURE LOSS':'OUTER HATCH / SEALED','LOCAL SENSOR FEED',t.fault?C.red:C.green);
 }
 
 const freightLabels={idle:'STANDBY',queued:'ORDER QUEUED',transmitting:'TRANSMITTING',inbound:'INBOUND',unloading:'UNLOADING'};
-const repairLabels={detected:'INSPECTION REQUIRED',inspect:'INSPECTING CONTACT',repair:'CONTACT ADJUSTMENT',verify:'VERIFYING LOCK'};
+const repairLabels={detected:'LEAK ACTIVE',inspect:'CHECKING PRESSURE',repair:'OUTER SEAL REPAIR',verify:'VERIFYING SEAL'};
 function power(ctx,t){
   header(ctx,2,'POWER / DISTRIBUTION',t);
   for(const [x,label,value,unit]of [[24,'SERVICE BUS',t.voltage.toFixed(1),'V'],[278,'CURRENT',t.amps.toFixed(1),'A'],[522,'TOTAL LOAD',(t.watts/1000).toFixed(2),'kW']]){
@@ -145,7 +146,7 @@ function power(ctx,t){
     box(ctx,454,y-7,159,12,C.line);ctx.fillStyle=active?C.green:C.line;ctx.fillRect(457,y-4,153*Math.min(1,load.watts/load.rating),6);
     text(ctx,`${String(load.watts).padStart(3,' ')} W`,743,y+7,20,active?C.bright:C.muted,'right');
   });
-  const status=t.fault?`INNER LOCK / ${repairLabels[t.faultStage]??'CHECK REQUIRED'}`:'PROTECTION / NO TRIPPED CIRCUITS';
+  const status=t.fault?`EVA BAY / ${repairLabels[t.faultStage]??'CHECK REQUIRED'}`:'PROTECTION / NO TRIPPED CIRCUITS';
   text(ctx,status,24,382,18,t.fault?C.red:C.muted);
   footer(ctx,`CARGO / ${freightLabels[t.freight]??'STANDBY'}`,`F:${t.stock.food} W:${t.stock.water} C:${t.stock.catfood}`,t.freight==='idle'?C.green:C.amber);
 }

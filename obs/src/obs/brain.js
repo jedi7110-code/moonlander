@@ -14,6 +14,7 @@ import {BunkVisit,BUNK_TRANSITION_DECAY} from './bunk-visit.js';
 import {HairGrowthClock,GroomingVisit} from './grooming-visit.js';
 import {SmokingClock,SmokingVisit,LOUNGE_SMOKING_SECONDS} from './smoking-visit.js';
 import {CabinEnvironment} from './environment.js';
+import {EVA_PASSAGE} from './layout.js';
 import {HatchRepairVisit} from './hatch-repair.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
@@ -90,7 +91,9 @@ export class CabinBrain extends Brain {
     const grooming=this.grooming;
     const smoking=this.smokingVisit;
     const repair=this.hatchRepair;
-    this.environment.update(dt);
+    const previousFault=this.environment.fault?.serial;
+    this.environment.update(dt,{bayOccupied:this.actor.floor===EVA_PASSAGE.floor&&this.actor.x>=EVA_PASSAGE.x-EVA_PASSAGE.clearance});
+    if(this.environment.fault&&this.environment.fault.serial!==previousFault)this.chooseHatchRepair();
     this.smokingClock.update(dt,Boolean(smoking)||this.actStation==='smoking');
     this.hairGrowth.update(dt,Boolean(grooming));
     const exit=this.loungeExit,stow=this.loungeStow;
@@ -141,7 +144,7 @@ export class CabinBrain extends Brain {
       }
     }
     if(repair&&this.hatchRepair===repair){
-      repair.update(dt);
+      repair.update(dt,{canVerify:this.environment.readyToVerify});
       if(['inspect','repair','verify'].includes(repair.phase))this.environment.setStage(repair.serial,repair.phase);
       if(repair.cancelled&&!repair.repaired)this.environment.setStage(repair.serial,'detected');
       if(repair.repaired&&!repair.reported){repair.reported=true;this.environment.resolve(repair.serial);}
@@ -214,10 +217,11 @@ export class CabinBrain extends Brain {
     if(!this.environment.fault||this.hatchRepair)return false;
     if(this.health.needsCare){this._go(getStation('medical'));return true;}
     if(Math.min(this.needs.energy,this.needs.hunger,this.needs.thirst,this.needs.bladder)<20)return false;
-    this._go(getStation(this.environment.fault.id));return true;
+    this._go(getStation(this.environment.fault.serviceStation??this.environment.fault.id));return true;
   }
   _go(station){
     station=getStation(station?.id);if(!station)return false;
+    if(this.environment.fault&&station.id==='eva')station=getStation('airlock');
     if(station.id===this.cur?.id&&this.hatchRepair)return true;
     if(station.id==='smoking'&&this.actStation==='smoking')return true;
     if(station.id==='grooming'&&(this.actStation==='grooming'||this.groomingQueued))return true;
@@ -240,9 +244,9 @@ export class CabinBrain extends Brain {
     return true;
   }
   _startPerform(station,seated=false){
-    if(station.id===this.environment.fault?.id){
+    if(station.id===(this.environment.fault?.serviceStation??this.environment.fault?.id)){
       this.cur=station;this.state='repairingHatch';this.actKey='perform';this.actStation=station.id;this.recoverNeed=null;
-      this.hatchRepair=new HatchRepairVisit(this.environment.fault.serial);return;
+      this.hatchRepair=new HatchRepairVisit(this.environment.fault.serial,{hatch:station.id==='airlock'?'outer':'inner'});return;
     }
     if(station.id==='smoking'){
       this.cur=station;this.state='smoking';this.actKey='perform';this.actStation='smoking';this.recoverNeed=null;
@@ -469,8 +473,8 @@ export class CabinBrain extends Brain {
       return words('ヘッドホンで少し聴いてくる。','I will listen on my headphones for a while.');
     }
     if(/修理|故障|環境異常|ロック.*(?:確認|点検)|repair|fix (?:the )?(?:door|hatch)/i.test(text)){
-      this._go(getStation('innerHatch'));
-      return this.environment.fault?words('船内ハッチのロックを点検して直してくる。','I will inspect and repair the inner hatch lock.'):words('船内ハッチのロックを点検してくる。','I will inspect the inner hatch lock.');
+      this._go(getStation('airlock'));
+      return words('漏れが続いている。奥の船外ハッチを修理してくる。','The leak is still active. I will repair the outer hatch inside the suit bay.');
     }
     if(/内扉|船内ハッチ|左.*ハッチ|inner (?:hatch|door)|cabin hatch/i.test(text)){
       this._go(getStation('innerHatch'));return words('船内側のハッチを点検してくる。','I will inspect the inner hatch.');

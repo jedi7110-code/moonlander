@@ -58,15 +58,16 @@ test('the journal records actual transitions once, bounds history and freezes wi
   environment.clock=0;screens.update(state);assert.equal(screens.events.length,1,'new session discards old events');
 });
 
-test('repair tracking and alarm journal identify the inner hatch, not the EVA exit',()=>{
+test('alarm journal identifies the EVA bay and identifies work at the outer hatch',()=>{
   const screens=new AISupervision(),environment=new CabinEnvironment();
   const brain={environment,state:'idle'},state={brain};screens.update(state);
   environment.triggerFault();environment.update(1);screens.update(state);
-  assert.deepEqual(screens.events.at(-1),{time:'08:00',source:'INNER LOCK',message:'DETECTED',alert:true});
-  brain.cur={id:'innerHatch'};brain.hatchRepair={phase:'repair'};brain.state='repairingHatch';
-  assert.equal(supervisionTelemetry(state).crewStatus,'INNER HATCH / REPAIR');
+  assert.deepEqual(screens.events.at(-1),{time:'08:00',source:'EVA BAY',message:'DETECTED',alert:true});
+  brain.cur={id:'airlock'};brain.hatchRepair={phase:'repair'};brain.state='repairingHatch';
+  assert.equal(supervisionTelemetry(state).crewStatus,'EVA HATCH / REPAIR');
+  environment.setStage(environment.fault.serial,'verify');environment.update(30);
   environment.resolve(environment.fault.serial);environment.update(1);screens.update(state);
-  assert.deepEqual(screens.events.at(-1),{time:'08:00',source:'INNER LOCK',message:'SEALED',alert:false});
+  assert.deepEqual(screens.events.at(-1),{time:'08:00',source:'EVA BAY',message:'SEALED',alert:false});
 });
 
 test('rack bezels leave four distinct correctly proportioned displays visible ahead of the backplate',()=>{

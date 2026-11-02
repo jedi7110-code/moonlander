@@ -84,9 +84,10 @@ const scene={
     inspectEVA(id){showMessage(id==='eva'?words('宇宙服は三着、ラックに固定されている。','Three suits, secured in the rack.'):id==='innerHatch'?words('船内側のハッチ、異常なし。','Inner hatch checked. No faults.'):words('船外ハッチは閉鎖、ロックを確認した。','EVA hatch sealed. Locks checked.'));},
     environmentEvent(event){
       if(event.type==='fault'){
-        showMessage(words('手前の船内ハッチにロック異常。点検・修理が必要。','Inner cabin hatch lock fault. Inspection and repair required.'),'SYSTEM');audio.tone(210,.3,.035);
-      }else if(event.type==='stage'&&event.stage==='repair')showMessage(words('ロックの接点を調整する。','I will adjust the lock contact.'));
-      else if(event.type==='restored')showMessage(words('ロックの修理と確認を終えた。船内環境、正常。','Lock repaired and checked. Cabin systems normal.'));
+        showMessage(words('宇宙服室で少量の空気漏れ。奥の船外ハッチのシールを修理する。','Small EVA bay air leak. Repair the seal at the outer hatch.'),'SYSTEM');audio.tone(210,.3,.035);
+      }
+      else if(event.type==='stage'&&event.stage==='repair')showMessage(words('奥の船外ハッチのシール機構を修理する。','Repairing the seal mechanism at the outer hatch.'));
+      else if(event.type==='restored')showMessage(words('宇宙服室の気密と圧力を確認。隔離を解除する。','EVA bay sealed and pressure verified. Releasing isolation.'));
     },
     healthEvent(event){
       if(event.type==='onset'){
@@ -413,6 +414,10 @@ async function start(){
       view.setMode('manual');view.center.set(8.30,4.45,.75);view.targetCenter.copy(view.center);
       view.viewHeight=view.targetHeight=2.8;view.zoom=view.fitHeight/2.8;
     }
+    if(new URLSearchParams(location.search).get('preview')==='airlock'){
+      view.setMode('manual');view.center.set(9.45,8.22,.25);view.targetCenter.copy(view.center);
+      view.viewHeight=view.targetHeight=4.5;view.zoom=view.fitHeight/4.5;
+    }
     view.startLighting({waitForActivation:true});
     view.render(0,elapsed,actor,brain,cat,care,true,airlock,null,true);
     // Compile every cabin program behind the connection screen. With
@@ -442,7 +447,7 @@ async function start(){
         accumulator+=dt;
         if(view.catRun&&openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor);
+        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor,brain.environment);
           if(!view.startupLighting?.waiting)curtis.update(step,{actor,droid,cat,brain});
           actor.waitingForVisitor=curtis.blocksCrew(actor,step);
           actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat,curtis});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}

@@ -17,7 +17,8 @@ import {animateBathroom} from './bathroom.js';
 import {animateCatPorts} from './cat-ports.js';
 import {animateGym,BIKE} from './gym.js';
 import {CAT_PORT,CAT_SOFA,LOUNGE_SEAT,CABIN_AISLE,FLOORS,getStation} from './layout.js';
-import {animateAirlock,animateHatchFault,HATCH_SERVICE_POINT} from './eva.js';
+import {animateAirlock,animateHatchFault,OUTER_HATCH_SERVICE_POINT} from './eva.js';
+import {createEVALeak} from './eva-leak.js';
 import {loadEVAGarment} from './eva-garment.js';
 import {loadMiloBody} from './milo-body.js';
 import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
@@ -88,7 +89,7 @@ export class ObservationView {
       await nextFrame();
       // Practical lighting also exists in studies that don't replay startup.
       view.startupLighting=new CabinStartupLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,start:false});
-      const workCenter=new THREE.Vector3(HATCH_SERVICE_POINT.x-.12,positionY(FLOORS[getStation('innerHatch').floor].y)+HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z);
+      const workCenter=new THREE.Vector3(OUTER_HATCH_SERVICE_POINT.x-.12,positionY(FLOORS[getStation('airlock').floor].y)+OUTER_HATCH_SERVICE_POINT.y,OUTER_HATCH_SERVICE_POINT.z);
       await nextFrame();
       view.emergencyLighting=new CabinEmergencyLighting([...roots,view.milo,view.cat,view.mouse.root],{reducedMotion:view.reducedMotion,workCenter});
       onProgress(.97);
@@ -160,6 +161,7 @@ export class ObservationView {
     this.camera=new THREE.PerspectiveCamera(24,1,.1,150);
     this.mode='all';this.zoom=1;this.center=new THREE.Vector3(0,HABITAT_VIEW.centerY,0);this.targetCenter=this.center.clone();this.viewHeight=15;this.targetHeight=15;
     this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.onStation=null;this.onModeChange=null;this.feedback=null;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.evaLeak=createEVALeak(positionY(FLOORS[getStation('eva').floor].y),{reducedMotion:this.reducedMotion});this.scene.add(this.evaLeak.root);
     this.resize=()=>{if(this.renderer.xr.isPresenting)return;const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;this.zoomAnchor=null;this.width=r.width;this.height=r.height;this.renderer.setSize(r.width,r.height,false);this.fitHeight=Math.max(HABITAT_VIEW.minHeight,29.4/(r.width/r.height));if(this.mode==='all')this.targetHeight=this.fitHeight/this.zoom;this.setFrustum();};
     this.observer=new ResizeObserver(this.resize);this.observer.observe(canvas);this.resize();this.viewHeight=this.targetHeight;this.setFrustum();
     this.listeners=[];this.bindControls();
@@ -482,6 +484,8 @@ export class ObservationView {
     animateMedical(this.ship.medical,medicalTime,action==='medical',action==='medical'?(treating?medicalReadings(brain.needs,brain.health):brain.medicalSample):brain.lastMedicalReport,{duration:brain.curDurSec,treating,alert:brain.health.needsCare,patient:this.milo,scanTime:brain.reclineExit?.id==='medical'?brain.reclineExit.actionTime:medicalTime});
     if(airlock)animateAirlock(this.ship.innerDoor,this.ship.innerSignal,airlock.opening);
     animateHatchFault(this.ship.innerSignal,brain.environment,{opening:airlock?.opening??0});
+    animateHatchFault(this.ship.outerSignal,brain.environment,{hatchId:'airlock'});
+    this.evaLeak?.update(brain.environment);
     const turn=catMotion.turnPose,passage=catMotion.passagePose,catMoving=!turn&&!catMotion.waitingForCrew&&!catMotion.waitingForDroid&&(catMotion.chase?catMotion.chase.speed>.03:passage?['enter','exit'].includes(passage.phase):catMotion.busy);
     const hop=catMotion.hop&&!turn?{...catMotion.hop,yaw:Math.atan2((positionX(CAT_SOFA.seatX)-positionX(CAT_SOFA.floorX))*(catMotion.hop.up?1:-1),(LOUNGE_SEAT.centerDepth-CAT_SOFA.approachZ)*(catMotion.hop.up?1:-1))}:null;
     this.cat.position.set(positionX(catMotion.x),positionY(catMotion.y)+catMotion.elevation,catMotion.z);this.cat.visible=!catMotion.hidden;

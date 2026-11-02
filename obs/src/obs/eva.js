@@ -18,6 +18,8 @@ export const EVA_BAY={suitX:EVA_SPOT_LAYOUT.suitX,suitZ:-.73,railY:2.62,hatchX:1
 // World X/Z and deck-relative Y, shared by OBS and the repair study.
 export const HATCH_SERVICE_POINT={x:EVA_BAY.innerX-(PRESSURE_LOCK_SERVICE.z+PRESSURE_LOCK_SERVICE.tip)*hatchScale,y:EVA_HATCH_FIT.centerY+PRESSURE_LOCK_SERVICE.y*hatchScale,z:EVA_BAY.depth+PRESSURE_LOCK_SERVICE.x*hatchScale};
 
+export const OUTER_HATCH_SERVICE_POINT={...HATCH_SERVICE_POINT,x:EVA_BAY.hatchX-(PRESSURE_LOCK_SERVICE.z+PRESSURE_LOCK_SERVICE.tip)*hatchScale};
+
 export function createEVASpotlights(m,y){
   const root=new THREE.Group();root.name='EVA overhead spotlights';
   const lens=new THREE.MeshBasicMaterial({name:'EVA spot light lens',color:0xffe5c6,toneMapped:false});
@@ -92,5 +94,5 @@ export function animateAirlock(door,signal,opening){
 }
 
 export function animateHatchFault(signal,environment,{hatchId='innerHatch',opening=0}={}){
-  signal.color.setHex(environment?.fault?.id===hatchId?0xff6254:opening>.01?0xf3bd62:0x85e3af);
+  signal.color.setHex(environment?.fault?.id===hatchId?0xff6254:opening>.01||(hatchId==='innerHatch'&&environment?.airlockInterlocked)?0xf3bd62:0x85e3af);
 }

@@ -4,7 +4,7 @@ import {relaxMiloHand} from './milo-hands.js';
 import {setRepairHandFit} from './cup-hand-fit.js';
 import {applyAuthoredMiloTurn} from './milo-turn.js';
 import {applyMocapWalk,miloWalkData} from './mocap-walk.js';
-import {HATCH_SERVICE_POINT} from './eva.js';
+import {HATCH_SERVICE_POINT,OUTER_HATCH_SERVICE_POINT} from './eva.js';
 export {HATCH_SERVICE_POINT} from './eva.js';
 
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -104,7 +104,8 @@ export function applyHatchRepairPose(root,visit){
   if(!weight){applyHatchRepairGrip(root,hatchRepairGripWeight(visit));return;}
   root.updateWorldMatrix(true,true);
   const right=arms[0];
-  const target=body.worldToLocal(v(HATCH_SERVICE_POINT.x,root.position.y+HATCH_SERVICE_POINT.y,HATCH_SERVICE_POINT.z));
+  const service=visit.hatch==='outer'?OUTER_HATCH_SERVICE_POINT:HATCH_SERVICE_POINT;
+  const target=body.worldToLocal(v(service.x,root.position.y+service.y,service.z));
   // Lift on a fixed branch, with the knuckles following the forearm. Keep the
   // shaft normal to the hatch while rolling the grip gently around its axis.
   const rotation=new THREE.Quaternion().setFromAxisAngle(v(0,0,1),pose.tool ? 1.05 : 0).multiply(new THREE.Quaternion().setFromAxisAngle(pose.tool?v(0,1,0):v(1,0,0),-Math.PI/2));

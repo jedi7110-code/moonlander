@@ -28,8 +28,8 @@ test('atmosphere values and hatch warnings come from the same live source as the
   environment.triggerFault();environment.setStage(environment.fault.serial,'repair');data=consoleTelemetry({brain});
   assert.equal(data.fault,true);assert.equal(data.faultStage,'repair');
   const {screens}=setup();screens.update({brain});
-  assert.ok(screens.displays[1].canvas.labels.includes('INNER LOCK / FAULT'));
-  assert.ok(screens.displays[2].canvas.labels.includes('INNER LOCK / CONTACT ADJUSTMENT'));
+  assert.ok(screens.displays[1].canvas.labels.includes('EVA BAY / PRESSURE LOSS'));
+  assert.ok(screens.displays[2].canvas.labels.includes('EVA BAY / OUTER SEAL REPAIR'));
   assert.ok(!screens.displays.some(display=>display.canvas.labels.some(label=>label.startsWith('EVA LOCK'))));
   environment.resolve(environment.fault.serial);assert.equal(consoleTelemetry({brain}).fault,false);
 });

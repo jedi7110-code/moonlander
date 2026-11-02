@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import * as THREE from 'three';
-import {CabinEnvironment,environmentDisplay,HATCH_FAULT_INTERVAL} from '../src/obs/environment.js';
+import {CabinEnvironment,environmentDisplay,HATCH_FAULT_INTERVAL,HATCH_FAULT_RESET_DELAY} from '../src/obs/environment.js';
 import {HatchRepairVisit,HATCH_REPAIR_PHASES,HATCH_REPAIR_DEPTH} from '../src/obs/hatch-repair.js';
 import {HATCH_SERVICE_POINT,REPAIR_TOOL_TIP} from '../src/obs/hatch-repair-pose.js';
 import {CabinBrain} from '../src/obs/brain.js';
@@ -12,7 +12,7 @@ import {AirlockPassage} from '../src/obs/airlock.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {loadMiloBody} from '../src/obs/milo-body.js';
 import {createLounge} from '../src/obs/ship.js';
-import {createEVAHatch,animateAirlock,animateHatchFault,EVA_BAY} from '../src/obs/eva.js';
+import {createEVAHatch,animateAirlock,animateHatchFault,EVA_BAY,OUTER_HATCH_SERVICE_POINT} from '../src/obs/eva.js';
 
 test('environment readings drift continuously in a narrow range and freeze without running time',()=>{
   const environment=new CabinEnvironment({random:()=>.5});
@@ -37,30 +37,68 @@ test('faults wait running minutes, persist until repaired and cannot immediately
   const events=[],environment=new CabinEnvironment({random:()=>0,onEvent:event=>events.push(event)});
   environment.update(HATCH_FAULT_INTERVAL.min-1);assert.equal(environment.fault,null);
   environment.update(1);const serial=environment.fault.serial;
-  assert.equal(environment.fault.id,'innerHatch');
+  assert.equal(environment.fault.id,'airlock');
   assert.equal(environmentDisplay(environment).state,'abnormal');
   assert.equal(environmentDisplay(environment).label,'船内環境 異常');
   assert.equal(environmentDisplay(environment,'en').label,'LIFE SUPPORT ALERT');
-  assert.equal(environmentDisplay(environment).issue,'船内ハッチ故障');
-  assert.equal(environmentDisplay(environment,'en').issue,'INNER HATCH FAULT');
-  assert.match(environmentDisplay(environment).detail,/手前の船内ハッチ/);
-  environment.update(3600);assert.equal(environment.fault.serial,serial);assert.equal(events.length,1);
+  assert.match(environmentDisplay(environment).issue,/宇宙服室 漏気/);
+  assert.match(environmentDisplay(environment,'en').issue,/EVA BAY/);
+  assert.match(environmentDisplay(environment).detail,/船外ハッチ.*シール漏れ/);
+  environment.update(3600);assert.equal(environment.fault.serial,serial);assert.equal(events.filter(event=>event.type==='fault').length,1);
   assert.equal(environment.resolve(serial+1),false);assert.ok(environment.fault);
+  assert.ok(environment.fault,'an unresolved leak cannot expire by elapsed time');
+  environment.equalizationRequested=true;environment.setStage(serial,'verify');environment.update(30);
   assert.equal(environment.resolve(serial),true);assert.equal(environmentDisplay(environment).state,'normal');
   assert.equal(environmentDisplay(environment).issue,'');assert.equal(environmentDisplay(environment).detail,'');
-  environment.update(HATCH_FAULT_INTERVAL.min-1);assert.equal(environment.fault,null);
+  environment.update(environment.nextFault-environment.clock-1);assert.equal(environment.fault,null);
   environment.update(1);assert.equal(environment.fault.serial,serial+1);
 });
 
-test('ordinary maintenance incidents are scheduled 45 to 90 running minutes apart',()=>{
-  for(const [random,minutes]of [[0,45],[.5,67.5],[1,90]]){
+test('first maintenance incident waits 5 to 90 running minutes, then redraws after the 90 minute reset',()=>{
+  for(const [random,minutes]of [[0,5],[.5,47.5],[1,90]]){
     const environment=new CabinEnvironment({random:()=>random});
     assert.equal(environment.nextFault,minutes*60);
     environment.update(minutes*60-1);assert.equal(environment.fault,null);
     environment.update(1);const serial=environment.fault.serial;
     assert.equal(environment.resolve(serial),true);
-    assert.equal(environment.nextFault-environment.clock,minutes*60);
+    assert.equal(environment.nextFault-environment.clock,HATCH_FAULT_RESET_DELAY+minutes*60);
   }
+});
+
+
+test('early repair preserves the reset deadline measured from detection',()=>{
+  const environment=new CabinEnvironment({random:()=>0});
+  environment.update(5*60);const serial=environment.fault.serial,detected=environment.clock;
+  environment.update(10*60);environment.equalizationRequested=true;environment.setStage(serial,'verify');environment.update(30);assert.equal(environment.resolve(serial),true);
+  assert.equal(environment.faultResetAt,detected+90*60);
+  assert.equal(environment.nextFault,detected+(90+5)*60);
+  environment.update(environment.faultResetAt-environment.clock);assert.equal(environment.fault,null,'reset does not immediately trigger another incident');
+  environment.update(5*60-1);assert.equal(environment.fault,null);
+  environment.update(1);assert.equal(environment.fault.serial,serial+1);
+});
+
+test('the 90 minute reset never clears an unrepaired incident or queues an overdue one',()=>{
+  const environment=new CabinEnvironment({random:()=>0});
+  environment.update(5*60);const serial=environment.fault.serial;
+  const resetAt=environment.faultResetAt;
+  environment.update(110*60);
+  assert.equal(environment.fault.serial,serial,'warning persists until repair');
+  assert.equal(environment.triggerFault(),false,'a repeated warning cannot move the reset deadline');
+  assert.equal(environment.faultResetAt,resetAt);
+  assert.equal(environment.resolve(serial+1),false);
+  environment.equalizationRequested=true;environment.setStage(serial,'verify');environment.update(30);
+  assert.equal(environment.resolve(serial),true);
+  assert.equal(environment.nextFault-environment.clock,5*60,'a fresh interval starts when a late repair finishes');
+  environment.update(5*60-1);assert.equal(environment.fault,null);
+  environment.update(1);assert.equal(environment.fault.serial,serial+1);
+});
+
+test('invalid and paused time cannot advance the incident reset',()=>{
+  const environment=new CabinEnvironment({random:()=>0});
+  environment.update(5*60);environment.resolve(environment.fault.serial);
+  const clock=environment.clock,next=environment.nextFault,resetAt=environment.faultResetAt;
+  for(const dt of [0,-1,NaN,Infinity])environment.update(dt);
+  assert.equal(environment.clock,clock);assert.equal(environment.nextFault,next);assert.equal(environment.faultResetAt,resetAt);
 });
 
 function setup(floor=2,x=700){
@@ -72,7 +110,7 @@ function setup(floor=2,x=700){
 }
 function advance(state,seconds,check=()=>{}){
   for(let i=0;i<Math.round(seconds*60);i++){
-    state.gate.update(1/60,state.actor);
+    state.gate.update(1/60,state.actor,state.brain.environment);
     if(!state.actor.waitingForHatch)state.actor.update(1/60);
     state.brain.update(1/60);check();
   }
@@ -88,31 +126,32 @@ test('dark startup never creates a fault, and the preview warning waits twelve s
   assert.equal(brain.releaseOpeningSleep(),true);
   brain.update(11);assert.equal(brain.environment.fault,null);assert.equal(brain.environment.clock,11);
   brain.update(0);assert.equal(brain.environment.clock,11);
-  brain.update(1);assert.equal(brain.environment.fault.id,'innerHatch');
+  brain.update(1);assert.equal(brain.environment.fault.id,'airlock');
   assert.equal(events.filter(event=>event.type==='fault').length,1);
 });
 
-test('Milo repairs the closed cabin-side hatch and verifies it before the alert clears',()=>{
+test('Milo waits for containment, enters the suit bay and repairs the outer hatch',()=>{
   const state=setup(),{brain,actor,events}=state,phases=new Set();
-  brain.environment.triggerFault();brain._choose();assert.equal(brain.actStation,'innerHatch');
+  brain.environment.triggerFault();brain._choose();assert.equal(brain.actStation,'airlock');
   let visited=false;
   advance(state,80,()=>{
     if(brain.hatchRepair){
-      visited=true;phases.add(brain.hatchRepair.phase);assert.equal(currentAction(brain),'innerHatch');
-      assert.equal(actor.x,getStation('innerHatch').x);assert.equal(actor.floor,getStation('innerHatch').floor);
+      visited=true;phases.add(brain.hatchRepair.phase);assert.equal(currentAction(brain),'airlock');
+      assert.equal(brain.hatchRepair.hatch,'outer');
+      assert.equal(actor.x,getStation('airlock').x);assert.ok(brain.environment.bayPressure>101);assert.equal(actor.floor,getStation('airlock').floor);
       if(['inspect','repair','verify'].includes(brain.hatchRepair.phase))assert.equal(state.gate.opening,0);
       if(!brain.hatchRepair.repaired)assert.ok(brain.environment.fault);
     }
   });
-  assert.ok(visited);for(const phase of ['inspect','repair','verify','return'])assert.ok(phases.has(phase),phase);
+  assert.ok(visited);for(const phase of ['inspect','repair','verify','release'])assert.ok(phases.has(phase),phase);
   assert.equal(brain.environment.fault,null);assert.equal(brain.hatchRepair,null);
   assert.equal(events.filter(event=>event.type==='restored').length,1);
   assert.ok(brain.environment.nextFault-brain.environment.clock>600);
 });
 
 test('an interrupted repair withdraws, returns to the aisle and leaves the fault active',()=>{
-  const station=getStation('innerHatch'),state=setup(station.floor,station.x),{brain,actor,events}=state;
-  brain.environment.triggerFault();brain._go(station);actor.update(.1);advance(state,12);
+  const station=getStation('airlock'),state=setup(station.floor,station.x),{brain,actor,events}=state;
+  brain.environment.triggerFault();brain.environment.update(20);brain._go(station);actor.update(.1);advance(state,12);
   assert.equal(brain.hatchRepair.phase,'repair');
   const age=brain.hatchRepair.age,clock=brain.environment.clock;brain.update(0);
   assert.equal(brain.environment.clock,clock);assert.equal(brain.hatchRepair.age,age);
@@ -121,22 +160,22 @@ test('an interrupted repair withdraws, returns to the aisle and leaves the fault
   assert.equal(brain.actStation,'hydro');assert.equal(events.filter(event=>event.type==='restored').length,0);
 });
 
-test('inspecting the outer hatch does not fix the inner fault; repeated inner-hatch clicks keep the repair',()=>{
+test('inspecting the inner hatch does not fix the outer fault; repeated outer-hatch clicks keep the repair',()=>{
   const {brain}=setup();brain.environment.triggerFault();
-  brain._startPerform(getStation('airlock'));
-  assert.equal(brain.hatchRepair,null);assert.ok(brain.environment.fault);
   brain._startPerform(getStation('innerHatch'));
+  assert.equal(brain.hatchRepair,null);assert.ok(brain.environment.fault);
+  brain.environment.update(20);brain._startPerform(getStation('airlock'));
   const visit=brain.hatchRepair;visit.update(9);
   assert.equal(visit.phase,'repair');const age=visit.age;
-  brain._go(getStation('innerHatch'));
+  brain._go(getStation('airlock'));
   assert.equal(brain.hatchRepair,visit);assert.equal(visit.age,age);assert.equal(visit.cancelled,false);
 });
 
-test('only the faulty inner signal turns red and the normal opening indication survives recovery',()=>{
+test('the leaking outer hatch turns red and the healthy inner door shows isolation amber',()=>{
   const environment=new CabinEnvironment(),inner=new THREE.MeshBasicMaterial(),outer=new THREE.MeshBasicMaterial();
   environment.triggerFault();
   animateHatchFault(inner,environment,{opening:.5});animateHatchFault(outer,environment,{hatchId:'airlock'});
-  assert.equal(inner.color.getHex(),0xff6254);assert.equal(outer.color.getHex(),0x85e3af);
+  assert.equal(inner.color.getHex(),0xf3bd62);assert.equal(outer.color.getHex(),0xff6254);
   environment.resolve(environment.fault.serial);animateHatchFault(inner,environment,{opening:.5});
   assert.equal(inner.color.getHex(),0xf3bd62);
   animateHatchFault(inner,environment);assert.equal(inner.color.getHex(),0x85e3af);
@@ -168,21 +207,21 @@ test('all repair phases and early cancellation keep continuous positions and ret
 
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
 const materials=()=>new Proxy({},{get:(o,k)=>o[k]??=new THREE.MeshStandardMaterial()});
-test('the repair tool meets the actual service screw on the closed inner door',()=>{
-  const m=materials(),root=createMilo(m),station=getStation('innerHatch'),visit=new HatchRepairVisit(1);
+for(const inner of [true,false])test(`the repair tool contacts the actual ${inner?'inner reference':'outer production'} hatch screw`,()=>{
+  const m=materials(),root=createMilo(m),station=getStation(inner?'innerHatch':'airlock'),visit=new HatchRepairVisit(1,{hatch:inner?'inner':'outer'});
   root.position.set((station.x-700)*.022,0,CABIN_AISLE.crewZ);root.rotation.y=Math.PI/2;
   let hatch;
   globalThis.document={createElement(){return{getContext(){return{fillRect(){},fillText(){},measureText(text){return{width:text.length*parseFloat(this.font.slice(4))*.6};}};}};}};
-  try{hatch=createEVAHatch(m,0,true);}finally{delete globalThis.document;}
+  try{hatch=createEVAHatch(m,0,inner);}finally{delete globalThis.document;}
   animateAirlock(hatch.userData.door,hatch.userData.signal,0);
   hatch.updateMatrixWorld(true);
-  const screw=hatch.getObjectByName('Inner lock service screw'),point=new THREE.Vector3(0,.014,0).applyMatrix4(screw.matrixWorld);
-  assert.ok(point.distanceTo(new THREE.Vector3(...Object.values(HATCH_SERVICE_POINT)))<1e-6);
-  const environment=new CabinEnvironment();environment.triggerFault();animateHatchFault(hatch.userData.signal,environment);
-  assert.equal(hatch.userData.signal.color.getHex(),0xff6254);assert.equal(hatch.userData.door.position.z,0,'local assembly stays fixed');
+  const screw=hatch.getObjectByName('Pressure lock / cabin face').getObjectByName(inner?'Inner lock service screw':'Pressure lock service screw'),point=new THREE.Vector3(0,.014,0).applyMatrix4(screw.matrixWorld);
+  assert.ok(point.distanceTo(new THREE.Vector3(...Object.values(inner?HATCH_SERVICE_POINT:OUTER_HATCH_SERVICE_POINT)))<1e-6);
+  const environment=new CabinEnvironment();environment.triggerFault();animateHatchFault(hatch.userData.signal,environment,{hatchId:inner?'innerHatch':'airlock'});
+  assert.equal(hatch.userData.signal.color.getHex(),inner?0x85e3af:0xff6254);assert.equal(hatch.userData.door.position.z,0,'local assembly stays fixed');
   let contacts=0;
   for(let time=0;time<30;time+=1/30){
-    animateMilo(root,{moving:false,climbing:false,facing:1,action:'innerHatch',time,dt:1/30,hatchRepair:visit});
+    animateMilo(root,{moving:false,climbing:false,facing:1,action:inner?'innerHatch':'airlock',time,dt:1/30,hatchRepair:visit});
     if(visit.phase==='repair'&&visit.pose.reach>.999){
       root.updateMatrixWorld(true);
       const tip=root.userData.arms[0].hand.localToWorld(REPAIR_TOOL_TIP.clone());

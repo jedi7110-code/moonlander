@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {BathroomVisit,animateBathroom} from '../src/obs/bathroom.js';
 import {CabinBrain} from '../src/obs/brain.js';
 import {CrewMotion,Supplies,getStation} from '../src/obs/state.js';
-import {Box3,Group,MeshStandardMaterial,ShaderLib} from 'three';
+import {Box3,Group,MeshStandardMaterial,ShaderLib,Vector3} from 'three';
 import {createBathroom,FLOOR_Y} from '../src/obs/ship.js';
 import {CabinStartupLighting} from '../src/obs/startup-lighting.js';
 import {createCabinToon} from '../src/obs/cabin-toon.js';
@@ -134,4 +134,41 @@ test('dining finishes returning its utensils before a new order starts',()=>{
  const count=care.supplies.food;brain._go(getStation('hydro'));assert.equal(brain.actStation,'galley');
  tick(2);assert.equal(brain.actStation,'galley');assert.equal(care.supplies.food,count);
  tick(7.2);assert.equal(brain.actStation,'hydro');
+});
+
+test('pocket-door faces, toon outlines and shadows share fixed jamb clipping through the full slide',()=>{
+ const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material}),fixed=new Group(),animated=new Group();
+ const ctx={fillRect(){},fillText(){},beginPath(){},arc(){},fill(){},measureText(){return{width:100};}};
+ const previous=globalThis.document;globalThis.document={createElement:()=>({getContext:()=>ctx})};
+ let rooms;try{rooms=[createBathroom(fixed,animated,m,-10,3.392,'shower'),createBathroom(fixed,animated,m,-7,3.392,'toilet')];}
+ finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
+ const planes=rooms.map(room=>room.door.children.find(mesh=>mesh.isMesh).material.clippingPlanes);
+ const toon=createCabinToon([fixed,animated]),clippedMaterials=new Set();
+ for(const style of ['cartoon','flat','current','cartoon']){
+   toon.setStyle(style);toon.update(1200,800,3,15);
+   for(const [i,room]of rooms.entries())for(const opening of [0,.16,.32,.6,.8,1,.8,.16,0]){
+     animateBathroom(room,{opening});animated.updateMatrixWorld(true);
+     let outlines=0;
+     room.door.traverse(mesh=>{
+       if(!mesh.isMesh)return;
+       assert.equal(mesh.material.clippingPlanes,planes[i]);assert.equal(mesh.material.clipShadows,true);
+       if(mesh.name!=='Cabin toon outline')return;
+       outlines++;clippedMaterials.add(mesh.material);assert.equal(mesh.material.clipping,true);
+       assert.equal(mesh.material.uniforms.width.value,1);
+       assert.equal(mesh.material.uniforms.viewport.value.x,1200);
+       if(opening===1){
+         const positions=mesh.geometry.attributes.position;
+         for(let vertex=0;vertex<positions.count;vertex++){
+           const point=new Vector3().fromBufferAttribute(positions,vertex).applyMatrix4(mesh.matrixWorld);
+           assert.ok(planes[i].some(plane=>plane.distanceToPoint(point)<0),'no hidden outline vertex may survive behind the wall');
+         }
+       }
+     });
+     assert.ok(outlines>0);
+   }
+ }
+ assert.equal(clippedMaterials.size,2,'reuse one outline variant per room, without sharing its jamb with the other room');
+ assert.equal(material.clippingPlanes,null,'fixed walls keep their unclipped material');
+ let disposed=0;for(const clipped of clippedMaterials)clipped.addEventListener('dispose',()=>disposed++);
+ toon.dispose();assert.equal(disposed,2);material.dispose();
 });
