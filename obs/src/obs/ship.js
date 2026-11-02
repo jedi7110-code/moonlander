@@ -36,7 +36,7 @@ import {createRearWindowStars} from './space-stars.js';
 import {finishGateFrames} from './gate-frame-finish.js';
 import {createCatFoodCarton,createCatFoodMaterial} from './cat-food-package.js';
 import {createServicePartsPanel} from './service-parts.js';
-import {createGalley} from './galley.js';
+import {createGalley,GALLEY} from './galley.js';
 import {paintFloorLevel} from './floor-level-marking.js';
 import {ACCESS_LADDER} from './layout.js';
 
@@ -357,9 +357,22 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
     // Route behind the shaft panel; leave the rails, rungs and climb path clear.
     for(const zz of [-1.25,-.94]){
       const rear=zz===-1.25?-1.92:-1.72;
-      pipe(staticRoot,zz===-1.25?m.red:m.metal,[[-12.8,y+2.6,zz],[-.95,y+2.6,zz],[-.78,y+2.6,rear],[.78,y+2.6,rear],[.95,y+2.6,zz],[12.8,y+2.6,zz]],zz===-1.25?.055:.075);
+      // The kitchen occupies the old exposed service route. Drop the forward
+      // lines behind its liner, with the bends outside both cabinet edges.
+      // Recess both together so the forward line never crosses the rear one.
+      const concealedZ=zz===-1.25?-1.54:-1.24;
+      const approach=level===DECK.LIFE_SUPPORT?
+        [[-12.8,y+2.6,zz],[-12.2,y+2.6,zz],[-11.95,y+2.6,concealedZ],[-11.65,y+2.6,concealedZ],
+          [-8.45,y+2.6,concealedZ],[-8.15,y+2.6,concealedZ],[-7.9,y+2.6,zz]]:[[-12.8,y+2.6,zz]];
+      pipe(staticRoot,zz===-1.25?m.red:m.metal,[...approach,[-.95,y+2.6,zz],[-.78,y+2.6,rear],[.78,y+2.6,rear],[.95,y+2.6,zz],[12.8,y+2.6,zz]],zz===-1.25?.055:.075)
+        .name=level===DECK.LIFE_SUPPORT?`Galley / concealed ${zz===-.94?'supply':'return'} line`:'Deck / rear service line';
     }
-    for(let xx=-12;xx<=12;xx+=2.4){if(Math.abs(xx)<.8)continue;box(staticRoot,m.dark,xx,y+2.60,-1.08,.052,.29,.55);}
+    for(let xx=-12;xx<=12;xx+=2.4){
+      if(Math.abs(xx)<.8)continue;
+      if(level===DECK.LIFE_SUPPORT&&xx>GALLEY.x-GALLEY.width/2&&xx<GALLEY.x+GALLEY.width/2){
+        box(staticRoot,m.dark,xx,y+2.60,-1.3775,.052,.29,.455).name='Galley / concealed supply clamp';
+      }else box(staticRoot,m.dark,xx,y+2.60,-1.08,.052,.29,.55);
+    }
     for(const xx of [-12.83,-3.1,7.1,12.83]){
       // Both pressure-hatch assemblies occupy these former trim/rib positions.
       if(level===DECK.OPERATIONS&&(xx===7.1||xx===12.83))continue;

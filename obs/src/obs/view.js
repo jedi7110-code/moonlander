@@ -404,7 +404,11 @@ export class ObservationView {
     // never overwrite the headset pose or the XR rig's locomotion/following.
     if(this.immersive?.active)return;
     if(this.characterCamera?.applyCamera())return;
-    this.camera.near=.1;this.camera.up.set(0,1,0);
+    // The cutaway camera stays 40 m away. A 10 cm near plane quantizes
+    // depth to about 1 mm there, making small fixture layers swap during pans.
+    // 1 m keeps the entire cabin visible and gives ten times finer precision.
+    // First-person and XR projections are handled above, with their own near.
+    this.camera.near=1;this.camera.up.set(0,1,0);
     const distance=40;
     this.camera.aspect=this.width/this.height;
     this.camera.fov=THREE.MathUtils.radToDeg(2*Math.atan(this.viewHeight/(2*distance)));

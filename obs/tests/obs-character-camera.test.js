@@ -65,7 +65,7 @@ test('first-person returns to the selected angle; switching character or wide re
     camera.toggleFirstPerson();tick();assert.equal(view.camera.fov,LOOK_PROFILES[id].fov);
     view.width=390;view.height=844;tick();near(view.camera.aspect,390/844);
   }
-  camera.select('all');tick();assert.equal(camera.available,false);assert.equal(camera.wall.visible,false);assert.equal(view.camera.near,.1);
+  camera.select('all');tick();assert.equal(camera.available,false);assert.equal(camera.wall.visible,false);assert.equal(view.camera.near,1);
   camera.dispose();
 });
 

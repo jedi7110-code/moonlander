@@ -93,8 +93,22 @@ function sink(parent,metal,dark){
   const floor=panel(parent,metal,'sink floor',s.x,s.bottom-.006,s.z,s.width*.82,s.depth*.76,.012);floor.rotation.x=-Math.PI/2;
   horizontalRing(parent,metal,'Galley / rolled sink rim',s.width+.055,s.depth+.055,s.width,s.depth,s.x,top+.004,s.z);
   cylinder(parent,dark,s.x+.17,s.bottom+.002,s.z-.055,.044,.005,.044,20).name='Galley / drain well';
-  const strainer=cylinder(parent,metal,s.x+.17,s.bottom+.006,s.z-.055,.031,.003,.031,16);strainer.name='Galley / drain strainer';
-  for(let i=-2;i<=2;i++)box(parent,dark,s.x+.17+i*.009,s.bottom+.008,s.z-.055,.004,.001,.033-Math.abs(i)*.006);
+  // Real slots replace dark strips just 1 mm above a solid cap. Both sides of
+  // the perforated plate stay stable at close and wide camera distances.
+  const strainerShape=new THREE.Shape();
+  for(let i=0;i<16;i++){
+    const angle=i/16*Math.PI*2,x=Math.cos(angle)*.031,y=Math.sin(angle)*.031;
+    if(i)strainerShape.lineTo(x,y);else strainerShape.moveTo(x,y);
+  }
+  strainerShape.closePath();
+  for(let i=-2;i<=2;i++){
+    const x=i*.009,half=(.033-Math.abs(i)*.006)/2;
+    strainerShape.holes.push(path([[x-.002,-half],[x-.002,half],[x+.002,half],[x+.002,-half]],THREE.Path));
+  }
+  const strainerGeometry=new THREE.ExtrudeGeometry(strainerShape,{depth:.003,bevelEnabled:false,steps:1,curveSegments:1});
+  strainerGeometry.rotateX(-Math.PI/2);
+  const strainer=new THREE.Mesh(strainerGeometry,metal);strainer.name='Galley / drain strainer';
+  strainer.position.set(s.x+.17,s.bottom+.0045,s.z-.055);strainer.castShadow=strainer.receiveShadow=true;parent.add(strainer);
 }
 
 export function createGalleyFinishes(m={}){
@@ -146,14 +160,16 @@ export function createGalley(m={}, {cookware=true}={}){
   for(const x of [-1.506,1.506]){
     // Recess the vertical edge behind the meal grip and leave toe clearance
     // under the cheek for the established rear service / mouse passage.
-    box(root,paint,x,.5835,-.46,.043,.897,1.20).name='Galley / lower side cheek';
-    box(root,paint,x,1.926,-.49,.043,1.788,1.14).name='Galley / side cheek';
-    box(root,metal,x,.556,.15,.037,.942,.052).name='Galley / lower corner extrusion';
-    box(root,metal,x,1.921,.068,.037,1.788,.052).name='Galley / corner extrusion';
+    box(root,paint,x,.566,-.468,.043,.862,1.184).name='Galley / lower side cheek';
+    box(root,paint,x,1.90675,-.509,.043,1.7435,1.102).name='Galley / side cheek';
+    box(root,metal,x,.541,.15,.037,.912,.052).name='Galley / lower corner extrusion';
+    box(root,metal,x,1.90675,.068,.037,1.7435,.052).name='Galley / corner extrusion';
   }
-  box(root,metal,0,2.80,-.47,3.06,.043,1.27);
+  // Cheeks and corner rails end at the worktop/cap underside and meet at
+  // their front edges; no near-coplanar faces remain inside the metal trim.
+  box(root,metal,0,2.80,-.47,3.06,.043,1.27).name='Galley / top cap';
   box(root,metal,0,2.25,-.65,3.01,.039,.89).name='Galley / insert carrier rail';
-  box(root,metal,0,.97,.163,3.01,.055,.062).name='Galley / cart restraint rail';
+  box(root,metal,0,.97,.163,2.975,.055,.062).name='Galley / cart restraint rail';
   for(const x of [-.757,-.008,.716])box(root,metal,x,.52,.149,.026,.83,.072);
 
   // Retained half-width service containers; wheels sit behind the kick line.
@@ -183,9 +199,9 @@ export function createGalley(m={}, {cookware=true}={}){
   const worktop=new THREE.Mesh(topGeometry,metal);worktop.name='Galley / cutout stainless worktop';worktop.position.y=GALLEY.top-.038;
   worktop.castShadow=worktop.receiveShadow=true;root.add(worktop);
   sink(root,metal,dark);
-  box(root,metal,0,1.071,-1.045,2.98,.076,.045).name='Galley / rear spill lip';
+  box(root,metal,0,1.071,-1.045,2.95,.076,.045).name='Galley / rear spill lip';
   // Keep the front edge low where Milo lifts the bowl and the droid chops.
-  for(const x of [-1.47,1.47])box(root,metal,x,1.065,-.48,.02,.06,1.12);
+  for(const x of [-1.47,1.47])box(root,metal,x,1.065,-.47125,.02,.06,1.1025).name='Galley / side spill lip';
   // The continuous worktop already forms the low front edge. A second strip
   // only 0.5 mm off its faces flickered at OBS distances; raising that strip
   // instead would obstruct Milo's bowl pickup. Keep a single exposed surface.
@@ -210,12 +226,14 @@ export function createGalley(m={}, {cookware=true}={}){
   // Upper inserts: oven at left, chilled provisions in the middle, open wet
   // niche at right. The geometry leaves the pan, bowl and faucet accessible.
   for(const [x,w,key]of [[-1.11,.735,'dry'],[-.37,.70,'dry'],[.37,.70,'chill'],[1.11,.735,'dry']]){
-    box(root,paint,x,2.519,-.66,w,.495,.78);
+    // The enclosure ends at the rear of its gasket, rather than poking
+    // through the gasket's face with a 2 mm depth difference.
+    box(root,paint,x,2.517,-.674,w-.02,.46,.78).name='Galley / upper stowage casing';
     door('upper stowage',x,2.517,w-.015,.486,-.256);
     print(root,ink,key,x-.025,2.681,-.219,w-.12,.15);
     for(const dx of [-w*.30,w*.30])restraint(x+dx,2.261,-.207);
   }
-  box(root,metals.shell,-1.02,1.925,-.846,.94,.60,.49).name='Galley / oven casing';
+  box(root,metals.shell,-1.02,1.925,-.853,.94,.60,.476).name='Galley / oven casing';
   door('thermal processor',-1.02,1.916,.864,.532,-.587);
   print(root,screen,'heat',-1.02,2.087,-.550,.74,.185);
   vent(-1.02,1.724,-.55,.64);
@@ -224,7 +242,7 @@ export function createGalley(m={}, {cookware=true}={}){
   print(root,ink,'chill',-.13,2.085,-.571,.54,.15);
   vent(-.12,1.72,-.571,.52);
   for(const x of [-1.42,-.54,.24,1.43])for(const y of [.991,2.25,2.801])fastener(root,metals.shell,x,y,y<1?.199:-.17);
-  box(root,indicator,.10,2.167,-.581,.036,.014,.009);
+  box(root,indicator,.10,2.167,-.568,.036,.014,.009).name='Galley / chilled status lens';
   // OBS already owns this permanent saucepan in the droid service rig. Only
   // the isolated study adds a local copy, so the live hob never has two pots.
   let pot=null;

@@ -108,3 +108,12 @@ test('reduced motion disables orbit, and a drag releases the wheel anchor',()=>{
   assert.notEqual(view.targetCenter.x,view.center.x);
   view.setMode('all');assert.equal(view.zoomAnchor,null);
 });
+
+
+test('cutaway depth distinguishes millimetre fixture layers at its 40 metre camera distance',()=>{
+  const {view}=setup();
+  const direction=new THREE.Vector3(0,0,-1).applyQuaternion(view.camera.quaternion);
+  const depthAt=distance=>view.camera.position.clone().addScaledVector(direction,distance).project(view.camera).z*.5+.5;
+  const steps=Math.abs(depthAt(40)-depthAt(40.001))*(2**24-1);
+  assert.ok(steps>8,`1 mm must span several depth-buffer values, received ${steps}`);
+});

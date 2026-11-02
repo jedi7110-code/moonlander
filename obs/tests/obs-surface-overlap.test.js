@@ -80,3 +80,40 @@ test('unmerged cabin has no coincident planar surfaces, including open pocket do
     ship.fan.children.forEach((part,i)=>assert.ok(part.position.equals(positions[i])));
   }
 });
+
+
+test('installed galley has millimetre clearance and its supply line stays behind the liner',t=>{
+  const ship=buildSurfaceFixture();t.after(()=>disposeSurfaceFixture(ship));
+  const galley=ship.staticMesh.getObjectByName('Aircraft cabin galley');
+  const liner=new Box3().setFromObject(galley.getObjectByName('Galley / rear liner'));
+  const bounds=new Box3().setFromObject(galley),nearby=new Group();
+  for(const root of [ship.staticMesh,ship.animated]){
+    root.updateMatrixWorld(true);
+    root.traverseVisible(mesh=>{
+      if(!mesh.isMesh||!bounds.intersectsBox(new Box3().setFromObject(mesh)))return;
+      const copy=mesh.clone(false);copy.matrix.copy(mesh.matrixWorld);copy.matrixAutoUpdate=false;nearby.add(copy);
+    });
+  }
+  const overlaps=coplanarSurfaces([nearby],{tolerance:.003});
+  assert.deepEqual(overlaps.map(({a,b})=>[describeFace(a),describeFace(b)]),[]);
+  const lines=['supply','return'].map(name=>ship.staticMesh.getObjectByName(`Galley / concealed ${name} line`));
+  for(const line of lines){
+    assert.ok(line,'both original lines are routed behind the kitchen');
+    const points=line.geometry.attributes.position;let checked=0;
+    for(let i=0;i<points.count;i++){
+      const point=line.localToWorld(new Vector3().fromBufferAttribute(points,i));
+      if(point.x<bounds.min.x||point.x>bounds.max.x)continue;
+      assert.ok(point.z<liner.min.z-.01,'entire tube circumference clears the liner');checked++;
+    }
+    assert.ok(checked>20,'check the actual curved tube, not just its control points');
+  }
+  // Identical X/Y bends retain separation through the kitchen and its
+  // approaches. Recessing only one pipe crosses them.
+  const [supply,returnLine]=lines.map(line=>line.geometry.parameters.path);
+  for(let i=0;i<=200;i++){
+    const point=supply.getPoint(i/200);
+    if(point.x< -7.8)assert.ok(point.distanceTo(returnLine.getPoint(i/200))>.24);
+  }
+  const clamp=ship.staticMesh.getObjectByName('Galley / concealed supply clamp');
+  assert.ok(new Box3().setFromObject(clamp).max.z<liner.min.z-.01);
+});

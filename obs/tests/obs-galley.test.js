@@ -103,3 +103,24 @@ test('worktop front has one exposed surface without sub-mm overlays or a raised 
     assert.ok(Math.abs(front.point.z-GALLEY.front)<1e-6);
   }
 });
+
+
+test('galley layers remain separated at millimetre scale, including the visible status lens',()=>{
+  const root=fixture();
+  const overlaps=coplanarSurfaces([root],{tolerance:.003});
+  assert.deepEqual(overlaps.map(({a,b})=>[a.mesh.name,b.mesh.name,a.axis]),[]);
+  const hits=new Raycaster(new Vector3(.10,2.167,0),new Vector3(0,0,-1)).intersectObject(root,true);
+  assert.equal(hits[0].object.name,'Galley / chilled status lens');
+  const lens=new Box3().setFromObject(hits[0].object);
+  const face=new Box3().setFromObject(root.getObjectByName('Galley / chilled insert face'));
+  assert.ok(lens.min.z-face.max.z>.004,'lens housing is fully in front of the door');
+});
+
+test('drain slots are real openings rather than near-coplanar dark overlays',()=>{
+  const root=fixture(),s=GALLEY.sink;
+  for(let i=-2;i<=2;i++){
+    const hit=down(root,s.x+.17+i*.009,s.z-.055,.84)[0];
+    assert.equal(hit.object.name,'Galley / drain well','each slot reveals the recessed drain');
+  }
+  assert.equal(down(root,s.x+.17+.027,s.z-.055,.84)[0].object.name,'Galley / drain strainer');
+});
