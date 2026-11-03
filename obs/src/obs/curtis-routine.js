@@ -1,10 +1,10 @@
 import {worldActor,worldCat,close,approaches,nextActor,nextDroid,CREW_CLEARANCE,CAT_CLEARANCE} from './curtis-traffic.js';
-import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,LOUNGE_ACCESS,LOUNGE_SEAT,getStation,ladderApproachDepth} from './layout.js';
+import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,LOUNGE_ACCESS,getStation,ladderApproachDepth} from './layout.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
 import {CREW_WALK_SPEED} from './pace.js';
 import {CURTIS_COFFEE} from './curtis-coffee.js';
-import {loungeEntryAge,loungeExitPose} from './lounge-exit.js';
+import {loungeWorldPose} from './lounge-conversation.js';
 
 export const CURTIS_TIMING={first:[90,150],between:[180,360],prepareAhead:35};
 export const CURTIS_WALK_SPEED=CREW_WALK_SPEED*.022;
@@ -163,9 +163,7 @@ export class CurtisRoutine {
     if(actor){
       const position=worldActor(actor);
       if(brain&&(brain.loungeEntry||brain.loungeExit||brain.loungeStow||brain.actStation==='lounge')&&!actor.busy){
-        const passage=brain.loungeEntry?loungeExitPose(loungeEntryAge(brain.loungeEntry.age)):
-          brain.loungeExit?loungeExitPose(brain.loungeExit.age):{x:0,depth:LOUNGE_SEAT.depth};
-        position.x=(getStation('lounge').x-700)*.022+passage.x;position.z=passage.depth;
+        const pose=loungeWorldPose(brain);position.x=pose.x;position.z=pose.z;
       }
       obstacles.push({p:position,r:CREW_CLEARANCE});
     }
@@ -261,6 +259,11 @@ export class CurtisRoutine {
         this.waiting=!movingAside;if(movingAside)this.yaw=shift>0?0:Math.PI;return;
       }
     }
+    // Wait through the guest's rise and passage as well as the conversation.
+    // Stepping into the aisle while the guest walks past creates a mutual hold.
+    const sharing=brain?.loungeCompanion?.peer===this&&(brain.loungeEntry||brain.loungeExit||brain.isSeatedInLounge());
+    const passing=actor?.busy&&actor.floor===1&&Math.abs((actor.x-700)*.022-CURTIS.seatX)<1.7;
+    if(s.kind==='relax'&&(sharing||passing))s.duration=Math.max(s.duration,this.age+dt+2);
     const before={...this.position};this.age=Math.min(s.duration,this.age+dt);
     let u=this.age/s.duration;
     // Ease ladder deck transfers while keeping the middle of the climb steady.

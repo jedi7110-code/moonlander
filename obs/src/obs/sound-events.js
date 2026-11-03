@@ -6,6 +6,7 @@ import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {CABIN_SOUNDS} from './sound-library.js';
 import {KIBBLE_STREAM,KIBBLE_CONTACT_DELAY} from './kibble-timing.js';
 import {diningPhase,MEAL_SPOON_CONTACTS} from './dining-timing.js';
+import {LoungeConversationAudio} from './lounge-conversation-audio.js';
 import {curtisCoffeePose} from './curtis-coffee.js';
 import walkCycle from './milo-walk-cycle.json' with {type:'json'};
 
@@ -24,7 +25,7 @@ const bedLocation={x:(getStation('bunk').x-700)*.022,y:(870-FLOORS[getStation('b
 // Read only simulation state. This advances while muted, so turning sound on
 // never replays a backlog. Rendering, mirrors and multiple XR eyes cannot emit.
 export class CabinSoundEvents {
-  constructor(audio,{random=Math.random}={}){this.audio=audio;this.random=random;this.catVoiceTime=0;this.catVoice=null;this.doors=new Map();this.lids=new Map();this.steps=new Map();this.beats=new Map();this.previousBathroom=null;this.previousBathroomPhase=null;this.previousDroidStep=null;this.previousDelivery=null;this.deliveryAge=0;this.variant=0;}
+  constructor(audio,{random=Math.random}={}){this.audio=audio;this.random=random;this.conversation=new LoungeConversationAudio(audio,{random});this.catVoiceTime=0;this.catVoice=null;this.doors=new Map();this.lids=new Map();this.steps=new Map();this.beats=new Map();this.previousBathroom=null;this.previousBathroomPhase=null;this.previousDroidStep=null;this.previousDelivery=null;this.deliveryAge=0;this.variant=0;}
   meal(dt,actor,brain){
     const duration=brain.curDurSec,age=duration-brain.performT;
     const active=brain.state==='performing'&&brain.cur?.id==='galley'&&!actor.busy&&!actor.climbing&&
@@ -232,6 +233,7 @@ export class CabinSoundEvents {
     this.lastY=actor.y;
     this.curtisFootfalls(dt,curtis);
     this.curtisCoffee(dt,curtis);
+    this.conversation.update(dt,brain);
     if(droid!==this.lidDroid){this.lids.clear();this.lidDroid=droid;}
     if(droid){
       const step=droid.step,p=droid.position,position={x:p.x,y:p.y+.65,z:p.z};

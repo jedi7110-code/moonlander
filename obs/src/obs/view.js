@@ -26,7 +26,7 @@ import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
 import {animateBunk} from './bunk.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {diningPhase,diningApproach} from './dining.js';
-import {loungeExitPose,loungeEntryAge} from './lounge-exit.js';
+import {loungeWorldPose} from './lounge-conversation.js';
 import {applyCabinLadder,updateCabinClimb} from './cabin-ladder.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {updateTableLeisureProps} from './lounge-table-props.js';
@@ -463,10 +463,10 @@ export class ObservationView {
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
     if(action==='lounge'&&!actor.busy){
       if(brain.loungeEntry)brain.loungeEntry.startYaw??=this.milo.rotation.y;
-      const passage=brain.loungeEntry?loungeExitPose(loungeEntryAge(brain.loungeEntry.age)):brain.loungeExit?loungeExitPose(brain.loungeExit.age):{x:0,depth:LOUNGE_SEAT.depth};
-      this.milo.position.x=positionX(getStation('lounge').x)+passage.x;this.milo.position.z=passage.depth;
+      const pose=loungeWorldPose(brain);
+      this.milo.position.x=pose.x;this.milo.position.z=pose.z;
     }
-    if(!brain.grooming)animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForVisitor||actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair});
+    if(!brain.grooming)animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForVisitor||actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],conversation:brain.isSeatedInLounge()&&brain.leisure==='conversation'?brain.loungeCompanion:null,leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair});
     if(this.cabinClimb)applyCabinLadder(this.milo,this.cabinClimb);
     this.harvestDelivery.update(this.milo,brain);
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
@@ -528,7 +528,7 @@ export class ObservationView {
     animateDelivery(this.ship,care,this.reducedMotion);
     this.ship.foodGroup.visible=(this.droidRoutine?care.catBowl>0:care.has('catfood'))||catRoutine.mode==='eat';
     if(this.droidRoutine)this.droidService.update(this.droidRoutine);
-    if(this.curtis&&this.curtisRoutine)this.curtis.render(this.curtisRoutine,paused?0:dt,{actor});
+    if(this.curtis&&this.curtisRoutine)this.curtis.render(this.curtisRoutine,paused?0:dt,{actor,brain});
     for(const [id,{group,material}]of Object.entries(this.ship.indicators)){
       const shipment=id==='hatch'&&care.delivery&&!['queued','transmitting'].includes(care.phase);
       const signal=shipment?{color:care.phase==='unloading'?0x85e3af:0xf3bd62,intensity:this.reducedMotion?1:.75+.25*Math.sin(time*3)}:this.feedback?.signal(id,this.reducedMotion)||(id==='gym'&&action==='gym'?{color:0x85e3af,intensity:1}:null);group.visible=Boolean(signal);

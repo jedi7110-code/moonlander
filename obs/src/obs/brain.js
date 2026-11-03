@@ -6,7 +6,7 @@ import {CrewHealth} from './health.js';
 import {BathroomVisit,BATHROOM_TURN_DECAY} from './bathroom.js';
 import {PlantBed} from './plant-state.js';
 import {CABIN_PACE} from './pace.js';
-import {LOUNGE_EXIT_SECONDS,LOUNGE_ENTRY_SECONDS,LOUNGE_TRANSITION_DECAY,loungeApproachX} from './lounge-exit.js';
+import {LOUNGE_EXIT_SECONDS,LOUNGE_ENTRY_SECONDS,LOUNGE_TRANSITION_DECAY,LOUNGE_COMPANION_SECONDS,loungeApproachX} from './lounge-exit.js';
 import {LOUNGE_STOW_SECONDS} from './lounge-handling.js';
 import {reclineProgress,RECLINE_EXIT_SECONDS} from './recline.js';
 import {GymVisit,GYM_TURN_SECONDS,GYM_TURN_DECAY} from './gym-visit.js';
@@ -16,6 +16,7 @@ import {SmokingClock,SmokingVisit,LOUNGE_SMOKING_SECONDS} from './smoking-visit.
 import {CabinEnvironment} from './environment.js';
 import {EVA_PASSAGE} from './layout.js';
 import {HatchRepairVisit} from './hatch-repair.js';
+import {loungeActorX,loungeCompanionAvailable,LOUNGE_COMPANION_GAP} from './lounge-conversation.js';
 
 const words=(ja,en)=>getLang()==='ja'?ja:en;
 export const OPENING_SLEEP_SECONDS=3;
@@ -28,7 +29,7 @@ export class CabinBrain extends Brain {
   constructor(...args){
     super(...args);
     const random=args[2]?.random??Math.random;
-    this.random=random;this.leisure=null;this.lastLeisure=null;this.catRoutine=null;
+    this.random=random;this.loungeCompanion=null;this.leisure=null;this.lastLeisure=null;this.catRoutine=null;
     for(const need of Object.keys(this.needs))this.needs[need]=35+Math.floor(random()*56);
     this.exercise=35+Math.floor(random()*56);this.gamePending=false;this.medicalSample=null;this.lastMedicalReport=null;
     this.health=new CrewHealth({onEvent:event=>this.scene.obsUI?.healthEvent?.(event)});
@@ -86,6 +87,12 @@ export class CabinBrain extends Brain {
       this.clock=(this.clock+dt*1000)%this.dayMs;
       this.plants.update(dt);
       return;
+    }
+    const companion=this.loungeCompanion;
+    if(companion){
+      const talking=this.isSeatedInLounge()&&this.leisure==='conversation'&&loungeCompanionAvailable(companion.peer)&&companion.peer.step.kind==='relax';
+      companion.weight+=((talking?1:0)-companion.weight)*(1-Math.exp(-3*dt));
+      if(talking)companion.age+=dt;
     }
     const harvest=this.harvestDelivery;
     const grooming=this.grooming;
@@ -154,9 +161,10 @@ export class CabinBrain extends Brain {
     if(gym&&this.gymVisit===gym)gym.update(dt);
     if(bunk&&this.bunkVisit===bunk)bunk.update(bunkDt);
     if(entry&&entry===this.loungeEntry){
-      entry.age=Math.min(LOUNGE_ENTRY_SECONDS,entry.age+dt);
-      if(entry.age===LOUNGE_ENTRY_SECONDS){
-        this.actor.x=getStation('lounge').x;
+      const seconds=entry.transitionSeconds??LOUNGE_ENTRY_SECONDS;
+      entry.age=Math.min(seconds,entry.age+dt);
+      if(entry.age===seconds){
+        this.actor.x=this.loungeCompanion?loungeActorX(this.loungeCompanion.seatX):getStation('lounge').x;
         this.loungeEntry=null;
         if(this.gamePending&&!this.afterActivity)this._startPerform(this.cur,true);
         else{this.state='performing';if(this.afterActivity){this.leisure=this.leisure==='smoking'?null:this.leisure;this.beginLoungeExit();}else if(this.leisure==='smoking')this.smokingVisit=new SmokingVisit({seated:true});else if(this.leisure==='cat')this.catRoutine?.inviteLounge(this);}
@@ -168,9 +176,11 @@ export class CabinBrain extends Brain {
       if(recline.age===duration){this.reclineExit=null;super._endPerform();this.finishDeparture();}
     }
     if(exit&&this.loungeExit===exit){
-      exit.age=Math.min(LOUNGE_EXIT_SECONDS,exit.age+dt);
-      if(exit.age>=LOUNGE_EXIT_SECONDS){
-        this.actor.x=loungeApproachX();this.actor.facing=-1;this.loungeExit=null;this.leisure=null;
+      const seconds=exit.transitionSeconds??LOUNGE_EXIT_SECONDS;
+      exit.age=Math.min(seconds,exit.age+dt);
+      if(exit.age>=seconds){
+        this.actor.x=this.loungeCompanion?loungeActorX(this.loungeCompanion.seatX):loungeApproachX();
+        this.actor.facing=-1;this.loungeExit=null;this.leisure=null;this.loungeCompanion=null;
         const directed=Boolean(this.afterActivity);
         super._endPerform();this.finishDeparture();
         // The exit already includes the pause and turn into the aisle.
@@ -229,6 +239,7 @@ export class CabinBrain extends Brain {
     if(this.droidRoutine?.reserveForCrew(station.id,()=>{this.groomingQueued=false;this._go(station);})){this.groomingQueued=station.id==='grooming';return true;}
     if(station.id==='medical'&&this.state==='performing'&&this.cur?.id==='medical')return true;
     if(this.deferDeparture(()=>this._go(station)))return true;
+    this.loungeCompanion=null;this.companionApproach=false;
     if(station.id!=='lounge')this.nextLeisure=null;
     if(station.id==='medical'&&this.actStation==='medical'&&!this.reclineExit)return true;
     if((this.health.critical&&station.id!=='medical')||(this.health.needsCare&&['gym','smoking'].includes(station.id))){
@@ -264,6 +275,19 @@ export class CabinBrain extends Brain {
       });return;
     }
     const enteringLounge=station.id==='lounge'&&!seated&&!this.isSeatedInLounge();
+    if(enteringLounge){
+      const peer=this.droidRoutine?.visitor;
+      if(!this.gamePending&&loungeCompanionAvailable(peer)){
+        this.loungeCompanion??={peer,seatX:peer.position.x+LOUNGE_COMPANION_GAP,age:0,weight:0};
+      }else this.loungeCompanion=null;
+      const x=this.loungeCompanion?loungeActorX(this.loungeCompanion.seatX):loungeApproachX();
+      // Finish the normal avoidance route, then enter directly beside Curtis.
+      if((this.loungeCompanion||this.companionApproach)&&Math.abs(this.actor.x-x)>.01){
+        this.companionApproach=true;
+        this.actor.goTo({floor:station.floor,x},()=>this._startPerform(station));return;
+      }
+    }
+    this.companionApproach=false;
     if(station.id==='gym'&&!this.gymVisit){
       this.cur=station;this.state='mountingGym';this.actKey='perform';this.actStation='gym';this.recoverNeed=null;
       this.gymVisit=new GymVisit({pedalTime:this.gymPedalTime??0,
@@ -273,8 +297,8 @@ export class CabinBrain extends Brain {
     }
     if(station.id==='lounge'&&!this.gamePending){
       const options=['tablet','music',...(this.catRoutine?.canPlayLounge()?['cat']:[]),...(this.smokingClock.due&&!this.health.needsCare?['smoking']:[])].filter(mode=>mode!==this.lastLeisure);
-      this.leisure=this.nextLeisure??options[Math.floor(this.random()*options.length)];this.nextLeisure=null;this.lastLeisure=this.leisure;
-      station={...station,dur:this.leisure==='smoking'?(LOUNGE_SMOKING_SECONDS+1)*1000:this.leisure==='cat'?40000:this.leisure==='tablet'?32000:36000};this.cur=station;
+      this.leisure=this.loungeCompanion?'conversation':this.nextLeisure??options[Math.floor(this.random()*options.length)];this.nextLeisure=null;this.lastLeisure=this.leisure;
+      station={...station,dur:this.leisure==='smoking'?(LOUNGE_SMOKING_SECONDS+1)*1000:this.leisure==='cat'?40000:['tablet','conversation'].includes(this.leisure)?32000:36000};this.cur=station;
       if(Math.min(this.needs.hunger,this.needs.thirst,this.needs.energy,this.needs.hygiene,this.needs.bladder)<45)station.dur=8000;
     }
     if(['shower','toilet'].includes(station.id)&&!this.bathroom){
@@ -297,7 +321,7 @@ export class CabinBrain extends Brain {
       this.medicalSample=medicalReadings(this.needs,this.health);
     }
     super._startPerform(station.id==='gym'?{...station,need:null}:station);
-    if(enteringLounge){this.cur=station;this.loungeEntry={age:0};this.state='enteringLounge';}
+    if(enteringLounge){this.cur=station;this.loungeEntry={age:0,...(this.loungeCompanion?{companion:true,transitionSeconds:LOUNGE_COMPANION_SECONDS}:{})};this.state='enteringLounge';}
     else if(station.id==='lounge'&&this.leisure==='smoking')this.smokingVisit=new SmokingVisit({seated:true});
     else if(station.id==='lounge'&&this.leisure==='cat')this.catRoutine.inviteLounge(this);
     if(['eva','airlock','innerHatch'].includes(station.id))this.scene.obsUI?.inspectEVA?.(station.id);
@@ -379,8 +403,8 @@ export class CabinBrain extends Brain {
   cancelQueuedGrooming(){if(this.groomingQueued){this.groomingQueued=false;if(this.droidRoutine)this.droidRoutine.crewRequest=null;}}
   beginLoungeExit(){
     if(this.loungeStow){this.loungeStow.next='exit';return;}
-    if(this.leisure){this.beginLoungeStow('exit');return;}
-    if(!this.loungeExit)this.loungeExit={age:0,leisure:this.leisure,actionTime:Math.max(0,(this.curDurSec??0)-(this.performT??0)),duration:this.curDurSec??32};
+    if(this.leisure&&this.leisure!=='conversation'){this.beginLoungeStow('exit');return;}
+    if(!this.loungeExit)this.loungeExit={age:0,leisure:this.leisure,actionTime:Math.max(0,(this.curDurSec??0)-(this.performT??0)),duration:this.curDurSec??32,...(this.loungeCompanion?{companion:true,transitionSeconds:LOUNGE_COMPANION_SECONDS,conversation:{age:this.loungeCompanion.age,weight:this.loungeCompanion.weight},seatedYaw:.15+(-.32-.15)*this.loungeCompanion.weight}:{})};
     this.state='leavingLounge';this.actKey='perform';this.actStation='lounge';this.recoverNeed=null;
   }
   beginLoungeStow(next){
@@ -411,6 +435,7 @@ export class CabinBrain extends Brain {
   }
   requestGame(kind=null){
     if(this.gamePending||this.state==='playingGame')return false;
+    if(this.loungeCompanion&&this.deferDeparture(()=>this.requestGame(kind)))return true;
     if(this.smokingVisit){this.afterActivity=()=>this.requestGame(kind);this.smokingVisit.requestExit();return true;}
     if(!this.isSeatedInLounge()&&this.deferDeparture(()=>this.requestGame(kind)))return true;
     if(this.health.urgent){this.scene.obsUI?.healthEvent?.({type:'restricted',kind:this.health.condition.kind,stage:this.health.stage});this._go(getStation('medical'));return false;}

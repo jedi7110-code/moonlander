@@ -36,6 +36,11 @@ export const CABIN_SOUNDS=Object.freeze({
   cutlery2:{file:'meal-cutlery-2.wav',label:'食事 / スプーン 2',description:'別の接触テイク / すくう・器へ戻す時だけ',gain:.12},
   cutlery3:{file:'meal-cutlery-3.wav',label:'食事 / スプーン 3',description:'別の接触テイク / 原速・短い減衰',gain:.11},
   simmer:{file:'pot-simmer.wav',label:'調理 / 鍋で煮込む',description:'実録の静かな煮込み / コトコト・原速・かき混ぜる間だけ',gain:.18,loop:true},
+  ...Object.fromEntries([1,2,3,4,5].map(n=>[`loungeVoice${n}`,{
+    file:`lounge-voice-${String(n).padStart(2,'0')}.mp3`,label:`ラウンジ / 会話 ${n}`,
+    description:'ユーザー制作の会話 / 二人で着席している間・控えめ',gain:.50,duration:n<=3?10:5,
+  }])),
   coffeeMachine:{file:'coffee-machine-a-20s.wav',label:'コーヒーマシン / A・20秒',description:'選択された実録Aの冒頭20秒 / ボタン押下から抽出完了まで・原速',gain:.18,duration:20},
 });
+export const LOUNGE_VOICE_IDS=Object.freeze([1,2,3,4,5].map(n=>`loungeVoice${n}`));
 export const CABIN_AUDIO_BASE=`${import.meta.env?.BASE_URL??'/obs/'}assets/obs/audio/`;

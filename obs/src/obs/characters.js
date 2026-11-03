@@ -25,7 +25,8 @@ import {setTabletHandFit} from './tablet-pose.js';
 import {setLadderHandFit} from './ladder-hand-fit.js';
 import {setCupHandFit} from './cup-hand-fit.js';
 import {updateInjuryAppearance} from './injury-appearance.js';
-import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeEntryAge} from './lounge-exit.js';
+import {applyLoungeConversation} from './lounge-conversation.js';
+import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeExitPoseAge,loungeEntryPoseAge} from './lounge-exit.js';
 import {applySeatedLegSpread} from './seated-pose.js';
 import {attachMiloSpine,updateMiloSpine} from './milo-spine.js';
 import {attachMiloNeck,setMiloNeckProtraction,updateMiloNeck} from './milo-neck.js';
@@ -217,7 +218,7 @@ export function* createMiloSteps(m,headModel=new THREE.Group(),{elbowStyle='supp
   root.userData.updateWristTwists?.();attachMiloWatch(root);attachMiloBioSensor(root);attachSmokingProps(root);attachHatchRepairTool(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,hatchRepair=null,sequentialBedEntry=true}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,conversation=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,hatchRepair=null,sequentialBedEntry=true}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   setMiloNeckProtraction(root,0);
   root.userData.spineCurve=null;
@@ -283,10 +284,11 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   applyCallingPose(root,calling?callingTime:null,dt);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
   if(seated&&action==='lounge'&&leisure&&loungeDocks)applyLoungeHandling(root,leisure,actionTime,{docks:loungeDocks,stow:loungeStow,entering:Boolean(loungeEntry)});
+  if(loungeExit?.conversation)applyLoungeConversation(root,{...loungeExit.conversation,weight:loungeExit.conversation.weight*(1-THREE.MathUtils.smoothstep(loungeExit.age,0,.8))});
   if(loungeExit)applyLoungeExit(root,loungeExit);
   if(loungeEntry)applyLoungeEntry(root,loungeEntry);
   if(seated){
-    const rise=loungeExit?loungeExitPose(loungeExit.age).rise:loungeEntry?loungeExitPose(loungeEntryAge(loungeEntry.age)).rise:0;
+    const rise=loungeExit?loungeExitPose(loungeExitPoseAge(loungeExit)).rise:loungeEntry?loungeExitPose(loungeEntryPoseAge(loungeEntry)).rise:0;
     applySeatedLegSpread(root,1-rise);
   }
   if(action==='bunk'&&!moving)applyReclinedPose(root,reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition),BUNK_BED.top,root.userData.bunkStartYaw);
@@ -339,6 +341,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   }
   if(smokingVisit){if(smokingVisit.seated&&loungeDocks)applyLoungeSmokingPose(root,smokingVisit,loungeDocks);else applySmokingPose(root,smokingVisit);}
   if(hatchRepair)applyHatchRepairPose(root,hatchRepair);
+  if(conversation&&seated&&!loungeEntry&&!loungeExit)applyLoungeConversation(root,conversation);
   root.userData.updateWristTwists?.();
   updateMiloSpine(root);
   updateMiloNeck(root);

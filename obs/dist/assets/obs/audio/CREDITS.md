@@ -422,3 +422,18 @@ No human voices/music were intentionally selected. Only these small edited clips
 the original full recordings/packs are not bundled. Existing synthetic ventilation
 and notification tones remain separate from these sourced sounds. Synthesized
 condensate plips were removed on 2026-10-08; the visual droplets/ripples remain.
+
+
+## Lounge conversation — user-provided, 2026-11-03
+
+Five recordings created and supplied by the user for Milo and Curtis. These are not part of the CC0 library.
+
+- `lounge-voice-01.wav`: 10 seconds; source SHA-256 `7ea40df61d1d783b488964739f2160882e8d3cae721917548ffba82d3eae1fe3`; level adjustment +3.35 dB.
+- `lounge-voice-02.wav`: 10 seconds; source SHA-256 `fc814a8ec0db59b5d87ad5d129a303cee4b3b96d4e7e90ee93f65e90c1e1836d`; level adjustment -2.76 dB.
+- `lounge-voice-03.wav`: 10 seconds; source SHA-256 `daac466074aa0a4f131db41cfeea9cb7e2e93c194c280ecf1c04177f365ef179`; level adjustment +2.30 dB.
+- `lounge-voice-04.wav`: 5 seconds; source SHA-256 `9c109f6b03343ba6cad2c1979d8546e3a93fbe8c5660dc74fe352fc42f7f2134`; level adjustment +9.04 dB.
+- `lounge-voice-05.wav`: 5 seconds; source SHA-256 `cf703ffc4e664f1ba33b083f9b96d0a36f8345511cc076c50a696fee296dccd3`; level adjustment +7.55 dB.
+
+Runtime copies: mono 24,000 Hz MP3 at 64 kbps, original pitch and duration. Each `lounge-voice-01.wav` through `lounge-voice-05.wav` source above maps to the corresponding `.mp3` runtime file. The five runtime files total approximately 325 KB. Match the five average levels to approximately -25 dBFS, with 40 ms leading and 60 ms trailing fades; cabin playback gain .50 plus normal camera/deck attenuation. The original files remain on the user's Desktop.
+
+Clips load only when a shared lounge visit approaches, outside initial loading. Each visit shuffles the five clips without adjacent repeats, inserts small pauses, and fits the available seated time. Pause/mute/visibility stop the sources; resuming uses the current clip offset, never replays earlier clips. Leaving either seat stops the conversation.

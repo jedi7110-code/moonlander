@@ -64,7 +64,7 @@ export class CurtisView {
     routine.update(routine.step.duration*.5);this.render(routine,0);
     this.root.visible=false;this.stream.visible=false;
   }
-  render(routine,dt,{actor}={}){
+  render(routine,dt,{actor,brain}={}){
     const root=this.root,s=routine.step;
     this.stream.visible=false;
     if(!routine.active||!s){root.visible=false;if(this.view.ship.coffeeMug)this.view.ship.coffeeMug.visible=true;return;}
@@ -74,6 +74,7 @@ export class CurtisView {
     if(coffee)this.dock.position.copy(this.cupPour).lerp(this.cupHome,coffee.returning);
     root.position.set(p.x,p.y,p.z);
     const seated=['sit','relax','stand'].includes(s.kind);
+    const conversation=s.kind==='relax'&&brain?.loungeCompanion?.peer===routine?{...brain.loungeCompanion,role:'curtis'}:null;
     // Reuse only the vertical sit/rise phase, without the table-side shuffle
     // or the belongings-handling phase that lifts the hands.
     const lowering=THREE.MathUtils.clamp((age-.6)/(s.duration-.6),0,1);
@@ -89,11 +90,11 @@ export class CurtisView {
       facing:Math.sign(Math.sin(routine.yaw))||1,walkYaw:routine.yaw,walkDistance:routine.walkDistance,
       action:seated?'lounge':s.kind==='coffee'?'hydro':null,
       time:routine.time,dt,actionTime:coffee?(coffee.brewing?0:coffee.drinkTime):age,actionDuration:coffee?coffee.drinkDuration:s.duration,
-      loungeExit:exit,diningDocks:s.kind==='coffee'?{mug:this.dock}:null});
+      leisure:conversation?'conversation':null,conversation,loungeExit:exit,diningDocks:s.kind==='coffee'?{mug:this.dock}:null});
     if(seated){
       if(s.kind==='sit')root.rotation.y+=Math.PI*(1-THREE.MathUtils.smoothstep(age,0,.6));
       const weight=s.kind==='sit'?THREE.MathUtils.smoothstep(lowering,0,1):s.kind==='stand'?1-THREE.MathUtils.smoothstep(age,0,s.duration):1;
-      for(const {arm,elbow,hand,side}of root.userData.arms){
+      if(!conversation)for(const {arm,elbow,hand,side}of root.userData.arms){
         arm.rotation.set(THREE.MathUtils.lerp(-.05,-.15,weight),0,side*.08);
         elbow.rotation.set(THREE.MathUtils.lerp(-.08,-.65,weight),0,0);
         hand.rotation.set(.12*weight,root.userData.bodySkin?side*Math.PI/2:0,0);
@@ -106,7 +107,7 @@ export class CurtisView {
         endYaw:s.enter?Math.PI/2:-Math.PI/2,endDepth:s.to.z});
     }else if(s.kind==='relax'){
       // Rest on the thighs; the visitor's seat is left of Milo and Lucy.
-      root.userData.head.rotation.y=.17*Math.sin(age*.16);
+      if(!conversation)root.userData.head.rotation.y=.17*Math.sin(age*.16);
     }else if(['work','window'].includes(s.kind)||coffee?.brewing){
       if(!coffee)root.rotation.y+=Math.atan2(Math.sin(Math.PI-root.rotation.y),Math.cos(Math.PI-root.rotation.y))*(1-Math.exp(-5*dt));
       const ease=THREE.MathUtils.smoothstep(Math.min(age,s.duration-age),0,1.5);

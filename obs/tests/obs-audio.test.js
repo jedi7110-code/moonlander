@@ -4,7 +4,7 @@ import {readFile,stat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {CabinAudio} from '../src/obs/audio.js';
 import {CabinSoundEvents} from '../src/obs/sound-events.js';
-import {CABIN_SOUNDS} from '../src/obs/sound-library.js';
+import {CABIN_SOUNDS,LOUNGE_VOICE_IDS} from '../src/obs/sound-library.js';
 import {BathroomVisit} from '../src/obs/bathroom.js';
 import {BunkVisit,BUNK_PHASE_SECONDS} from '../src/obs/bunk-visit.js';
 import {CatMotion,CatRoutine,CrewMotion,Supplies} from '../src/obs/state.js';
@@ -125,6 +125,7 @@ test('local assets are compact mono PCM, finite, non-silent, bounded and loop se
   const credits=await readFile(new URL('../public/assets/obs/audio/CREDITS.md',import.meta.url),'utf8');
   for(const definition of Object.values(CABIN_SOUNDS)){
     const url=new URL('../public/assets/obs/audio/'+definition.file,import.meta.url),file=await readFile(url);total+=(await stat(url)).size;
+    if(definition.file.endsWith('.mp3')){assert.equal(file.toString('ascii',0,3),'ID3');continue;}
     assert.equal(file.toString('ascii',0,4),'RIFF');assert.equal(file.readUInt16LE(22),1);assert.equal(file.readUInt32LE(24),22050);
     assert.equal(file.readUInt16LE(34),16);assert.equal(file.length-44,file.readUInt32LE(40));assert.ok(credits.includes(definition.file));
     const data=Array.from({length:(file.length-44)/2},(_,i)=>file.readInt16LE(44+i*2)/32768);
@@ -133,7 +134,9 @@ test('local assets are compact mono PCM, finite, non-silent, bounded and loop se
     if(definition.loop)assert.ok(Math.abs(data[0]-data.at(-1))<.15,`${definition.file} seam`);
   }
   const deferred=(await stat(new URL('../public/assets/obs/audio/coffee-machine-a-20s.wav',import.meta.url))).size;
-  assert.equal(deferred,882044);assert.ok(total-deferred<1800000,`initial clips use ${total-deferred} bytes; the selected twenty-second coffee clip is deferred`);
+  assert.equal(deferred,882044);
+  let voices=0;for(const id of LOUNGE_VOICE_IDS)voices+=(await stat(new URL('../public/assets/obs/audio/'+CABIN_SOUNDS[id].file,import.meta.url))).size;
+  assert.ok(total-deferred-voices<1800000,`initial clips use ${total-deferred-voices} bytes; coffee and conversation are deferred`);
 });
 test('bed piston and slide are short faded recordings, without live loops or filters',async()=>{
   const ctx=context(),audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async()=>response(),ambience:false});
@@ -218,7 +221,7 @@ test('bed lid is one native-length stroke and leaves the tray recording unchange
 });
 test('explicit activation loads each local clip once with bounded concurrency, mute never fetches',async()=>{
   let calls=0,inFlight=0,max=0;const ctx=context();
-  const audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async(url)=>{assert.match(url,/^\/obs\/assets\/obs\/audio\/[\w-]+\.wav$/);calls++;max=Math.max(max,++inFlight);await new Promise(resolve=>setImmediate(resolve));inFlight--;return response();}});
+  const audio=new CabinAudio({createContext:()=>ctx,fetchAudio:async(url)=>{assert.match(url,/^\/obs\/assets\/obs\/audio\/[\w-]+\.(?:wav|mp3)$/);calls++;max=Math.max(max,++inFlight);await new Promise(resolve=>setImmediate(resolve));inFlight--;return response();}});
   audio.play('doorOpen');assert.equal(calls,0);
   audio.pause(true);await audio.toggle();assert.equal(audio.master.gain.value,0,'pause before context creation survives activation');
   await audio.load();assert.equal(calls,soundCount);assert.ok(max<=3);assert.equal(audio.stats.loaded,soundCount);
@@ -245,15 +248,16 @@ test('ambient updates follow camera focus but never synthesize pitched water dro
   audio.dispose();
 });
 test('coffee stays out of initial loading, decodes once on demand and never unlocks audio by loading',async()=>{
-  const ctx=context(),urls=[],audio=new CabinAudio({createContext:()=>ctx,ambience:false,defer:['coffeeMachine'],fetchAudio:async url=>{urls.push(url);return response();}});
+  const ctx=context(),urls=[],audio=new CabinAudio({createContext:()=>ctx,ambience:false,defer:['coffeeMachine',...LOUNGE_VOICE_IDS],fetchAudio:async url=>{urls.push(url);return response();}});
   try{
-    audio.prepare();await audio.load();assert.equal(audio.buffers.size,soundCount-1);
+    audio.prepare();await audio.load();assert.equal(audio.buffers.size,soundCount-1-LOUNGE_VOICE_IDS.length);
     assert.equal(urls.some(url=>url.includes('coffee-machine')),false);assert.equal(audio.unlocked,false);
     await Promise.all([audio.loadDeferred('coffeeMachine'),audio.loadDeferred('coffeeMachine')]);
-    assert.equal(urls.filter(url=>url.includes('coffee-machine')).length,1);assert.equal(audio.buffers.size,soundCount);assert.equal(audio.unlocked,false);
+    assert.equal(urls.filter(url=>url.includes('coffee-machine')).length,1);assert.equal(audio.buffers.size,soundCount-LOUNGE_VOICE_IDS.length);assert.equal(audio.unlocked,false);
+    assert.equal(urls.some(url=>url.includes('lounge-voice')),false);
     await audio.loadDeferred('coffeeMachine');assert.equal(urls.filter(url=>url.includes('coffee-machine')).length,1);
     const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');
-    assert.match(main,/defer:\['coffeeMachine'\]/);assert.match(main,/audio\.loadDeferred\('coffeeMachine'\)/);
+    assert.match(main,/defer:\['coffeeMachine',\.\.\.LOUNGE_VOICE_IDS\]/);assert.match(main,/audio\.loadDeferred\('coffeeMachine'\)/);
   }finally{audio.dispose();}
 });
 test('finite coffee playback can resume at the current offset without looping or changing pitch',async()=>{

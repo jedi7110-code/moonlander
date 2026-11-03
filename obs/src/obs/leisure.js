@@ -9,7 +9,7 @@ import {setMealHandFit} from './cup-hand-fit.js';
 import {createCatTeaser} from './cat-teaser.js';
 import {createPadTerminal} from './pad-terminal.js';
 
-export const LEISURE_LABELS={tablet:['パッド端末を読んでいる','Reading on a tablet'],music:['音楽を聴いている','Listening to music'],cat:['猫と遊んでいる','Playing with the cat']};
+export const LEISURE_LABELS={conversation:['カーティスと会話中','Talking with Curtis'],tablet:['パッド端末を読んでいる','Reading on a tablet'],music:['音楽を聴いている','Listening to music'],cat:['猫と遊んでいる','Playing with the cat']};
 
 export const MUSIC_BPM=95;
 const musicBeat=time=>.5-.5*Math.cos((time-4.25)*MUSIC_BPM/60*Math.PI*2);

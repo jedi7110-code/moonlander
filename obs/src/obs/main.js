@@ -14,6 +14,7 @@ import {closeLoadingScreen} from './loading-transition.js';
 import {bindStartupLightingInput,activateStartupLighting} from './startup-input.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
+import {LOUNGE_VOICE_IDS} from './sound-library.js';
 import {CabinSoundEvents} from './sound-events.js';
 import {bindCabinAudioGestures} from './audio-unlock.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
@@ -29,7 +30,7 @@ import {updateCharacterCameraUI,updateFirstPersonOverlay} from './character-came
 import {updateFullscreenUI} from './fullscreen-ui.js';
 import {environmentDisplay} from './environment.js';
 import {HATCH_REPAIR_LABELS} from './hatch-repair.js';
-import {FLOORS} from './layout.js';
+import {FLOORS,DECK,CABIN_FLOOR_Y} from './layout.js';
 import {exteriorCinema} from './exterior-session.js';
 
 const $=id=>document.getElementById(id);
@@ -52,7 +53,7 @@ const needOrders={
   bladder:{station:'toilet',icon:'toilet',label:['トイレへ行く','Use the toilet'],detail:['トイレを使用して回復します。','Restore this level by using the toilet.']},
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
-const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine']});
+const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine',...LOUNGE_VOICE_IDS]});
 const soundEvents=new CabinSoundEvents(audio);
 // Lucy's grooming correction cache arrives after the cabin is on screen.
 cat.groomAvailable=false;
@@ -398,6 +399,8 @@ async function start(){
     });
     view.immersive=immersive;
     brain.catRoutine=cat;
+    const loungeConversationPreview=new URLSearchParams(location.search).get('preview')==='lounge-conversation';
+    const startConversationPreview=()=>{if(loungeConversationPreview&&curtis.ready&&brain.state==='loungePreviewReady'&&!view.startupLighting.waiting)brain._go(getStation('lounge'));};
     const loungeSmokingPreview=new URLSearchParams(location.search).get('preview')==='lounge-smoking';
     if(loungeSmokingPreview){
       const station=getStation('lounge');actor.floor=station.floor;actor.x=station.x;actor.y=FLOORS[station.floor].y;
@@ -406,6 +409,9 @@ async function start(){
     }else brain.beginWakeUp({waitForActivation:true});
     if(new URLSearchParams(location.search).get('preview')==='airlock')brain.environment.nextFault=12;
     view.setMode('all');
+    // Start centered on the inhabited middle deck, before the first draw.
+    view.center.set(0,(CABIN_FLOOR_Y[DECK.HABITATION]+CABIN_FLOOR_Y[DECK.OPERATIONS])/2,0);
+    view.targetCenter.copy(view.center);view.viewHeight=view.targetHeight;
     if(new URLSearchParams(location.search).get('preview')==='supervisor'){
       view.setMode('manual');view.center.set(-4.57,8.22,-1.30);view.targetCenter.copy(view.center);
       view.viewHeight=view.targetHeight=3.1;view.zoom=view.fitHeight/3.1;
@@ -413,6 +419,10 @@ async function start(){
     if(loungeSmokingPreview){
       view.setMode('manual');view.center.set(8.30,4.45,.75);view.targetCenter.copy(view.center);
       view.viewHeight=view.targetHeight=2.8;view.zoom=view.fitHeight/2.8;
+    }
+    if(loungeConversationPreview){
+      view.setMode('manual');view.center.set(6.7,4.35,.45);view.targetCenter.copy(view.center);
+      view.viewHeight=view.targetHeight=2.6;view.zoom=view.fitHeight/2.6;
     }
     if(new URLSearchParams(location.search).get('preview')==='airlock'){
       view.setMode('manual');view.center.set(9.45,8.22,.25);view.targetCenter.copy(view.center);
@@ -435,7 +445,7 @@ async function start(){
     document.documentElement.dataset.cabinFirstDrawReadyMs=performance.now().toFixed(1);
     exterior.hostProgress(.98);
     $('lighting-hint').hidden=false;
-    view.onSceneActivate=()=>{try{audio.unlock();}catch(error){console.warn('Cabin audio activation failed.',error);}return activateStartupLighting(view.startupLighting,{audio,onActivate:()=>{brain.releaseOpeningSleep();$('lighting-hint').hidden=true;}});};
+    view.onSceneActivate=()=>{try{audio.unlock();}catch(error){console.warn('Cabin audio activation failed.',error);}return activateStartupLighting(view.startupLighting,{audio,onActivate:()=>{brain.releaseOpeningSleep();startConversationPreview();$('lighting-hint').hidden=true;}});};
     unbindStartupLighting=bindStartupLightingInput($('ship-view'),()=>view.onSceneActivate());
     previous=performance.now();
     let firstVisibleFrame=true;
@@ -463,6 +473,14 @@ async function start(){
     view.renderer.setAnimationLoop(tick);
     document.documentElement.dataset.cabinReadyMs=performance.now().toFixed(1);
     exterior.hostReady();
+    if(loungeConversationPreview)void view.prepareCurtis().then(()=>{
+      curtis.ready=true;curtis.active=true;curtis.position={x:6.05,y:3.392,z:.06};curtis.hold('relax',60);
+      brain.openingWake=null;brain.bunkVisit=null;cat.finishBunkWake();
+      actor.floor=1;actor.x=700+3.4/.022;actor.y=FLOORS[1].y;actor.queue=[];actor.onArrive=null;
+      for(const key of Object.keys(brain.needs))brain.needs[key]=90;
+      brain.health.nextIncident=Infinity;brain.environment.nextFault=Infinity;brain.state='loungePreviewReady';
+      startConversationPreview();
+    }).catch(error=>console.warn('Lounge conversation preview unavailable.',error));
     void runDeferredPreparation([
       nextFrame=>view.prepareDeferredDetails(nextFrame),
       nextFrame=>view.compilePrograms({nextFrame}),

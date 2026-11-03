@@ -9,8 +9,17 @@ export const LOUNGE_ENTRY_SECONDS=8;
 export const LOUNGE_TRANSITION_DECAY=.14;
 export const loungeApproachX=()=>getStation('lounge').x+LOUNGE_ACCESS.sideX/.022;
 export const loungeEntryAge=age=>LOUNGE_EXIT_SECONDS-THREE.MathUtils.clamp(age,0,LOUNGE_ENTRY_SECONDS);
+// The adjacent cushion has a direct entrance from the aisle. Skip the four
+// seconds of sideways travel around the table, retaining the authored feet.
+export const LOUNGE_COMPANION_SECONDS=4;
+export const LOUNGE_COMPANION_ACCESS=Object.freeze({sideX:0,gapZ:LOUNGE_ACCESS.gapZ});
+export function loungeExitPoseAge(exit){
+  if(!exit.companion)return exit.age;
+  return exit.age<=2.2?exit.age:exit.age+4;
+}
+export const loungeEntryPoseAge=entry=>loungeExitPoseAge({companion:entry.companion,age:(entry.companion?LOUNGE_COMPANION_SECONDS:LOUNGE_ENTRY_SECONDS)-entry.age});
 export function applyLoungeEntry(root,entry){
-  applyLoungeExit(root,{age:loungeEntryAge(entry.age),turnYaw:entry.startYaw??Math.PI/2});
+  applyLoungeExit(root,{age:loungeEntryPoseAge(entry),entering:Boolean(entry.companion),access:entry.companion?LOUNGE_COMPANION_ACCESS:LOUNGE_ACCESS,turnYaw:entry.startYaw??Math.PI/2});
   for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
 }
 const smooth=(t,a,b)=>THREE.MathUtils.smoothstep(t,a,b);
@@ -28,22 +37,23 @@ function passageSteps(age,start,end,count,from,to){
   });
   return{position:from.clone().addScaledVector(span,(index+s)/2),feet};
 }
-export function loungePassageFeet(age){
-  const gap=new THREE.Vector3(0,0,LOUNGE_ACCESS.gapZ),side=new THREE.Vector3(LOUNGE_ACCESS.sideX,0,LOUNGE_ACCESS.gapZ);
-  return age<=6.2?passageSteps(age,2.2,6.2,8,gap,side):passageSteps(age,6.2,7.2,2,side,new THREE.Vector3(LOUNGE_ACCESS.sideX,0,CABIN_AISLE.crewZ));
+export function loungePassageFeet(age,access=LOUNGE_ACCESS){
+  const gap=new THREE.Vector3(0,0,access.gapZ),side=new THREE.Vector3(access.sideX,0,access.gapZ);
+  return age<=6.2?passageSteps(age,2.2,6.2,8,gap,side):passageSteps(age,6.2,7.2,2,side,new THREE.Vector3(access.sideX,0,CABIN_AISLE.crewZ));
 }
-export function loungeExitPose(age){
-  const rise=smooth(age,.8,2.2),step=smooth(age,2.2,7.2),passage=loungePassageFeet(age);
+export function loungeExitPose(age,access=LOUNGE_ACCESS){
+  const rise=smooth(age,.8,2.2),step=smooth(age,2.2,7.2),passage=loungePassageFeet(age,access);
   return {age,stow:smooth(age,0,.8),rise,step,x:passage.position.x,
-    depth:age<2.2?THREE.MathUtils.lerp(LOUNGE_SEAT.depth,LOUNGE_ACCESS.gapZ,rise)-.045*Math.sin(Math.PI*rise):passage.position.z,
+    depth:age<2.2?THREE.MathUtils.lerp(LOUNGE_SEAT.depth,access.gapZ,rise)-.045*Math.sin(Math.PI*rise):passage.position.z,
     turn:smooth(age,7.2,LOUNGE_EXIT_SECONDS)};
 }
 
 export function applyLoungeExit(root,exit){
   root.userData.spineCurve=null;
-  const {body,chest,head,arms,legs,leisure}=root.userData,{age,stow,rise,step,depth}=loungeExitPose(exit.age);
+  const access=exit.access??(exit.companion?LOUNGE_COMPANION_ACCESS:LOUNGE_ACCESS);
+  const {body,chest,head,arms,legs,leisure}=root.userData,{age,stow,rise,step,depth}=loungeExitPose(loungeExitPoseAge(exit),access);
   const turn=smooth(age,7.2,LOUNGE_EXIT_SECONDS),turnYaw=exit.turnYaw??-Math.PI/2;
-  root.rotation.y=.15*(1-rise)+turnYaw*turn;
+  root.rotation.y=(exit.seatedYaw??.15)*(1-rise)+turnYaw*turn;
   // Finish handling belongings before shifting weight off the cushion.
   for(const key of ['tablet','phones','toy']){
     const prop=leisure[key];if(!prop.visible)continue;
@@ -55,7 +65,7 @@ export function applyLoungeExit(root,exit){
     const {arm,elbow,hand,side}=rig;
     const settle=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.34*(1-rise)-.05*rise,0,side*.025));
     const relaxedHand=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),root.userData.bodySkin?side*Math.PI/2:0);
-    if(age<.8){
+    if(age<.8&&!exit.entering){
       // Withdraw the fingers behind the edge before lowering the hands. A
       // joint-only blend lowers them straight through a close tabletop.
       const upper=arm.quaternion.clone(),lower=upper.clone().multiply(elbow.quaternion),rotation=lower.clone().multiply(hand.quaternion);
@@ -77,14 +87,14 @@ export function applyLoungeExit(root,exit){
   head.position.set(0,pivot+(1.637-pivot)*Math.cos(lean)+.009*Math.sin(lean),(1.637-pivot)*Math.sin(lean)-.009*Math.cos(lean));
   head.rotation.x=THREE.MathUtils.lerp(head.rotation.x,-lean*.3,stow);
   for(const {leg,knee,boot,side}of legs){
-    const tuck=smooth(age,side<0?.05:.4,side<0?.35:.7),ankleZ=THREE.MathUtils.lerp(.503,LOUNGE_ACCESS.gapZ+.013,tuck);
+    const tuck=smooth(age,side<0?.05:.4,side<0?.35:.7),ankleZ=THREE.MathUtils.lerp(.503,access.gapZ+.013,tuck);
     const ankleY=THREE.MathUtils.lerp(.113,.110,tuck)+.018*Math.sin(Math.PI*tuck)**2;
     const angles=hingeAngles(ankleY-body.position.y-leg.position.y,ankleZ-depth,.435,Math.hypot(.425,.013));
     leg.rotation.set(angles.upper,0,0);knee.rotation.x=angles.lower+Math.atan2(.013,.425);
     boot.rotation.x=-(leg.rotation.x+knee.rotation.x);
   }
   if(age>=2.2&&age<=7.2){
-    const passage=loungePassageFeet(age),targets=passage.feet.map(foot=>({...foot,position:foot.position.clone().sub(passage.position)}));
+    const passage=loungePassageFeet(age,access),targets=passage.feet.map(foot=>({...foot,position:foot.position.clone().sub(passage.position)}));
     // Lower the pelvis just enough to keep both real leg lengths reachable.
     body.position.y=0;
     for(const {leg,knee,boot,side}of legs){
@@ -99,5 +109,5 @@ export function applyLoungeExit(root,exit){
     }
   }
   if(age>=7.2)applyAuthoredMiloTurn(root,0,turnYaw,turn,{upperBody:false});
-  return loungeExitPose(age);
+  return loungeExitPose(age,access);
 }

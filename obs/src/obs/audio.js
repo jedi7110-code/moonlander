@@ -175,7 +175,7 @@ export class CabinAudio {
     gain.gain.value=0;source.connect(gain);if(pan)gain.connect(pan).connect(this.master);else gain.connect(this.master);
     const voice={id,source,gain,pan,position:position?{...position}:null,volume:definition.gain*volume,key,stopping:false,startedAt:this.context.currentTime};
     this.voices.add(voice);this.positionVoice(voice);
-    source.onended=()=>{source.disconnect();gain.disconnect();pan?.disconnect();this.voices.delete(voice);if(key&&this.loops.get(key)===voice)this.loops.delete(key);this.onChange?.();};
+    source.onended=()=>{voice.ended=true;source.disconnect();gain.disconnect();pan?.disconnect();this.voices.delete(voice);if(key&&this.loops.get(key)===voice)this.loops.delete(key);this.onChange?.();};
     source.start(voice.startedAt,offset);return voice;
   }
   // The running audio clock is authoritative for visuals that follow a loop.
