@@ -400,7 +400,17 @@ async function start(){
     view.immersive=immersive;
     brain.catRoutine=cat;
     const loungeConversationPreview=new URLSearchParams(location.search).get('preview')==='lounge-conversation';
-    const startConversationPreview=()=>{if(loungeConversationPreview&&curtis.ready&&brain.state==='loungePreviewReady'&&!view.startupLighting.waiting)brain._go(getStation('lounge'));};
+    let conversationPreviewStarted=false;
+    const startConversationPreview=()=>{
+      if(!loungeConversationPreview||conversationPreviewStarted||!curtis.ready||!view.startupLighting.done)return;
+      conversationPreviewStarted=true;
+      curtis.active=true;curtis.position={x:6.05,y:3.392,z:.06};curtis.hold('relax',60);
+      brain.openingWake=null;brain.bunkVisit=null;cat.finishBunkWake();
+      actor.floor=1;actor.x=700+3.4/.022;actor.y=FLOORS[1].y;actor.queue=[];actor.onArrive=null;
+      for(const key of Object.keys(brain.needs))brain.needs[key]=90;
+      brain.health.nextIncident=Infinity;brain.environment.nextFault=Infinity;brain.state='idle';
+      brain._go(getStation('lounge'));
+    };
     const loungeSmokingPreview=new URLSearchParams(location.search).get('preview')==='lounge-smoking';
     if(loungeSmokingPreview){
       const station=getStation('lounge');actor.floor=station.floor;actor.x=station.x;actor.y=FLOORS[station.floor].y;
@@ -458,12 +468,12 @@ async function start(){
         if(view.catRun&&openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
         while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor,brain.environment);
-          if(!view.startupLighting?.waiting)curtis.update(step,{actor,droid,cat,brain});
+          if(view.startupLighting?.done)curtis.update(step,{actor,droid,cat,brain});
           actor.waitingForVisitor=curtis.blocksCrew(actor,step);
           actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat,curtis});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
         if(pendingHQ&&brain.state==='reading'){pendingHQ=false;showMessage(line('hq'),'HQ');}
       }
-      if(visible){view.startupLighting?.update(paused||games.open||firstVisibleFrame?0:frameDt);feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);firstVisibleFrame=false;if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
+      if(visible){view.startupLighting?.update(paused||games.open||firstVisibleFrame?0:frameDt);startConversationPreview();feedback.update(dt,brain,actor,paused||games.open);view.render(dt,elapsed,actor,brain,cat,care,paused||games.open,airlock,xrFrame);firstVisibleFrame=false;if(!immersive.active)updateLoungeGamePrompt($('lounge-game-prompt'),brain,games.open,view);}
       if(visible&&audio.enabled){
         const camera=immersive.active?view.renderer.xr.getCamera(view.camera):view.camera;
         audio.setViewListener(camera,view,immersive.active||Boolean(view.characterCamera?.active));
@@ -474,12 +484,7 @@ async function start(){
     document.documentElement.dataset.cabinReadyMs=performance.now().toFixed(1);
     exterior.hostReady();
     if(loungeConversationPreview)void view.prepareCurtis().then(()=>{
-      curtis.ready=true;curtis.active=true;curtis.position={x:6.05,y:3.392,z:.06};curtis.hold('relax',60);
-      brain.openingWake=null;brain.bunkVisit=null;cat.finishBunkWake();
-      actor.floor=1;actor.x=700+3.4/.022;actor.y=FLOORS[1].y;actor.queue=[];actor.onArrive=null;
-      for(const key of Object.keys(brain.needs))brain.needs[key]=90;
-      brain.health.nextIncident=Infinity;brain.environment.nextFault=Infinity;brain.state='loungePreviewReady';
-      startConversationPreview();
+      curtis.ready=true;startConversationPreview();
     }).catch(error=>console.warn('Lounge conversation preview unavailable.',error));
     void runDeferredPreparation([
       nextFrame=>view.prepareDeferredDetails(nextFrame),

@@ -1,4 +1,5 @@
 import {MathUtils} from 'three';
+import {applyThighHands} from './seated-pose.js';
 import {getStation,LOUNGE_SEAT} from './layout.js';
 import {loungeExitPose,loungeExitPoseAge,loungeEntryPoseAge,LOUNGE_COMPANION_ACCESS} from './lounge-exit.js';
 
@@ -35,5 +36,6 @@ export function applyLoungeConversation(root,{age,weight,role='milo'}){
     elbow.rotation.set(MathUtils.lerp(role==='curtis'?-.65:-.55,-.68,w)-.50*active*w,0,0);
     hand.rotation.set(.10-.13*active*w,root.userData.bodySkin?armSide*Math.PI/2:0,armSide*.08*active*w);
   }
+  applyThighHands(root,1,arms.map(rig=>1-(rig.side===side?gesture*w:0)));
   for(const key of ['tablet','phones','toy'])leisure[key].visible=false;
 }

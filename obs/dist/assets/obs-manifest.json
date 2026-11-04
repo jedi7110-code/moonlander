@@ -1,220 +1,220 @@
 {
-  "_BufferGeometryUtils-BkG5nKdK.js": {
-    "file": "assets/BufferGeometryUtils-BkG5nKdK.js",
+  "_BufferGeometryUtils-BwWSkuaY.js": {
+    "file": "assets/BufferGeometryUtils-BwWSkuaY.js",
     "name": "BufferGeometryUtils",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_OrbitControls-5HAqjRZv.js": {
-    "file": "assets/OrbitControls-5HAqjRZv.js",
+  "_OrbitControls-DEgK3zL7.js": {
+    "file": "assets/OrbitControls-DEgK3zL7.js",
     "name": "OrbitControls",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_OutputPass-Bf2dSWJK.js": {
-    "file": "assets/OutputPass-Bf2dSWJK.js",
+  "_OutputPass-DT0kkiZu.js": {
+    "file": "assets/OutputPass-DT0kkiZu.js",
     "name": "OutputPass",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_RoundedBoxGeometry-UAZHkPTS.js": {
-    "file": "assets/RoundedBoxGeometry-UAZHkPTS.js",
+  "_RoundedBoxGeometry-DDHtBzXO.js": {
+    "file": "assets/RoundedBoxGeometry-DDHtBzXO.js",
     "name": "RoundedBoxGeometry",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_audio-GE55RYcO.js": {
-    "file": "assets/audio-GE55RYcO.js",
+  "_audio-CxiiZLxj.js": {
+    "file": "assets/audio-CxiiZLxj.js",
     "name": "audio",
     "imports": [
-      "_sound-library-DDqg2YWl.js",
+      "_sound-library-DDjpCwlW.js",
       "_layout-B5uZgtAZ.js"
     ]
   },
-  "_bathroom-window-BCaJ5x4h.js": {
-    "file": "assets/bathroom-window-BCaJ5x4h.js",
+  "_bathroom-window-BN72hhrK.js": {
+    "file": "assets/bathroom-window-BN72hhrK.js",
     "name": "bathroom-window",
     "imports": [
       "_habitat-rotation-DV4_2eFX.js",
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js"
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js"
     ]
   },
   "_bulkhead-gate-layout-BOid6TaK.js": {
     "file": "assets/bulkhead-gate-layout-BOid6TaK.js",
     "name": "bulkhead-gate-layout"
   },
-  "_cabin-ladder-ChFUhbMj.js": {
-    "file": "assets/cabin-ladder-ChFUhbMj.js",
+  "_cabin-ladder-s1i-s1hT.js": {
+    "file": "assets/cabin-ladder-s1i-s1hT.js",
     "name": "cabin-ladder",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_lighting-8YwrBJyM.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-body--FL5lTBQ.js",
+      "_three-BlkkMigJ.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_lighting-CLHF_GKg.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-body-D88bgi8Y.js",
       "_layout-B5uZgtAZ.js",
-      "_cabin-walkway-BwWPwmnT.js"
+      "_cabin-walkway-CYGntaFk.js"
     ]
   },
-  "_cabin-toon-BU0AO3p1.js": {
-    "file": "assets/cabin-toon-BU0AO3p1.js",
+  "_cabin-toon-DO6yNbdf.js": {
+    "file": "assets/cabin-toon-DO6yNbdf.js",
     "name": "cabin-toon",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_cabin-walkway-BwWPwmnT.js": {
-    "file": "assets/cabin-walkway-BwWPwmnT.js",
+  "_cabin-walkway-CYGntaFk.js": {
+    "file": "assets/cabin-walkway-CYGntaFk.js",
     "name": "cabin-walkway",
     "imports": [
-      "_characters-DLF7PTsx.js",
+      "_characters-Bbtpw7rJ.js",
       "_layout-B5uZgtAZ.js"
     ]
   },
-  "_cargo-bay-zJv5GlYO.js": {
-    "file": "assets/cargo-bay-zJv5GlYO.js",
+  "_cargo-bay-CJoRCyP-.js": {
+    "file": "assets/cargo-bay-CJoRCyP-.js",
     "name": "cargo-bay",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
       "_layout-B5uZgtAZ.js",
-      "_characters-DLF7PTsx.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js"
+      "_characters-Bbtpw7rJ.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js"
     ]
   },
-  "_characters-DLF7PTsx.js": {
-    "file": "assets/characters-DLF7PTsx.js",
+  "_characters-Bbtpw7rJ.js": {
+    "file": "assets/characters-Bbtpw7rJ.js",
     "name": "characters",
     "isDynamicEntry": true,
     "imports": [
-      "_lighting-8YwrBJyM.js",
-      "_three-CxW9jrRV.js",
+      "_lighting-CLHF_GKg.js",
+      "_three-BlkkMigJ.js",
       "_layout-B5uZgtAZ.js",
-      "_milo-body--FL5lTBQ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
+      "_milo-body-D88bgi8Y.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
       "_pad-screen-2TrnPFYj.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_eva-D6qWoPF-.js"
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_eva-B4ItrgHb.js"
     ]
   },
-  "_chess-geometry-FujoaqUA.js": {
-    "file": "assets/chess-geometry-FujoaqUA.js",
+  "_chess-geometry-hF44oMWf.js": {
+    "file": "assets/chess-geometry-hF44oMWf.js",
     "name": "chess-geometry",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js"
+      "_three-BlkkMigJ.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js"
     ]
   },
-  "_chess-hologram-DF4C-7Pq.js": {
-    "file": "assets/chess-hologram-DF4C-7Pq.js",
+  "_chess-hologram-CDXiZdgg.js": {
+    "file": "assets/chess-hologram-CDXiZdgg.js",
     "name": "chess-hologram",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_curtis-model-DgNXC7_v.js": {
-    "file": "assets/curtis-model-DgNXC7_v.js",
+  "_curtis-model-DVbtvja_.js": {
+    "file": "assets/curtis-model-DVbtvja_.js",
     "name": "curtis-model",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_head-BaxM1XC6.js",
-      "_milo-body--FL5lTBQ.js",
-      "_characters-DLF7PTsx.js",
-      "_cabin-ladder-ChFUhbMj.js"
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_head-BD3DMKHl.js",
+      "_milo-body-D88bgi8Y.js",
+      "_characters-Bbtpw7rJ.js",
+      "_cabin-ladder-s1i-s1hT.js"
     ]
   },
-  "_curtis-routine-CozOL_E-.js": {
-    "file": "assets/curtis-routine-CozOL_E-.js",
+  "_curtis-routine-CJnxNQhI.js": {
+    "file": "assets/curtis-routine-CJnxNQhI.js",
     "name": "curtis-routine",
     "imports": [
-      "_cabin-walkway-BwWPwmnT.js",
+      "_cabin-walkway-CYGntaFk.js",
       "_layout-B5uZgtAZ.js",
-      "_characters-DLF7PTsx.js"
+      "_characters-Bbtpw7rJ.js"
     ]
   },
-  "_droid-routine-ftH6wy3R.js": {
-    "file": "assets/droid-routine-ftH6wy3R.js",
+  "_droid-routine-CM6LPkWq.js": {
+    "file": "assets/droid-routine-CM6LPkWq.js",
     "name": "droid-routine",
     "imports": [
-      "_grooming-BzRKkAyL.js",
-      "_characters-DLF7PTsx.js",
+      "_grooming-DvbYw2bk.js",
+      "_characters-Bbtpw7rJ.js",
       "_layout-B5uZgtAZ.js",
-      "_droid-startup-DPAe3jWY.js",
-      "_curtis-routine-CozOL_E-.js",
-      "_cabin-walkway-BwWPwmnT.js"
+      "_droid-startup-68v27D7b.js",
+      "_curtis-routine-CJnxNQhI.js",
+      "_cabin-walkway-CYGntaFk.js"
     ]
   },
-  "_droid-startup-DPAe3jWY.js": {
-    "file": "assets/droid-startup-DPAe3jWY.js",
+  "_droid-startup-68v27D7b.js": {
+    "file": "assets/droid-startup-68v27D7b.js",
     "name": "droid-startup",
     "imports": [
-      "_grooming-BzRKkAyL.js",
+      "_grooming-DvbYw2bk.js",
       "_layout-B5uZgtAZ.js",
-      "_characters-DLF7PTsx.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_three-CxW9jrRV.js"
+      "_characters-Bbtpw7rJ.js",
+      "_cabin-walkway-CYGntaFk.js",
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_environment-BfAbNPyg.js": {
-    "file": "assets/environment-BfAbNPyg.js",
+  "_environment-Bk-RbY6j.js": {
+    "file": "assets/environment-Bk-RbY6j.js",
     "name": "environment",
     "imports": [
       "_preload-helper-QFMnwACP.js",
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_industrial-Dk1lH2dn.js",
-      "_cabin-ladder-ChFUhbMj.js",
-      "_ship-KxOUvtjw.js",
-      "_characters-DLF7PTsx.js",
-      "_eva-D6qWoPF-.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_industrial-BiK4cD9z.js",
+      "_cabin-ladder-s1i-s1hT.js",
+      "_ship-D-V3wfR6.js",
+      "_characters-Bbtpw7rJ.js",
+      "_eva-B4ItrgHb.js",
       "_layout-B5uZgtAZ.js",
-      "_triangle-subset-CmYhXjyt.js",
-      "_droid-startup-DPAe3jWY.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_head-BaxM1XC6.js",
-      "_grooming-BzRKkAyL.js",
-      "_floor-level-marking-B93G9ol5.js",
-      "_milo-body--FL5lTBQ.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_milo-toon-Bw-lumZE.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_metal-deck-_THwtDD3.js",
-      "_sound-library-DDqg2YWl.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_triangle-subset-CIm-EoK-.js",
+      "_droid-startup-68v27D7b.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_head-BD3DMKHl.js",
+      "_grooming-DvbYw2bk.js",
+      "_floor-level-marking-Px__WHM5.js",
+      "_milo-body-D88bgi8Y.js",
+      "_cabin-walkway-CYGntaFk.js",
+      "_milo-toon-CFNx4D0S.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_metal-deck-txl_-dlx.js",
+      "_sound-library-DDjpCwlW.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_bathroom-window-BN72hhrK.js",
       "_viewing-wall-profile-D0wf8frT.js"
     ],
     "dynamicImports": [
       "obs/curtis-view.js"
     ]
   },
-  "_eva-D6qWoPF-.js": {
-    "file": "assets/eva-D6qWoPF-.js",
+  "_eva-B4ItrgHb.js": {
+    "file": "assets/eva-B4ItrgHb.js",
     "name": "eva",
     "imports": [
-      "_lighting-8YwrBJyM.js",
-      "_three-CxW9jrRV.js",
+      "_lighting-CLHF_GKg.js",
+      "_three-BlkkMigJ.js",
       "_layout-B5uZgtAZ.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ]
   },
-  "_exterior-cargo-hatch-D1IfMr7c.js": {
-    "file": "assets/exterior-cargo-hatch-D1IfMr7c.js",
+  "_exterior-cargo-hatch-DtKSEsD2.js": {
+    "file": "assets/exterior-cargo-hatch-DtKSEsD2.js",
     "name": "exterior-cargo-hatch",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_three-BlkkMigJ.js",
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ]
   },
   "_exterior-cinema-ui-BUK0Bjud.js": {
@@ -228,70 +228,70 @@
     "file": "assets/exterior-cinema-ui-C8uPO7WS.css",
     "src": "_exterior-cinema-ui-C8uPO7WS.css"
   },
-  "_exterior-cinematic-ZqZkuXIz.js": {
-    "file": "assets/exterior-cinematic-ZqZkuXIz.js",
+  "_exterior-cinematic-aL61_I09.js": {
+    "file": "assets/exterior-cinematic-aL61_I09.js",
     "name": "exterior-cinematic",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-stars-lbsOBk9O.js",
-      "_exterior-probe-flight-C_Tx1JEr.js"
+      "_three-BlkkMigJ.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-stars-B5QqMURT.js",
+      "_exterior-probe-flight-xDlX1nhq.js"
     ]
   },
   "_exterior-depth-CjZabxrl.js": {
     "file": "assets/exterior-depth-CjZabxrl.js",
     "name": "exterior-depth"
   },
-  "_exterior-dissolve-DYWoXfLv.js": {
-    "file": "assets/exterior-dissolve-DYWoXfLv.js",
+  "_exterior-dissolve-COT6LSls.js": {
+    "file": "assets/exterior-dissolve-COT6LSls.js",
     "name": "exterior-dissolve",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_exterior-gas-pass-C3IGBMmA.js": {
-    "file": "assets/exterior-gas-pass-C3IGBMmA.js",
+  "_exterior-gas-pass-BFCndI2j.js": {
+    "file": "assets/exterior-gas-pass-BFCndI2j.js",
     "name": "exterior-gas-pass",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_exterior-optics-B-ngFG2o.js": {
-    "file": "assets/exterior-optics-B-ngFG2o.js",
+  "_exterior-optics-Qog-M3z2.js": {
+    "file": "assets/exterior-optics-Qog-M3z2.js",
     "name": "exterior-optics",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_exterior-planet-BPH9GbWh.js": {
-    "file": "assets/exterior-planet-BPH9GbWh.js",
+  "_exterior-planet-B4PMmmXu.js": {
+    "file": "assets/exterior-planet-B4PMmmXu.js",
     "name": "exterior-planet",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_exterior-probe-flight-C_Tx1JEr.js": {
-    "file": "assets/exterior-probe-flight-C_Tx1JEr.js",
+  "_exterior-probe-flight-xDlX1nhq.js": {
+    "file": "assets/exterior-probe-flight-xDlX1nhq.js",
     "name": "exterior-probe-flight",
     "imports": [
-      "_exterior-shadow-CtxGqOCE.js"
+      "_exterior-shadow-l8ETXBAX.js"
     ]
   },
-  "_exterior-production-BLWfYXNw.js": {
-    "file": "assets/exterior-production-BLWfYXNw.js",
+  "_exterior-production-Dr-HeipY.js": {
+    "file": "assets/exterior-production-Dr-HeipY.js",
     "name": "exterior-production",
     "imports": [
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-cargo-hatch-D1IfMr7c.js"
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-cargo-hatch-DtKSEsD2.js"
     ]
   },
-  "_exterior-shadow-CtxGqOCE.js": {
-    "file": "assets/exterior-shadow-CtxGqOCE.js",
+  "_exterior-shadow-l8ETXBAX.js": {
+    "file": "assets/exterior-shadow-l8ETXBAX.js",
     "name": "exterior-shadow",
     "imports": [
       "_preload-helper-QFMnwACP.js",
-      "_three-CxW9jrRV.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
+      "_three-BlkkMigJ.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
       "_habitat-rotation-DV4_2eFX.js",
@@ -301,79 +301,79 @@
       "obs/exterior-probe.js"
     ]
   },
-  "_exterior-stars-lbsOBk9O.js": {
-    "file": "assets/exterior-stars-lbsOBk9O.js",
+  "_exterior-stars-B5QqMURT.js": {
+    "file": "assets/exterior-stars-B5QqMURT.js",
     "name": "exterior-stars",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_floor-level-marking-B93G9ol5.js": {
-    "file": "assets/floor-level-marking-B93G9ol5.js",
+  "_floor-level-marking-Px__WHM5.js": {
+    "file": "assets/floor-level-marking-Px__WHM5.js",
     "name": "floor-level-marking",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_characters-DLF7PTsx.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_characters-Bbtpw7rJ.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_bathroom-window-BN72hhrK.js",
       "_habitat-rotation-DV4_2eFX.js",
       "_layout-B5uZgtAZ.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ]
   },
-  "_grooming-BzRKkAyL.js": {
-    "file": "assets/grooming-BzRKkAyL.js",
+  "_grooming-DvbYw2bk.js": {
+    "file": "assets/grooming-DvbYw2bk.js",
     "name": "grooming",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
       "_layout-B5uZgtAZ.js",
-      "_characters-DLF7PTsx.js"
+      "_characters-Bbtpw7rJ.js"
     ]
   },
   "_habitat-rotation-DV4_2eFX.js": {
     "file": "assets/habitat-rotation-DV4_2eFX.js",
     "name": "habitat-rotation"
   },
-  "_hatch-repair-rLYWvw0h.js": {
-    "file": "assets/hatch-repair-rLYWvw0h.js",
+  "_hatch-repair-MzqgeqbZ.js": {
+    "file": "assets/hatch-repair-MzqgeqbZ.js",
     "name": "hatch-repair",
     "imports": [
       "_layout-B5uZgtAZ.js",
-      "_characters-DLF7PTsx.js"
+      "_characters-Bbtpw7rJ.js"
     ]
   },
-  "_hatch-repair-study-model-Cn-Jxksj.js": {
-    "file": "assets/hatch-repair-study-model-Cn-Jxksj.js",
+  "_hatch-repair-study-model-mc-RSMEf.js": {
+    "file": "assets/hatch-repair-study-model-mc-RSMEf.js",
     "name": "hatch-repair-study-model",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_hatch-repair-rLYWvw0h.js",
-      "_characters-DLF7PTsx.js",
+      "_three-BlkkMigJ.js",
+      "_hatch-repair-MzqgeqbZ.js",
+      "_characters-Bbtpw7rJ.js",
       "_layout-B5uZgtAZ.js",
-      "_eva-D6qWoPF-.js"
+      "_eva-B4ItrgHb.js"
     ]
   },
-  "_head-BaxM1XC6.js": {
-    "file": "assets/head-BaxM1XC6.js",
+  "_head-BD3DMKHl.js": {
+    "file": "assets/head-BD3DMKHl.js",
     "name": "head",
     "isDynamicEntry": true,
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_eva-D6qWoPF-.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_triangle-subset-CmYhXjyt.js",
-      "_lighting-8YwrBJyM.js"
+      "_three-BlkkMigJ.js",
+      "_eva-B4ItrgHb.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_triangle-subset-CIm-EoK-.js",
+      "_lighting-CLHF_GKg.js"
     ]
   },
-  "_industrial-Dk1lH2dn.js": {
-    "file": "assets/industrial-Dk1lH2dn.js",
+  "_industrial-BiK4cD9z.js": {
+    "file": "assets/industrial-BiK4cD9z.js",
     "name": "industrial",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
       "_layout-B5uZgtAZ.js"
     ]
   },
@@ -381,22 +381,22 @@
     "file": "assets/layout-B5uZgtAZ.js",
     "name": "layout"
   },
-  "_lighting-8YwrBJyM.js": {
-    "file": "assets/lighting-8YwrBJyM.js",
+  "_lighting-CLHF_GKg.js": {
+    "file": "assets/lighting-CLHF_GKg.js",
     "name": "lighting",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
+      "_three-BlkkMigJ.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
       "_layout-B5uZgtAZ.js"
     ]
   },
-  "_lounge-games-BGtH8Sdl.js": {
-    "file": "assets/lounge-games-BGtH8Sdl.js",
+  "_lounge-games-BMdmWlsW.js": {
+    "file": "assets/lounge-games-BMdmWlsW.js",
     "name": "lounge-games",
     "imports": [
       "_preload-helper-QFMnwACP.js",
-      "_audio-GE55RYcO.js",
+      "_audio-CxiiZLxj.js",
       "_pad-screen-2TrnPFYj.js"
     ],
     "dynamicImports": [
@@ -411,40 +411,40 @@
     "file": "assets/lounge-games-xFATa-WZ.css",
     "src": "_lounge-games-xFATa-WZ.css"
   },
-  "_metal-deck-_THwtDD3.js": {
-    "file": "assets/metal-deck-_THwtDD3.js",
+  "_metal-deck-txl_-dlx.js": {
+    "file": "assets/metal-deck-txl_-dlx.js",
     "name": "metal-deck",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_grooming-BzRKkAyL.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_grooming-DvbYw2bk.js",
       "_layout-B5uZgtAZ.js"
     ]
   },
-  "_milo-body--FL5lTBQ.js": {
-    "file": "assets/milo-body--FL5lTBQ.js",
+  "_milo-body-D88bgi8Y.js": {
+    "file": "assets/milo-body-D88bgi8Y.js",
     "name": "milo-body",
     "isDynamicEntry": true,
     "imports": [
-      "_lighting-8YwrBJyM.js",
-      "_three-CxW9jrRV.js",
-      "_triangle-subset-CmYhXjyt.js"
+      "_lighting-CLHF_GKg.js",
+      "_three-BlkkMigJ.js",
+      "_triangle-subset-CIm-EoK-.js"
     ]
   },
-  "_milo-toon-Bw-lumZE.js": {
-    "file": "assets/milo-toon-Bw-lumZE.js",
+  "_milo-toon-CFNx4D0S.js": {
+    "file": "assets/milo-toon-CFNx4D0S.js",
     "name": "milo-toon",
     "imports": [
-      "_lighting-8YwrBJyM.js",
-      "_three-CxW9jrRV.js"
+      "_lighting-CLHF_GKg.js",
+      "_three-BlkkMigJ.js"
     ]
   },
-  "_models-Cn8Ng1Xo.js": {
-    "file": "assets/models-Cn8Ng1Xo.js",
+  "_models-DMmq_xgu.js": {
+    "file": "assets/models-DMmq_xgu.js",
     "name": "models",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_three-BlkkMigJ.js",
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ]
   },
   "_modulepreload-polyfill-B5Qt9EMX.js": {
@@ -467,84 +467,84 @@
     "file": "assets/preload-helper-QFMnwACP.js",
     "name": "preload-helper"
   },
-  "_rear-room-furnishings-BDDPkRw5.js": {
-    "file": "assets/rear-room-furnishings-BDDPkRw5.js",
+  "_rear-room-furnishings-B9p_sZ_u.js": {
+    "file": "assets/rear-room-furnishings-B9p_sZ_u.js",
     "name": "rear-room-furnishings",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_characters-DLF7PTsx.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_characters-Bbtpw7rJ.js",
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ]
   },
-  "_service-parts-8pFYl2T3.js": {
-    "file": "assets/service-parts-8pFYl2T3.js",
+  "_service-parts-CrhmuaZ_.js": {
+    "file": "assets/service-parts-CrhmuaZ_.js",
     "name": "service-parts",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js"
+      "_three-BlkkMigJ.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js"
     ]
   },
-  "_ship-KxOUvtjw.js": {
-    "file": "assets/ship-KxOUvtjw.js",
+  "_ship-D-V3wfR6.js": {
+    "file": "assets/ship-D-V3wfR6.js",
     "name": "ship",
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_characters-DLF7PTsx.js",
-      "_floor-level-marking-B93G9ol5.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_characters-Bbtpw7rJ.js",
+      "_floor-level-marking-Px__WHM5.js",
       "_layout-B5uZgtAZ.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_grooming-BzRKkAyL.js",
-      "_eva-D6qWoPF-.js",
-      "_industrial-Dk1lH2dn.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_bathroom-window-BCaJ5x4h.js",
-      "_service-parts-8pFYl2T3.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_grooming-DvbYw2bk.js",
+      "_eva-B4ItrgHb.js",
+      "_industrial-BiK4cD9z.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_bathroom-window-BN72hhrK.js",
+      "_service-parts-CrhmuaZ_.js",
       "_bulkhead-gate-layout-BOid6TaK.js"
     ]
   },
-  "_ship-exterior-DHFx5OVl.js": {
-    "file": "assets/ship-exterior-DHFx5OVl.js",
+  "_ship-exterior-mLkRsHoD.js": {
+    "file": "assets/ship-exterior-mLkRsHoD.js",
     "name": "ship-exterior",
     "imports": [
-      "_exterior-shadow-CtxGqOCE.js",
+      "_exterior-shadow-l8ETXBAX.js",
       "obs/exterior-probe.js"
     ]
   },
-  "_smoking-visit-CBtH7f5Q.js": {
-    "file": "assets/smoking-visit-CBtH7f5Q.js",
+  "_smoking-visit-M-nla8DO.js": {
+    "file": "assets/smoking-visit-M-nla8DO.js",
     "name": "smoking-visit",
     "imports": [
       "_layout-B5uZgtAZ.js",
-      "_characters-DLF7PTsx.js"
+      "_characters-Bbtpw7rJ.js"
     ]
   },
-  "_sound-events-BH4mR3FL.js": {
-    "file": "assets/sound-events-BH4mR3FL.js",
+  "_sound-events-7xiMhNoo.js": {
+    "file": "assets/sound-events-7xiMhNoo.js",
     "name": "sound-events",
     "imports": [
       "_layout-B5uZgtAZ.js",
-      "_grooming-BzRKkAyL.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_sound-library-DDqg2YWl.js",
-      "_characters-DLF7PTsx.js",
-      "_curtis-routine-CozOL_E-.js"
+      "_grooming-DvbYw2bk.js",
+      "_cabin-walkway-CYGntaFk.js",
+      "_sound-library-DDjpCwlW.js",
+      "_characters-Bbtpw7rJ.js",
+      "_curtis-routine-CJnxNQhI.js"
     ]
   },
-  "_sound-library-DDqg2YWl.js": {
-    "file": "assets/sound-library-DDqg2YWl.js",
+  "_sound-library-DDjpCwlW.js": {
+    "file": "assets/sound-library-DDjpCwlW.js",
     "name": "sound-library"
   },
-  "_three-CxW9jrRV.js": {
-    "file": "assets/three-CxW9jrRV.js",
+  "_three-BlkkMigJ.js": {
+    "file": "assets/three-BlkkMigJ.js",
     "name": "three"
   },
-  "_triangle-subset-CmYhXjyt.js": {
-    "file": "assets/triangle-subset-CmYhXjyt.js",
+  "_triangle-subset-CIm-EoK-.js": {
+    "file": "assets/triangle-subset-CIm-EoK-.js",
     "name": "triangle-subset",
     "imports": [
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ]
   },
   "_viewing-wall-profile-D0wf8frT.js": {
@@ -555,128 +555,128 @@
     ]
   },
   "cabin-audio-study.html": {
-    "file": "assets/cabinAudioStudy-BaIw57zQ.js",
+    "file": "assets/cabinAudioStudy-BWlJuTJc.js",
     "name": "cabinAudioStudy",
     "src": "cabin-audio-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_audio-GE55RYcO.js",
-      "_sound-events-BH4mR3FL.js",
-      "_sound-library-DDqg2YWl.js",
-      "_droid-startup-DPAe3jWY.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_droid-routine-ftH6wy3R.js",
+      "_audio-CxiiZLxj.js",
+      "_sound-events-7xiMhNoo.js",
+      "_sound-library-DDjpCwlW.js",
+      "_droid-startup-68v27D7b.js",
+      "_cabin-walkway-CYGntaFk.js",
+      "_droid-routine-CM6LPkWq.js",
       "_layout-B5uZgtAZ.js",
-      "_curtis-routine-CozOL_E-.js",
-      "_grooming-BzRKkAyL.js",
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_curtis-routine-CJnxNQhI.js",
+      "_grooming-DvbYw2bk.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_pad-screen-2TrnPFYj.js",
-      "_eva-D6qWoPF-.js"
+      "_eva-B4ItrgHb.js"
     ]
   },
   "chess-piece-study.html": {
-    "file": "assets/chessPieceStudy-B_ttGwln.js",
+    "file": "assets/chessPieceStudy-CgtXQe11.js",
     "name": "chessPieceStudy",
     "src": "chess-piece-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_OutputPass-Bf2dSWJK.js",
-      "_chess-geometry-FujoaqUA.js",
-      "_chess-hologram-DF4C-7Pq.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js"
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_OutputPass-DT0kkiZu.js",
+      "_chess-geometry-hF44oMWf.js",
+      "_chess-hologram-CDXiZdgg.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js"
     ]
   },
   "curtis-study.html": {
-    "file": "assets/curtisStudy-Cz54ciAw.js",
+    "file": "assets/curtisStudy-5W6aeQr-.js",
     "name": "curtisStudy",
     "src": "curtis-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_characters-DLF7PTsx.js",
-      "_floor-level-marking-B93G9ol5.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_characters-Bbtpw7rJ.js",
+      "_floor-level-marking-Px__WHM5.js",
       "_layout-B5uZgtAZ.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_grooming-BzRKkAyL.js",
-      "_eva-D6qWoPF-.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_bathroom-window-BCaJ5x4h.js",
-      "_service-parts-8pFYl2T3.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_grooming-DvbYw2bk.js",
+      "_eva-B4ItrgHb.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_bathroom-window-BN72hhrK.js",
+      "_service-parts-CrhmuaZ_.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_curtis-routine-CozOL_E-.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_curtis-model-DgNXC7_v.js",
-      "_cabin-ladder-ChFUhbMj.js",
-      "_milo-toon-Bw-lumZE.js",
-      "_metal-deck-_THwtDD3.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_audio-GE55RYcO.js",
-      "_sound-events-BH4mR3FL.js",
-      "_sound-library-DDqg2YWl.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_curtis-routine-CJnxNQhI.js",
+      "_cabin-walkway-CYGntaFk.js",
+      "_curtis-model-DVbtvja_.js",
+      "_cabin-ladder-s1i-s1hT.js",
+      "_milo-toon-CFNx4D0S.js",
+      "_metal-deck-txl_-dlx.js",
+      "_head-BD3DMKHl.js",
+      "_milo-body-D88bgi8Y.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_audio-CxiiZLxj.js",
+      "_sound-events-7xiMhNoo.js",
+      "_sound-library-DDjpCwlW.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
       "_pad-screen-2TrnPFYj.js",
       "_habitat-rotation-DV4_2eFX.js",
-      "_head-BaxM1XC6.js"
+      "_triangle-subset-CIm-EoK-.js"
     ]
   },
   "emergency-lighting-study.html": {
-    "file": "assets/emergencyLightingStudy-BpijpHSK.js",
+    "file": "assets/emergencyLightingStudy-DKA1XI-U.js",
     "name": "emergencyLightingStudy",
     "src": "emergency-lighting-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_environment-BfAbNPyg.js",
-      "_eva-D6qWoPF-.js",
+      "_environment-Bk-RbY6j.js",
+      "_eva-B4ItrgHb.js",
       "_layout-B5uZgtAZ.js",
-      "_ship-KxOUvtjw.js",
-      "_hatch-repair-study-model-Cn-Jxksj.js",
-      "_characters-DLF7PTsx.js",
-      "_audio-GE55RYcO.js",
+      "_ship-D-V3wfR6.js",
+      "_hatch-repair-study-model-mc-RSMEf.js",
+      "_characters-Bbtpw7rJ.js",
+      "_audio-CxiiZLxj.js",
       "_preload-helper-QFMnwACP.js",
-      "_three-CxW9jrRV.js",
-      "_lighting-8YwrBJyM.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_industrial-Dk1lH2dn.js",
-      "_cabin-ladder-ChFUhbMj.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_droid-startup-DPAe3jWY.js",
-      "_grooming-BzRKkAyL.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_head-BaxM1XC6.js",
-      "_floor-level-marking-B93G9ol5.js",
+      "_three-BlkkMigJ.js",
+      "_lighting-CLHF_GKg.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_industrial-BiK4cD9z.js",
+      "_cabin-ladder-s1i-s1hT.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
+      "_cabin-walkway-CYGntaFk.js",
+      "_droid-startup-68v27D7b.js",
+      "_grooming-DvbYw2bk.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_head-BD3DMKHl.js",
+      "_floor-level-marking-Px__WHM5.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_bathroom-window-BN72hhrK.js",
       "_habitat-rotation-DV4_2eFX.js",
-      "_milo-toon-Bw-lumZE.js",
-      "_metal-deck-_THwtDD3.js",
-      "_sound-library-DDqg2YWl.js",
+      "_milo-toon-CFNx4D0S.js",
+      "_metal-deck-txl_-dlx.js",
+      "_sound-library-DDjpCwlW.js",
       "_viewing-wall-profile-D0wf8frT.js",
-      "_service-parts-8pFYl2T3.js",
-      "_hatch-repair-rLYWvw0h.js",
+      "_service-parts-CrhmuaZ_.js",
+      "_hatch-repair-MzqgeqbZ.js",
       "_pad-screen-2TrnPFYj.js"
     ],
     "css": [
@@ -684,49 +684,49 @@
     ]
   },
   "equipment-label-study.html": {
-    "file": "assets/equipmentLabelStudy-CATdEFec.js",
+    "file": "assets/equipmentLabelStudy-DhlDJG4S.js",
     "name": "equipmentLabelStudy",
     "src": "equipment-label-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
       "_plant-state-04NGcDSI.js",
-      "_cabin-toon-BU0AO3p1.js",
+      "_cabin-toon-DO6yNbdf.js",
       "_layout-B5uZgtAZ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_pad-screen-2TrnPFYj.js",
-      "_eva-D6qWoPF-.js"
+      "_eva-B4ItrgHb.js"
     ]
   },
   "exterior-craft-study.html": {
-    "file": "assets/exteriorCraftStudy-9DlquZMS.js",
+    "file": "assets/exteriorCraftStudy-BgQeW9M-.js",
     "name": "exteriorCraftStudy",
     "src": "exterior-craft-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_ship-exterior-DHFx5OVl.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-dissolve-DYWoXfLv.js",
-      "_exterior-gas-pass-C3IGBMmA.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_ship-exterior-mLkRsHoD.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-dissolve-COT6LSls.js",
+      "_exterior-gas-pass-BFCndI2j.js",
       "_exterior-depth-CjZabxrl.js",
-      "_exterior-cargo-hatch-D1IfMr7c.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_exterior-probe-flight-C_Tx1JEr.js",
+      "_exterior-cargo-hatch-DtKSEsD2.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_exterior-probe-flight-xDlX1nhq.js",
       "obs/exterior-probe.js",
-      "_models-Cn8Ng1Xo.js",
+      "_models-DMmq_xgu.js",
       "_preload-helper-QFMnwACP.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
@@ -738,23 +738,23 @@
     ]
   },
   "exterior-flare-study.html": {
-    "file": "assets/exteriorFlareStudy-DEwuykxs.js",
+    "file": "assets/exteriorFlareStudy-Dg-2sxg5.js",
     "name": "exteriorFlareStudy",
     "src": "exterior-flare-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_ship-exterior-DHFx5OVl.js",
-      "_exterior-optics-B-ngFG2o.js",
-      "_exterior-cinematic-ZqZkuXIz.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-stars-lbsOBk9O.js",
-      "_exterior-dissolve-DYWoXfLv.js",
+      "_three-BlkkMigJ.js",
+      "_ship-exterior-mLkRsHoD.js",
+      "_exterior-optics-Qog-M3z2.js",
+      "_exterior-cinematic-aL61_I09.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-stars-B5QqMURT.js",
+      "_exterior-dissolve-COT6LSls.js",
       "obs/exterior-probe.js",
-      "_models-Cn8Ng1Xo.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_exterior-probe-flight-C_Tx1JEr.js",
+      "_models-DMmq_xgu.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_exterior-probe-flight-xDlX1nhq.js",
       "_preload-helper-QFMnwACP.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
@@ -763,25 +763,25 @@
     ]
   },
   "exterior-planet-study.html": {
-    "file": "assets/exteriorPlanetStudy-BwG9y9y8.js",
+    "file": "assets/exteriorPlanetStudy-nBLJhsdC.js",
     "name": "exteriorPlanetStudy",
     "src": "exterior-planet-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-planet-BPH9GbWh.js",
-      "_exterior-cinematic-ZqZkuXIz.js",
-      "_exterior-stars-lbsOBk9O.js",
-      "_exterior-dissolve-DYWoXfLv.js",
+      "_three-BlkkMigJ.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-planet-B4PMmmXu.js",
+      "_exterior-cinematic-aL61_I09.js",
+      "_exterior-stars-B5QqMURT.js",
+      "_exterior-dissolve-COT6LSls.js",
       "_preload-helper-QFMnwACP.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
       "_habitat-rotation-DV4_2eFX.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_exterior-probe-flight-C_Tx1JEr.js"
+      "_exterior-probe-flight-xDlX1nhq.js"
     ]
   },
   "exterior-scene-catalog.html": {
@@ -803,21 +803,21 @@
     ]
   },
   "exterior-sunrise-study.html": {
-    "file": "assets/exteriorSunriseStudy-OGKb6DJ0.js",
+    "file": "assets/exteriorSunriseStudy-B9YDoSUo.js",
     "name": "exteriorSunriseStudy",
     "src": "exterior-sunrise-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_exterior-production-BLWfYXNw.js",
-      "_exterior-planet-BPH9GbWh.js",
-      "_exterior-cinematic-ZqZkuXIz.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-stars-lbsOBk9O.js",
-      "_exterior-cargo-hatch-D1IfMr7c.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_exterior-probe-flight-C_Tx1JEr.js",
+      "_three-BlkkMigJ.js",
+      "_exterior-production-Dr-HeipY.js",
+      "_exterior-planet-B4PMmmXu.js",
+      "_exterior-cinematic-aL61_I09.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-stars-B5QqMURT.js",
+      "_exterior-cargo-hatch-DtKSEsD2.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_exterior-probe-flight-xDlX1nhq.js",
       "_preload-helper-QFMnwACP.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
@@ -826,109 +826,109 @@
     ]
   },
   "galley-study.html": {
-    "file": "assets/galleyStudy-CC_FzJ_R.js",
+    "file": "assets/galleyStudy-BkntxaE0.js",
     "name": "galleyStudy",
     "src": "galley-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_bathroom-window-BN72hhrK.js",
       "_layout-B5uZgtAZ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_pad-screen-2TrnPFYj.js",
-      "_eva-D6qWoPF-.js",
+      "_eva-B4ItrgHb.js",
       "_habitat-rotation-DV4_2eFX.js"
     ]
   },
   "gate-frame-study.html": {
-    "file": "assets/gateFrameStudy-Bj6IJmn4.js",
+    "file": "assets/gateFrameStudy-Cez3pGV_.js",
     "name": "gateFrameStudy",
     "src": "gate-frame-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_ship-KxOUvtjw.js",
-      "_metal-deck-_THwtDD3.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_floor-level-marking-B93G9ol5.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_ship-D-V3wfR6.js",
+      "_metal-deck-txl_-dlx.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_floor-level-marking-Px__WHM5.js",
       "_layout-B5uZgtAZ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_pad-screen-2TrnPFYj.js",
-      "_eva-D6qWoPF-.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_grooming-BzRKkAyL.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_eva-B4ItrgHb.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_grooming-DvbYw2bk.js",
+      "_bathroom-window-BN72hhrK.js",
       "_habitat-rotation-DV4_2eFX.js",
-      "_service-parts-8pFYl2T3.js",
+      "_service-parts-CrhmuaZ_.js",
       "_bulkhead-gate-layout-BOid6TaK.js"
     ]
   },
   "hatch-door-study.html": {
-    "file": "assets/hatchDoorStudy-DVT1HH37.js",
+    "file": "assets/hatchDoorStudy-DuR-kCPc.js",
     "name": "hatchDoorStudy",
     "src": "hatch-door-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
       "_preload-helper-QFMnwACP.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_eva-D6qWoPF-.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_lighting-8YwrBJyM.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_eva-B4ItrgHb.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_lighting-CLHF_GKg.js",
       "_layout-B5uZgtAZ.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js"
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js"
     ],
     "dynamicImports": [
-      "_head-BaxM1XC6.js",
-      "_milo-body--FL5lTBQ.js",
-      "_characters-DLF7PTsx.js"
+      "_head-BD3DMKHl.js",
+      "_milo-body-D88bgi8Y.js",
+      "_characters-Bbtpw7rJ.js"
     ]
   },
   "hatch-repair-study.html": {
-    "file": "assets/hatchRepairStudy-Cj2uwqkH.js",
+    "file": "assets/hatchRepairStudy-DhIWpafa.js",
     "name": "hatchRepairStudy",
     "src": "hatch-repair-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_head-BaxM1XC6.js",
-      "_milo-body--FL5lTBQ.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-toon-Bw-lumZE.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_eva-D6qWoPF-.js",
-      "_hatch-repair-rLYWvw0h.js",
-      "_hatch-repair-study-model-Cn-Jxksj.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_head-BD3DMKHl.js",
+      "_milo-body-D88bgi8Y.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-toon-CFNx4D0S.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_eva-B4ItrgHb.js",
+      "_hatch-repair-MzqgeqbZ.js",
+      "_hatch-repair-study-model-mc-RSMEf.js",
       "_layout-B5uZgtAZ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_pad-screen-2TrnPFYj.js"
     ],
     "css": [
@@ -936,108 +936,108 @@
     ]
   },
   "index.html": {
-    "file": "assets/main-CYX8bLTl.js",
+    "file": "assets/main-Bd_wtaGG.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_models-Cn8Ng1Xo.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_three-BlkkMigJ.js",
+      "_models-DMmq_xgu.js",
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ],
     "css": [
       "assets/main-Cz8GJSrC.css"
     ]
   },
   "ladder-structure-study.html": {
-    "file": "assets/ladderStructureStudy-C0T9ioEA.js",
+    "file": "assets/ladderStructureStudy-BKdMVTDv.js",
     "name": "ladderStructureStudy",
     "src": "ladder-structure-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_ship-KxOUvtjw.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_ship-D-V3wfR6.js",
       "_layout-B5uZgtAZ.js",
-      "_metal-deck-_THwtDD3.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_floor-level-marking-B93G9ol5.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_metal-deck-txl_-dlx.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_floor-level-marking-Px__WHM5.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_pad-screen-2TrnPFYj.js",
-      "_eva-D6qWoPF-.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_grooming-BzRKkAyL.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_eva-B4ItrgHb.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_grooming-DvbYw2bk.js",
+      "_bathroom-window-BN72hhrK.js",
       "_habitat-rotation-DV4_2eFX.js",
-      "_service-parts-8pFYl2T3.js",
+      "_service-parts-CrhmuaZ_.js",
       "_bulkhead-gate-layout-BOid6TaK.js"
     ]
   },
   "lounge-games-study.html": {
-    "file": "assets/loungeGamesStudy-elBABs8S.js",
+    "file": "assets/loungeGamesStudy-EdXaNc5b.js",
     "name": "loungeGamesStudy",
     "src": "lounge-games-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_lounge-games-BGtH8Sdl.js",
-      "_chess-hologram-DF4C-7Pq.js",
+      "_lounge-games-BMdmWlsW.js",
+      "_chess-hologram-CDXiZdgg.js",
       "_preload-helper-QFMnwACP.js",
-      "_audio-GE55RYcO.js",
-      "_sound-library-DDqg2YWl.js",
+      "_audio-CxiiZLxj.js",
+      "_sound-library-DDjpCwlW.js",
       "_layout-B5uZgtAZ.js",
       "_pad-screen-2TrnPFYj.js",
-      "_three-CxW9jrRV.js"
+      "_three-BlkkMigJ.js"
     ],
     "css": [
       "assets/obs-yx7tgiXm.css"
     ]
   },
   "lounge-smoking-study.html": {
-    "file": "assets/loungeSmokingStudy-B4bJn5-x.js",
+    "file": "assets/loungeSmokingStudy-DXg2QlNk.js",
     "name": "loungeSmokingStudy",
     "src": "lounge-smoking-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_head-BaxM1XC6.js",
-      "_milo-body--FL5lTBQ.js",
-      "_milo-toon-Bw-lumZE.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_floor-level-marking-B93G9ol5.js",
-      "_characters-DLF7PTsx.js",
-      "_ship-KxOUvtjw.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_head-BD3DMKHl.js",
+      "_milo-body-D88bgi8Y.js",
+      "_milo-toon-CFNx4D0S.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_floor-level-marking-Px__WHM5.js",
+      "_characters-Bbtpw7rJ.js",
+      "_ship-D-V3wfR6.js",
       "_layout-B5uZgtAZ.js",
-      "_smoking-visit-CBtH7f5Q.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_eva-D6qWoPF-.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_smoking-visit-M-nla8DO.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_eva-B4ItrgHb.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_bathroom-window-BN72hhrK.js",
       "_habitat-rotation-DV4_2eFX.js",
       "_pad-screen-2TrnPFYj.js",
-      "_grooming-BzRKkAyL.js",
-      "_service-parts-8pFYl2T3.js"
+      "_grooming-DvbYw2bk.js",
+      "_service-parts-CrhmuaZ_.js"
     ]
   },
   "obs.html": {
-    "file": "assets/obs-bjdWGr3L.js",
+    "file": "assets/obs-DJ741SUA.js",
     "name": "obs",
     "src": "obs.html",
     "isEntry": true,
@@ -1045,7 +1045,7 @@
       "_modulepreload-polyfill-B5Qt9EMX.js",
       "_preload-helper-QFMnwACP.js",
       "_exterior-cinema-ui-BUK0Bjud.js",
-      "_sound-library-DDqg2YWl.js"
+      "_sound-library-DDjpCwlW.js"
     ],
     "dynamicImports": [
       "obs/main.js"
@@ -1055,57 +1055,57 @@
     ]
   },
   "obs/chess-3d.js": {
-    "file": "assets/chess-3d-JfRjwhfm.js",
+    "file": "assets/chess-3d-B5pr__zf.js",
     "name": "chess-3d",
     "src": "obs/chess-3d.js",
     "isDynamicEntry": true,
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_OutputPass-Bf2dSWJK.js",
-      "_chess-geometry-FujoaqUA.js",
-      "_chess-hologram-DF4C-7Pq.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_three-BlkkMigJ.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_OutputPass-DT0kkiZu.js",
+      "_chess-geometry-hF44oMWf.js",
+      "_chess-hologram-CDXiZdgg.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ]
   },
   "obs/curtis-view.js": {
-    "file": "assets/curtis-view-dfEA0ZAY.js",
+    "file": "assets/curtis-view-dpiUC1OF.js",
     "name": "curtis-view",
     "src": "obs/curtis-view.js",
     "isDynamicEntry": true,
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_curtis-model-DgNXC7_v.js",
-      "_characters-DLF7PTsx.js",
-      "_cabin-ladder-ChFUhbMj.js",
-      "_milo-toon-Bw-lumZE.js",
-      "_metal-deck-_THwtDD3.js",
-      "_lighting-8YwrBJyM.js",
-      "_curtis-routine-CozOL_E-.js",
-      "_head-BaxM1XC6.js",
-      "_eva-D6qWoPF-.js",
+      "_three-BlkkMigJ.js",
+      "_curtis-model-DVbtvja_.js",
+      "_characters-Bbtpw7rJ.js",
+      "_cabin-ladder-s1i-s1hT.js",
+      "_milo-toon-CFNx4D0S.js",
+      "_metal-deck-txl_-dlx.js",
+      "_lighting-CLHF_GKg.js",
+      "_curtis-routine-CJnxNQhI.js",
+      "_head-BD3DMKHl.js",
+      "_eva-B4ItrgHb.js",
       "_layout-B5uZgtAZ.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_triangle-subset-CmYhXjyt.js",
-      "_milo-body--FL5lTBQ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_triangle-subset-CIm-EoK-.js",
+      "_milo-body-D88bgi8Y.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
       "_pad-screen-2TrnPFYj.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_grooming-BzRKkAyL.js"
+      "_cabin-walkway-CYGntaFk.js",
+      "_grooming-DvbYw2bk.js"
     ]
   },
   "obs/exterior-probe.js": {
-    "file": "assets/exterior-probe-DI4M7mX5.js",
+    "file": "assets/exterior-probe-ChXOawFf.js",
     "name": "exterior-probe",
     "src": "obs/exterior-probe.js",
     "isDynamicEntry": true,
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_models-Cn8Ng1Xo.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-probe-flight-C_Tx1JEr.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
+      "_three-BlkkMigJ.js",
+      "_models-DMmq_xgu.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-probe-flight-xDlX1nhq.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
       "_preload-helper-QFMnwACP.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
@@ -1114,51 +1114,51 @@
     ]
   },
   "obs/main.js": {
-    "file": "assets/main-BkqIdnlZ.js",
+    "file": "assets/main-Cct2cYmd.js",
     "name": "main",
     "src": "obs/main.js",
     "isDynamicEntry": true,
     "imports": [
-      "_lounge-games-BGtH8Sdl.js",
+      "_lounge-games-BMdmWlsW.js",
       "_layout-B5uZgtAZ.js",
-      "_droid-startup-DPAe3jWY.js",
-      "_characters-DLF7PTsx.js",
+      "_droid-startup-68v27D7b.js",
+      "_characters-Bbtpw7rJ.js",
       "_plant-state-04NGcDSI.js",
-      "_cabin-walkway-BwWPwmnT.js",
-      "_droid-routine-ftH6wy3R.js",
-      "_smoking-visit-CBtH7f5Q.js",
-      "_environment-BfAbNPyg.js",
-      "_hatch-repair-rLYWvw0h.js",
-      "_three-CxW9jrRV.js",
-      "_ship-KxOUvtjw.js",
-      "_metal-deck-_THwtDD3.js",
-      "_audio-GE55RYcO.js",
-      "_sound-library-DDqg2YWl.js",
-      "_sound-events-BH4mR3FL.js",
-      "_curtis-routine-CozOL_E-.js",
-      "_lighting-8YwrBJyM.js",
+      "_cabin-walkway-CYGntaFk.js",
+      "_droid-routine-CM6LPkWq.js",
+      "_smoking-visit-M-nla8DO.js",
+      "_environment-Bk-RbY6j.js",
+      "_hatch-repair-MzqgeqbZ.js",
+      "_three-BlkkMigJ.js",
+      "_ship-D-V3wfR6.js",
+      "_metal-deck-txl_-dlx.js",
+      "_audio-CxiiZLxj.js",
+      "_sound-library-DDjpCwlW.js",
+      "_sound-events-7xiMhNoo.js",
+      "_curtis-routine-CJnxNQhI.js",
+      "_lighting-CLHF_GKg.js",
       "obs.html",
       "_preload-helper-QFMnwACP.js",
       "_pad-screen-2TrnPFYj.js",
-      "_grooming-BzRKkAyL.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_eva-D6qWoPF-.js",
-      "_industrial-Dk1lH2dn.js",
-      "_cabin-ladder-ChFUhbMj.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_cabin-toon-BU0AO3p1.js",
-      "_head-BaxM1XC6.js",
-      "_floor-level-marking-B93G9ol5.js",
+      "_grooming-DvbYw2bk.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_eva-B4ItrgHb.js",
+      "_industrial-BiK4cD9z.js",
+      "_cabin-ladder-s1i-s1hT.js",
+      "_cargo-bay-CJoRCyP-.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_cabin-toon-DO6yNbdf.js",
+      "_head-BD3DMKHl.js",
+      "_floor-level-marking-Px__WHM5.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_bathroom-window-BN72hhrK.js",
       "_habitat-rotation-DV4_2eFX.js",
-      "_milo-toon-Bw-lumZE.js",
+      "_milo-toon-CFNx4D0S.js",
       "_viewing-wall-profile-D0wf8frT.js",
-      "_service-parts-8pFYl2T3.js",
+      "_service-parts-CrhmuaZ_.js",
       "_modulepreload-polyfill-B5Qt9EMX.js",
       "_exterior-cinema-ui-BUK0Bjud.js"
     ],
@@ -1167,15 +1167,15 @@
     ]
   },
   "obs/reversi-3d.js": {
-    "file": "assets/reversi-3d-Dg12Y0V6.js",
+    "file": "assets/reversi-3d-DShULQxn.js",
     "name": "reversi-3d",
     "src": "obs/reversi-3d.js",
     "isDynamicEntry": true,
     "imports": [
-      "_three-CxW9jrRV.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_OutputPass-Bf2dSWJK.js",
-      "_chess-hologram-DF4C-7Pq.js"
+      "_three-BlkkMigJ.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_OutputPass-DT0kkiZu.js",
+      "_chess-hologram-CDXiZdgg.js"
     ]
   },
   "service-parts-reference.png": {
@@ -1183,112 +1183,112 @@
     "src": "service-parts-reference.png"
   },
   "service-parts-study.html": {
-    "file": "assets/servicePartsStudy-BHaC_j4w.js",
+    "file": "assets/servicePartsStudy-DD9HC2ou.js",
     "name": "servicePartsStudy",
     "src": "service-parts-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_service-parts-8pFYl2T3.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_service-parts-CrhmuaZ_.js",
       "_layout-B5uZgtAZ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js"
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js"
     ],
     "assets": [
       "assets/service-parts-reference-DY8YQa3v.png"
     ]
   },
   "ship-exterior-cinema.html": {
-    "file": "assets/shipExteriorCinema-BbYfD2kZ.js",
+    "file": "assets/shipExteriorCinema-iW-Wwj_U.js",
     "name": "shipExteriorCinema",
     "src": "ship-exterior-cinema.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-production-BLWfYXNw.js",
-      "_exterior-optics-B-ngFG2o.js",
-      "_exterior-stars-lbsOBk9O.js",
-      "_exterior-planet-BPH9GbWh.js",
-      "_exterior-cinematic-ZqZkuXIz.js",
-      "_exterior-dissolve-DYWoXfLv.js",
-      "_exterior-probe-flight-C_Tx1JEr.js",
-      "_exterior-gas-pass-C3IGBMmA.js",
+      "_three-BlkkMigJ.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-production-Dr-HeipY.js",
+      "_exterior-optics-Qog-M3z2.js",
+      "_exterior-stars-B5QqMURT.js",
+      "_exterior-planet-B4PMmmXu.js",
+      "_exterior-cinematic-aL61_I09.js",
+      "_exterior-dissolve-COT6LSls.js",
+      "_exterior-probe-flight-xDlX1nhq.js",
+      "_exterior-gas-pass-BFCndI2j.js",
       "_preload-helper-QFMnwACP.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
       "_habitat-rotation-DV4_2eFX.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_exterior-cargo-hatch-D1IfMr7c.js"
+      "_exterior-cargo-hatch-DtKSEsD2.js"
     ],
     "css": [
       "assets/shipExteriorCinema-tSqXhuWu.css"
     ]
   },
   "ship-exterior-study.html": {
-    "file": "assets/shipExteriorStudy-CYBX01HR.js",
+    "file": "assets/shipExteriorStudy-DdyJhg3l.js",
     "name": "shipExteriorStudy",
     "src": "ship-exterior-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_exterior-shadow-CtxGqOCE.js",
-      "_exterior-production-BLWfYXNw.js",
-      "_exterior-optics-B-ngFG2o.js",
-      "_exterior-stars-lbsOBk9O.js",
-      "_exterior-planet-BPH9GbWh.js",
-      "_exterior-dissolve-DYWoXfLv.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_exterior-shadow-l8ETXBAX.js",
+      "_exterior-production-Dr-HeipY.js",
+      "_exterior-optics-Qog-M3z2.js",
+      "_exterior-stars-B5QqMURT.js",
+      "_exterior-planet-B4PMmmXu.js",
+      "_exterior-dissolve-COT6LSls.js",
       "_exterior-depth-CjZabxrl.js",
       "_exterior-cinema-ui-BUK0Bjud.js",
       "_preload-helper-QFMnwACP.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
       "_layout-B5uZgtAZ.js",
       "_viewing-wall-profile-D0wf8frT.js",
       "_habitat-rotation-DV4_2eFX.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_exterior-cargo-hatch-D1IfMr7c.js"
+      "_exterior-cargo-hatch-DtKSEsD2.js"
     ],
     "css": [
       "assets/shipExteriorStudy-fIA0mNcg.css"
     ]
   },
   "sofa-study.html": {
-    "file": "assets/sofaStudy-BZgILFtH.js",
+    "file": "assets/sofaStudy-CFrThzR1.js",
     "name": "sofaStudy",
     "src": "sofa-study.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js",
-      "_three-CxW9jrRV.js",
-      "_OrbitControls-5HAqjRZv.js",
-      "_industrial-Dk1lH2dn.js",
-      "_lighting-8YwrBJyM.js",
-      "_ship-KxOUvtjw.js",
-      "_cabin-toon-BU0AO3p1.js",
+      "_three-BlkkMigJ.js",
+      "_OrbitControls-DEgK3zL7.js",
+      "_industrial-BiK4cD9z.js",
+      "_lighting-CLHF_GKg.js",
+      "_ship-D-V3wfR6.js",
+      "_cabin-toon-DO6yNbdf.js",
       "_layout-B5uZgtAZ.js",
-      "_RoundedBoxGeometry-UAZHkPTS.js",
-      "_BufferGeometryUtils-BkG5nKdK.js",
-      "_characters-DLF7PTsx.js",
-      "_milo-body--FL5lTBQ.js",
-      "_triangle-subset-CmYhXjyt.js",
+      "_RoundedBoxGeometry-DDHtBzXO.js",
+      "_BufferGeometryUtils-BwWSkuaY.js",
+      "_characters-Bbtpw7rJ.js",
+      "_milo-body-D88bgi8Y.js",
+      "_triangle-subset-CIm-EoK-.js",
       "_pad-screen-2TrnPFYj.js",
-      "_eva-D6qWoPF-.js",
-      "_floor-level-marking-B93G9ol5.js",
+      "_eva-B4ItrgHb.js",
+      "_floor-level-marking-Px__WHM5.js",
       "_bulkhead-gate-layout-BOid6TaK.js",
-      "_rear-room-furnishings-BDDPkRw5.js",
-      "_bathroom-window-BCaJ5x4h.js",
+      "_rear-room-furnishings-B9p_sZ_u.js",
+      "_bathroom-window-BN72hhrK.js",
       "_habitat-rotation-DV4_2eFX.js",
-      "_cargo-bay-zJv5GlYO.js",
-      "_grooming-BzRKkAyL.js",
-      "_service-parts-8pFYl2T3.js"
+      "_cargo-bay-CJoRCyP-.js",
+      "_grooming-DvbYw2bk.js",
+      "_service-parts-CrhmuaZ_.js"
     ]
   }
 }

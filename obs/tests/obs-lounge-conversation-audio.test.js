@@ -29,7 +29,7 @@ test('random combinations fit long and short seated visits, leave pauses and nev
   }
   // Also sample the full range of initial draws, rather than only nearby LCG seeds.
   for(const draw of [0,.2,.4,.6,.8,.99])firsts.add(loungeVoiceSequence(32,()=>draw)[0].id);
-  assert.equal(firsts.size,5);
+  assert.equal(firsts.size,6);
 });
 
 test('the voice files load once on the approach, but sound waits until both crew members are seated',()=>{
@@ -69,14 +69,14 @@ test('a naturally ended source cannot replay the same clip when the simulation f
   h.tick(h.driver.clips[1].start+.01);assert.equal(h.calls.length,2);
 });
 
-test('all five runtime recordings are small MP3s, retain their 10/5 second clocks and stay out of startup',async()=>{
+test('all six runtime recordings are small MP3s, retain their exact source clocks and stay out of startup',async()=>{
   let total=0;
   for(const [index,id]of LOUNGE_VOICE_IDS.entries()){
     const definition=CABIN_SOUNDS[id],data=await readFile(new URL('../public/assets/obs/audio/'+definition.file,import.meta.url));total+=data.length;
     assert.ok(definition.file.endsWith('.mp3'));assert.equal(data.toString('ascii',0,3),'ID3');
-    assert.equal(definition.duration,index<3?10:5);assert.ok(data.length<definition.duration*8500);
-    assert.equal(definition.gain,.50);assert.notEqual(definition.loop,true);
+    assert.equal(definition.duration,[10,8.4,5,5,5,5][index]);assert.ok(data.length<definition.duration*8500);
+    assert.equal(definition.gain,.40);assert.notEqual(definition.loop,true);
   }
-  assert.ok(total<350_000,'all five clips together stay under 350 KB');
+  assert.ok(total<350_000,'all six clips together stay under 350 KB');
   const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');assert.match(main,/defer:\['coffeeMachine',\.\.\.LOUNGE_VOICE_IDS\]/);
 });

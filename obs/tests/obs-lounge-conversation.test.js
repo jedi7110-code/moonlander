@@ -140,7 +140,15 @@ test('sitting beside Curtis never borrows the table-withdrawal hand motion',()=>
     root.updateMatrixWorld(true);
     for(const {hand}of root.userData.arms){
       const wrist=root.userData.body.worldToLocal(hand.getWorldPosition(new Vector3()));
-      assert.ok(wrist.y<1.08,`the wrist stays below the chest throughout entry (${i/60}, ${wrist.y})`);
+      assert.ok(wrist.y<1.15,`the wrist stays below the chest throughout entry (${i/60}, ${wrist.y})`);
     }
   }
+});
+
+test('a natural conversation departure starts a normal activity even when every need is satisfied',()=>{
+  const {brain,actor,until}=setup();brain._go(getStation('lounge'));until(()=>brain.isSeatedInLounge());
+  for(const key of Object.keys(brain.needs))brain.needs[key]=98;brain.exercise=98;
+  until(()=>Boolean(brain.loungeExit),40);until(()=>!brain.loungeExit,10);
+  assert.equal(brain.state,'goingTo');assert.ok(actor.busy,'Milo does not stand indefinitely beside the sofa');
+  assert.notEqual(brain.actStation,'lounge');
 });

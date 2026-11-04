@@ -170,7 +170,7 @@ export async function createCurtis(){
   animateMilo(visitor,{moving:false,climbing:false,facing:1,time:0});visitor.rotation.y=0;
   const skin=visitor.userData.bodySkin;
   const original=skin.material.onBeforeCompile;
-  skin.material.onBeforeCompile=function(shader,...rest){original.call(this,shader,...rest);shader.uniforms.shirtColor.value.set('#eeeae1');shader.uniforms.tattooStrength.value=0;shader.uniforms.shirtBackPrintStrength.value=0;};
+  skin.material.onBeforeCompile=function(shader,...rest){original.call(this,shader,...rest);shader.uniforms.shirtColor.value.set('#eeeae1');shader.uniforms.trouserColor.value.set('#657582');shader.uniforms.tattooStrength.value=0;shader.uniforms.shirtBackPrintStrength.value=0;};
   skin.material.customProgramCacheKey=()=> 'visitor-white-tee-v1';
 
   const garment=skin.clone();garment.name='Open space-print aloha shirt';garment.material=skin.material.clone();garment.skeleton=skin.skeleton;garment.bindMatrix.copy(skin.bindMatrix);garment.bindMatrixInverse.copy(skin.bindMatrixInverse);

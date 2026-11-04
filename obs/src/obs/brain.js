@@ -179,12 +179,18 @@ export class CabinBrain extends Brain {
       const seconds=exit.transitionSeconds??LOUNGE_EXIT_SECONDS;
       exit.age=Math.min(seconds,exit.age+dt);
       if(exit.age>=seconds){
+        const sharedVisit=Boolean(this.loungeCompanion);
         this.actor.x=this.loungeCompanion?loungeActorX(this.loungeCompanion.seatX):loungeApproachX();
         this.actor.facing=-1;this.loungeExit=null;this.leisure=null;this.loungeCompanion=null;
         const directed=Boolean(this.afterActivity);
         super._endPerform();this.finishDeparture();
         // The exit already includes the pause and turn into the aisle.
-        if(!directed&&this.state==='idle'&&!this.want)this._choose();
+        if(!directed&&this.state==='idle'&&!this.want){
+          this._choose();
+          // A shared visit must hand off to the normal routine even when the
+          // low-needs threshold would otherwise leave Milo standing here.
+          if(sharedVisit&&this.state==='idle'&&!this.want&&!this.groomingQueued)super._choose();
+        }
       }
     }
     if(stow&&this.loungeStow===stow){

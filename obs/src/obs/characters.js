@@ -26,8 +26,9 @@ import {setLadderHandFit} from './ladder-hand-fit.js';
 import {setCupHandFit} from './cup-hand-fit.js';
 import {updateInjuryAppearance} from './injury-appearance.js';
 import {applyLoungeConversation} from './lounge-conversation.js';
+import {prepareLoungeRise,applyLoungeRise} from './lounge-rise.js';
 import {applyLoungeExit,applyLoungeEntry,loungeExitPose,loungeExitPoseAge,loungeEntryPoseAge} from './lounge-exit.js';
-import {applySeatedLegSpread} from './seated-pose.js';
+import {applySeatedLegSpread,applyThighHands} from './seated-pose.js';
 import {attachMiloSpine,updateMiloSpine} from './milo-spine.js';
 import {attachMiloNeck,setMiloNeckProtraction,updateMiloNeck} from './milo-neck.js';
 import {LOUNGE_SEAT,CAT_SCALE,CAT_BOWL} from './layout.js';
@@ -284,7 +285,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   applyCallingPose(root,calling?callingTime:null,dt);
   if(seated&&action==='lounge'&&leisure)applyLeisurePose(root,leisure,actionTime,actionDuration,catReady);
   if(seated&&action==='lounge'&&leisure&&loungeDocks)applyLoungeHandling(root,leisure,actionTime,{docks:loungeDocks,stow:loungeStow,entering:Boolean(loungeEntry)});
-  if(loungeExit?.conversation)applyLoungeConversation(root,{...loungeExit.conversation,weight:loungeExit.conversation.weight*(1-THREE.MathUtils.smoothstep(loungeExit.age,0,.8))});
+  if(loungeExit?.companion)prepareLoungeRise(root,loungeExit);
+  else root.userData.loungeRise=null;
   if(loungeExit)applyLoungeExit(root,loungeExit);
   if(loungeEntry)applyLoungeEntry(root,loungeEntry);
   if(seated){
@@ -341,6 +343,11 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   }
   if(smokingVisit){if(smokingVisit.seated&&loungeDocks)applyLoungeSmokingPose(root,smokingVisit,loungeDocks);else applySmokingPose(root,smokingVisit);}
   if(hatchRepair)applyHatchRepairPose(root,hatchRepair);
+  if(loungeEntry?.companion){
+    const rise=loungeExitPose(loungeEntryPoseAge(loungeEntry)).rise;
+    applyThighHands(root,THREE.MathUtils.smoothstep(1-rise,.55,1));
+  }
+  if(loungeExit?.companion)applyLoungeRise(root,loungeExit);
   if(conversation&&seated&&!loungeEntry&&!loungeExit)applyLoungeConversation(root,conversation);
   root.userData.updateWristTwists?.();
   updateMiloSpine(root);

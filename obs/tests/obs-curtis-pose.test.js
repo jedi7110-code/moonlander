@@ -51,9 +51,9 @@ test('visit poses use the real body rig, remain finite, and restore the parked m
       }
       if(['sit','stand','relax'].includes(step.kind)){
         assert.equal(root.position.x,6.05,'seating never shuffles sideways');
-        for(const {arm,elbow}of root.userData.arms){
-          assert.ok(arm.rotation.x>=-.151,'hands stay lowered');
-          assert.ok(elbow.rotation.x>=-.651,'no tabletop hand lift');
+        for(const {hand}of root.userData.arms){
+          const wrist=root.userData.body.worldToLocal(hand.getWorldPosition(new Vector3()));
+          assert.ok(wrist.y<1.15,'hands stay below the chest while resting on the thighs');
         }
       }
       root.traverse(node=>assert.ok(node.matrixWorld.elements.every(Number.isFinite),`${step.kind}: ${node.name}`));

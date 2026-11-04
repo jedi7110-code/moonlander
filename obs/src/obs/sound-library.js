@@ -1,5 +1,6 @@
 // Local clips: CC0, one Pixabay gas strut, and a labelled user-supplied edit.
 // Provenance and edit recipes: assets/obs/audio/CREDITS.md.
+const loungeVoiceDurations=[10,8.4,5,5,5,5];
 export const CABIN_SOUNDS=Object.freeze({
   hatchAlarm:{file:'factory-warning-buzzer.wav',label:'非常警報 / ハッチ故障',description:'Factory Warning Buzzer / 工業用ブザー・原速3秒・故障中のみ',gain:.38,loop:true,duration:3},
   powerOn:{file:'power-on-glitch.wav',label:'船内照明 / 点灯',description:'グリッチの短い断片 / 2回のスターター＋減衰',license:'ユーザー提供素材（ライセンス未確認）',gain:.24},
@@ -36,11 +37,11 @@ export const CABIN_SOUNDS=Object.freeze({
   cutlery2:{file:'meal-cutlery-2.wav',label:'食事 / スプーン 2',description:'別の接触テイク / すくう・器へ戻す時だけ',gain:.12},
   cutlery3:{file:'meal-cutlery-3.wav',label:'食事 / スプーン 3',description:'別の接触テイク / 原速・短い減衰',gain:.11},
   simmer:{file:'pot-simmer.wav',label:'調理 / 鍋で煮込む',description:'実録の静かな煮込み / コトコト・原速・かき混ぜる間だけ',gain:.18,loop:true},
-  ...Object.fromEntries([1,2,3,4,5].map(n=>[`loungeVoice${n}`,{
-    file:`lounge-voice-${String(n).padStart(2,'0')}.mp3`,label:`ラウンジ / 会話 ${n}`,
-    description:'ユーザー制作の会話 / 二人で着席している間・控えめ',gain:.50,duration:n<=3?10:5,
+  ...Object.fromEntries(loungeVoiceDurations.map((duration,index)=>[`loungeVoice${index+1}`,{
+    file:`lounge-voice-${String(index+1).padStart(2,'0')}.mp3`,label:`ラウンジ / 会話 ${index+1}`,
+    description:'ユーザー制作の会話 / 二人で着席している間・控えめ',gain:.40,duration,
   }])),
   coffeeMachine:{file:'coffee-machine-a-20s.wav',label:'コーヒーマシン / A・20秒',description:'選択された実録Aの冒頭20秒 / ボタン押下から抽出完了まで・原速',gain:.18,duration:20},
 });
-export const LOUNGE_VOICE_IDS=Object.freeze([1,2,3,4,5].map(n=>`loungeVoice${n}`));
+export const LOUNGE_VOICE_IDS=Object.freeze(loungeVoiceDurations.map((_,index)=>`loungeVoice${index+1}`));
 export const CABIN_AUDIO_BASE=`${import.meta.env?.BASE_URL??'/obs/'}assets/obs/audio/`;

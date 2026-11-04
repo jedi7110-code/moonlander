@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import {createCurtis} from './curtis-model.js?v=print11';
+import {createCurtis} from './curtis-model.js?v=print12';
 import {animateMilo} from './characters.js';
+import {applyThighHands} from './seated-pose.js';
 import {applyCabinLadder} from './cabin-ladder.js';
 import {loungeExitPose} from './lounge-exit.js';
 import {applyLeisurePose} from './leisure.js';
@@ -99,6 +100,7 @@ export class CurtisView {
         elbow.rotation.set(THREE.MathUtils.lerp(-.08,-.65,weight),0,0);
         hand.rotation.set(.12*weight,root.userData.bodySkin?side*Math.PI/2:0,0);
       }
+      if(!conversation){applyThighHands(root,weight);root.userData.updateWristTwists?.();}
       for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
     }
     if(s.kind==='climb'){
