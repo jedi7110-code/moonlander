@@ -10,6 +10,7 @@ import {applyExteriorProbePose} from './obs/exterior-probe-flight.js';
 import {createExteriorShadow} from './obs/exterior-shadow.js';
 import {createExteriorGasPass} from './obs/exterior-gas-pass.js';
 import {EXTERIOR_LOGO,LOGO_SETTLED} from './obs/exterior-logo.js';
+import {createOpeningCredits} from './obs/exterior-credits.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),opening=query.get('mode')==='opening',embedded=query.get('embedded')==='1';
 // Optional study override; the adopted film keeps its authored optics.
 const requestedFlareRatio=Number(query.get('flareRatio'));
@@ -67,6 +68,7 @@ try{
   const options={opening,coreScale:ship.coreScale,phase:(query.has('phase')?Number(query.get('phase')):55)*Math.PI/180,
     rpm:query.has('rpm')?Number(query.get('rpm')):EXTERIOR.rpm,penultimate:query.get('penultimate'),approach:query.get('approach'),ending:query.get('ending'),endingCamera:query.get('endingCamera'),docking:query.get('docking'),openingCamera:query.get('openingCamera'),transition:query.get('transition'),revision:query.get('revision')};
   const identity=document.querySelector('.identity'),logoReveal=identity.querySelector('.logo-reveal');
+  const credits=createOpeningCredits(document.querySelector('main'),options);
   function drawView(shot,renderTarget,gasTarget){
     ship.root.scale.setScalar(shot.shipScale??1);ship.root.position.x=shot.shipX;ship.root.visible=shot.shipVisible;ship.setAngle(shot.angle);camera.position.fromArray(shot.eye);target.fromArray(shot.target);
     applyExteriorProbePose(ship,shot.probe);
@@ -85,6 +87,7 @@ try{
   function draw(){
     const film=sampleExteriorCinemaFrame(time,{...options,aspect:camera.aspect}),shot=film.shot;
     dissolve.render(film,drawView);
+    credits.update(time);
     identity.style.opacity=hideLogo?'0':String(shot.titleOpacity*.88);
     // The first dial-up band starts after 120ms. Keep the glow hidden until
     // that band exists, and sample every band from the film's own clock.
@@ -183,7 +186,7 @@ try{
   }
   frame=requestAnimationFrame(tick);
   const visibility=()=>{last=performance.now();};document.addEventListener('visibilitychange',visibility);
-  cleanup=()=>{disposed=true;cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();dissolve.dispose();optics.dispose();stars.dispose();planet.dispose();ship.dispose();renderer.dispose();renderer.forceContextLoss();};
+  cleanup=()=>{disposed=true;cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',visibility);resize.disconnect();credits.dispose();dissolve.dispose();optics.dispose();stars.dispose();planet.dispose();ship.dispose();renderer.dispose();renderer.forceContextLoss();};
   $('exterior-view').addEventListener('webglcontextlost',event=>{if(disposed)return;event.preventDefault();play(false);$('status').hidden=false;$('status').textContent='映像接続が中断されました。船内へ戻って再度お試しください。';});
 }catch(error){console.error(error);tell('failed');$('status').hidden=false;$('cinema-controls').hidden=false;$('status').textContent='船体映像を開けませんでした。船内へ戻って再度お試しください。';}
 window.addEventListener('pagehide',event=>{if(!event.persisted)cleanup();});

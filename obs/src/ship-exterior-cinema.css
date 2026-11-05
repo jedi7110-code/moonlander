@@ -11,3 +11,10 @@
 nav{position:absolute;z-index:14;left:4%;bottom:2%;display:flex;align-items:center;gap:12px;width:92%;font-size:11px;color:#95a4ad}button,a{background:transparent;color:#d6ddd8;border:1px solid #66777d66;padding:7px 10px;border-radius:3px;font:inherit;cursor:pointer;text-decoration:none}button:hover,a:hover{background:#253139}button:focus-visible,a:focus-visible{outline:2px solid #f3d77d;outline-offset:3px}#time{margin-left:auto;font-variant-numeric:tabular-nums}
 #timeline{flex:1;min-width:40px;max-width:150px;accent-color:#9fb6c3}#time{white-space:nowrap}
 @media(max-width:600px){nav{gap:7px}.letterbox{height:6%}.logo-wordmark{width:76vw}}
+
+.opening-credits{position:absolute;inset:8% 0;z-index:12;overflow:hidden;pointer-events:none;text-align:center;color:#d9efff;mask-image:linear-gradient(to bottom,transparent,#000 4%,#000 96%,transparent);font-family:system-ui,sans-serif;text-shadow:0 1px 4px #030609,0 0 12px #030609}
+.opening-credits-roll{position:absolute;top:0;left:5%;width:90%;will-change:transform}
+.opening-credit{display:flex;flex-direction:column;align-items:center;gap:.6vh;margin:0;padding:0 0 3.4vh;line-height:1.5}
+.opening-credit-role{font-size:clamp(11px,1.5vh,17px);letter-spacing:.06em;color:#abc9e1;text-shadow:0 1px 4px #030609,0 0 6px #80baff40}
+.opening-credit-name{color:#d9efff;text-shadow:0 1px 4px #030609,0 0 5px #80baff75,0 0 14px #5faaff38;font-size:clamp(14px,2vh,23px);font-weight:500;letter-spacing:.16em}
+@media(max-width:600px){.opening-credits{inset:6% 0}.opening-credit-role{letter-spacing:.02em}.opening-credit-name{letter-spacing:.1em}}
