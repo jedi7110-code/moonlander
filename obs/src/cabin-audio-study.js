@@ -8,6 +8,7 @@ import {CatMotion,CatRoutine,CrewMotion,Supplies} from './obs/state.js';
 import {CAT_PORT,CAT_BOWL,FLOORS,LADDER_X,getStation} from './obs/layout.js';
 import {planDroidTurn} from './obs/droid-turn.js';
 import {DroidRoutine,DROID_PACE} from './obs/droid-routine.js';
+import {DROID_STARTUP_SECONDS} from './obs/droid-startup.js';
 import {DROID_GAIT,CREW_WALK_SPEED} from './obs/pace.js';
 import {CurtisRoutine,CURTIS} from './obs/curtis-routine.js';
 import {CURTIS_COFFEE} from './obs/curtis-coffee.js';
@@ -31,7 +32,7 @@ const unbindAudioGestures=bindCabinAudioGestures(audio,{ignore:event=>Boolean(ev
 for(const [id,definition]of Object.entries(CABIN_SOUNDS)){
   const card=document.createElement('article');card.className='card';
   const title=document.createElement('b');title.textContent=definition.label;
-  const detail=document.createElement('p');detail.textContent=`${definition.description?definition.description+' · ':''}${definition.loop?'ループ / 試聴は4秒':'単発'} · mono WAV · ${definition.license??'CC0'}`;
+  const detail=document.createElement('p');detail.textContent=`${definition.description?definition.description+' · ':''}${definition.loop?'ループ / 試聴は4秒':'単発'} · mono ${definition.file.endsWith('.mp3')?'MP3':'WAV'} · ${definition.license??'CC0'}`;
   const button=document.createElement('button');button.textContent='試聴';button.dataset.sound=id;button.disabled=true;
   button.addEventListener('click',()=>{stop();audio.pause(false);audio.unlock();if(definition.loop)audio.setLoop('preview',id,true);else audio.play(id);$('scene-state').textContent=`個別試聴：${definition.label}`;status();previewTimer=setTimeout(()=>{audio.stopLoop('preview');status();},4000);});
   card.append(title,detail,button);$('library').append(card);
@@ -40,6 +41,19 @@ function start(){
   stop();audio.pause(false);audio.unlock();
   const kind=$('scenario').value,state={actor:{x:700,y:650,floor:1,walkDistance:0,queue:[],busy:false},brain:{},care:{phase:'idle'},airlock:{opening:0}};
   const driver=new CabinSoundEvents(audio);driver.update(1/60,state);
+  if(['droidWake','droidSleep'].includes(kind)){
+    const droid=state.droid=new DroidRoutine({care:state.care,brain:state.brain,actor:state.actor});
+    droid.job='audio-preview';droid.add('hold',.5);
+    droid.add(kind==='droidWake'?'wake':'sleep',kind==='droidWake'?DROID_STARTUP_SECONDS:2);
+    droid.add('hold',1.2);driver.update(1/60,state);
+  }
+  if(kind==='droidHum'){
+    const droid=state.droid=new DroidRoutine({care:state.care,brain:state.brain,actor:state.actor});
+    droid.job='audio-preview';droid.position={x:-10.25,y:0,z:.66,floor:2,yaw:Math.PI};
+    droid.add('hold',.5);droid.act('cook-stir',16);
+    droid.add('walk',2,null,{from:{...droid.position},to:{...droid.position,x:-8}});
+    droid.act('scrub-shower',48);droid.add('hold',1);driver.update(1/60,state);
+  }
   if(kind==='meal'){
     const station=getStation('galley');state.actor=new CrewMotion({floor:station.floor,x:station.x});
     Object.assign(state.brain,{state:'performing',cur:station,curDurSec:station.dur/1000,performT:station.dur/1000});
@@ -108,14 +122,14 @@ function tick(now){
   if(r.kind.startsWith('miloClimb'))s.actor.update(dt);
   if(s.curtis)s.curtis.update(dt);
   if(r.kind==='droidWalk'){s.droid.waiting=t>=4;if(!s.droid.waiting){const travel=dt*DROID_GAIT.speed*DROID_PACE;s.droid.walkDistance+=travel;s.droid.position.x+=travel;}}
-  if(['washerDoor','feed','simmer'].includes(r.kind))s.droid.update(dt);
+  if(['washerDoor','feed','simmer','droidWake','droidSleep','droidHum'].includes(r.kind))s.droid.update(dt);
   else if(s.droid){s.droid.time=t;s.droid.age=Math.min(t,s.droid.step?.duration??6);if(r.kind==='droidClimb')s.droid.position.y=Math.min(3.392,t*.40*DROID_PACE);if(t>=(s.droid.step?.duration??6))s.droid.step=null;}
   if(r.kind==='mouseChase')s.cat.update(dt);
   else if(s.cat)s.cat.motion.update(dt);
   if(s.care.delivery){s.care.delivery.age=t;if(t>3.3)s.care.phase='idle';}
   r.driver.update(dt,s);status();$('scene-state').textContent=`${$('scenario').selectedOptions[0].textContent} / ${t.toFixed(1)}秒 / ${s.curtis?.step?.kind??s.cat?.mouseChase?.pose?.phase??s.cat?.motion.portal?.phase??s.brain.bunkVisit?.phase??s.brain.grooming?.pose.label??s.brain.bathroom?.phase??s.droid?.step?.action??(r.kind==='meal'?(s.brain.state==='performing'?'食事中':'食事終了'):s.care.phase)}`;
   if(s.curtis){if(!s.curtis.active){stop();return;}frame=requestAnimationFrame(tick);return;}
-  if(['washerDoor','feed','simmer'].includes(r.kind)&&!s.droid.step){stop();return;}
+  if(['washerDoor','feed','simmer','droidWake','droidSleep','droidHum'].includes(r.kind)&&!s.droid.step){stop();return;}
   if(r.kind==='simmer'){frame=requestAnimationFrame(tick);return;}
   if(r.kind==='meal'){if(t>s.brain.curDurSec+.5){stop();return;}frame=requestAnimationFrame(tick);return;}
   if(r.kind==='grooming'){if(s.brain.grooming.done){stop();return;}frame=requestAnimationFrame(tick);return;}

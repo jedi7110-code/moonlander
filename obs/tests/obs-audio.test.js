@@ -4,7 +4,7 @@ import {readFile,stat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {CabinAudio} from '../src/obs/audio.js';
 import {CabinSoundEvents} from '../src/obs/sound-events.js';
-import {CABIN_SOUNDS,LOUNGE_VOICE_IDS} from '../src/obs/sound-library.js';
+import {CABIN_SOUNDS,LOUNGE_VOICE_IDS,DROID_POWER_SOUND_IDS,DROID_HUM_SOUND_IDS} from '../src/obs/sound-library.js';
 import {BathroomVisit} from '../src/obs/bathroom.js';
 import {BunkVisit,BUNK_PHASE_SECONDS} from '../src/obs/bunk-visit.js';
 import {CatMotion,CatRoutine,CrewMotion,Supplies} from '../src/obs/state.js';
@@ -135,7 +135,7 @@ test('local assets are compact mono PCM, finite, non-silent, bounded and loop se
   }
   const deferred=(await stat(new URL('../public/assets/obs/audio/coffee-machine-a-20s.wav',import.meta.url))).size;
   assert.equal(deferred,882044);
-  let voices=0;for(const id of LOUNGE_VOICE_IDS)voices+=(await stat(new URL('../public/assets/obs/audio/'+CABIN_SOUNDS[id].file,import.meta.url))).size;
+  let voices=0;for(const id of [...LOUNGE_VOICE_IDS,...DROID_POWER_SOUND_IDS,...DROID_HUM_SOUND_IDS])voices+=(await stat(new URL('../public/assets/obs/audio/'+CABIN_SOUNDS[id].file,import.meta.url))).size;
   assert.ok(total-deferred-voices<1800000,`initial clips use ${total-deferred-voices} bytes; coffee and conversation are deferred`);
 });
 test('bed piston and slide are short faded recordings, without live loops or filters',async()=>{
@@ -257,7 +257,7 @@ test('coffee stays out of initial loading, decodes once on demand and never unlo
     assert.equal(urls.some(url=>url.includes('lounge-voice')),false);
     await audio.loadDeferred('coffeeMachine');assert.equal(urls.filter(url=>url.includes('coffee-machine')).length,1);
     const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');
-    assert.match(main,/defer:\['coffeeMachine',\.\.\.LOUNGE_VOICE_IDS\]/);assert.match(main,/audio\.loadDeferred\('coffeeMachine'\)/);
+    assert.match(main,/defer:\['coffeeMachine',\.\.\.LOUNGE_VOICE_IDS,\.\.\.DROID_POWER_SOUND_IDS,\.\.\.DROID_HUM_SOUND_IDS\]/);assert.match(main,/audio\.loadDeferred\('coffeeMachine'\)/);
   }finally{audio.dispose();}
 });
 test('finite coffee playback can resume at the current offset without looping or changing pitch',async()=>{
@@ -1155,7 +1155,7 @@ test('the feed study runs the real routine at OBS pace and offers a separate kib
   const html=await readFile(new URL('../src/cabin-audio-study.html',import.meta.url),'utf8');
   const js=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
   assert.match(html,/猫餌の袋 ＋ カリカリを皿へ/);assert.match(js,/droid\.act\('food-pour',6/);
-  assert.match(js,/\['washerDoor','feed','simmer'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
+  assert.match(js,/\['washerDoor','feed','simmer','droidWake','droidSleep','droidHum'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
   assert.match(CABIN_SOUNDS.kibblePour.label,/カリカリを皿へ/);
 });
 test('simmer is a compact native-speed recording with a quiet gain and a continuous loop join',async()=>{
@@ -1217,7 +1217,7 @@ test('simmer reuses one voice and stops on mute or pause without restarting a co
     h.driver.update(1/60,h.state);const voice=audio.loops.get('pot-simmer');assert.ok(voice);
     assert.equal(voice.source.loop,true);assert.equal(voice.source.playbackRate.value,1);
     for(let i=0;i<600;i++)h.driver.update(1/60,h.state);
-    assert.equal(audio.loops.get('pot-simmer'),voice);assert.equal(ctx.created.length-before,3);
+    assert.equal(audio.loops.get('pot-simmer'),voice);assert.equal(ctx.created.filter(node=>node.buffer===audio.buffers.get('simmer')).length,1,'humming may add a separate one-shot but never duplicates simmer');
     audio.pause(true);h.driver.update(1/60,h.state);assert.equal(audio.loops.size,0);assert.equal(voice.stopping,true);
     voice.source.onended();audio.pause(false);h.driver.update(1/60,h.state);
     const resumed=audio.loops.get('pot-simmer');assert.ok(resumed);
@@ -1230,7 +1230,7 @@ test('simmer study previews actual stir and serve phases instead of a synthetic 
   const page=await readFile(new URL('../src/cabin-audio-study.html',import.meta.url),'utf8');
   const source=await readFile(new URL('../src/cabin-audio-study.js',import.meta.url),'utf8');
   assert.match(page,/<option value="simmer">/);assert.match(source,/droid\.act\('cook-stir',16\);droid\.act\('cook-serve',3\)/);
-  assert.match(source,/\['washerDoor','feed','simmer'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
+  assert.match(source,/\['washerDoor','feed','simmer','droidWake','droidSleep','droidHum'\]\.includes\(r\.kind\)\)s\.droid\.update\(dt\)/);
 });
 test('disposal during an in-flight download aborts and cannot repopulate the cache',async()=>{
   let release;const pending=new Promise(resolve=>release=resolve),ctx=context();

@@ -438,3 +438,30 @@ Six recordings created and supplied by the user for Milo and Curtis. Takes 02 an
 Runtime copies: mono 24,000 Hz MP3 at 64 kbps, original pitch and duration. Each `lounge-voice-01.wav` through `lounge-voice-06.wav` source above maps to the corresponding `.mp3` runtime file. The six runtime files total 311,502 bytes. Match the six average levels to approximately -25 dBFS, with 40 ms leading and 60 ms trailing fades; cabin playback gain .40 (reduced 20% on 2026-11-04) plus normal camera/deck attenuation. The original files remain on the user's Desktop.
 
 Clips load only when a shared lounge visit approaches, outside initial loading. Each visit shuffles the six clips without adjacent repeats, inserts small pauses, and fits the available seated time. Pause/mute/visibility stop the sources; resuming uses the current clip offset, never replays earlier clips. Leaving either seat stops the conversation.
+
+
+## Droid power cues — user-provided, 2026-11-06
+
+Provided by the user for the robot's wake-up and start of sleep. These are not CC0 library assets; original WAVs remain on the user's Desktop.
+
+- `ロボットが起動.wav` → `droid-startup.mp3`; source SHA-256 `b49c3ba39560f2d6e6d073cfa6502835dbdcb19a4f68a202013bd6790f4533bc`; mono level adjustment -13.3 dB.
+- `ロボットが眠る音.wav` → `droid-sleep.mp3`; source SHA-256 `0e430510a3028d1d85adf18785ca338c9fdde6f93976c01f092bfe790ffa1d7e`; mono level adjustment -7.4 dB.
+
+Both sources: 3.000 seconds, 48 kHz stereo WAV. Runtime copies: 3.000 seconds, mono 24 kHz MP3 at 64 kbps, 24,621 bytes each (49,242 bytes total). Downmix before level adjustment; target mean about -25 dBFS, 10 ms leading / 40 ms trailing fades, no trimming, pitch change, time stretch, or looping. Playback gain .24 with the normal robot-position, camera/deck attenuation, and master mix.
+
+Reproduce with ffmpeg: `-af "aformat=channel_layouts=mono,volume=GAINdB,afade=t=in:d=0.01,afade=t=out:st=2.96:d=0.04" -ar 24000 -c:a libmp3lame -b:a 64k -id3v2_version 3 -map_metadata -1`, substituting the adjustment above. The cue starts once at the actual `wake` or `sleep` step boundary. Muted or late-loaded events never replay; interrupted steps stop their sound. Sleep's natural tail can finish after its two-second pose settles. The old generic wake servo is replaced; walking/turning/climbing servo sounds are unchanged.
+
+These two MP3s are deferred outside the initial loading bar. The first live robot snapshot requests them once, three simulation seconds before the first scheduled wake-up; a missed cue is never queued or replayed later.
+
+
+## Droid work melodies — user-provided Firefly recordings, 2026-11-06
+
+Supplied by the user for intermittent humming while the robot works. These are not CC0 library assets; original WAVs remain on the Desktop.
+
+- `Firefly_audio_お手伝いロボの作業中のかわいい鼻歌メロディー_beep音で_variation1.wav` → `droid-hum-1.mp3`; 8 seconds, 64,749 bytes, level adjustment -10.6 dB; source SHA-256 `3666e67aa655f3319c8353f78b13e57548fe73fc7f23028bf1cb8804dc972d1f`.
+- `Firefly_audio_お手伝いロボの作業中のかわいい鼻歌メロディー_beep音で_variation2.wav` → `droid-hum-2.mp3`; 8 seconds, 64,749 bytes, level adjustment -7.6 dB; source SHA-256 `7de7cf944b5bfacae2792990d575401b10319ee668b5105f258e3132984115c3`.
+- `Firefly_audio_お手伝いロボの作業中の鼻歌メロディー_variation2.wav` → `droid-hum-3.mp3`; 5 seconds, 40,749 bytes, level adjustment -3.6 dB; source SHA-256 `39f7efab01660bc7471d193b924ad7d5fed1484e06e85fabddf9877b4b1ab85b`.
+
+Runtime copies: mono 24 kHz MP3, 64 kbps, 170,247 bytes combined. Mean decoded levels -25.5 / -25.4 / -25.4 dBFS. Downmix to float mono before gain; 30 ms leading / 80 ms trailing fades, original duration and pitch, no stretching or loops. Reproduce with ffmpeg `-af "aformat=sample_fmts=fltp:channel_layouts=mono,volume=GAINdB,afade=t=in:d=0.03,afade=t=out:st=DURATION_MINUS_0.08:d=0.08" -ar 24000 -c:a libmp3lame -b:a 64k -id3v2_version 3 -map_metadata -1` using the adjustments above.
+
+Playback gain .14, quieter than the .24 startup/sleep cues, plus the existing robot-position/camera/deck attenuation. The three clips load on first actual work, outside initial loading. Each working period waits 1–3 simulation seconds, selects a random melody that fits the remaining action without repeating the previous melody, and leaves 18–40 seconds after its end before another is allowed. Travel, ladders, charging, wake/sleep, blocked work, mechanical door transitions, interruption and removal stop humming. Pause/mute/late loading never queue or replay missed songs.

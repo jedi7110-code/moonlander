@@ -78,5 +78,5 @@ test('all six runtime recordings are small MP3s, retain their exact source clock
     assert.equal(definition.gain,.40);assert.notEqual(definition.loop,true);
   }
   assert.ok(total<350_000,'all six clips together stay under 350 KB');
-  const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');assert.match(main,/defer:\['coffeeMachine',\.\.\.LOUNGE_VOICE_IDS\]/);
+  const main=await readFile(new URL('../src/obs/main.js',import.meta.url),'utf8');assert.match(main,/defer:\['coffeeMachine',\.\.\.LOUNGE_VOICE_IDS,\.\.\.DROID_POWER_SOUND_IDS,\.\.\.DROID_HUM_SOUND_IDS\]/);
 });

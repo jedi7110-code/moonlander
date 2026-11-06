@@ -14,7 +14,7 @@ import {closeLoadingScreen} from './loading-transition.js';
 import {bindStartupLightingInput,activateStartupLighting} from './startup-input.js';
 import {IdleCamera} from './idle-camera.js';
 import {CabinAudio} from './audio.js';
-import {LOUNGE_VOICE_IDS} from './sound-library.js';
+import {LOUNGE_VOICE_IDS,DROID_POWER_SOUND_IDS,DROID_HUM_SOUND_IDS} from './sound-library.js';
 import {CabinSoundEvents} from './sound-events.js';
 import {bindCabinAudioGestures} from './audio-unlock.js';
 import {StationFeedback,SIGNAL_COLORS} from './feedback.js';
@@ -53,7 +53,7 @@ const needOrders={
   bladder:{station:'toilet',icon:'toilet',label:['トイレへ行く','Use the toilet'],detail:['トイレを使用して回復します。','Restore this level by using the toilet.']},
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
-const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine',...LOUNGE_VOICE_IDS]});
+const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine',...LOUNGE_VOICE_IDS,...DROID_POWER_SOUND_IDS,...DROID_HUM_SOUND_IDS]});
 const soundEvents=new CabinSoundEvents(audio);
 // Lucy's grooming correction cache arrives after the cabin is on screen.
 cat.groomAvailable=false;

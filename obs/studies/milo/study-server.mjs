@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const study=path.dirname(fileURLToPath(import.meta.url)),project=path.resolve(study,'../..'),port=Number(process.env.PORT??8768);
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.glb':'model/gltf-binary','.jpg':'image/jpeg','.webp':'image/webp','.css':'text/css'};
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.glb':'model/gltf-binary','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.woff':'font/woff','.woff2':'font/woff2','.jpg':'image/jpeg','.webp':'image/webp','.css':'text/css','.mp3':'audio/mpeg','.wav':'audio/wav'};
 http.createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,'http://localhost');

@@ -3,9 +3,10 @@ import {hatchOpening} from './delivery.js';
 import {catPortOpening} from './cat-ports.js';
 import {DROID_WALK_CYCLE_DISTANCE} from './pace.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
-import {CABIN_SOUNDS} from './sound-library.js';
+import {CABIN_SOUNDS,DROID_POWER_SOUND_IDS} from './sound-library.js';
 import {KIBBLE_STREAM,KIBBLE_CONTACT_DELAY} from './kibble-timing.js';
 import {diningPhase,MEAL_SPOON_CONTACTS} from './dining-timing.js';
+import {DroidWorkAudio} from './droid-work-audio.js';
 import {LoungeConversationAudio} from './lounge-conversation-audio.js';
 import {curtisCoffeePose} from './curtis-coffee.js';
 import walkCycle from './milo-walk-cycle.json' with {type:'json'};
@@ -25,7 +26,7 @@ const bedLocation={x:(getStation('bunk').x-700)*.022,y:(870-FLOORS[getStation('b
 // Read only simulation state. This advances while muted, so turning sound on
 // never replays a backlog. Rendering, mirrors and multiple XR eyes cannot emit.
 export class CabinSoundEvents {
-  constructor(audio,{random=Math.random}={}){this.audio=audio;this.random=random;this.conversation=new LoungeConversationAudio(audio,{random});this.catVoiceTime=0;this.catVoice=null;this.doors=new Map();this.lids=new Map();this.steps=new Map();this.beats=new Map();this.previousBathroom=null;this.previousBathroomPhase=null;this.previousDroidStep=null;this.previousDelivery=null;this.deliveryAge=0;this.variant=0;}
+  constructor(audio,{random=Math.random}={}){this.audio=audio;this.random=random;this.conversation=new LoungeConversationAudio(audio,{random});this.droidWork=new DroidWorkAudio(audio,{random});this.catVoiceTime=0;this.catVoice=null;this.doors=new Map();this.lids=new Map();this.steps=new Map();this.beats=new Map();this.previousBathroom=null;this.previousBathroomPhase=null;this.previousDroidStep=null;this.previousDelivery=null;this.deliveryAge=0;this.variant=0;}
   meal(dt,actor,brain){
     const duration=brain.curDurSec,age=duration-brain.performT;
     const active=brain.state==='performing'&&brain.cur?.id==='galley'&&!actor.busy&&!actor.climbing&&
@@ -71,6 +72,34 @@ export class CabinSoundEvents {
       this.bedVoice=this.audio.play(id,{position:bedLocation,rate});
     }
     this.previousBunk={visit,phase,age};
+  }
+  droidPower(dt,droid){
+    if(this.droidPowerVoice?.ended||this.droidPowerVoice?.stopping)this.droidPowerVoice=null;
+    const previous=this.previousDroidPower,step=droid?.step,age=droid?.age??0;
+    const sameRobot=Boolean(previous&&previous.droid===droid),sameStep=sameRobot&&previous.step===step;
+    if(droid&&!sameRobot)for(const id of DROID_POWER_SOUND_IDS)void this.audio.loadDeferred?.(id);
+    const discontinuity=dt>.1||(sameStep&&(age<previous.age||age-previous.age>dt+1e-6));
+    const leavingVoice=Boolean(this.droidPowerStep&&sameRobot&&previous.step===this.droidPowerStep&&step!==this.droidPowerStep);
+    const finished=leavingVoice&&previous.age+dt>=this.droidPowerStep.duration-1e-6;
+    // Keep the natural decay when a two-second sleep pose completes. A
+    // cancelled/replaced robot or a seek cannot leave its cue playing.
+    if(this.droidPowerVoice&&(!droid||droid!==this.droidPowerRobot||discontinuity||(leavingVoice&&!finished))){
+      this.audio.stopVoice(this.droidPowerVoice);this.droidPowerVoice=null;
+    }
+    if(leavingVoice)this.droidPowerStep=null;
+    const id=step?.kind==='wake'?'droidStartup':step?.kind==='sleep'?'droidSleep':null;
+    let consumed=sameStep?previous.consumed:!(sameRobot&&age<=dt+1e-6&&dt<=.1);
+    if(discontinuity)consumed=true;
+    // Initial snapshots / late loads establish state silently. A cue armed
+    // at the phase boundary may wait at age zero for an actual movement.
+    if(id&&!consumed&&!droid.waiting){
+      consumed=true;
+      if(this.droidPowerVoice)this.audio.stopVoice(this.droidPowerVoice);
+      const p=droid.position;
+      this.droidPowerVoice=this.audio.play(id,{position:{x:p.x,y:p.y+.65,z:p.z}});
+      this.droidPowerStep=step;this.droidPowerRobot=droid;
+    }
+    this.previousDroidPower={droid,step,age,consumed};
   }
   hungryCat(dt,cat){
     const now=this.catVoiceTime+=dt,motion=cat?.motion;
@@ -208,6 +237,8 @@ export class CabinSoundEvents {
     this.bunk(dt,brain.bunkVisit);
     this.meal(dt,actor,brain);
     this.grooming(actor,brain.grooming);
+    this.droidPower(dt,droid);
+    this.droidWork.update(dt,droid);
     const feedStep=droid?.step,feedRate=feedStep?.actionRate??1,feedAge=(droid?.age??0)*feedRate;
     const pouring=feedStep?.action==='food-pour'&&Boolean(droid.carriedFood)&&!droid.waiting&&
       feedAge>=KIBBLE_STREAM.start+KIBBLE_CONTACT_DELAY&&feedAge<feedStep.duration*feedRate-KIBBLE_STREAM.finishLead+KIBBLE_CONTACT_DELAY;
@@ -242,8 +273,7 @@ export class CabinSoundEvents {
       // One quiet stroke per pivot pair / rung, with silence between strokes.
       // Climbing follows travelled height, never a running buzz or wall clock.
       const driveProgress=step?.kind==='turn'&&step.turn?droid.age/step.duration*(step.turn.steps/2):
-        step?.kind==='climb'&&step.from?Math.abs(p.y-step.from.y)/.28:
-        step?.kind==='wake'?droid.age/Math.max(step.duration,1):-1;
+        step?.kind==='climb'&&step.from?Math.abs(p.y-step.from.y)/.28:-1;
       this.beat('droid-drive',step,Math.floor(driveProgress-.12),!droid.waiting&&driveProgress>=0,'servo',position);
       audio.setLoop('washer','washer',droid.washingUntil>droid.time,{position:locations.washer});
       this.applianceLid('washer',droid.washerOpening,locations.washer,dt);

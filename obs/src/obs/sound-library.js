@@ -20,6 +20,12 @@ export const CABIN_SOUNDS=Object.freeze({
   rubberStep2:{file:'step-rubber-2.wav',label:'ドロイド / ゴム底 2',description:'実録：柔らかいゴム底の接地音',gain:.28},
   rubberStep3:{file:'step-rubber-3.wav',label:'ドロイド / ゴム底 3',description:'実録：柔らかいゴム底の接地音',gain:.30},
   metal:{file:'metal.wav',label:'荷物 / ハードケースの着地',description:'実録の工具箱 / 短く鈍い接地音・控えめ',gain:.20},
+  ...Object.fromEntries([8,8,5].map((duration,index)=>[`droidHum${index+1}`,{
+    file:`droid-hum-${index+1}.mp3`,label:`ドロイド / 作業中の鼻歌 ${index+1}`,
+    description:'ユーザー提供の鼻歌 / 作業中にランダム・控えめ',license:'ユーザー提供素材',gain:.14,duration,
+  }])),
+  droidStartup:{file:'droid-startup.mp3',label:'ドロイド / 起動',description:'ユーザー提供の起動音 / 起動開始に一度・原速3秒',license:'ユーザー提供素材',gain:.24,duration:3},
+  droidSleep:{file:'droid-sleep.mp3',label:'ドロイド / スリープ開始',description:'ユーザー提供のスリープ音 / 休止開始に一度・原速3秒',license:'ユーザー提供素材',gain:.24,duration:3},
   servo:{file:'servo-stroke.wav',label:'ドロイド / 関節の短い駆動音',description:'実録サーボ / 0.2秒・小音量・ループなし',gain:.055},
   shower:{file:'shower.wav',label:'シャワー / 流水',gain:.35,loop:true},
   flush:{file:'flush.wav',label:'トイレ / 排水',gain:.36},
@@ -43,5 +49,7 @@ export const CABIN_SOUNDS=Object.freeze({
   }])),
   coffeeMachine:{file:'coffee-machine-a-20s.wav',label:'コーヒーマシン / A・20秒',description:'選択された実録Aの冒頭20秒 / ボタン押下から抽出完了まで・原速',gain:.18,duration:20},
 });
+export const DROID_HUM_SOUND_IDS=Object.freeze(['droidHum1','droidHum2','droidHum3']);
+export const DROID_POWER_SOUND_IDS=Object.freeze(['droidStartup','droidSleep']);
 export const LOUNGE_VOICE_IDS=Object.freeze(loungeVoiceDurations.map((_,index)=>`loungeVoice${index+1}`));
 export const CABIN_AUDIO_BASE=`${import.meta.env?.BASE_URL??'/obs/'}assets/obs/audio/`;
