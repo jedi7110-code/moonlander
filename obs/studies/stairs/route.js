@@ -55,7 +55,7 @@ export function stairFoot(distance,direction,side,{cycle=.65,stance=.62,forward=
 
 export class StairTraffic {
   constructor(){this.reset();}
-  reset(){this.agents=[{id:'human',s:0,direction:1,speed:.66,wait:0},{id:'robot',s:STAIR_ROUTE_LENGTH,direction:-1,speed:.58,wait:0},{id:'cat',s:STAIR_ROUTE_LENGTH*.48,direction:1,speed:.88,wait:0}];}
+  reset(){this.agents=[{id:'human',s:0,direction:1,speed:.66,wait:0},{id:'robot',s:STAIR_ROUTE_LENGTH,direction:-1,speed:.58,wait:0},{id:'cat',s:STAIR_ROUTE_LENGTH*.48,direction:1,speed:.50,wait:0}];}
   update(dt){
     for(const a of this.agents){
       a.waiting=false;

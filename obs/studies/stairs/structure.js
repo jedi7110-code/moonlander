@@ -39,9 +39,18 @@ export function createStairStructure(m){
   }
   for(let level=0;level<3;level++){
     const y=level*rise*20;
-    // Wide level landing shares the cabin floor, with a flush threshold.
-    box(root,dark,-13.245,y-.17,zc,.66,.32,3.25);
-    box(root,steel,-13.2275,y-.01825,zc,.695,.0355,3.25);
+    // The rear flight arrives at x=right. Its floor must start there:
+    // extending the slab left over the ninth tread buries a small animal.
+    // Keep the wider forward deck underneath the approved LEVEL 1 guardrail.
+    const landingBack=zc-3.25/2,landingFront=zc+3.25/2,arrivalFront=back+width/2+.035;
+    const landingParts=level===0?
+      [{left:-13.575,back:landingBack,front:landingFront}]:
+      [{left:right,back:landingBack,front:arrivalFront},{left:-13.575,back:arrivalFront,front:landingFront}];
+    for(const part of landingParts){
+      const zz=(part.back+part.front)/2,depth=part.front-part.back;
+      box(root,dark,(part.left-12.915)/2,y-.17,zz,-12.915-part.left,.32,depth).name='Level landing structure';
+      box(root,steel,(part.left-12.88)/2,y-.01825,zz,-12.88-part.left,.0355,depth).name='Level landing walking surface';
+    }
     for(const z of [-1.04,2.34])beam(root,dark,[outerLeft,y-.17,z],[-12.42,y-.17,z],.15,.15);
     // Reinforced openings replace the old continuous left wall.
     for(const [a,b]of [[-1.85,-1.04],[2.30,2.55]])box(root,paint,-13.18,y+1.60,(a+b)/2,.27,3.20,b-a);

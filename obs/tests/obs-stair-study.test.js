@@ -45,3 +45,19 @@ test('stair plates, stringers, pressure lining and rails are batched into a smal
   const bounds=new THREE.Box3().setFromObject(root);assert.ok(bounds.min.x<-17.5);assert.ok(bounds.max.y>=10.4);
   root.traverse(o=>o.geometry?.dispose());Object.values(m).forEach(mat=>mat.dispose());
 });
+
+
+test('rear landing floors leave the final incoming tread exposed on both decks',()=>{
+  const m=Object.fromEntries(['metal','dark','enamel','yellow'].map(k=>[k,new THREE.MeshStandardMaterial()]));
+  const root=createStairStructure(m);root.updateMatrixWorld(true);
+  const ray=new THREE.Raycaster(),down=new THREE.Vector3(0,-1,0);
+  for(const flight of STAIR_SEGMENTS.filter(s=>s.kind==='flight'&&s.half===1)){
+    const top=flight.b[1];
+    for(const [x,expected]of [[flight.b[0]-STAIRS.tread*.5,top-STAIRS.rise],[flight.b[0]+.05,top-.0005]]){
+      ray.set(new THREE.Vector3(x,top+.30,STAIRS.back),down);
+      const hits=ray.intersectObject(root,true);assert.ok(hits.length);
+      assert.ok(Math.abs(hits[0].point.y-expected)<.00001,`floor covers the last tread at deck ${flight.level}`);
+    }
+  }
+  root.traverse(o=>o.geometry?.dispose());Object.values(m).forEach(mat=>mat.dispose());
+});

@@ -13,6 +13,8 @@
 - 元の左壁を開き、各階の広い踊り場から船内の前側通路に接続。中央ハシゴは維持。
 - 固定部は材質ごとに結合。接地用の経路と右側通行を共有し、同方向の追従は間隔を空ける。
 - 再生 / 一時停止 / 上下反転 / 時間指定 / 個別表示 / 荷物 / 足の接地点 / 追従視点。
-- 検証: `node --test tests/obs-stair-study.test.js`
+- 猫の動作調整と調査資料: [cat-motion-research.md](./cat-motion-research.md)。上り・下りの単独確認と半速再生付き。通常速度の確認: `?cat=up&view=cat&rate=1` / `?cat=down&view=cat&rate=1`。
+- 猫の階段歩行は `cat-gait.js` が経路上の位置から毎フレーム計算する（事前生成データなし）。平地は本編の `animateLucy` と完全に同じで、階段の前後1.0〜1.4 mで階段用の足運びへ切り替わる。
+- 検証: `node --test tests/obs-stair-study.test.js tests/obs-cat-stair-gait.test.js`
 
 本編への採用時には通常AIのフロア移動、外観の圧力殻、階段と元の充電設備周辺の最終配置を連動させる。

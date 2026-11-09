@@ -13,13 +13,14 @@ import {createDroidChargingBay} from '../../src/obs/droid-charging.js';
 import {createMiloToon} from '../../src/obs/milo-toon.js';
 import {createCabinToon} from '../../src/obs/cabin-toon.js';
 import {CABIN_AMBIENCE,limitCabinLights} from '../../src/obs/lighting.js';
-import {StairTraffic,STAIRS,stairContact,STAIR_ROUTE_LENGTH} from './route.js';
+import {StairTraffic,STAIRS,STAIR_SEGMENTS,stairContact,STAIR_ROUTE_LENGTH} from './route.js';
 import {createStairStructure,openCabinLeft} from './structure.js';
 import {poseHuman,poseRobot,poseCat} from './poses.js';
 const $=id=>document.getElementById(id);
 let playing=true,time=0,last=performance.now(),view='stairs',reversed=false,frame,dirty=true;
 const traffic=new StairTraffic();
 const param=new URLSearchParams(location.search);
+let catPass=['up','down'].includes(param.get('cat'))?param.get('cat'):null;
 if(param.has('paused'))playing=false;
 async function start(){
   const canvas=$('view'),scene=new THREE.Scene();scene.background=new THREE.Color('#0b1013');
@@ -58,15 +59,21 @@ async function start(){
   function reset(){
     dirty=true;time=0;traffic.reset();
     if(reversed)for(const a of traffic.agents){a.s=STAIR_ROUTE_LENGTH-a.s;a.direction*=-1;}
+    if(catPass){const catAgent=traffic.agents.find(a=>a.id==='cat'),flight=STAIR_SEGMENTS.find(s=>s.kind==='flight');catAgent.direction=catPass==='up'?1:-1;catAgent.s=catAgent.direction>0?flight.start-.6:flight.end+.6;}
     last=performance.now();
   }
+  document.querySelectorAll('[data-cat-pass]').forEach(button=>button.onclick=()=>{
+    catPass=button.dataset.catPass;reset();$('cat').checked=true;$('human').checked=false;$('robot').checked=false;playing=true;$('play').textContent='一時停止';setView('cat');
+  });
+  $('rate').value=param.get('rate')==='.5'?'.5':'1';
   $('play').onclick=()=>{playing=!playing;dirty=true;$('play').textContent=playing?'一時停止':'再生';last=performance.now();};
   $('restart').onclick=()=>{reset();playing=true;$('play').textContent='一時停止';};
-  $('reverse').onclick=()=>{reversed=!reversed;reset();playing=true;$('play').textContent='一時停止';};
+  $('reverse').onclick=()=>{if(catPass)catPass=catPass==='up'?'down':'up';else reversed=!reversed;reset();playing=true;$('play').textContent='一時停止';};
   $('time').oninput=()=>{const target=Number($('time').value);reset();for(let t=0;t<target-1e-9;t+=1/60)traffic.update(Math.min(1/60,target-t));time=target;playing=false;dirty=true;$('play').textContent='再生';};
   const resize=()=>{const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();dirty=true;};
   controls.addEventListener('change',()=>{dirty=true;});document.querySelectorAll('input[type=checkbox]').forEach(input=>input.onchange=()=>{dirty=true;});
-  const observer=new ResizeObserver(resize);observer.observe(canvas);resize();setView('stairs');
+  const observer=new ResizeObserver(resize);observer.observe(canvas);resize();setView(param.get('view')==='cat'||catPass?'cat':'stairs');
+  if(catPass){reset();$('human').checked=false;$('robot').checked=false;}
   window.stairStudy={traffic,scene,stairs,human,cat,robot,robotParent,camera,controls,renderer,removed,setView,get time(){return time;}};
   function draw(dt){
     load.visible=$('cargo').checked;const poses=[];
@@ -80,20 +87,20 @@ async function start(){
     let dot=0;for(const pose of poses)for(const foot of pose.feet){if(dot<dots.length)dots[dot++].position.set(foot.x,foot.y+.025,foot.z);}
     for(let i=0;i<dots.length;i++)dots[i].visible=i<dot;
     if(['human','robot','cat'].includes(view)){
-      const a=traffic.agents.find(a=>a.id===view),p=stairContact(a.s,a.direction,.32),target=new THREE.Vector3(p.x,p.y+(view==='cat'?.3:.95),p.z);
-      const offset=view==='cat'?new THREE.Vector3(0,1.0,3.0):new THREE.Vector3(0,.7,5.8);
+      const a=traffic.agents.find(a=>a.id===view),p=view==='cat'?cat.position:stairContact(a.s,a.direction,.32),target=new THREE.Vector3(p.x,p.y+(view==='cat'?.28:.95),p.z);
+      const offset=view==='cat'?new THREE.Vector3(0,.32,2.8):new THREE.Vector3(0,.7,5.8);
       controls.target.lerp(target,dt>0?.16:1);camera.position.lerp(target.clone().add(offset),dt>0?.16:1);
     }
     controls.update();toon.update(canvas.clientWidth,canvas.clientHeight,view==='whole'?16:11,16);
     humanToon.update(canvas.clientWidth,canvas.clientHeight,11,16);renderer.render(scene,camera);
     $('time').value=time;$('clock').textContent=`${time.toFixed(1)} 秒`;
-    $('state').textContent='人・ロボ・猫の同時通行 / '+(playing?'再生中':'一時停止');
+    $('state').textContent=(catPass?('猫の'+(catPass==='up'?'上り':'下り')+' / '+($('rate').value==='1'?'通常速度':'½速度')):'人・ロボ・猫の同時通行')+' / '+(playing?'再生中':'一時停止');
     window.stairStudy.poses=poses;
     if(traffic.agents.every(a=>a.wait===Infinity&&a.exit>=1)&&playing){playing=false;$('play').textContent='再生';}
   }
-  if(param.has('time')){const t=Math.min(50,Math.max(0,Number(param.get('time'))||0));for(let s=0;s<t;s+=1/60)traffic.update(1/60);time=t;}
+  if(param.has('time')){const t=Math.min(100,Math.max(0,Number(param.get('time'))||0));for(let s=0;s<t;s+=1/60)traffic.update(1/60);time=t;}
   draw(1/60);$('play').textContent=playing?'一時停止':'再生';$('loading').hidden=true;last=performance.now();
-  function tick(now){frame=requestAnimationFrame(tick);const dt=Math.min(.05,(now-last)/1000);last=now;if(document.hidden)return;if(playing){time+=dt;traffic.update(dt);}if(playing||dirty){dirty=false;draw(playing?dt:0);}}
+  function tick(now){frame=requestAnimationFrame(tick);const dt=Math.min(.05,(now-last)/1000);last=now;if(document.hidden)return;if(playing){const step=dt*Number($('rate').value);time+=step;traffic.update(step);}if(playing||dirty){dirty=false;draw(playing?dt:0);}}
   frame=requestAnimationFrame(tick);
   window.addEventListener('pagehide',()=>{cancelAnimationFrame(frame);observer.disconnect();controls.dispose();toon.dispose();humanToon.dispose();renderer.dispose();env.dispose();});
 }

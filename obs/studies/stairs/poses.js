@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import {animateMilo} from '../../src/obs/characters.js';
-import {animateLucy} from '../../src/obs/lucy.js';
 import {STAIR_ROUTE_LENGTH,stairPoint,stairContact,stairFoot,STAIRS} from './route.js';
 const V=(...p)=>new THREE.Vector3(...p),down=V(0,-1,0),up=V(0,1,0);
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -59,21 +58,4 @@ export function poseRobot(robot,parent,load,agent,time){
   parent.updateMatrixWorld(true);return{center,feet,pose};
 }
 
-export function poseCat(root,agent,time,dt){
-  const state=root.userData;
-  if(!state.stairTargets)state.stairTargets=state.ik.iks.map(chain=>{const bone=state.ik.mesh.skeleton.bones[chain.target];return {bone,position:bone.position.clone(),side:Math.sign(bone.getWorldPosition(V()).x)||-1,rear:bone.name.startsWith('feet_')};});
-  state.stairTargets.forEach(t=>t.bone.position.copy(t.position));
-  const {center,feet}=agentFeet(agent);
-  animateLucy(root,{time,dt,moving:!agent.waiting&&agent.wait!==Infinity,yaw:center.yaw,headingControlled:true,mode:'idle',walkDistance:agent.s});
-  const ground=feet.reduce((sum,p)=>sum+p.y,0)/4;
-  root.position.set(center.x,ground,center.z);
-  const smoothPitch=center.kind==='flight'?Math.min(.54,center.pitch)*agent.direction:0;
-  root.rotation.set(-smoothPitch,center.yaw,0,'YXZ');root.updateMatrixWorld(true);
-  // Match the GLB targets by actual anatomical side, not skeleton array order.
-  for(let i=0;i<state.stairTargets.length;i++){
-    const target=state.stairTargets[i],p=feet.find(p=>p.side===target.side&&p.rear===target.rear);
-    target.bone.position.copy(target.bone.parent.worldToLocal(V(p.x,p.y+.025,p.z)));
-  }
-  state.ik.update();root.updateMatrixWorld(true);
-  return{center,feet};
-}
+export {poseCatStairs as poseCat} from './cat-gait.js';
