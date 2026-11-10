@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {droidStairPose} from './droid-stair-pose.js';
 import {createCatFoodMaterial,createCatFoodPouch} from './cat-food-package.js';
 import {createKibbleStream} from './kibble-stream.js';
 import {box,cylinder,rod,ball,batchStatic} from './materials.js';
@@ -264,6 +265,14 @@ export function createDroidServiceRig(bay,ship){
     ship.incinerator?.update(routine.incineratorOpen,routine.time<routine.incineratingUntil&&routine.incineratorOpen===0);
     const model=sampleDroidServicePose(p,loads);
     actorRoot.position.set(p.x,p.y,p.z);actorRoot.rotation.y=p.yaw;
+    if(p.stairs){
+      // On the stair tower: tread-by-tread feet, body over the lower foot.
+      const stair=droidStairPose(p.stairs.trip,p.stairs.t,walkingFeet(p.walkDistance,1));
+      actorRoot.position.set(stair.root.x,stair.root.y,stair.root.z);actorRoot.rotation.y=stair.root.yaw;
+      Object.assign(model,{feet:stair.feet,walkAmount:p.waiting?0:1,walkPhase:stair.walkPhase,
+        hipHeight:mix(model.hipHeight,stair.hipHeight,stair.weight),lean:mix(DROID_POSTURE.walkLean,stair.lean,stair.weight)});
+      model.nod=-model.lean*.6;
+    }
     droid.face.setExpression(expression);droid.update(p.time,'service',model);
     bay.mode=p.mode;
     root.updateMatrixWorld(true);

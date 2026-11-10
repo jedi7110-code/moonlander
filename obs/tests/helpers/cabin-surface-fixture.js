@@ -1,12 +1,12 @@
 import {MeshStandardMaterial} from 'three';
 import {buildShip} from '../../src/obs/ship.js';
 
-export function buildSurfaceFixture(){
+export function buildSurfaceFixture(options={}){
   const ctx=new Proxy({measureText:t=>({width:t.length*8}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:()=>{}});
   const materials=new Map(),source=new Proxy({},{get:(_,key)=>{if(!materials.has(key))materials.set(key,new MeshStandardMaterial({name:String(key)}));return materials.get(key);}});
   const original=globalThis.document;
   globalThis.document={createElement:()=>({getContext:()=>ctx})};
-  try{return buildShip(source,{mergeStatic:false});}
+  try{return buildShip(source,{mergeStatic:false,...options});}
   finally{if(original===undefined)delete globalThis.document;else globalThis.document=original;}
 }
 

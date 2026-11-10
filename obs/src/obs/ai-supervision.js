@@ -14,7 +14,7 @@ const percentage=value=>Number.isFinite(value)?clamp(Math.round(value),0,100):nu
 function crewActivity(brain,actor){
   if(!brain)return 'AWAITING TELEMETRY';
   if(actor?.climbing)return 'IN TRANSIT / SHAFT';
-  if(actor?.waitingForHatch||actor?.waitingForCat||actor?.waitingForDroid)return 'HOLD / AISLE CLEARANCE';
+  if(actor?.waitingForHatch||actor?.waitingForCat||actor?.waitingForDroid||actor?.waitingForStairs)return 'HOLD / AISLE CLEARANCE';
   const destination=stationNames[brain.cur?.id]??code(brain.cur?.id);
   if(actor?.busy||brain.state==='goingTo')return `TRANSIT > ${destination}`;
   if(brain.hatchRepair)return `${destination} / ${code(brain.hatchRepair.phase)}`;
@@ -26,7 +26,7 @@ function crewActivity(brain,actor){
 function track(id,name,color,motion,world=false,status='STANDBY'){
   if(!motion||!Number.isFinite(motion.x))return null;
   const floor=clamp(motion.floor??0,0,2),height=Number.isFinite(motion.y)?(world?motion.y:(870-motion.y)*.016):floorHeight(floor);
-  return{id,name,color,x:clamp(world?motion.x:(motion.x-700)*.022,-13,13),
+  return{id,name,color,x:clamp(world?motion.x:(motion.x-700)*.022,-18,13), // -18: the left stair tower
     deck:clamp((floorHeight(0)-height)/(floorHeight(0)-floorHeight(1)),0,2),status};
 }
 

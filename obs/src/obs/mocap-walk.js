@@ -48,8 +48,15 @@ function solveLeg(leg,knee,boot,target,pole){
   knee.quaternion.copy(leg.quaternion).invert().multiply(lowerWorld);
 }
 
-export function applyMocapWalk(root,data,time){
+// `stride` scales how far the feet reach ahead of and behind the hips: a
+// walk driven with stride s covers s cycle distances per cycle without the
+// planted foot sliding (the stair trips shorten the step this way).
+export function applyMocapWalk(root,data,time,stride=1){
   const p=sampleWalk(data,time),{body,chest,head,arms,legs}=root.userData;
+  if(stride!==1)for(const prefix of ['Left','Right']){
+    const ankle=p[prefix+'Foot'],knee=p[prefix+'Leg'],shift=(ankle.z-p.Hips.z)*(stride-1);
+    ankle.z+=shift;p[prefix+'ToeBase'].z+=shift;knee.z+=(knee.z-p.Hips.z)*(stride-1);
+  }
   const pelvis=orientation(p.RightUpLeg.clone().sub(p.LeftUpLeg),p.Spine.clone().sub(p.Hips));
   const torso=orientation(p.RightArm.clone().sub(p.LeftArm),p.Neck.clone().sub(p.Hips));
   const inversePelvis=pelvis.clone().invert(),hip=p.Hips.clone();

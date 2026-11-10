@@ -10,6 +10,7 @@ import {createEVABaySteps} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
 import {createBunk} from './bunk.js';
 import {industrialMaterials,addIndustrialDeck,addWorkLights} from './industrial.js';
+import {createStairTowerGroup,openStairTowerWall} from './stair-tower.js';
 import {BULKHEAD_GATE,gateWall,createBulkheadGate} from './bulkhead-gate.js';
 import {addCabinDressingSteps} from './cabin-dressing.js';
 import {configurePocketShutter,addPocketShutterFrame} from './shutter.js';
@@ -313,7 +314,7 @@ export function createDiningStation(m,action){
   return{root,propsRoot,docks,stationX};
 }
 
-function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDeckFloor}={}) {
+function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDeckFloor,stairTower=false}={}) {
   const m=industrialMaterials(sourceMaterials);
   const staticRoot=new THREE.Group(),animated=new THREE.Group(),targets=[];
   // Leave clearance behind the fitted jambs: aperture reveal faces must not
@@ -512,9 +513,18 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
   animated.add(createRearWindowStars(staticRoot,{rotating:true}));
   yield;
+  if(stairTower){
+    // Left stair tower between the three decks (cabin interior only; the
+    // exterior hull does not include it yet). It replaces the old left wall.
+    staticRoot.updateMatrixWorld(true);openStairTowerWall(staticRoot);
+    staticRoot.add(createStairTowerGroup(m));
+    yield;
+  }
   const staticMesh=mergeStatic?(yield* batchStaticSteps(staticRoot,{xrLOD:true})):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
+  // The character view's window wall continues across the stair tower.
+  staticMesh.userData.stairTower=stairTower;
   return {staticMesh,animated,targets,indicators,cargo,catFoodPackage,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,coffeeMug,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
 }
 

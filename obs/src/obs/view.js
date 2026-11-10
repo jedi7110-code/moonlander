@@ -7,6 +7,8 @@ import {FixtureInstances} from './fixture-instances.js';
 import {createGroupShadowProxySteps} from './group-shadow-proxy.js';
 import {buildShip,buildShipInBackground,positionX,positionY,HABITAT_VIEW} from './ship.js';
 import {createMiloSteps,animateMilo} from './characters.js';
+import {poseHumanTrip} from './human-stair-gait.js';
+import {poseCatPath,catPathPhase,CAT_STAIR_GAIT} from './cat-stair-gait.js';
 import {loadCabinLucy as loadLucy,createCabinLucySteps as createLucySteps,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
 import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
@@ -55,7 +57,7 @@ import {visibleInScene} from './deferred-preparation.js';
 export class ObservationView {
   // Typical step counts of the two sliced assembly phases, so the connection
   // gauge moves through them; a drift only makes it reach a milestone early.
-  static SHIP_BUILD_STEPS=92;static PREPARATION_STEPS=300;
+  static SHIP_BUILD_STEPS=93;static PREPARATION_STEPS=300;
   static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false,deferOptional=false,nextFrame=nextPreparationFrame,onProgress=()=>{}}={}){
     const phase=(from,to,expected)=>count=>onProgress(from+(to-from)*Math.min(1,count/expected));
     // The head takes most of this phase (its hair and eyes are built here), so
@@ -67,7 +69,7 @@ export class ObservationView {
     head.userData.setAppearance({hair:'crop',beard:'none'});
     const deckStyle=floorBuilder?null:createMetalDeckStyle();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
-    const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor,nextFrame,onStep:phase(.4,.6,ObservationView.SHIP_BUILD_STEPS)});
+    const builtShip=await buildShipInBackground(m,{floorBuilder:floorBuilder??deckStyle.buildFloor,stairTower:true,nextFrame,onStep:phase(.4,.6,ObservationView.SHIP_BUILD_STEPS)});
     onProgress(.6);
     const view=new ObservationView(canvas,m,head,lucy,{floorBuilder:floorBuilder??deckStyle.buildFloor,builtShip,deferSetup:true,deferOptional});
     const preparation=[],prepared=phase(.6,.8,ObservationView.PREPARATION_STEPS);
@@ -115,7 +117,7 @@ export class ObservationView {
     this.envTarget=pmrem.fromScene(environment,.04);this.scene.environment=this.envTarget.texture;environment.dispose();pmrem.dispose();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
     this.scene.add(new THREE.HemisphereLight(CABIN_AMBIENCE.sky,CABIN_AMBIENCE.ground,CABIN_AMBIENCE.ambient));
-    const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-16,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
+    const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-19,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
     yield;
     this.ship=builtShip??buildShip(m,{floorBuilder});limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
@@ -363,7 +365,7 @@ export class ObservationView {
   bindControls(){
     let drag=null;
     this.bind('pointerdown',e=>{if(this.characterCamera?.pointerDown(e))return;if(e.button!==0||e.isPrimary===false||drag)return;this.zoomAnchor=null;drag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,cx:this.targetCenter.x,cy:this.targetCenter.y,target:this.targetAt(e),moved:false};this.canvas.setPointerCapture(e.pointerId);});
-    this.bind('pointermove',e=>{if(this.characterCamera?.pointerMove(e))return;if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.characterCamera?.select('manual');this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-13,13);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,HABITAT_VIEW.panMinY,HABITAT_VIEW.panMaxY);}});
+    this.bind('pointermove',e=>{if(this.characterCamera?.pointerMove(e))return;if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.characterCamera?.select('manual');this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-16.5,13);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,HABITAT_VIEW.panMinY,HABITAT_VIEW.panMaxY);}});
     // The first dark-scene tap powers the lights, not a station order with a
     // pitched acknowledgement. Clear drag normally so subsequent taps work.
     this.bind('pointerup',e=>{if(this.characterCamera?.pointerEnd(e))return;if(!drag||e.pointerId!==drag.pointerId)return;const {target,moved}=drag;drag=null;this.hover(null);if(moved||!target)return;if(target.type==='character')this.setMode(target.id);else if(!this.startupLighting?.waiting)this.onStation?.(target.id);});
@@ -450,6 +452,11 @@ export class ObservationView {
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
     const walkway=crewWalkway(positionX(actor.x),actor.floor,actor.facing,actor.loungeAvoidance);
     this.milo.position.set(positionX(actor.x),positionY(actor.y),walkway.z);
+    const stairTrip=actor.onStairs;
+    if(stairTrip){
+      const frame=stairTrip.trip.frame(stairTrip.t);
+      this.milo.position.set(frame.x,frame.y,frame.z);walkway.yaw=frame.yaw;
+    }
     const climb=actor.climbing?actor.queue[0]:null,nextX=actor.queue[1]?.x??actor.x;
     this.cabinClimb=updateCabinClimb(this.cabinClimb,climb?{
       height:positionY(actor.y),startHeight:positionY(FLOORS[actor.floor].y),startYaw:this.milo.rotation.y,startDepth:walkway.z,
@@ -466,7 +473,11 @@ export class ObservationView {
       const pose=loungeWorldPose(brain);
       this.milo.position.x=pose.x;this.milo.position.z=pose.z;
     }
-    if(!brain.grooming)animateMilo(this.milo,{moving:actor.busy&&!actor.climbing,waiting:actor.waitingForVisitor||actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],conversation:brain.isSeatedInLounge()&&brain.leisure==='conversation'?brain.loungeCompanion:null,leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair});
+    const miloPose={moving:actor.busy&&!actor.climbing,waiting:actor.waitingForVisitor||actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid||actor.waitingForStairs,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],conversation:brain.isSeatedInLounge()&&brain.leisure==='conversation'?brain.loungeCompanion:null,leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair};
+    // On a stair trip the cabin walk carries Milo up to the stairs and away
+    // from them; the stair walk places the body and legs at the flights.
+    if(stairTrip&&!brain.grooming)poseHumanTrip(this.milo,stairTrip.trip,stairTrip.t,time,{waiting:actor.stairWaiting,arrival:stairTrip.arrival,cabinPose:(walkDistance,walkStride)=>animateMilo(this.milo,{...miloPose,waiting:miloPose.waiting||actor.stairWaiting,walkDistance,walkStride})});
+    else if(!brain.grooming)animateMilo(this.milo,miloPose);
     if(this.cabinClimb)applyCabinLadder(this.milo,this.cabinClimb);
     this.harvestDelivery.update(this.milo,brain);
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
@@ -498,7 +509,19 @@ export class ObservationView {
         this.cat.position.set(bedX,floorY+THREE.MathUtils.lerp(BUNK_BED.top,0,s)+Math.sin(Math.PI*u)*.32,THREE.MathUtils.lerp(bedZ,CAT_PORT.walkZ,s));
       }else this.cat.position.set(bedX,floorY+BUNK_BED.top,bedZ);
     }
-    animateLucy(this.cat,{time,dt:paused?0:dt,moving:catMoving,facing:catMotion.facing,yaw:catRoutine.poseYaw,headingControlled:catMotion.turns,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance+catMotion.depthWalkDistance,passage,hop:wakeHop??hop,turn,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
+    const catStairs=catMotion.onStairs,catWalk=positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance+catMotion.depthWalkDistance+(this.catWalkOffset??0);
+    if(catStairs){
+      // Lucy on the stair tower: the stair gait places her body and paws. Her
+      // Walk clip continues the cabin phase on entry and hands it back on exit.
+      if(this.catStairTrip!==catStairs){this.catStairTrip=catStairs;this.catStairPhase=catWalk/CAT_STAIR_GAIT.natural-catPathPhase(this.cat,catStairs.trip,catStairs.t);}
+      const fade=Math.max(.3,(catStairs.trip.flights[0]?.t0??1.6)-CAT_STAIR_GAIT.stairZone.none-.05);
+      const cabin=this.cat.userData.cabin;cabin.poseRoot.position.set(0,0,0);cabin.poseRoot.quaternion.identity();
+      const pose=poseCatPath(this.cat,catStairs.trip,catStairs.t,time,paused?0:dt,{moving:!catMotion.stairWaiting,phaseOffset:this.catStairPhase*(1-THREE.MathUtils.smoothstep(catStairs.t,0,fade))});
+      this.catStairWalk={stair:pose.walkDistance,cabin:catWalk};
+    }else{
+      if(this.catStairTrip){this.catStairTrip=null;this.catWalkOffset=(this.catWalkOffset??0)+(this.catStairWalk?.stair??catWalk)-(this.catStairWalk?.cabin??catWalk);}
+      animateLucy(this.cat,{time,dt:paused?0:dt,moving:catMoving,facing:catMotion.facing,yaw:catRoutine.poseYaw,headingControlled:catMotion.turns,mode:catRoutine.mode,walkDistance:positionX(catMotion.walkDistance)-positionX(0)+catMotion.portalWalkDistance+catMotion.depthWalkDistance+(this.catWalkOffset??0),passage,hop:wakeHop??hop,turn,actionTime:catRoutine.modeTime,remaining:catRoutine.remaining,playRelease:catRoutine.playRelease});
+    }
     const pursuit=catRoutine.mouseChase,run=pursuit?.pose,mouse=pursuit?.mouse;
     if(!paused&&run&&run.speed>.45)this.catRun?.update({distance:run.distance,speed:run.speed});
     this.mouse.root.visible=Boolean(mouse?.visible);

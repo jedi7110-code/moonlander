@@ -87,7 +87,7 @@ async function start(){
     let dot=0;for(const pose of poses)for(const foot of pose.feet){if(dot<dots.length)dots[dot++].position.set(foot.x,foot.y+.025,foot.z);}
     for(let i=0;i<dots.length;i++)dots[i].visible=i<dot;
     if(['human','robot','cat'].includes(view)){
-      const a=traffic.agents.find(a=>a.id===view),p=view==='cat'?cat.position:stairContact(a.s,a.direction,.32),target=new THREE.Vector3(p.x,p.y+(view==='cat'?.28:.95),p.z);
+      const a=traffic.agents.find(a=>a.id===view),p=view==='cat'?cat.position:view==='human'?human.position.clone().setY(human.position.y-.055):stairContact(a.s,a.direction,.32),target=new THREE.Vector3(p.x,p.y+(view==='cat'?.28:.95),p.z);
       const offset=view==='cat'?new THREE.Vector3(0,.32,2.8):new THREE.Vector3(view==='robot'?-2:0,.7,5.8);
       controls.target.lerp(target,dt>0?.16:1);camera.position.lerp(target.clone().add(offset),dt>0?.16:1);
     }

@@ -251,8 +251,9 @@ export class CabinSoundEvents {
     audio.setLoop('shower','shower',bathroom?.id==='shower'&&bathroom.phase==='use',{position:locations.shower});
     if(bathroom===this.previousBathroom&&bathroom?.id==='toilet'&&this.previousBathroomPhase==='use'&&bathroom.phase==='reopen')audio.play('flush',{position:locations.toilet});
     this.previousBathroom=bathroom;this.previousBathroomPhase=bathroom?.phase;
-    const milo={x:(actor.x-700)*.022,y:(870-actor.y)*.016+.1,z:pose?.depth??.78};
-    const walking=actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid;
+    const stairs=actor.onStairs,onStair=stairs?.trip.frame(stairs.t);
+    const milo=onStair?{x:onStair.x,y:onStair.y+.1,z:onStair.z}:{x:(actor.x-700)*.022,y:(870-actor.y)*.016+.1,z:pose?.depth??.78};
+    const walking=actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid&&!actor.waitingForStairs&&!actor.stairWaiting;
     this.stride('milo',(actor.walkDistance??0)*.022,walking,walkCycle.cycleDistance/2,milo);
     this.stride('bathroom',pose?.walkDistance??0,Boolean(pose?.moving),walkCycle.cycleDistance/2,milo);
     // Count ladder rungs from height, not time; waiting on the ladder is silent.
@@ -268,7 +269,7 @@ export class CabinSoundEvents {
     if(droid!==this.lidDroid){this.lids.clear();this.lidDroid=droid;}
     if(droid){
       const step=droid.step,p=droid.position,position={x:p.x,y:p.y+.65,z:p.z};
-      const moving=step?.kind==='walk'&&!droid.waiting;
+      const moving=(step?.kind==='walk'||step?.kind==='stairs')&&!droid.waiting;
       this.droidFootfall(droid.walkDistance??0,moving,position);
       // One quiet stroke per pivot pair / rung, with silence between strokes.
       // Climbing follows travelled height, never a running buzz or wall clock.

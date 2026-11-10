@@ -4,6 +4,7 @@ import {DROID_STARTUP_SECONDS} from './droid-startup.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
 import {worldActor,nextActor,nextDroid} from './curtis-traffic.js';
 import {DROID_LADDER_LANDING,LADDER_ENTRY,DROID_GAIT} from './pace.js';
+import {stairTrip} from './stair-trip.js';
 
 export const DROID_JOBS=Object.freeze({
   cargo:'支援物資を倉庫へ運搬',harvest:'野菜を収穫',laundry:'衣類を洗濯',
@@ -36,6 +37,7 @@ export class DroidRoutine {
     this.wasteKind=null;this.binWaste=null;this.disposedWaste=0;this.incineratorOpen=0;this.incineratingUntil=0;
   }
   get step(){return this.steps[0]??null;}
+  onStairTrip(){return this.step?.kind==='stairs';}
   get docked(){return !this.job&&!this.steps.length;}
   get label(){return this.docked?'充電休止':this.waiting&&this.step?.ladderEntry?'ハシゴの空き待ち':this.returning?'充電台へ戻る':this.carrying==='waste'||this.step?.action?.startsWith('waste-')?'ごみを焼却ボックスへ':DROID_JOBS[this.job];}
   get station(){return this.returning?null:STATIONS[this.job];}
@@ -51,6 +53,7 @@ export class DroidRoutine {
       walking:s?.kind==='walk'&&!this.waiting,
       turn:s?.turn??null,
       rest:this.docked?1:s?.kind==='wake'?1-u:s?.kind==='sleep'?u:0,
+      stairs:s?.kind==='stairs'&&s.decided?{trip:s.trip,t:s.t}:null,
       climb:s?.kind==='climb'?{from:s.from.y,to:s.to.y,startDepth:s.from.z,endDepth:s.to.z,progress:u,
         landingProgress:s.landingDuration&&this.age>=s.duration-s.landingDuration?
           (this.age-s.duration+s.landingDuration)/s.landingDuration:null}:null};
@@ -75,7 +78,8 @@ export class DroidRoutine {
     this.crewRequest=callback;return true;
   }
   blocksCrew(actor,dt=1/60){
-    const route=actor?.loungeAvoidance;
+    // (a bend round the robot itself is not a route the robot has to keep out of)
+    const route=actor?.loungeAvoidance?.robot?null:actor?.loungeAvoidance;
     if(route&&route.floor===actor.floor){
       const from=worldActor(actor),to=nextActor(actor,dt);
       // Let a robot already passing the sofa clear the detour before Milo
@@ -154,7 +158,21 @@ export class DroidRoutine {
   }
   travel(floor,x,z){
     this.walk(this.plan.x,LANE);
-    if(floor!==this.plan.floor){
+    if(floor!==this.plan.floor&&this.stairs){
+      // By the left stair tower when it is usable when the robot gets there;
+      // otherwise the step expands into the ladder route below (same end).
+      const trip=stairTrip(this.plan.floor,floor,{fromZ:LANE,toZ:LANE});
+      // From the dock (2 cm short of the trip start) just turn toward the tower.
+      if(Math.abs(this.plan.x-trip.from.x)>.05)this.walk(trip.from.x,LANE);
+      this.turn(-Math.PI/2);
+      this.add('stairs',Infinity,null,{trip,t:0,floor,decided:false});
+      this.plan={x:trip.to.x,y:DROID_FLOORS[floor],z:LANE,floor,yaw:Math.PI/2};
+    }else if(floor!==this.plan.floor)this.ladderSteps(floor,x);
+    this.walk(x,LANE);this.walk(x,z,floor);
+  }
+  // Ladder route from the current plan position to (endX, lane) on `floor`.
+  ladderSteps(floor,x,endX=null){
+    {
       const side=Math.sign(this.plan.x)||Math.sign(x)||-1;
       this.walk(side*DROID_LADDER_TRAFFIC.droidWaitX,LANE);
       this.add('ladder-wait',.1,null,{ladderEntry:true,ladderPath:{from:this.plan.y,to:DROID_FLOORS[floor]}});
@@ -169,8 +187,42 @@ export class DroidRoutine {
       this.walk(0,LANE);
       this.walk((Math.sign(x)||side)*DROID_LADDER_TRAFFIC.droidWaitX,LANE);
       this.add('ladder-release',.01,()=>{this.ladderClaim=false;this.ladderRoute=null;});
+      if(endX!==null)this.walk(endX,LANE);
     }
-    this.walk(x,LANE);this.walk(x,z,floor);
+  }
+  // Replace the stairs step at the head with a ladder route. The aisle walk
+  // planned after the trip (along the lane on the arrival deck) is folded into
+  // it, so the droid goes straight to where that walk ended instead of back
+  // to the tower, and finally faces the way the next planned step expects.
+  stairsToLadder(s){
+    let n=1,end=null;
+    for(;n<this.steps.length;n++){
+      const next=this.steps[n];
+      if(!['walk','turn'].includes(next.kind)||next.action||!next.to||next.to.floor!==s.floor||Math.abs(next.to.z-LANE)>1e-6)break;
+      end=next.to;
+    }
+    const saved=this.steps,plan=this.plan;
+    this.steps=[];this.plan={...this.position};this.ladderSteps(s.floor,end?.x??s.trip.to.x,end?.x??s.trip.to.x);
+    if(end)this.turn(end.yaw);else this.turn(Math.PI/2);
+    const ladder=this.steps;this.steps=saved;this.plan=plan;
+    this.steps.splice(0,n,...ladder);this.age=0;
+  }
+  stairsStep(s,dt){
+    if(!s.decided){
+      s.decided=true;
+      if(!this.stairs.available(this,s.trip)){this.stairsToLadder(s);return;}
+      this.stairs.enter(this,'droid',s.trip,0);
+    }
+    const want=SPEED*Math.min(1,s.trip.pace(s.t))*dt,{travel,waiting,stuck}=this.stairs.advance(this,want,dt);
+    if(stuck){this.stairs.giveUp(this);this.stairsToLadder(s);return;}
+    this.waiting=waiting;s.t=this.stairs.walker(this).t;this.walkDistance+=travel;
+    const f=s.trip.frame(Math.min(s.t,s.trip.length));
+    Object.assign(this.position,{x:f.x,y:f.y,z:f.z,yaw:f.yaw});
+    if(s.t>=s.trip.length){
+      this.stairs.leave(this);
+      Object.assign(this.position,{x:s.trip.to.x,y:DROID_FLOORS[s.floor],z:LANE,floor:s.floor,yaw:Math.PI/2});
+      this.steps.shift();this.age=0;
+    }
   }
   enterRear(floor,x,z){
     this.travel(floor,-1.88,-1.22);this.walk(-1.88,-2.70,floor,DROID_FLOORS[floor]+.122);
@@ -269,7 +321,7 @@ export class DroidRoutine {
     this.waiting=false;this.waitingForCat=false;
     if(this.docked){if(this.time>=this.restUntil){const job=this.choose();if(job)this.request(job);}return;}
     const s=this.step;if(!s)return;
-    const route=this.actor?.loungeAvoidance;
+    const route=this.actor?.loungeAvoidance?.robot?null:this.actor?.loungeAvoidance;
     if(s.kind==='walk'&&route&&route.floor===this.actor.floor){
       const crew=worldActor(this.actor),next=nextDroid(this,dt);
       const from=Math.abs(this.position.x-route.x),to=Math.abs(next.x-route.x);
@@ -278,10 +330,27 @@ export class DroidRoutine {
       if(Math.abs(crew.x-route.x)<route.halfWidth&&Math.abs(crew.y-this.position.y)<1.4&&
         to<route.halfWidth+.70&&to<from){this.waiting=true;return;}
     }
+    // On the stair tower only the stair traffic holds the droid.
+    if(s.kind==='stairs'&&s.decided){this.stairsStep(s,dt);return;}
     if(this.visitor?.blocksDroid?.(this,dt)){this.waiting=true;return;}
+    // walking in the cabin, the droid gives way to anyone on a stair trip
+    if(s.kind==='walk'&&s.to&&this.stairs?.blocksBystander(this,this.position,nextDroid(this,dt),dt)){this.waiting=true;return;}
+    // ... and does not walk into Milo: it stops at arm's length while he is
+    // still walking (clearing its way), and goes on past him, without
+    // touching, when he has stopped to wait for it; for at most 10 s
+    if(s.kind==='walk'&&s.to&&this.actor&&!this.actor.onStairTrip?.()){
+      const crew=worldActor(this.actor),next=nextDroid(this,dt);
+      const before=Math.hypot(this.position.x-crew.x,this.position.z-crew.z),after=Math.hypot(next.x-crew.x,next.z-crew.z);
+      const blocked=Math.abs(this.position.y-crew.y)<.6&&after<(this.actor.robotWait>0?.4:.5)&&after<before-1e-9;
+      this.crewWait=blocked?(this.crewWait??0)+dt:0;
+      // (when Milo is held up by something else he will not move out of the way: only a moment then)
+      const a=this.actor,held=a.waitingForVisitor||a.waitingForHatch||a.waitingForCat||a.waitingForDroid||!a.busy;
+      if(blocked&&this.crewWait<(held?1.5:10)){this.waiting=true;return;}
+    }else this.crewWait=0;
     this.waitingForCat=Boolean(this.cat?.motion?.blocksDroid(this,dt));
     if(this.waitingForCat){this.waiting=true;return;}
     if(s.guard&&this.occupied(this.job)){this.waiting=true;return;}
+    if(s.kind==='stairs'){this.stairsStep(s,dt);return;}
     if(s.ladderEntry&&!this.ladderClaim){
       if(this.visitor?.ladderClaim&&ladderPathsConflict(s.ladderPath,this.visitor.ladderPath)){this.waiting=true;return;}
       const crewNear=this.actor?.climbing||Math.abs((this.actor?.x??0)-LADDER_X)*.022<DROID_LADDER_TRAFFIC.crewClearX;

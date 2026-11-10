@@ -5,17 +5,80 @@ import {createCatTurn,sampleCatTurn,angleDelta} from './cat-turn.js';
 import {APPROVED_RESTS,approvedRestRelease} from './cat-approved-rest.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {crewWalkway} from './cabin-walkway.js';
+import {worldActor,nextActor} from './curtis-traffic.js';
 import {CabinMouseChase} from './mouse-chase.js';
+import {stairTrip} from './stair-trip.js';
+import {humanTripDistance} from './human-stair-gait.js';
+
+const toPx=x=>x/.022+700,toPxY=y=>870-y/.016;
 
 export const CAT_WALK_SPEED=18;
 const CAT_FREE_REST_MODES=new Set(['look','groom','sleep','stretch','prone']);
 const CAT_REST_YAWS=Array.from({length:8},(_,i)=>i*Math.PI/4);
 const CAT_WAKE_PREP_SECONDS=.3,CAT_WAKE_LAND_SECONDS=.45;
 
+// Where the robot stands at work in or next to the crew's aisle lane (the
+// galley, the incinerator), the crew walks round it: the lane bends away from
+// the robot the way it bends round the lounge sofa (crewWalkway). The bend is
+// only set or taken away while Milo is outside it, so he never jumps sideways.
+export const ROBOT_DETOUR=Object.freeze({near:.56,clear:.62,halfWidth:1.25,drift:.4,space:.5,brush:.4,limit:10,moment:1.5});
+function robotDetour(actor,droid,dt){
+  const route=actor.loungeAvoidance;
+  if(route&&!route.robot)return;
+  const p=droid?.position,x=(actor.x-700)*.022,D=ROBOT_DETOUR;
+  if(route){
+    // Keep the bend while Milo is in it. If the robot moves on to a work
+    // spot next to the first one meanwhile, the bend drifts over to it.
+    if(Math.abs(x-route.x)<route.halfWidth&&route.floor===actor.floor){
+      if(p&&droid.step?.kind==='work'&&Math.abs(p.y-(870-FLOORS[actor.floor].y)*.016)<.6&&Math.abs(p.z-CABIN_AISLE.crewZ)<D.near&&Math.abs(p.x-route.x)<D.halfWidth){
+        const step=D.drift*dt,toward=(a,b)=>a+Math.max(-step,Math.min(step,b-a));
+        actor.loungeAvoidance={...route,x:toward(route.x,p.x),depth:toward(route.depth,p.z+D.clear)};
+      }
+      return;
+    }
+    actor.loungeAvoidance=null;
+  }
+  const walk=actor.queue[0];
+  if(!p||droid.docked||!['work','turn'].includes(droid.step?.kind)||walk?.type!=='walk')return;
+  if(Math.abs(p.y-(870-FLOORS[actor.floor].y)*.016)>.6||Math.abs(p.z-CABIN_AISLE.crewZ)>=D.near||Math.abs(x-p.x)<D.halfWidth)return;
+  // only to walk past: where Milo is going to stop next to the robot (a
+  // station, the start of a stair trip) he stays on his lane
+  if(Math.abs((walk.x-700)*.022-p.x)<D.halfWidth)return;
+  actor.loungeAvoidance={robot:true,floor:actor.floor,x:p.x,halfWidth:D.halfWidth,depth:p.z+D.clear};
+}
+
 export function advanceCabinTraffic(actor,cat,dt,droid=null){
   if(dt<=0)return;
+  robotDetour(actor,droid,dt);
   actor.waitingForCat=cat.motion.blocksCrew(actor,dt);
-  if(!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid&&!actor.waitingForVisitor)actor.update(dt);
+  // walking in the cabin, the crew gives way to anyone on a stair trip
+  actor.waitingForStairs=Boolean(actor.queue[0]?.type==='walk'&&actor.stairs?.blocksBystander(actor,worldActor(actor),nextActor(actor,dt),dt));
+  // ... and does not walk into the robot (the robot goes first: it crosses
+  // the lane, Milo walks along it). After ROBOT_DETOUR.limit seconds Milo
+  // goes on; on the way to the stairs he takes the ladder instead when the
+  // robot is at them.
+  let blocked=false;
+  if(!actor.waitingForStairs&&actor.queue[0]?.type==='walk'&&droid&&!droid.docked&&!droid.onStairTrip?.()){
+    const from=worldActor(actor),to=nextActor(actor,dt),p=droid.position;
+    const before=Math.hypot(from.x-p.x,from.z-p.z),after=Math.hypot(to.x-p.x,to.z-p.z),level=Math.abs(p.y-from.y)<.6;
+    // The stretch the robot is about to walk: Milo stays out of it; if he is
+    // already in it he walks on to clear it and may brush past the robot.
+    const goal=droid.step?.kind==='walk'?droid.step.to:null;let inWay=false;
+    if(goal&&level){
+      const dx=goal.x-p.x,dz=goal.z-p.z,length=Math.hypot(dx,dz),reach=Math.min(length,2.5);
+      const gap=q=>{const u=length<1e-6?0:Math.max(0,Math.min(reach,((q.x-p.x)*dx+(q.z-p.z)*dz)/length));return Math.hypot(q.x-p.x-dx/Math.max(length,1e-6)*u,q.z-p.z-dz/Math.max(length,1e-6)*u);};
+      inWay=gap(from)<ROBOT_DETOUR.clear;
+      blocked=!inWay&&gap(to)<ROBOT_DETOUR.clear;
+    }
+    actor.inRobotWay=inWay;
+    if(!blocked)blocked=level&&after<(inWay?ROBOT_DETOUR.brush:ROBOT_DETOUR.space)&&after<before-1e-9;
+  }else actor.inRobotWay=false;
+  actor.robotWait=blocked?(actor.robotWait??0)+dt:0;
+  // (a robot that is itself held up is not going to move out of the way: Milo only waits a moment for it)
+  const patience=droid?.waiting?ROBOT_DETOUR.moment:ROBOT_DETOUR.limit;
+  if(blocked&&actor.robotWait>1&&actor.queue[1]?.type==='stairs'&&!actor.queue[1].entered)actor.stairsFallback(actor.queue[1]);
+  else if(blocked&&actor.robotWait<patience)actor.waitingForStairs=true;
+  if(!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid&&!actor.waitingForVisitor&&!actor.waitingForStairs)actor.update(dt);
   cat.update(dt,actor,droid);
 }
 
@@ -27,6 +90,9 @@ export class CrewMotion {
   }
   get busy(){return this.queue.length>0;}
   get climbing(){return this.queue[0]?.type==='climb';}
+  // walking a stair trip (between two decks by the left stair tower)
+  get onStairs(){const s=this.queue[0];return s?.type==='stairs'&&s.entered?s:null;}
+  onStairTrip(){return this.queue[0]?.type==='stairs';}
   setSymbol(symbol){this.symbol=symbol;}
   knock(){this.knockTime=.7;}
   goTo(target,onArrive) {
@@ -35,14 +101,73 @@ export class CrewMotion {
     target=getStation(target?.id)??target;
     if(!target||!FLOORS[target.floor])return;
     this.commandVersion++;
-    const queue=[];
+    // A stair trip in progress is finished first; plan the rest from its end.
+    const current=this.onStairs;
+    if(current){
+      // (a jam before the stair itself re-plans to this newest target)
+      current.target=target;
+      this.queue=[current,...(current.floor===target.floor?[{type:'walk',x:target.x}]:[{type:'replan',target}])];
+      this.onArrive=onArrive||null;return;
+    }
+    this.queue=this.planRoute(target);this.onArrive=onArrive||null;
+  }
+  // Floor changes take the stair tower when a shared CabinStairs is attached
+  // and the stairs are usable; otherwise (and in plain studies) the ladder.
+  planRoute(target,{ladder=false}={}){
+    const queue=[],atFloor=this.y===FLOORS[this.floor].y;
+    if(!ladder&&this.stairs&&atFloor&&target.floor!==this.floor){
+      const trip=stairTrip(this.floor,target.floor);
+      if(this.stairs.available(this,trip)){
+        if(this.x!==toPx(trip.from.x))queue.push({type:'walk',x:toPx(trip.from.x)});
+        queue.push({type:'stairs',trip,floor:target.floor,t:0,entered:false,target});
+        queue.push({type:'walk',x:target.x});return queue;
+      }
+    }
     // Retargeting on a ladder preserves the current height, including mid-climb.
     if(this.y!==FLOORS[target.floor].y){
       if(this.x!==LADDER_X)queue.push({type:'walk',x:LADDER_X});
       queue.push({type:'climb',floor:target.floor,y:FLOORS[target.floor].y,startY:this.y,
         mounting:this.y===FLOORS[this.floor].y});
     }
-    queue.push({type:'walk',x:target.x});this.queue=queue;this.onArrive=onArrive||null;
+    queue.push({type:'walk',x:target.x});return queue;
+  }
+  stairsFallback(seg){this.queue=[...this.planRoute(seg.target,{ladder:true})];}
+  // Travel wanted on a stair trip this step. The trip is walked at the cabin
+  // speed the walker arrived with (a change of health takes effect after it).
+  stairTravel(seg,dt){const speed=seg.arrival.speed;return speed*seg.trip.pace(seg.t,speed)*dt;}
+  // The crew walks onto and off a stair trip without breaking step.
+  get walksThrough(){return true;}
+  // The walk counter (which drives the walk cycle and the footstep sounds)
+  // follows the trip's footfalls: they slow down and shorten at the stairs.
+  beginStairWalk(seg){seg.arrival={speed:this.walkSpeed*.022,entry:this.walkDistance*.022};}
+  stairWalk(seg){this.walkDistance=humanTripDistance(seg.trip,Math.min(seg.t,seg.trip.length),seg.arrival)/.022;}
+  // One step along the stair trip at the head of the queue.
+  stairStep(seg,dt){
+    if(!seg.entered){
+      // (someone may have come to stand at the entrance since the route was planned)
+      if(this.stairs.blockedAtStart(this,seg.trip)){this.stairsFallback(seg);return;}
+      this.stairs.enter(this,this.stairKind??'crew',seg.trip,seg.t);seg.entered=true;this.beginStairWalk(seg);
+    }
+    const want=this.stairTravel(seg,Math.max(0,dt));
+    const {travel,waiting,stuck}=this.stairs.advance(this,want,dt);
+    this.stairWaiting=waiting;
+    if(stuck){
+      // The stairs are jammed at the entrance: take the ladder from here.
+      this.stairs.giveUp(this);this.stairWaiting=false;this.stairsFallback(seg);return;
+    }
+    seg.t=this.stairs.walker(this).t;
+    const f=seg.trip.frame(Math.min(seg.t,seg.trip.length));
+    this.x=toPx(f.x);this.y=toPxY(f.y);this.stairWalk(seg,travel);
+    if(Math.abs(f.dx)>.2)this.facing=Math.sign(f.dx);
+    if(seg.t>=seg.trip.length){
+      const over=(seg.t-seg.trip.length)/(this.walkSpeed*.022),through=this.walksThrough;
+      this.stairs.leave(this);this.floor=seg.floor;this.x=toPx(seg.trip.to.x);this.y=FLOORS[seg.floor].y;
+      this.queue.shift();
+      if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}
+      // walking straight on into the cabin (or to a route planned on the
+      // stairs): spend the rest of this step there
+      else if(through&&over>0&&['walk','replan'].includes(this.queue[0].type))this.advance(over);
+    }
   }
   walkStep(dt){
     const s=this.queue[0],step=this.walkSpeed*Math.max(0,dt);
@@ -57,7 +182,16 @@ export class CrewMotion {
   }
   update(dt) {
     this.knockTime=Math.max(0,this.knockTime-dt);
+    this.advance(dt);
+  }
+  advance(dt){
     const seg=this.queue[0];if(!seg)return;
+    if(seg.type==='stairs'){this.stairStep(seg,dt);return;}
+    if(seg.type==='replan'){
+      const callback=this.onArrive;this.queue=this.planRoute(getStation(seg.target?.id)??seg.target);this.onArrive=callback;
+      if(this.walksThrough&&this.queue[0]?.type==='walk')this.advance(dt);
+      return;
+    }
     const key=seg.type==='climb'?'y':'x',speed=seg.type==='climb'?this.climbSpeed:this.walkSpeed;
     const delta=seg[key]-this[key];let landingSpeed=1;
     if(seg.type==='climb'){
@@ -75,7 +209,11 @@ export class CrewMotion {
       this.walkDistance+=this.loungeAvoidance?Math.hypot(dx,(to-from)/.022):Math.abs(dx);
     }
     if(key==='x'&&Math.abs(delta)>.01)this.facing=Math.sign(delta);
-    if(Math.abs(delta)<=step){this[key]=seg[key];if(seg.type==='climb')this.floor=seg.floor;this.queue.shift();if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}}
+    if(Math.abs(delta)<=step){
+      this[key]=seg[key];if(seg.type==='climb')this.floor=seg.floor;this.queue.shift();if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}
+      // walking straight on into a stair trip: spend the rest of this step on it
+      else if(this.walksThrough&&seg.type==='walk'&&this.queue[0].type==='stairs'&&step>0)this.advance(dt*(1-Math.abs(delta)/step));
+    }
     else this[key]+=Math.sign(delta)*step;
   }
 }
@@ -100,13 +238,28 @@ export class CatMotion extends CrewMotion {
     return null;
   }
   get climbing(){return false;}
+  get stairKind(){return 'cat';}
+  // A calm cat keeps about 0.5 m/s up and down the flights (stair study).
+  stairTravel(seg,dt){return this.walkSpeed*.022*1.25*dt;}
+  get walksThrough(){return false;}
+  beginStairWalk(){}
+  stairWalk(seg,travel){this.walkDistance+=travel/.022;}
+  // Jammed stairs: the cat takes its wall passage instead (stairs avoided now).
+  stairsFallback(){this.queue=[];this.plan();}
+  stairStep(seg,dt){
+    super.stairStep(seg,dt);
+    if(this.queue[0]===seg){const f=seg.trip.frame(seg.t);this.z=f.z;this.heading=f.yaw;}
+    else if(this.floor===seg.floor&&this.y===FLOORS[seg.floor].y){this.z=seg.trip.to.z;this.heading=seg.trip.frame(seg.trip.length).yaw;}
+  }
   get passageWalkSeconds(){return Math.abs(CAT_PORT.walkZ-CAT_PORT.turnInset-CAT_PORT.insideZ)/(this.walkSpeed*.022);}
   get hidden(){return ['close','transit','reopen'].includes(this.portal?.phase);}
   goTo(target,onArrive){
     if(!target||!FLOORS[target.floor])return;
     this.commandVersion++;this.destination={floor:target.floor,x:target.x,z:target.z??CAT_PORT.walkZ};this.onDestination=onArrive||null;
-    // Finish an occupied passage before following a changed destination.
-    if(!this.portal&&!this.hop)this.plan();
+    // Finish an occupied passage or stair trip before following a changed
+    // destination (a trip re-plans from its end: onArrive -> plan()).
+    if(this.onStairTrip())this.onArrive=()=>this.plan();
+    else if(!this.portal&&!this.hop)this.plan();
   }
   plan(){
     if(!this.destination)return;
@@ -120,6 +273,18 @@ export class CatMotion extends CrewMotion {
       this.onArrive=()=>{this.facing=up?1:-1;this.hop={up,phase:'prepare',age:0,duration:.14};};return;
     }
     const crossing=this.destination.floor!==this.floor;
+    // Change decks by the stair tower when it is usable (not from the sofa);
+    // the wall passage otherwise.
+    if(crossing&&this.stairs&&!this.onSofa&&this.y===FLOORS[this.floor].y){
+      const trip=stairTrip(this.floor,this.destination.floor,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ});
+      if(this.stairs.available(this,trip)){
+        this.queue=[];
+        if(this.z!==CAT_PORT.walkZ)this.queue.push({type:'depth',z:CAT_PORT.walkZ});
+        if(this.x!==toPx(trip.from.x))this.queue.push({type:'walk',x:toPx(trip.from.x)});
+        this.queue.push({type:'stairs',trip,floor:this.destination.floor,t:0,entered:false,target:this.destination});
+        this.onArrive=()=>this.plan();return;
+      }
+    }
     this.queue=[];
     if(!this.onSofa&&this.z!==CAT_PORT.walkZ&&(crossing||this.destination.x!==this.x))this.queue.push({type:'depth',z:CAT_PORT.walkZ});
     this.queue.push({type:'walk',x:crossing?CAT_PORT.x:this.destination.x});
@@ -131,6 +296,8 @@ export class CatMotion extends CrewMotion {
   }
   get laneYaw(){const segment=this.queue[0];return segment?.type==='depth'?(segment.z<this.z?Math.PI:0):null;}
   get crossing(){
+    // On the stair tower the stair traffic keeps the distances.
+    if(this.onStairs)return null;
     const segment=this.queue[0];
     let min=this.x,max=this.x,seconds=0,active=false;
     if(this.hop){min=CAT_SOFA.floorX;max=CAT_SOFA.seatX;seconds=1;active=this.hop.up||this.hop.started||this.hop.phase!=='prepare';}
@@ -173,7 +340,8 @@ export class CatMotion extends CrewMotion {
   blocksDroid(droid,dt){return Boolean(this.crossing?.active&&this.droidInCrossing(droid,dt));}
   update(dt,actor=null,droid=null){
     if(dt<=0)return;
-    if(this.visitor?.blocksCat(this,dt))return;
+    // On the stair tower only the stair traffic holds the cat.
+    if(!this.onStairTrip()&&this.visitor?.blocksCat(this,dt))return;
     if(this.turn){
       this.turn.age=Math.min(this.turn.duration,this.turn.age+dt);this.heading=sampleCatTurn(this.turn).yaw;
       if(this.turn.age===this.turn.duration){

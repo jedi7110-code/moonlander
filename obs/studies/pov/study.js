@@ -153,7 +153,7 @@ async function start(){
   for(const [type,fn,options]of view.listeners)canvas.removeEventListener(type,fn,options);view.listeners=[];
   view.milo.rotation.y=['water','console'].includes(previewArea)?Math.PI:Math.PI/2;
   view.render(.016,0,actor,brain,cat,care,false,airlock);
-  rigs=createRigs();wall=createViewingWall(cabinWallMaterials(view.ship.staticMesh));view.scene.add(wall);
+  rigs=createRigs();wall=createViewingWall(cabinWallMaterials(view.ship.staticMesh),{stairTower:Boolean(view.ship.staticMesh.userData.stairTower)});view.scene.add(wall);
   comfort=new StableFirstPersonCamera(view.milo,rigs.milo.eyePosition());
   if(previewActivity){
     brain.nextLeisure=previewActivity;brain._startPerform(getStation('lounge'));brain.update(LOUNGE_ENTRY_SECONDS);

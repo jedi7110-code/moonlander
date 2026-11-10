@@ -1,4 +1,6 @@
 import {worldActor,worldCat,close,approaches,nextActor,nextDroid,CREW_CLEARANCE,CAT_CLEARANCE} from './curtis-traffic.js';
+import {stairTrip} from './stair-trip.js';
+import {humanTripDistance} from './human-stair-gait.js';
 import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,LOUNGE_ACCESS,getStation,ladderApproachDepth} from './layout.js';
 import {crewWalkway} from './cabin-walkway.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
@@ -37,6 +39,7 @@ export class CurtisRoutine {
   range([a,b]){return a+(b-a)*this.random();}
   get step(){return this.steps[0]??null;}
   get ladderPath(){return this.ladderClaim?{from:this.position.y,to:this.claimEnd}:null;}
+  onStairTrip(){return this.active&&this.step?.kind==='stairs';}
   get approachingLadderPath(){
     let crosses=false;
     for(const step of this.steps){
@@ -74,6 +77,47 @@ export class CurtisRoutine {
     const from=this.steps.at(-1)?.to??this.position,y=leave?CURTIS.top:FLOORS[floor];
     this.add('climb',{x:0,y,z:leave?ladderApproachDepth(0):ladderApproachDepth(floor)},Math.abs(y-from.y)/.46+2.4,{enter,leave,floor});
   }
+  // Inside the cabin the visitor changes decks by the stair tower when it is
+  // usable when he gets there; otherwise (or without stairs) by the ladder.
+  changeDeck(from,to){
+    if(!this.stairs){this.aisleTo(0,from);this.climbTo(to);return;}
+    const trip=stairTrip(from,to);
+    this.aisleTo(trip.from.x,from);
+    const last=this.steps.at(-1)?.to??this.position;
+    this.steps.push({kind:'stairs',from:{...last},to:{x:trip.to.x,y:FLOORS[to],z:trip.to.z},duration:Infinity,trip,t:0,decided:false,fromFloor:from,floor:to});
+  }
+  // Replace the stairs step with the ladder, folding in the aisle walk that
+  // followed the trip on the arrival deck (no detour back to the tower).
+  stairsToLadder(s){
+    let n=1,end=s.to;
+    for(;n<this.steps.length;n++){
+      const next=this.steps[n];
+      if(next.kind!=='walk'||Math.abs(next.to.y-FLOORS[s.floor])>1e-6||Math.abs(next.to.z-curtisWalkway(next.to.x,s.floor))>1e-6)break;
+      end=next.to;
+    }
+    const saved=this.steps;this.steps=[];
+    this.aisleTo(0,s.fromFloor);this.climbTo(s.floor);this.aisleTo(end.x,s.floor);
+    const ladder=this.steps;this.steps=saved;this.steps.splice(0,n,...ladder);this.age=0;
+  }
+  stairsStep(s,dt){
+    // Back from the passing side-step onto the aisle before the trip starts.
+    const offset=this.passOffset??0;
+    if(!s.decided&&Math.abs(offset)>.005){
+      const k=Math.min(Math.abs(offset),dt*.85);this.passOffset=offset-Math.sign(offset)*k;
+      this.walkDistance+=k;this.yaw=offset>0?Math.PI:0;return;
+    }
+    if(!s.decided){
+      s.decided=true;
+      if(!this.stairs.available(this,s.trip)){this.stairsToLadder(s);return;}
+      this.stairs.enter(this,'crew',s.trip,0);s.arrival={speed:CURTIS_WALK_SPEED,entry:this.walkDistance};
+    }
+    const want=CURTIS_WALK_SPEED*s.trip.pace(s.t,CURTIS_WALK_SPEED)*dt,{waiting,stuck}=this.stairs.advance(this,want,dt);
+    if(stuck){this.stairs.giveUp(this);this.stairsToLadder(s);return;}
+    this.waiting=waiting;s.t=this.stairs.walker(this).t;this.walkDistance=humanTripDistance(s.trip,s.t,s.arrival);
+    const f=s.trip.frame(Math.min(s.t,s.trip.length));
+    this.position={x:f.x,y:f.y,z:f.z};this.yaw=f.yaw;this.passOffset=0;
+    if(s.t>=s.trip.length){this.stairs.leave(this);this.position={...s.to};this.steps.shift();this.age=0;}
+  }
   lounge(){
     this.aisleTo(CURTIS.seatX,1);
     this.walk(CURTIS.seatX,FLOORS[1],.43);
@@ -92,7 +136,7 @@ export class CurtisRoutine {
     this.active=true;this.visits++;this.age=0;this.passOffset=0;this.position={x:0,y:CURTIS.top,z:ladderApproachDepth(0)};
     this.climbTo(1,{enter:true});
     if(this.random()<.5){this.lounge();this.coffee();}else{this.coffee();this.lounge();}
-    this.aisleTo(0,1);this.climbTo(0);this.aisleTo(CURTIS.roomX,0);
+    this.changeDeck(1,0);this.aisleTo(CURTIS.roomX,0);
     // The rear room has an open portal and a raised 11 cm metal floor.
     this.walk(CURTIS.roomX,FLOORS[0],-1.30);
     this.walk(CURTIS.roomX,FLOORS[0]+.11,-1.85);
@@ -133,9 +177,9 @@ export class CurtisRoutine {
     if(actor){
       const seated=this.active&&this.floor===1&&['sit','relax','stand'].includes(this.step?.kind);
       const x=(actor.x-700)*.022;
-      if(seated&&actor.floor===1)actor.loungeAvoidance??=CURTIS_LOUNGE_PASSAGE;
+      if(seated&&actor.floor===1&&!actor.loungeAvoidance?.robot)actor.loungeAvoidance??=CURTIS_LOUNGE_PASSAGE;
       // Keep a route already in use until Milo is clear, even if Curtis rises.
-      else if(actor.loungeAvoidance&&Math.abs(x-actor.loungeAvoidance.x)>=actor.loungeAvoidance.halfWidth)actor.loungeAvoidance=null;
+      else if(actor.loungeAvoidance===CURTIS_LOUNGE_PASSAGE&&Math.abs(x-actor.loungeAvoidance.x)>=actor.loungeAvoidance.halfWidth)actor.loungeAvoidance=null;
     }
     if(this.active&&actor){
       const from=worldActor(actor),to=nextActor(actor,dt);
@@ -159,6 +203,7 @@ export class CurtisRoutine {
     }
     const s=this.step;if(!s)return;
     this.waiting=false;
+    if(s.kind==='stairs'){this.stairsStep(s,dt);return;}
     const obstacles=[];
     if(actor){
       const position=worldActor(actor);
@@ -204,6 +249,12 @@ export class CurtisRoutine {
     if(this.ladderClaim&&s.kind!=='climb'&&(Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.clearX||
       (!path&&Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.mergeX)))this.ladderClaim=false;
     if(s.kind==='walk'){
+      // walking in the cabin, the visitor gives way to anyone on a stair trip
+      if(this.stairs){
+        const p=this.trafficPosition,u=Math.min(1,(this.age+dt)/s.duration);
+        const next={x:s.from.x+(s.to.x-s.from.x)*u,y:s.from.y+(s.to.y-s.from.y)*u,z:s.from.z+(s.to.z-s.from.z)*u+(this.passOffset??0)};
+        if(this.stairs.blocksBystander(this,p,next,dt)){this.waiting=true;return;}
+      }
       const near=(x,y,z,r)=>Math.abs(y-this.position.y)<1&&Math.hypot(x-this.position.x,z-this.position.z)<r;
       const cm=cat?.motion;
       // Only wait for crossings already in progress, so the other actor can finish.

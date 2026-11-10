@@ -17,7 +17,7 @@ view.milo.visible=false;view.cat.visible=false;view.droidService.root.visible=fa
 // kitchen even when this static check hides the droid and other job props.
 view.scene.attach(view.droidService.props.pot);
 view.ship.medical.rig.root.visible=false;
-const viewingWall=createViewingWall(cabinWallMaterials(view.ship.staticMesh));view.scene.add(viewingWall);
+const viewingWall=createViewingWall(cabinWallMaterials(view.ship.staticMesh),{stairTower:Boolean(view.ship.staticMesh.userData.stairTower)});view.scene.add(viewingWall);
 const nearWallViews=[
  {label:'操縦区画の向かい',deck:0,x:-10.45,eyeX:-11.1},{label:'医療区画の向かい',deck:0,x:1.7},
  {label:'寝台の向かい',deck:1,x:-3.5},{label:'ラウンジの向かい',deck:1,x:6.9},

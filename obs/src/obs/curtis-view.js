@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {createCurtis} from './curtis-model.js?v=print12';
 import {animateMilo} from './characters.js';
+import {poseHumanTrip} from './human-stair-gait.js';
 import {applyThighHands} from './seated-pose.js';
 import {applyCabinLadder} from './cabin-ladder.js';
 import {loungeExitPose} from './lounge-exit.js';
@@ -87,11 +88,14 @@ export class CurtisView {
       const pose=exit?loungeExitPose(poseAge):{depth:.06};
       root.position.x=CURTIS.seatX;root.position.z=pose.depth;
     }
-    animateMilo(root,{moving:s.kind==='walk',waiting:routine.waiting,climbing:false,
+    const curtisPose={moving:s.kind==='walk'||s.kind==='stairs',waiting:routine.waiting,climbing:false,
       facing:Math.sign(Math.sin(routine.yaw))||1,walkYaw:routine.yaw,walkDistance:routine.walkDistance,
       action:seated?'lounge':s.kind==='coffee'?'hydro':null,
       time:routine.time,dt,actionTime:coffee?(coffee.brewing?0:coffee.drinkTime):age,actionDuration:coffee?coffee.drinkDuration:s.duration,
-      leisure:conversation?'conversation':null,conversation,loungeExit:exit,diningDocks:s.kind==='coffee'?{mug:this.dock}:null});
+      leisure:conversation?'conversation':null,conversation,loungeExit:exit,diningDocks:s.kind==='coffee'?{mug:this.dock}:null};
+    // On the stair tower the stair walk places body and legs (as for Milo).
+    if(s.kind==='stairs'&&s.decided)poseHumanTrip(root,s.trip,s.t,routine.time,{waiting:routine.waiting,arrival:s.arrival,cabinPose:(walkDistance,walkStride)=>animateMilo(root,{...curtisPose,walkDistance,walkStride})});
+    else animateMilo(root,curtisPose);
     if(seated){
       if(s.kind==='sit')root.rotation.y+=Math.PI*(1-THREE.MathUtils.smoothstep(age,0,.6));
       const weight=s.kind==='sit'?THREE.MathUtils.smoothstep(lowering,0,1):s.kind==='stand'?1-THREE.MathUtils.smoothstep(age,0,s.duration):1;

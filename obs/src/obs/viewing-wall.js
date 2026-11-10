@@ -7,7 +7,7 @@ import {EVA_BAY,EVA_HATCH_FIT} from './eva.js';
 import {FOOTLIGHT} from './viewing-footlights.js';
 import {addViewingWallDressing} from './viewing-wall-dressing.js';
 import {addViewingWallDetails} from './viewing-wall-details.js';
-import {VIEWING_WALL as PROFILE,viewingWallWindow,viewingWallPanelX,viewingWallFaceZ} from './viewing-wall-profile.js';
+import {VIEWING_WALL as PROFILE,VIEWING_WALL_TOWER as TOWER,viewingWallWindow,viewingWallPanelX,viewingWallFaceZ} from './viewing-wall-profile.js';
 
 function octagon(path,w,h,corner=.12,cy=0,cx=0){
   const points=[[-w/2+corner,-h/2],[w/2-corner,-h/2],[w/2,-h/2+corner],[w/2,h/2-corner],[w/2-corner,h/2],[-w/2+corner,h/2],[-w/2,h/2-corner],[-w/2,-h/2+corner]];
@@ -35,7 +35,7 @@ function surfaceMount(parent,name,x,floor,from,to){
 }
 function upperEquipment(parent,m,diffuser,x,floor,index){
   const mount=surfaceMount(parent,'POV / upper service bay',x,floor,PROFILE.shoulder,PROFILE.top);
-  if(index%3===2){
+  if(viewingWallWindow(index)){
     box(mount,m.dark,0,0,.032,1.16,.43,.05).name='Upper light recess';
     box(mount,diffuser,0,0,.062,1.03,.30,.018).name='Upper louvered diffuser';
     for(let i=0;i<7;i++)box(mount,m.metal,-.45+i*.15,0,.085,.027,.34,.032).name='Upper light guard';
@@ -63,10 +63,10 @@ function viewport(parent,m,x,floor){
     const bolt=cylinder(parent,m.dark,x+dx,floor+y+dy,z-.091,.019,.014,.019,6);bolt.rotation.x=Math.PI/2;bolt.name='Window frame fastener';
   }
 }
-function exteriorSpace(){
+function exteriorSpace(firstIndex){
   const root=new Group();root.name='POV / space beyond windows';
   const windows=[];
-  for(const floor of FLOOR_Y)for(let i=0;i<PROFILE.count;i++)if(viewingWallWindow(i))windows.push({
+  for(const floor of FLOOR_Y)for(let i=firstIndex;i<PROFILE.count;i++)if(viewingWallWindow(i))windows.push({
     x:viewingWallPanelX(i),y:floor+PROFILE.windowY,z:PROFILE.faceZ+.145,
     width:PROFILE.windowWidth,height:PROFILE.windowHeight,cut:.12,
   });
@@ -108,9 +108,14 @@ export function cabinWallMaterials(ship){
   return materials;
 }
 
-export function createViewingWall(m,{mergeStatic=true}={}){
+// `stairTower`: the ship has the left stair tower (ship.staticMesh.userData.stairTower).
+export function createViewingWall(m,{mergeStatic=true,stairTower=false}={}){
   const root=new Group();root.name='POV / matching cabin enclosure';
   const front=CABIN_AISLE.deckFront,operations=FLOOR_Y[DECK.OPERATIONS];
+  // Across the stair tower the same bays continue to its outer lining.
+  const firstIndex=stairTower?TOWER.firstIndex:0,leftEdge=stairTower?TOWER.left:-PROFILE.halfWidth;
+  const wallWidth=PROFILE.halfWidth-leftEdge,wallX=(PROFILE.halfWidth+leftEdge)/2;
+  const span=(name,material,y,z,h,d,half)=>{const left=stairTower?leftEdge:-half;return solid(name,material,(left+half)/2,y,z,half-left,h,d);};
   const diffuser=new MeshBasicMaterial({name:'POV / concealed footlight diffuser',color:0xffdfb3,toneMapped:false});
   diffuser.userData.castShadow=false;
   const overhead=new MeshBasicMaterial({name:'POV / upper diffuser',color:0xe0e8e2,toneMapped:false});overhead.userData.castShadow=false;
@@ -133,12 +138,12 @@ export function createViewingWall(m,{mergeStatic=true}={}){
   // No full-height sheet sits behind the windows.
   for(const floor of FLOOR_Y){
     const mid=(PROFILE.knee+PROFILE.shoulder)/2,height=PROFILE.shoulder-PROFILE.knee;
-    const backing=rectangle(PROFILE.halfWidth*2,height);
-    for(let i=0;i<PROFILE.count;i++)if(viewingWallWindow(i))backing.holes.push(octagon(new Path(),PROFILE.windowWidth,PROFILE.windowHeight,.12,PROFILE.windowY-mid,viewingWallPanelX(i)));
-    extrusion(root,'Front pressure backing',backing,m.rubber,0,floor+mid,PROFILE.faceZ+.052,.16);
-    slope(root,'Lower pressure backing',m.dark,0,floor,PROFILE.halfWidth*2,PROFILE.bottom,PROFILE.knee,.052,.16);
-    slope(root,'Upper pressure backing',m.dark,0,floor,PROFILE.halfWidth*2,PROFILE.shoulder,PROFILE.top,.052,.16);
-    for(let i=0;i<FOOTLIGHT.count;i++){
+    const backing=rectangle(wallWidth,height);
+    for(let i=firstIndex;i<PROFILE.count;i++)if(viewingWallWindow(i))backing.holes.push(octagon(new Path(),PROFILE.windowWidth,PROFILE.windowHeight,.12,PROFILE.windowY-mid,viewingWallPanelX(i)-wallX));
+    extrusion(root,'Front pressure backing',backing,m.rubber,wallX,floor+mid,PROFILE.faceZ+.052,.16);
+    slope(root,'Lower pressure backing',m.dark,wallX,floor,wallWidth,PROFILE.bottom,PROFILE.knee,.052,.16);
+    slope(root,'Upper pressure backing',m.dark,wallX,floor,wallWidth,PROFILE.shoulder,PROFILE.top,.052,.16);
+    for(let i=firstIndex;i<FOOTLIGHT.count;i++){
       const x=FOOTLIGHT.firstX+i*FOOTLIGHT.spacing;
       const face=rectangle(1.48,height);
       if(viewingWallWindow(i))face.holes.push(octagon(new Path(),PROFILE.windowWidth,PROFILE.windowHeight,.12,PROFILE.windowY-mid));
@@ -157,28 +162,31 @@ export function createViewingWall(m,{mergeStatic=true}={}){
       }
     }
     // Close the narrow end bays using the same cross-section as the panels.
-    for(const [left,right]of [[-PROFILE.halfWidth,FOOTLIGHT.firstX-.76],[FOOTLIGHT.firstX+(FOOTLIGHT.count-1)*FOOTLIGHT.spacing+.76,PROFILE.halfWidth]]){
+    for(const [left,right]of [[leftEdge,viewingWallPanelX(firstIndex)-.76],[FOOTLIGHT.firstX+(FOOTLIGHT.count-1)*FOOTLIGHT.spacing+.76,PROFILE.halfWidth]]){
       const width=right-left,x=(left+right)/2;
       solid('Front end bay',m.enamel,x,floor+mid,PROFILE.faceZ+.0225,width,height,.045);
       slope(root,'Lower end bay',m.enamel,x,floor,width,PROFILE.bottom,PROFILE.knee);
       slope(root,'Upper end bay',m.enamel,x,floor,width,PROFILE.shoulder,PROFILE.top);
     }
-    solid('Front skirting',m.dark,0,floor+.029,front-.049,26.2,.064,.09);
-    solid('Front sill backing',m.dark,0,floor+.069,front+.104,26.3,.154,.20);
-    solid('Front ceiling seam',m.dark,0,floor+3.02,front-.073,26.2,.16,.14);
-    solid('Front interdeck closure',m.dark,0,floor+3.21,PROFILE.edgeZ+.105,26.3,.22,.21);
+    span('Front skirting',m.dark,floor+.029,front-.049,.064,.09,13.1);
+    span('Front sill backing',m.dark,floor+.069,front+.104,.154,.20,13.15);
+    span('Front ceiling seam',m.dark,floor+3.02,front-.073,.16,.14,13.1);
+    span('Front interdeck closure',m.dark,floor+3.21,PROFILE.edgeZ+.105,.22,.21,13.15);
   }
   // Side walls stop at z=1.595; the roof now reaches the forward deck edge.
   for(const side of [-1,1]){
     const spans=side===1?[[-.365,operations],[operations+3.242,10.245]]:[[-.365,10.245]];
     const outside=PROFILE.faceZ+.226;
-    for(const [bottom,top]of spans)solid('Side wall return',m.enamel,side*13.07,(bottom+top)/2,(1.57+outside)/2,.40,top-bottom,outside-1.57);
-    solid('Roof return',m.dark,side*7,10.31,(front-.03+outside+.014)/2,12.9,.26,outside+.014-front+.03);
+    // The tower's outer lining reaches the deck front; its return starts there.
+    const tower=side<0&&stairTower,x=tower?leftEdge+.08:side*13.07,from=tower?2.30:1.57;
+    for(const [bottom,top]of spans)solid('Side wall return',m.enamel,x,(bottom+top)/2,(from+outside)/2,.40,top-bottom,outside-from);
+    const inner=.55,outer=tower?.2-leftEdge:13.45;
+    solid('Roof return',m.dark,side*(inner+outer)/2,10.31,(front-.03+outside+.014)/2,outer-inner,.26,outside+.014-front+.03);
   }
   const roofOutside=PROFILE.faceZ+.24;
   solid('Central roof return',m.dark,0,10.31,(front+roofOutside)/2,1.10,.26,roofOutside-front);
   pressureReturns(root,m,operations);
   addViewingWallDressing(root,m.fixtures,FLOOR_Y);
   addViewingWallDetails(root,m,FLOOR_Y,overhead);
-  const result=mergeStatic?batchStatic(root):root;result.add(exteriorSpace());result.name=root.name;result.visible=false;return result;
+  const result=mergeStatic?batchStatic(root):root;result.add(exteriorSpace(firstIndex));result.name=root.name;result.visible=false;return result;
 }

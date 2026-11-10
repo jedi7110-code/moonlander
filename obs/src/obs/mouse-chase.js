@@ -17,7 +17,8 @@ export class CabinMouseChase {
   get pose(){return this.controlled?this.sim.cat:null;}
   canReact(cat){
     const m=cat.motion;
-    return !cat.bunkWake&&!cat.pendingMove&&!cat.playHost&&!m.onSofa&&!m.hop&&!m.portal&&!m.turn
+    // (not on the stair tower: the chase takes over her plan on a floor only)
+    return !cat.bunkWake&&!cat.pendingMove&&!cat.playHost&&!m.onSofa&&!m.hop&&!m.portal&&!m.turn&&!m.onStairTrip?.()
       &&!m.waitingForCrew&&!m.waitingForDroid&&m.elevation===0&&Math.abs(m.z-CAT_PORT.walkZ)<.001
       &&cat.hunger>25&&cat.energy>20&&INTERRUPTIBLE.has(cat.mode);
   }

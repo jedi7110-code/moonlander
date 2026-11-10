@@ -11,7 +11,7 @@ if(['0','1','2'].includes(params.get('floor')))deck.value=params.get('floor');
 let mode=['front','window','detail'].includes(params.get('view'))?params.get('view'):'corridor';
 const view=await ObservationView.create(document.querySelector('canvas'));view.observer.disconnect();
 view.milo.visible=false;view.cat.visible=false;view.droidService.root.visible=false;view.ship.medical.rig.root.visible=false;
-const wall=createViewingWall(cabinWallMaterials(view.ship.staticMesh));wall.visible=true;view.scene.add(wall);view.deckStyle?.setFootlightsVisible(true);
+const wall=createViewingWall(cabinWallMaterials(view.ship.staticMesh),{stairTower:Boolean(view.ship.staticMesh.userData.stairTower)});wall.visible=true;view.scene.add(wall);view.deckStyle?.setFootlightsVisible(true);
 function render(){
   const y=FLOOR_Y[Number(deck.value)],camera=view.camera,width=innerWidth,height=innerHeight-64;
   camera.near=.025;camera.far=150;camera.aspect=width/height;

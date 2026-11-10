@@ -7,7 +7,12 @@ export const VIEWING_WALL={
   firstX:-11.8,spacing:1.52,count:16,halfWidth:13.15,
   windowY:1.52,windowWidth:1.02,windowHeight:1.12,
 };
-export const viewingWallWindow=index=>index%3===2;
+// With the left stair tower the wall continues over three more bays (negative
+// indices) to the tower's outer lining. The cabin's window spacing carries on,
+// which puts one window beside the stair entrance (bay -1) and none at the
+// turn landing, where the landing slab would cut across it.
+export const VIEWING_WALL_TOWER={firstIndex:-3,left:-17.695};
+export const viewingWallWindow=index=>(index%3+3)%3===2;
 export const viewingWallPanelX=index=>VIEWING_WALL.firstX+index*VIEWING_WALL.spacing;
 export function viewingWallFaceZ(y){
   const p=VIEWING_WALL;

@@ -128,7 +128,7 @@ function flange(root,m,x,y,z,r){
   }
 }
 
-function cableRun(root,m,left,right,y,z,count=4,sag=.42,ceilingY=null){
+export function cableRun(root,m,left,right,y,z,count=4,sag=.42,ceilingY=null){
   const spacing=ceilingY===null?.061:.04;
   // Pack overhead bundles closer to the ceiling so their low point clears door signs.
   if(ceilingY!==null){y=Math.min(y,ceilingY-.16);sag=Math.min(sag,.22);}

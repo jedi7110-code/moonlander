@@ -119,7 +119,7 @@ export class CabinBrain extends Brain {
     const medicalTime=medicalActive?this.curDurSec-this.performT:0;
     const treatmentTime=medicalActive?Math.max(0,Math.min(medicalTime+dt,this.curDurSec-MED_BED.transition)-Math.max(medicalTime,MED_BED.transition)):0;
     const smokingTime=smoking?.update(dt)??0;
-    this.health.update(dt,{needs:this.needs,activity:this.state==='performing'?this.cur?.id:null,moving:this.actor.busy,climbing:this.actor.climbing,treatmentTime,smokingTime});
+    this.health.update(dt,{needs:this.needs,activity:this.state==='performing'?this.cur?.id:null,moving:this.actor.busy,climbing:this.actor.climbing||Boolean(this.actor.onStairs?.trip.flightGap(this.actor.onStairs.t)===0),treatmentTime,smokingTime});
     this.actor.walkSpeed=this.baseWalkSpeed*this.health.speedFactor;this.actor.climbSpeed=this.baseClimbSpeed*this.health.speedFactor;
     const exercising=this.state==='performing'&&this.cur?.id==='gym';
     this.exercise=Math.max(0,Math.min(100,this.exercise+dt*(exercising?100/16:-.20*CABIN_PACE.needDecay)));

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import {animateMilo} from '../../src/obs/characters.js';
 import {STAIR_ROUTE_LENGTH,stairPoint,stairContact,stairFoot,STAIRS} from './route.js';
 const V=(...p)=>new THREE.Vector3(...p),down=V(0,-1,0),up=V(0,1,0);
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -22,32 +21,6 @@ export function agentFeet(agent){
   return {center,feet};
 }
 
-function solveHumanLeg(rig,target){
-  const {leg,knee,boot}=rig,origin=leg.position.clone(),delta=target.clone().sub(origin),distance=delta.length();
-  const upper=knee.position.length(),lower=boot.position.length();
-  const d=Math.min(distance,upper+lower-.001),axis=delta.normalize();
-  const pole=V(0,-.1,1);pole.addScaledVector(axis,-pole.dot(axis)).normalize();
-  const along=(upper*upper+d*d-lower*lower)/(2*d),height=Math.sqrt(Math.max(0,upper*upper-along*along));
-  const joint=origin.clone().addScaledVector(axis,along).addScaledVector(pole,height);
-  leg.quaternion.setFromUnitVectors(knee.position.clone().normalize(),joint.clone().sub(origin).normalize());
-  const world=new THREE.Quaternion().setFromUnitVectors(boot.position.clone().normalize(),target.clone().sub(joint).normalize());
-  knee.quaternion.copy(leg.quaternion).invert().multiply(world);
-  boot.quaternion.copy(world).invert();
-}
-
-export function poseHuman(root,agent,time){
-  const {center,feet}=agentFeet(agent),yaw=center.yaw;
-  animateMilo(root,{moving:agent.wait!==Infinity&&!agent.waiting,waiting:agent.waiting,climbing:false,facing:1,walkYaw:yaw,walkStyle:'legacy',walkDistance:agent.s,time,dt:1/60});
-  root.position.set(center.x,Math.min(...feet.map(p=>p.y)),center.z);root.rotation.set(0,yaw,0);
-  const {body,legs}=root.userData;body.position.set(0,-.075,0);body.quaternion.identity();
-  for(let i=0;i<legs.length;i++){
-    const p=feet[i],target=V(p.x,p.y+.107,p.z).sub(root.position).applyAxisAngle(up,-yaw).sub(body.position);
-    solveHumanLeg(legs[i],target);
-  }
-  root.userData.updateWristTwists?.();root.updateMatrixWorld(true);
-  return {center,feet};
-}
-
 export function poseRobot(robot,parent,load,agent,time){
   const {center,feet}=agentFeet(agent),yaw=center.yaw;
   parent.position.set(center.x,Math.min(...feet.map(p=>p.y)),center.z);parent.rotation.set(0,yaw,0);
@@ -59,3 +32,4 @@ export function poseRobot(robot,parent,load,agent,time){
 }
 
 export {poseCatStairs as poseCat} from './cat-gait.js';
+export {poseHumanStairs as poseHuman} from './human-gait.js';

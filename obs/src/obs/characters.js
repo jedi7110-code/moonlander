@@ -219,7 +219,7 @@ export function* createMiloSteps(m,headModel=new THREE.Group(),{elbowStyle='supp
   root.userData.updateWristTwists?.();attachMiloWatch(root);attachMiloBioSensor(root);attachSmokingProps(root);attachHatchRepairTool(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,conversation=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,hatchRepair=null,sequentialBedEntry=true}) {
+export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',walkStride=1,actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,conversation=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,hatchRepair=null,sequentialBedEntry=true}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   setMiloNeckProtraction(root,0);
   root.userData.spineCurve=null;
@@ -278,7 +278,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
     // still use Milo's selected walk, driven by actual passage distance.
     const distance=bathroom?.moving?bathroom.walkDistance:walkDistance;
     if(walkStyle==='legacy')applyWalkingPose(root,distance);
-    else applyMocapWalk(root,miloWalkData,distance/miloWalkData.cycleDistance*miloWalkData.duration);
+    else applyMocapWalk(root,miloWalkData,distance/miloWalkData.cycleDistance*miloWalkData.duration,walkStride);
   }
   if(!dining&&!bathroom)applyCurrentMiloTurn(root,{upperBody:!calling});
   if(seated&&action==='lounge'&&!leisure)applyDeskHands(root);

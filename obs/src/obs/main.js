@@ -5,6 +5,8 @@ import {loungeGamePromptAvailable,updateLoungeGamePrompt} from './lounge-prompt.
 import {LEISURE_LABELS} from './leisure.js';
 import {t,line,getLang,toggleLang} from '../../../js/obs/i18n.js?v=15';
 import {CrewMotion,Supplies,CatRoutine,getStation,currentAction,advanceCabinTraffic} from './state.js';
+import {CabinStairs,cabinBodies} from './stair-traffic.js';
+import {worldActor} from './curtis-traffic.js';
 import {ObservationView} from './view.js';
 import {loadCabinLucyGroomCache} from './lucy-cabin.js';
 import {ObservationXR} from './xr.js';
@@ -53,7 +55,13 @@ const needOrders={
   bladder:{station:'toilet',icon:'toilet',label:['トイレへ行く','Use the toilet'],detail:['トイレを使用して回復します。','Restore this level by using the toilet.']},
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
-const care=new Supplies(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine',...LOUNGE_VOICE_IDS,...DROID_POWER_SOUND_IDS,...DROID_HUM_SOUND_IDS]});
+const care=new Supplies(),stairs=new CabinStairs(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine',...LOUNGE_VOICE_IDS,...DROID_POWER_SOUND_IDS,...DROID_HUM_SOUND_IDS]});
+// Floor changes use the left stair tower; the ladder when it is jammed.
+actor.stairs=stairs;cat.motion.stairs=stairs;
+// the stairs keep trips and everybody who is not on a trip off each other
+// (smoking, Milo stands at the ashtray ledge, away from the aisle)
+const crewDepth=a=>brain.smokingVisit?.pose?.depth??worldActor(a).z;
+stairs.bodies=cabinBodies({actor,catMotion:cat.motion,crewDepth});
 const soundEvents=new CabinSoundEvents(audio);
 // Lucy's grooming correction cache arrives after the cabin is on screen.
 cat.groomAvailable=false;
@@ -373,10 +381,10 @@ async function start(){
     progress(.1);
     view=await ObservationView.create($('ship-view'),{characterViews:true,deferGroomCache:true,deferOptional:true,nextFrame:nextStartupFrame,onProgress:value=>progress(.1+value*.62)});
     document.documentElement.dataset.cabinViewReadyMs=performance.now().toFixed(1);
-    if(new URLSearchParams(location.search).has('debug'))globalThis.cabinView=view;
+    if(new URLSearchParams(location.search).has('debug')){globalThis.cabinView=view;globalThis.cabinSim={actor,brain,cat,care,airlock,stairs,get droid(){return view.droidRoutine;}};}
     view.audio=audio;
-    const droid=new DroidRoutine({care,brain,actor,cat});view.droidRoutine=droid;brain.droidRoutine=droid;
-    const curtis=new CurtisRoutine({prepare:()=>Promise.all([view.prepareCurtis(),audio.loadDeferred('coffeeMachine')])});
+    const droid=new DroidRoutine({care,brain,actor,cat});droid.stairs=stairs;view.droidRoutine=droid;brain.droidRoutine=droid;
+    const curtis=new CurtisRoutine({prepare:()=>Promise.all([view.prepareCurtis(),audio.loadDeferred('coffeeMachine')])});curtis.stairs=stairs;stairs.bodies=cabinBodies({actor,droid,catMotion:cat.motion,curtis,crewDepth});
     view.curtisRoutine=curtis;droid.visitor=curtis;cat.motion.visitor=curtis;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);
@@ -467,7 +475,7 @@ async function start(){
         accumulator+=dt;
         if(view.catRun&&openingMousePending&&(cat.mouseChase.appearOpening(cat)||!brain.openingWake))openingMousePending=false;
         // The shared 2D brain uses a 60 Hz tick for its social timer.
-        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;care.update(step);airlock.update(step,actor,brain.environment);
+        while(accumulator>=1/60&&!games.open){const step=1/60;elapsed+=step;stairs.update(step);care.update(step);airlock.update(step,actor,brain.environment);
           if(view.startupLighting?.done)curtis.update(step,{actor,droid,cat,brain});
           actor.waitingForVisitor=curtis.blocksCrew(actor,step);
           actor.waitingForDroid=droid.blocksCrew(actor,step);advanceCabinTraffic(actor,cat,step,droid);brain.update(step);droid.update(step);soundEvents.update(step,{actor,brain,droid,airlock,care,cat,curtis});for(let i=timers.length-1;i>=0;i--)if(timers[i].at<=elapsed){const timer=timers.splice(i,1)[0];timer.callback();}accumulator-=step;}
