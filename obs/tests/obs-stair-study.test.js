@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {STAIRS,STAIR_SEGMENTS,STAIR_ROUTE_LENGTH,stairPoint,stairContact,stairFoot,StairTraffic} from '../studies/stairs/route.js';
+import {STAIRS,STAIR_SEGMENTS,STAIR_ROUTE_LENGTH,stairPoint,stairContact,stairFoot,StairTraffic,ROBOT_ROUTE_LENGTH,stairRouteLength} from '../studies/stairs/route.js';
 import {createStairStructure} from '../studies/stairs/structure.js';
 
 test('two switchback decks share the existing floor heights with twenty equal risers each',()=>{
@@ -26,15 +26,35 @@ test('opposing traffic keeps right and every step has a finite safe contact targ
   }
 });
 
-test('three agents complete both directions without a ladder or same-lane overlap',()=>{
-  const traffic=new StairTraffic();
-  for(let i=0;i<9000;i++){
+test('the robot starts toward the rear top flight and skips the guarded front approach',()=>{
+  const traffic=new StairTraffic(),robot=traffic.agents.find(a=>a.id==='robot');
+  const topFlight=STAIR_SEGMENTS.filter(s=>s.kind==='flight').at(-1);
+  assert.equal(robot.s,ROBOT_ROUTE_LENGTH);assert.equal(robot.direction,-1);
+  let previous=Infinity;
+  for(let i=0;i<=120;i++){
+    const p=stairContact(robot.s,robot.direction,.32);
+    assert.ok(p.z<.20,'the start must stay behind the front guardrail');
+    if(robot.s>=topFlight.end){
+      const distance=Math.hypot(p.x-STAIRS.right,p.z-(STAIRS.back+.32));
+      assert.ok(distance<=previous+1e-9,'first movement must approach the descending stairs');previous=distance;
+    }
     traffic.update(1/120);
-    for(const a of traffic.agents){assert.ok(a.s>=0&&a.s<=STAIR_ROUTE_LENGTH);assert.ok(a.wait>=0);}
   }
-  assert.ok(traffic.agents.every(a=>a.wait===Infinity));
-  assert.ok(traffic.agents.find(a=>a.id==='human').s===STAIR_ROUTE_LENGTH);
-  assert.equal(traffic.agents.find(a=>a.id==='robot').s,0);
+  assert.ok(robot.s<topFlight.end,'the robot should enter the stairs within its first second');
+});
+
+test('three agents complete both directions without a ladder or same-lane overlap',()=>{
+  for(const reversed of [false,true]){
+    const traffic=new StairTraffic();
+    if(reversed)for(const a of traffic.agents){a.s=stairRouteLength(a.id)-a.s;a.direction*=-1;}
+    for(let i=0;i<9000;i++){
+      traffic.update(1/120);
+      for(const a of traffic.agents){assert.ok(a.s>=0&&a.s<=stairRouteLength(a.id));assert.ok(a.wait>=0);}
+    }
+    assert.ok(traffic.agents.every(a=>a.wait===Infinity));
+    assert.equal(traffic.agents.find(a=>a.id==='human').s,reversed?0:STAIR_ROUTE_LENGTH);
+    assert.equal(traffic.agents.find(a=>a.id==='robot').s,reversed?ROBOT_ROUTE_LENGTH:0);
+  }
 });
 
 test('stair plates, stringers, pressure lining and rails are batched into a small finite model',()=>{

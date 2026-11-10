@@ -13,7 +13,7 @@ import {createDroidChargingBay} from '../../src/obs/droid-charging.js';
 import {createMiloToon} from '../../src/obs/milo-toon.js';
 import {createCabinToon} from '../../src/obs/cabin-toon.js';
 import {CABIN_AMBIENCE,limitCabinLights} from '../../src/obs/lighting.js';
-import {StairTraffic,STAIRS,STAIR_SEGMENTS,stairContact,STAIR_ROUTE_LENGTH} from './route.js';
+import {StairTraffic,STAIRS,STAIR_SEGMENTS,stairContact,STAIR_ROUTE_LENGTH,stairRouteLength} from './route.js';
 import {createStairStructure,openCabinLeft} from './structure.js';
 import {poseHuman,poseRobot,poseCat} from './poses.js';
 const $=id=>document.getElementById(id);
@@ -58,7 +58,7 @@ async function start(){
   document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
   function reset(){
     dirty=true;time=0;traffic.reset();
-    if(reversed)for(const a of traffic.agents){a.s=STAIR_ROUTE_LENGTH-a.s;a.direction*=-1;}
+    if(reversed)for(const a of traffic.agents){a.s=stairRouteLength(a.id)-a.s;a.direction*=-1;}
     if(catPass){const catAgent=traffic.agents.find(a=>a.id==='cat'),flight=STAIR_SEGMENTS.find(s=>s.kind==='flight');catAgent.direction=catPass==='up'?1:-1;catAgent.s=catAgent.direction>0?flight.start-.6:flight.end+.6;}
     last=performance.now();
   }
@@ -72,7 +72,7 @@ async function start(){
   $('time').oninput=()=>{const target=Number($('time').value);reset();for(let t=0;t<target-1e-9;t+=1/60)traffic.update(Math.min(1/60,target-t));time=target;playing=false;dirty=true;$('play').textContent='再生';};
   const resize=()=>{const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();dirty=true;};
   controls.addEventListener('change',()=>{dirty=true;});document.querySelectorAll('input[type=checkbox]').forEach(input=>input.onchange=()=>{dirty=true;});
-  const observer=new ResizeObserver(resize);observer.observe(canvas);resize();setView(param.get('view')==='cat'||catPass?'cat':'stairs');
+  const observer=new ResizeObserver(resize);observer.observe(canvas);resize();setView(catPass?'cat':(['cat','robot','human','angle','whole'].includes(param.get('view'))?param.get('view'):'stairs'));
   if(catPass){reset();$('human').checked=false;$('robot').checked=false;}
   window.stairStudy={traffic,scene,stairs,human,cat,robot,robotParent,camera,controls,renderer,removed,setView,get time(){return time;}};
   function draw(dt){
@@ -88,7 +88,7 @@ async function start(){
     for(let i=0;i<dots.length;i++)dots[i].visible=i<dot;
     if(['human','robot','cat'].includes(view)){
       const a=traffic.agents.find(a=>a.id===view),p=view==='cat'?cat.position:stairContact(a.s,a.direction,.32),target=new THREE.Vector3(p.x,p.y+(view==='cat'?.28:.95),p.z);
-      const offset=view==='cat'?new THREE.Vector3(0,.32,2.8):new THREE.Vector3(0,.7,5.8);
+      const offset=view==='cat'?new THREE.Vector3(0,.32,2.8):new THREE.Vector3(view==='robot'?-2:0,.7,5.8);
       controls.target.lerp(target,dt>0?.16:1);camera.position.lerp(target.clone().add(offset),dt>0?.16:1);
     }
     controls.update();toon.update(canvas.clientWidth,canvas.clientHeight,view==='whole'?16:11,16);

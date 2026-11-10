@@ -17,6 +17,10 @@ line([STAIRS.right,CABIN_FLOOR_Y[0],STAIRS.front],[-11.85,CABIN_FLOOR_Y[0],STAIR
 let offset=0;
 export const STAIR_SEGMENTS=Object.freeze(segments.map(s=>{const out={...s,start:offset,end:offset+s.length};offset+=s.length;return Object.freeze(out);}));
 export const STAIR_ROUTE_LENGTH=offset;
+// The top flight is at the rear. Start the robot on its approach, instead of
+// walking toward the guarded front edge where no downward stair exists.
+export const ROBOT_ROUTE_LENGTH=STAIR_SEGMENTS.filter(s=>s.kind==='flight').at(-1).end+.55;
+export const stairRouteLength=id=>id==='robot'?ROBOT_ROUTE_LENGTH:STAIR_ROUTE_LENGTH;
 
 export function stairPoint(distance,{contact=false}={}){
   const d=Math.max(0,Math.min(STAIR_ROUTE_LENGTH,distance));
@@ -55,7 +59,7 @@ export function stairFoot(distance,direction,side,{cycle=.65,stance=.62,forward=
 
 export class StairTraffic {
   constructor(){this.reset();}
-  reset(){this.agents=[{id:'human',s:0,direction:1,speed:.66,wait:0},{id:'robot',s:STAIR_ROUTE_LENGTH,direction:-1,speed:.58,wait:0},{id:'cat',s:STAIR_ROUTE_LENGTH*.48,direction:1,speed:.50,wait:0}];}
+  reset(){this.agents=[{id:'human',s:0,direction:1,speed:.66,wait:0},{id:'robot',s:ROBOT_ROUTE_LENGTH,direction:-1,speed:.58,wait:0},{id:'cat',s:STAIR_ROUTE_LENGTH*.48,direction:1,speed:.50,wait:0}];}
   update(dt){
     for(const a of this.agents){
       a.waiting=false;
@@ -66,8 +70,9 @@ export class StairTraffic {
         if(gap>0)travel=Math.min(travel,Math.max(0,gap-clearance));
       }
       a.waiting=travel<a.speed*dt*.5;
-      a.s=Math.max(0,Math.min(STAIR_ROUTE_LENGTH,a.s+a.direction*travel));
-      if(a.s===0||a.s===STAIR_ROUTE_LENGTH)a.wait=Infinity;
+      const end=stairRouteLength(a.id);
+      a.s=Math.max(0,Math.min(end,a.s+a.direction*travel));
+      if(a.s===0||a.s===end)a.wait=Infinity;
     }
   }
 }
