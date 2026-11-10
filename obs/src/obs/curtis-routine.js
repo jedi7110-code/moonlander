@@ -1,5 +1,4 @@
 import {worldActor,worldCat,close,approaches,nextActor,nextDroid,CREW_CLEARANCE,CAT_CLEARANCE} from './curtis-traffic.js';
-import {stairTrip} from './stair-trip.js';
 import {humanTripDistance} from './human-stair-gait.js';
 import {CABIN_FLOOR_Y as FLOORS,CABIN_AISLE,LOUNGE_TABLE,LOUNGE_ACCESS,getStation,ladderApproachDepth} from './layout.js';
 import {crewWalkway} from './cabin-walkway.js';
@@ -81,7 +80,7 @@ export class CurtisRoutine {
   // usable when he gets there; otherwise (or without stairs) by the ladder.
   changeDeck(from,to){
     if(!this.stairs){this.aisleTo(0,from);this.climbTo(to);return;}
-    const trip=stairTrip(from,to);
+    const at=this.steps.at(-1)?.to??this.position,trip=this.stairs.trip(from,to,at.x,at.x);
     this.aisleTo(trip.from.x,from);
     const last=this.steps.at(-1)?.to??this.position;
     this.steps.push({kind:'stairs',from:{...last},to:{x:trip.to.x,y:FLOORS[to],z:trip.to.z},duration:Infinity,trip,t:0,decided:false,fromFloor:from,floor:to});

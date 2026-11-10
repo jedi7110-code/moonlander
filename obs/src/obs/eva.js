@@ -77,15 +77,18 @@ export function* createEVABaySteps(m,y){
 export function createEVAPartitions(m,y){
   const root=new THREE.Group();root.name='Permanent airlock partitions';
   const front=CABIN_AISLE.deckFront,back=-1.87;
-  for(const x of [EVA_BAY.innerX,EVA_BAY.hatchX]){
-    const top=x===EVA_BAY.innerX?3.396:3.242;
-    const shape=new THREE.Shape();shape.moveTo(back,0);shape.lineTo(front,0);shape.lineTo(front,top);shape.lineTo(back,top);shape.closePath();
-    const points=pressureCassetteOutline(cassette).map(([z,yy])=>[z*hatchScale+EVA_BAY.depth,yy*hatchScale+EVA_HATCH_FIT.centerY]).reverse();
-    const opening=new THREE.Path();opening.moveTo(...points[0]);for(const point of points.slice(1))opening.lineTo(...point);opening.closePath();shape.holes.push(opening);
-    const bulkhead=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.20,bevelEnabled:false,steps:1}),m.enamel);
-    bulkhead.name='Hatch bulkhead return';bulkhead.position.set(x+.155,y,0);bulkhead.rotation.y=-Math.PI/2;bulkhead.castShadow=bulkhead.receiveShadow=true;root.add(bulkhead);
-  }
+  for(const x of [EVA_BAY.innerX,EVA_BAY.hatchX])root.add(createHatchBulkhead(m,x,y,x===EVA_BAY.innerX?3.396:3.242,{back,front}));
   return root;
+}
+// One pressure bulkhead across the deck at x, with the hatch cassette's opening
+// (the hatch itself: createEVAHatch, moved to the same x).
+export function createHatchBulkhead(m,x,y,top,{back=-1.87,front=CABIN_AISLE.deckFront}={}){
+  const shape=new THREE.Shape();shape.moveTo(back,0);shape.lineTo(front,0);shape.lineTo(front,top);shape.lineTo(back,top);shape.closePath();
+  const points=pressureCassetteOutline(cassette).map(([z,yy])=>[z*hatchScale+EVA_BAY.depth,yy*hatchScale+EVA_HATCH_FIT.centerY]).reverse();
+  const opening=new THREE.Path();opening.moveTo(...points[0]);for(const point of points.slice(1))opening.lineTo(...point);opening.closePath();shape.holes.push(opening);
+  const bulkhead=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.20,bevelEnabled:false,steps:1}),m.enamel);
+  bulkhead.name='Hatch bulkhead return';bulkhead.position.set(x+.155,y,0);bulkhead.rotation.y=-Math.PI/2;bulkhead.castShadow=bulkhead.receiveShadow=true;
+  return bulkhead;
 }
 
 export function animateAirlock(door,signal,opening){

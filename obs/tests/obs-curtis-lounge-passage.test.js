@@ -16,7 +16,7 @@ function seatedCurtis(){
 }
 
 test('Milo passes a seated Curtis in either direction with clearance, constant walking speed and matching footfall distance',()=>{
-  for(const dt of [1/120,1/60,1/30,.1])for(const [from,to] of [[3,9],[9,3]]){
+  for(const dt of [1/120,1/60,1/30,.1])for(const [from,to] of [[3,10],[10,3]]){
     const curtis=seatedCurtis(),actor=new CrewMotion({floor:1,x:700+from/.022});
     actor.goTo({floor:1,x:700+to/.022});let depth=0;
     for(let i=0;i<20/dt&&actor.busy;i++){
@@ -26,7 +26,7 @@ test('Milo passes a seated Curtis in either direction with clearance, constant w
       assert.ok(travelled<=actor.walkSpeed*.022*dt*1.04,'the detour must not speed up the walk');
       assert.ok(Math.abs((actor.walkDistance-distance)*.022-travelled)<1e-9,'gait advances by the full curved distance');
       assert.ok(Math.hypot(after.x-CURTIS.seatX,after.z-.06)>CREW_CLEARANCE+.05);
-      assert.ok(after.x+.3<LOUNGE_TABLE.x-LOUNGE_TABLE.width/2||Math.abs(after.z-.78)<1e-8,'the curve rejoins the aisle before the table');
+      assert.ok(Math.hypot(Math.max(0,Math.abs(after.x-LOUNGE_TABLE.x)-LOUNGE_TABLE.width/2),Math.max(0,Math.abs(after.z-LOUNGE_TABLE.z)-LOUNGE_TABLE.depth/2))>.3,'the path clears both Curtis and the table');
       depth=Math.max(depth,after.z);
     }
     assert.equal(actor.busy,false);assert.ok(depth>1.3);assert.equal(worldActor(actor).z,.78);
@@ -52,7 +52,7 @@ test('Milo reaches the authored lounge entry and seats normally while Curtis sta
 });
 
 test('pausing and Curtis standing up mid-pass never snap Milo back into the seated body',()=>{
-  const curtis=seatedCurtis(),actor=new CrewMotion({floor:1,x:700+4/.022});actor.goTo({floor:1,x:700+9/.022});
+  const curtis=seatedCurtis(),actor=new CrewMotion({floor:1,x:700+4/.022});actor.goTo({floor:1,x:700+10.5/.022});
   while((actor.x-700)*.022<CURTIS.seatX){curtis.blocksCrew(actor);actor.update(1/60);}
   const before=worldActor(actor),distance=actor.walkDistance;
   for(let i=0;i<20;i++){curtis.blocksCrew(actor,0);actor.update(0);}
@@ -60,13 +60,13 @@ test('pausing and Curtis standing up mid-pass never snap Milo back into the seat
   curtis.active=false;curtis.blocksCrew(actor);assert.deepEqual(worldActor(actor),before);
   while(actor.busy){const from=worldActor(actor);curtis.blocksCrew(actor);actor.update(1/60);const to=worldActor(actor);assert.ok(Math.hypot(to.x-from.x,to.z-from.z)<.022);}
   curtis.blocksCrew(actor);assert.equal(actor.loungeAvoidance,null);
-  assert.equal(crewWalkway(8,1,1,actor.loungeAvoidance).z,.78);
+  assert.ok(crewWalkway(8,1,1,actor.loungeAvoidance).z>LOUNGE_TABLE.z+LOUNGE_TABLE.depth/2+.3);
 });
 
 
 test('Milo and a passing droid take turns through the lounge detour without overlap or a standoff',()=>{
   for(const [from,to] of [[6.5,3],[10,3],[2,10]]){
-    const curtis=seatedCurtis(),actor=new CrewMotion({floor:1,x:700+3/.022});actor.goTo({floor:1,x:700+9/.022});
+    const curtis=seatedCurtis(),actor=new CrewMotion({floor:1,x:700+3/.022});actor.goTo({floor:1,x:700+10.5/.022});
     const droid=new DroidRoutine({care:new Supplies(),actor});droid.visitor=curtis;droid.job='cook';
     droid.position={x:from,y:3.392,z:1.48,floor:1,yaw:0};
     droid.steps=[{kind:'walk',from:{...droid.position},to:{...droid.position,x:to},duration:Math.abs(to-from)/.928}];

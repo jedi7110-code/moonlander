@@ -87,7 +87,7 @@ export function stairTrip(fromFloor,toFloor,{fromZ=.78,toZ=fromZ,lane=STAIR_LANE
     .map(f=>{const a=enter.length+Math.abs((direction>0?f.start:f.end)-s0),b=enter.length+Math.abs((direction>0?f.end:f.start)-s0);return {flight:f,t0:a,t1:b,direction};});
   if(direction<0)flights.sort((a,b)=>a.t0-b.t0);
   const trip={
-    key,fromFloor,toFloor,direction,length,lane,flights,
+    key,side:-1,fromFloor,toFloor,direction,length,lane,flights,
     from:{x:fromX,y:y0,z:fromZ},to:{x:toX,y:y1,z:toZ},
     enterLength:enter.length,exitStart:enter.length+routeLength,
     routeS(t){return t<enter.length||t>enter.length+routeLength?null:s0+direction*(t-enter.length);},
@@ -136,4 +136,32 @@ export function stairTrip(fromFloor,toFloor,{fromZ=.78,toZ=fromZ,lane=STAIR_LANE
   };
   cache.set(key,Object.freeze(trip));
   return trip;
+}
+
+// ---- The right stair tower (LEVEL 3 <-> LEVEL 2) is the left tower's two
+// lower decks in a mirror (x -> -x), entered from the same aisle lanes. A
+// right trip is therefore the left trip between the same floors, mirrored:
+// the same travel t, length, pace and flights; frame(t) is reflected. Gaits
+// are computed on `mirrorOf` (left-tower space) and reflected in their pose.
+export const RIGHT_TOWER_FLOORS=Object.freeze([1,2]);
+const rightCache=new Map();
+export function rightStairTrip(fromFloor,toFloor,options={}){
+  if(![fromFloor,toFloor].every(f=>RIGHT_TOWER_FLOORS.includes(f))||fromFloor===toFloor)throw new Error(`no right stair trip ${fromFloor}->${toFloor}`);
+  const base=stairTrip(fromFloor,toFloor,options);
+  if(rightCache.has(base.key))return rightCache.get(base.key);
+  const mirror=p=>({...p,x:-p.x});
+  const trip=Object.freeze({...base,key:`R|${base.key}`,side:1,mirrorOf:base,from:mirror(base.from),to:mirror(base.to),
+    frame(t){const f=base.frame(t);return {...f,x:-f.x,dx:-f.dx,yaw:-f.yaw};}});
+  rightCache.set(base.key,trip);return trip;
+}
+export const servedByRightTower=(fromFloor,toFloor)=>fromFloor!==toFloor&&[fromFloor,toFloor].every(f=>RIGHT_TOWER_FLOORS.includes(f));
+// The stair trip between two floors with the shorter walk from x `fromX` to x
+// `toX` (world metres): by the left tower, or by the right one where it serves
+// both floors and `right` is set (the cabin has it).
+export function nearestStairTrip(fromFloor,toFloor,fromX,toX,{right=false,...options}={}){
+  const left=stairTrip(fromFloor,toFloor,options);
+  if(!right||!servedByRightTower(fromFloor,toFloor))return left;
+  const other=rightStairTrip(fromFloor,toFloor,options);
+  const cost=trip=>Math.abs(fromX-trip.from.x)+trip.length+Math.abs(trip.to.x-toX);
+  return cost(other)<cost(left)?other:left;
 }

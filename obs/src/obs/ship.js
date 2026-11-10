@@ -10,7 +10,8 @@ import {createEVABaySteps} from './eva.js';
 import {createMedicalBay,MED_BED} from './medical.js';
 import {createBunk} from './bunk.js';
 import {industrialMaterials,addIndustrialDeck,addWorkLights} from './industrial.js';
-import {createStairTowerGroup,openStairTowerWall} from './stair-tower.js';
+import {createStairTowerGroup,openStairTowerWall,createRightStairTowerGroup,openRightStairTowerWall} from './stair-tower.js';
+import {createEVAReadyRoom} from './eva-ready-room.js';
 import {BULKHEAD_GATE,gateWall,createBulkheadGate} from './bulkhead-gate.js';
 import {addCabinDressingSteps} from './cabin-dressing.js';
 import {configurePocketShutter,addPocketShutterFrame} from './shutter.js';
@@ -343,7 +344,8 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
       box(staticRoot,m.metal,side*13.33,(bottom+top)/2,-.52,.14,top-bottom-.1,2.41,.025);
     }
     for(let i=0;i<27;i++)if(side<0||.11+i*.37<airlockBottom||.11+i*.37>airlockTop)box(staticRoot,m.dark,side*13.40,.11+i*.37,-.25,.18,.1,1.73,.012);
-    pipe(staticRoot,m.dark,[[side*13.63,.20,-.65],[side*13.65,1,-.65],[side*13.65,8.8,-.65],[side*13.15,10.1,-.65]],.115);
+    // (with the stair towers the right end is the right tower and the EVA ready room: no end-wall pipe there)
+    if(!(side>0&&stairTower))pipe(staticRoot,m.dark,[[side*13.63,.20,-.65],[side*13.65,1,-.65],[side*13.65,8.8,-.65],[side*13.15,10.1,-.65]],.115);
   }
   yield;
   for(const [level,y]of FLOOR_Y.entries()){
@@ -511,20 +513,28 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
   const coffeeMug=staticRoot.getObjectByName('Coffee / TARAIRON mug');
   if(coffeeMug)animated.attach(coffeeMug);
   for(const part of [washerDoor,washerClothes])if(part)animated.attach(part);
-  animated.add(createRearWindowStars(staticRoot,{rotating:true}));
   yield;
   if(stairTower){
     // Left stair tower between the three decks (cabin interior only; the
     // exterior hull does not include it yet). It replaces the old left wall.
     staticRoot.updateMatrixWorld(true);openStairTowerWall(staticRoot);
     staticRoot.add(createStairTowerGroup(m));
+    // Right stair tower between LEVEL 3 and LEVEL 2, under the airlock end.
+    staticRoot.updateMatrixWorld(true);openRightStairTowerWall(staticRoot,FLOOR_Y[DECK.OPERATIONS]);
+    staticRoot.add(createRightStairTowerGroup(m));
+    yield;
+    // EVA ready room on top of it: the EVA bay's hatch opens into this room,
+    // whose own outer hatch leads to space.
+    staticRoot.add(createEVAReadyRoom(m,FLOOR_Y[DECK.OPERATIONS]));
     yield;
   }
+  // Stars behind every real space window (after the ready room, whose viewport is one of them).
+  animated.add(createRearWindowStars(staticRoot,{rotating:true}));
   const staticMesh=mergeStatic?(yield* batchStaticSteps(staticRoot,{xrLOD:true})):staticRoot;
   const pipes=staticRoot.getObjectByName('Rear wall pipe bundle / 運動区画と機関部の間').clone();pipes.position.set(0,0,0);
   staticMesh.userData.viewingWallFixtures={...dressing.userData.viewingWallFixtures,pipes};
   // The character view's window wall continues across the stair tower.
-  staticMesh.userData.stairTower=stairTower;
+  staticMesh.userData.stairTower=stairTower;staticMesh.userData.rightStairTower=stairTower;staticMesh.userData.readyRoom=stairTower;
   return {staticMesh,animated,targets,indicators,cargo,catFoodPackage,hatchDoor:supplyHatch.door,hatchLamp:supplyHatch.lamp,foodGroup,fan,gym,medical,innerDoor,innerSignal,outerSignal,bathrooms,catPorts,diningDocks,loungeProps,plants,bunk,washerDoor,washerClothes,coffeeMug,incinerator,groomingStation,consoleScreens,aiSupervision:aiRack.screens,gateFinish};
 }
 

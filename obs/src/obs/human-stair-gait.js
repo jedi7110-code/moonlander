@@ -226,7 +226,8 @@ function buildSchedule(path,walk=null){
     const slow=walked(Math.max(0,(path.flights[0]?.t0??E)-path.slowDistance(walk.speed))),arriving=[];
     const first=blocks[0]?.[0],room=first?Math.min(first.w-MIN_STEP,walked(tOfCount(countOf(first.t)-.5))+C.lead):Infinity;
     for(const side of [-1,1])for(let j=Math.ceil((walk.entry-2.2*C.step)/C.cycle-C.contact[side]);;j++){
-      const w=(C.contact[side]+j)*C.cycle-walk.entry;arriving.push({w,side});if(w>=slow)break;
+      // (on a mirrored trip the cabin walk's foot `side` is this schedule's other foot)
+      const w=(C.contact[side]+j)*C.cycle-walk.entry;arriving.push({w,side:walk.mirror?-side:side});if(w>=slow)break;
     }
     arriving.sort((a,b)=>a.w-b.w);
     const next=arriving.findIndex(a=>a.w>=slow);
@@ -281,7 +282,8 @@ function buildSchedule(path,walk=null){
   if(walk){
     // the cabin walk's distance counter at each contact
     steps[0].distance=walk.entry+walked(steps[0].t);
-    for(let k=1;k<steps.length;k++)steps[k].distance=steps[k-1].distance+(((C.contact[steps[k].side]-C.contact[steps[k-1].side])%1+1)%1||1)*C.cycle;
+    const cabinSide=side=>walk.mirror?-side:side;
+    for(let k=1;k<steps.length;k++)steps[k].distance=steps[k-1].distance+(((C.contact[cabinSide(steps[k].side)]-C.contact[cabinSide(steps[k-1].side)])%1+1)%1||1)*C.cycle;
     steps.distance=t=>{
       if(t<=steps[0].t)return steps[0].distance+walked(t)-walked(steps[0].t);
       const phi=stepPhase(steps,t),k=Math.min(Math.floor(phi),steps.length-2);
@@ -361,6 +363,7 @@ const schedules=new Map();
 const WALK_SCHEDULES=48,walkSchedules=new Map();
 export function humanSchedule(path,walk=null){
   if(typeof path==='number')path=studyPath(path);
+  path=path.mirrorOf??path; // a right-tower trip walks the left one's footfalls, reflected
   if(!walk){
     if(!schedules.has(path.key))schedules.set(path.key,buildSchedule(path));
     return schedules.get(path.key);
@@ -375,21 +378,24 @@ export function humanSchedule(path,walk=null){
 // where the trip starts}) reduced to one of WALK_PHASES arrival phases, so
 // that schedules can be shared; `base` + `shift` is what was taken off.
 const WALK_PHASES=32;
-function tripWalk({speed=CREW_WALK_SPEED*.022,entry=0}={}){
+// On a right-tower trip (`mirror`) the schedule is built in the left tower,
+// where the walker's feet are reflected: its left foot there is the cabin
+// walk's right foot.
+function tripWalk({speed=CREW_WALK_SPEED*.022,entry=0}={},mirror=false){
   const {cycle}=cabinWalkCycle(),phase=((entry/cycle)%1+1)%1,bin=Math.round(phase*WALK_PHASES)%WALK_PHASES;
   let shift=phase-bin/WALK_PHASES;shift-=Math.round(shift);
-  return {speed,entry:bin/WALK_PHASES*cycle,key:`${speed.toFixed(3)}:${bin}`,base:entry-(bin/WALK_PHASES+shift)*cycle,shift:shift*cycle};
+  return {speed,entry:bin/WALK_PHASES*cycle,mirror,key:`${speed.toFixed(3)}:${bin}${mirror?':m':''}`,base:entry-(bin/WALK_PHASES+shift)*cycle,shift:shift*cycle};
 }
 // The cabin walk's distance counter at travel t of a trip: it continues from
 // `entry` and follows the trip's footfalls (see buildSchedule).
 export function humanTripDistance(trip,t,arrival){
-  const walk=tripWalk(arrival);
+  const walk=tripWalk(arrival,Boolean(trip.mirrorOf));
   return walk.base+humanSchedule(trip,walk).distance(t)+walk.shift*(1-smooth(t));
 }
 // The cabin walk's stride on the floor of a trip (1 away from the stairs,
 // shorter where the steps shorten): see applyMocapWalk.
 export function humanTripStride(trip,t,arrival){
-  return clamp(humanSchedule(trip,tripWalk(arrival)).stride(t),.3,1.15);
+  return clamp(humanSchedule(trip,tripWalk(arrival,Boolean(trip.mirrorOf))).stride(t),.3,1.15);
 }
 
 function stepPhase(steps,t){
@@ -457,7 +463,16 @@ function reachShortfall(path,steps,t,parities){
 }
 // Pure pose description (no rig) at travel t on a path: pelvis, hip joints,
 // feet and posture.
+// A right-tower trip (stair-trip.js) is sampled on its left-tower trip and
+// reflected: x -> -x, headings negated, and the feet (and hips) change sides.
+function mirrorHumanSample(sample){
+  const point=p=>p&&{...p,x:-p.x,...(p.yaw!==undefined?{yaw:-p.yaw}:{}),...(p.dx!==undefined?{dx:-p.dx}:{})};
+  const foot=f=>({...f,ankle:f.ankle.clone().setX(-f.ankle.x),yaw:-f.yaw,side:f.side!==undefined?-f.side:f.side});
+  return {...sample,pelvis:point(sample.pelvis),center:point(sample.center),
+    hips:[...sample.hips].reverse().map(h=>h.clone().setX(-h.x)),feet:[...sample.feet].reverse().map(foot),forward:[...sample.forward].reverse()};
+}
 export function sampleHumanPath(path,t,walk=null){
+  if(path.mirrorOf)return mirrorHumanSample(sampleHumanPath(path.mirrorOf,t,walk));
   const steps=humanSchedule(path,walk);
   const phi=stepPhase(steps,t),frame=path.frame(t),w=1-smooth(path.flightGap(t)/G.stairZone),mode=path.direction>0?'up':'down';
   const floorBob=-G.bob*Math.cos(2*Math.PI*phi)*(1-w);
@@ -551,7 +566,7 @@ function blendJoints(root){
 // `arrival`: {speed, entry} of the walker (see humanTripDistance; without it
 // the crew's usual cabin speed and a walk counter of 0 are assumed).
 export function poseHumanTrip(root,trip,t,time,{cabinPose=null,arrival,moving=true,waiting=false}={}){
-  const walk=tripWalk(arrival),distance=humanTripDistance(trip,t,arrival),w=cabinPose?humanTripWeight(trip,t,walk.speed):1;
+  const walk=tripWalk(arrival,Boolean(trip.mirrorOf)),distance=humanTripDistance(trip,t,arrival),w=cabinPose?humanTripWeight(trip,t,walk.speed):1;
   let saved=null;
   if(w<1){
     cabinPose(distance,humanTripStride(trip,t,arrival));

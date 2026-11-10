@@ -30,7 +30,7 @@ import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {diningPhase,diningApproach} from './dining.js';
 import {loungeWorldPose} from './lounge-conversation.js';
 import {applyCabinLadder,updateCabinClimb} from './cabin-ladder.js';
-import {crewWalkway} from './cabin-walkway.js';
+import {crewWalkway,actorWalkway} from './cabin-walkway.js';
 import {updateTableLeisureProps} from './lounge-table-props.js';
 import {createLucyToon} from './lucy-toon.js';
 import {createLucyRunRigSteps} from './lucy-run-rig.js';
@@ -57,7 +57,7 @@ import {visibleInScene} from './deferred-preparation.js';
 export class ObservationView {
   // Typical step counts of the two sliced assembly phases, so the connection
   // gauge moves through them; a drift only makes it reach a milestone early.
-  static SHIP_BUILD_STEPS=93;static PREPARATION_STEPS=300;
+  static SHIP_BUILD_STEPS=94;static PREPARATION_STEPS=300;
   static async create(canvas,{cabinStyle='cartoon',floorBuilder,characterViews=false,deferGroomCache=false,deferOptional=false,nextFrame=nextPreparationFrame,onProgress=()=>{}}={}){
     const phase=(from,to,expected)=>count=>onProgress(from+(to-from)*Math.min(1,count/expected));
     // The head takes most of this phase (its hair and eyes are built here), so
@@ -117,7 +117,7 @@ export class ObservationView {
     this.envTarget=pmrem.fromScene(environment,.04);this.scene.environment=this.envTarget.texture;environment.dispose();pmrem.dispose();
     Object.values(m).forEach(mat=>{if(mat.isMeshStandardMaterial)mat.envMapIntensity=CABIN_AMBIENCE.environment;});
     this.scene.add(new THREE.HemisphereLight(CABIN_AMBIENCE.sky,CABIN_AMBIENCE.ground,CABIN_AMBIENCE.ambient));
-    const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-19,right:16,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
+    const key=new THREE.DirectionalLight(CABIN_AMBIENCE.key,CABIN_AMBIENCE.keyPower);key.position.set(-5,12,15);key.castShadow=true;key.shadow.mapSize.set(CABIN_SHADOW_SIZE,CABIN_SHADOW_SIZE);Object.assign(key.shadow.camera,{left:-19,right:19,top:11,bottom:-10,near:.1,far:60});key.shadow.bias=-.0001;key.shadow.normalBias=.024;key.target.position.set(0,5,0);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight(CABIN_AMBIENCE.fill,CABIN_AMBIENCE.fillPower);fill.position.set(12,7,9);this.scene.add(fill);
     yield;
     this.ship=builtShip??buildShip(m,{floorBuilder});limitCabinLights(this.ship.animated);this.scene.add(this.ship.staticMesh,this.ship.animated);
@@ -365,7 +365,7 @@ export class ObservationView {
   bindControls(){
     let drag=null;
     this.bind('pointerdown',e=>{if(this.characterCamera?.pointerDown(e))return;if(e.button!==0||e.isPrimary===false||drag)return;this.zoomAnchor=null;drag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,cx:this.targetCenter.x,cy:this.targetCenter.y,target:this.targetAt(e),moved:false};this.canvas.setPointerCapture(e.pointerId);});
-    this.bind('pointermove',e=>{if(this.characterCamera?.pointerMove(e))return;if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.characterCamera?.select('manual');this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-16.5,13);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,HABITAT_VIEW.panMinY,HABITAT_VIEW.panMaxY);}});
+    this.bind('pointermove',e=>{if(this.characterCamera?.pointerMove(e))return;if(!drag){this.hoverTarget(this.targetAt(e));return;}if(e.pointerId!==drag.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)drag.moved=true;if(drag.moved){this.hover(null);this.canvas.style.cursor='grabbing';if(this.mode!=='manual'){this.mode='manual';this.characterCamera?.select('manual');this.onModeChange?.(this.mode);}this.targetCenter.x=THREE.MathUtils.clamp(drag.cx-dx*this.viewHeight/this.height,-16.5,16.5);this.targetCenter.y=THREE.MathUtils.clamp(drag.cy+dy*this.viewHeight/this.height,HABITAT_VIEW.panMinY,HABITAT_VIEW.panMaxY);}});
     // The first dark-scene tap powers the lights, not a station order with a
     // pitched acknowledgement. Clear drag normally so subsequent taps work.
     this.bind('pointerup',e=>{if(this.characterCamera?.pointerEnd(e))return;if(!drag||e.pointerId!==drag.pointerId)return;const {target,moved}=drag;drag=null;this.hover(null);if(moved||!target)return;if(target.type==='character')this.setMode(target.id);else if(!this.startupLighting?.waiting)this.onStation?.(target.id);});
@@ -450,7 +450,7 @@ export class ObservationView {
     animateGym(this.ship.gym,brain.gymVisit?.pedalTime??brain.gymPedalTime??0);
     animateBunk(this.ship.bunk,brain.bunkVisit?.pose);
     if(brain.plants)animatePlants(this.ship.plants,brain.plants,time);
-    const walkway=crewWalkway(positionX(actor.x),actor.floor,actor.facing,actor.loungeAvoidance);
+    const walkway=actorWalkway(actor);
     this.milo.position.set(positionX(actor.x),positionY(actor.y),walkway.z);
     const stairTrip=actor.onStairs;
     if(stairTrip){

@@ -15,8 +15,10 @@ function contact(trip,t,side){
   const f=trip.frame(t);return {x:f.x+f.dz*lateral,y:f.y,z:f.z-f.dx*lateral};
 }
 
-// World positions of the left and right foot soles at travel t.
+// World positions of the left and right foot soles at travel t. On a
+// right-tower trip: the left-tower trip's feet, reflected (they change sides).
 export function droidStairFeet(trip,t){
+  if(trip.mirrorOf)return droidStairFeet(trip.mirrorOf,t).map(f=>({...f,x:-f.x})).reverse();
   return [-1,1].map(side=>{
     const phase=side<0?.5:0,q=t/G.cycle+phase,index=Math.floor(q),u=q-index;
     const plant=(index-phase)*G.cycle+G.cycle*G.plant,swing=u<G.stance?0:(u-G.stance)/(1-G.stance);

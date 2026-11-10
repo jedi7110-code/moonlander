@@ -41,7 +41,7 @@ export function createCharacterLookRigs(view){
 }
 
 export class CharacterCamera {
-  constructor(view,{rigs=createCharacterLookRigs(view),wall=createViewingWall(cabinWallMaterials(view.ship.staticMesh),{stairTower:Boolean(view.ship.staticMesh.userData.stairTower)})}={}){
+  constructor(view,{rigs=createCharacterLookRigs(view),wall=createViewingWall(cabinWallMaterials(view.ship.staticMesh),{stairTower:Boolean(view.ship.staticMesh.userData.stairTower),rightTower:Boolean(view.ship.staticMesh.userData.rightStairTower),readyRoom:Boolean(view.ship.staticMesh.userData.readyRoom)})}={}){
     this.view=view;this.rigs=rigs;this.wall=wall;view.scene.add(wall);
     this.look=new LookInput();this.comfort=new StableFirstPersonCamera(view.milo,rigs.milo.eyePosition());
     this.selected=null;this.angle='front';this.firstPerson=false;this.transition=null;this.rest=inactiveRest();this.touch=null;

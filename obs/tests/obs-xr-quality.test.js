@@ -130,3 +130,20 @@ test('VR selection uses bounds, follows motion, ignores hidden characters, and s
   ray.far=1;assert.equal(picker.pick(ray),null);
   body.geometry.dispose();body.material.dispose();station.geometry.dispose();station.material.dispose();
 });
+
+test('a mirrored part keeps its faces outward in both the merged mesh and its wide XR copy',()=>{
+  // (the right stair tower is the left one under scale.x=-1)
+  const root=new T.Group(),mirror=new T.Group(),mat=new T.MeshStandardMaterial();mirror.scale.x=-1;root.add(mirror);
+  const part=new T.Mesh(new T.BoxGeometry(2,1,1),mat);part.position.set(3,0,0);mirror.add(part);
+  const result=batchStatic(root,{xrLOD:true}),centre=new T.Vector3(-3,0,0);
+  for(const [label,g] of [['merged',result.children[0].geometry],['wide',result.children[0].userData.xrWideGeometry]]){
+    const p=g.attributes.position,index=g.index.array,a=new T.Vector3(),b=new T.Vector3(),c=new T.Vector3();
+    assert.ok(index.length>=36,label);
+    for(let i=0;i<index.length;i+=3){
+      a.fromBufferAttribute(p,index[i]);b.fromBufferAttribute(p,index[i+1]);c.fromBufferAttribute(p,index[i+2]);
+      const normal=b.clone().sub(a).cross(c.clone().sub(a)),out=a.clone().add(b).add(c).divideScalar(3).sub(centre);
+      assert.ok(normal.dot(out)>0,`${label} triangle ${i/3} faces outward`);
+    }
+  }
+  result.children[0].geometry.dispose();part.geometry.dispose();mat.dispose();
+});

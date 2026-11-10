@@ -55,7 +55,7 @@ const needOrders={
   bladder:{station:'toilet',icon:'toilet',label:['トイレへ行く','Use the toilet'],detail:['トイレを使用して回復します。','Restore this level by using the toilet.']},
   exercise:{station:'gym',icon:'bike',label:['ジムで運動する','Exercise in the gym'],detail:['ジムで身体を動かして回復します。','Restore this level by exercising in the gym.']},
 };
-const care=new Supplies(),stairs=new CabinStairs(),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine',...LOUNGE_VOICE_IDS,...DROID_POWER_SOUND_IDS,...DROID_HUM_SOUND_IDS]});
+const care=new Supplies(),stairs=new CabinStairs({right:true}),actor=new CrewMotion(),cat=new CatRoutine(care,{turns:true,mouseChase:true}),audio=new CabinAudio({enabled:true,defer:['coffeeMachine',...LOUNGE_VOICE_IDS,...DROID_POWER_SOUND_IDS,...DROID_HUM_SOUND_IDS]});
 // Floor changes use the left stair tower; the ladder when it is jammed.
 actor.stairs=stairs;cat.motion.stairs=stairs;
 // the stairs keep trips and everybody who is not on a trip off each other

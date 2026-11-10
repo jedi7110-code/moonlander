@@ -205,6 +205,9 @@ export function* batchStaticSteps(root,{xrLOD=false}={}) {
   for(const mesh of sources){
     if(performance.now()-batchStart>=4){yield;batchStart=performance.now();}
     const geometry=indexedCopy(mesh.geometry);geometry.applyMatrix4(mesh.matrixWorld);geometry.deleteAttribute('uv2');const key=mesh.material.uuid;
+    // A mirrored part (negative scale) turns its triangles inside out once its
+    // matrix is baked in; restore their winding so front faces stay in front.
+    if(mesh.matrixWorld.determinant()<0){const index=geometry.index.array;for(let i=0;i+2<index.length;i+=3){const t=index[i+1];index[i+1]=index[i+2];index[i+2]=t;}}
     if(!grouped.has(key))grouped.set(key,{mat:mesh.material,geometries:[],wide:[]});
     const group=grouped.get(key);group.geometries.push(geometry);
     if(xrLOD){
@@ -230,7 +233,10 @@ function deferXRWideGeometry(mesh,sources){
   const build=()=>{
     const parts=sources.map(({source,matrix})=>{
       const coarse=makeXRWideGeometry(source),wide=indexedCopy(coarse);coarse.dispose();
-      wide.applyMatrix4(matrix);wide.deleteAttribute('uv2');return wide;
+      wide.applyMatrix4(matrix);wide.deleteAttribute('uv2');
+      // a mirrored part (the right stair tower) comes out inside out: restore its winding, as the main batch does
+      if(matrix.determinant()<0&&wide.index){const index=wide.index.array;for(let i=0;i+2<index.length;i+=3){const t=index[i+1];index[i+1]=index[i+2];index[i+2]=t;}}
+      return wide;
     });
     const geometry=parts.length?mergeGeometries(parts,false):new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([],3));
     if(!geometry)throw new Error('Invalid XR ship geometry');

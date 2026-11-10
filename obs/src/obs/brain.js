@@ -290,7 +290,7 @@ export class CabinBrain extends Brain {
       // Finish the normal avoidance route, then enter directly beside Curtis.
       if((this.loungeCompanion||this.companionApproach)&&Math.abs(this.actor.x-x)>.01){
         this.companionApproach=true;
-        this.actor.goTo({floor:station.floor,x},()=>this._startPerform(station));return;
+        this.actor.goTo({floor:station.floor,x,loungeAccess:true},()=>this._startPerform(station));return;
       }
     }
     this.companionApproach=false;

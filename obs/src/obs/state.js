@@ -4,10 +4,9 @@ import {CABIN_PACE,CREW_WALK_SPEED,LADDER_PACE,LADDER_LANDING,LADDER_ENTRY} from
 import {createCatTurn,sampleCatTurn,angleDelta} from './cat-turn.js';
 import {APPROVED_RESTS,approvedRestRelease} from './cat-approved-rest.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
-import {crewWalkway} from './cabin-walkway.js';
+import {actorWalkway,LOUNGE_TABLE_PASSAGE} from './cabin-walkway.js';
 import {worldActor,nextActor} from './curtis-traffic.js';
 import {CabinMouseChase} from './mouse-chase.js';
-import {stairTrip} from './stair-trip.js';
 import {humanTripDistance} from './human-stair-gait.js';
 
 const toPx=x=>x/.022+700,toPxY=y=>870-y/.016;
@@ -109,6 +108,15 @@ export class CrewMotion {
       this.queue=[current,...(current.floor===target.floor?[{type:'walk',x:target.x}]:[{type:'replan',target}])];
       this.onArrive=onArrive||null;return;
     }
+    if(target.loungeAccess)this.loungeTableAccess=true;
+    else if(this.loungeTableAccess){
+      // Leave the adjacent cushion by its own left-side entrance, then
+      // rejoin the table bypass. Switching lanes beside the cushion snaps
+      // the body into the table route while it is still next to the seat.
+      this.queue=[{type:'walk',x:toPx(LOUNGE_TABLE_PASSAGE.x-LOUNGE_TABLE_PASSAGE.halfWidth)},
+        {type:'replan',target,leaveLoungeAccess:true}];
+      this.onArrive=onArrive||null;return;
+    }
     this.queue=this.planRoute(target);this.onArrive=onArrive||null;
   }
   // Floor changes take the stair tower when a shared CabinStairs is attached
@@ -116,7 +124,7 @@ export class CrewMotion {
   planRoute(target,{ladder=false}={}){
     const queue=[],atFloor=this.y===FLOORS[this.floor].y;
     if(!ladder&&this.stairs&&atFloor&&target.floor!==this.floor){
-      const trip=stairTrip(this.floor,target.floor);
+      const trip=this.stairs.trip(this.floor,target.floor,(this.x-700)*.022,(target.x-700)*.022);
       if(this.stairs.available(this,trip)){
         if(this.x!==toPx(trip.from.x))queue.push({type:'walk',x:toPx(trip.from.x)});
         queue.push({type:'stairs',trip,floor:target.floor,t:0,entered:false,target});
@@ -169,17 +177,23 @@ export class CrewMotion {
       else if(through&&over>0&&['walk','replan'].includes(this.queue[0].type))this.advance(over);
     }
   }
+  get curvedCrewWalk(){return Boolean(this.loungeAvoidance)||(!this.loungeTableAccess&&this.floor===1&&
+    Math.abs((this.x-700)*.022-LOUNGE_TABLE_PASSAGE.x)<LOUNGE_TABLE_PASSAGE.halfWidth+1);}
   walkStep(dt){
     const s=this.queue[0],step=this.walkSpeed*Math.max(0,dt);
-    if(s?.type!=='walk'||!this.loungeAvoidance)return step;
-    const dx=Math.sign(s.x-this.x)*Math.min(Math.abs(s.x-this.x),step);
-    if(!dx)return 0;
-    const x=(this.x-700)*.022;
-    const from=crewWalkway(x,this.floor,this.facing,this.loungeAvoidance).z;
-    const to=crewWalkway(x+dx*.022,this.floor,this.facing,this.loungeAvoidance).z;
-    // Keep walking speed and footfalls tied to distance along the curve.
-    return step/Math.hypot(1,(to-from)/(dx*.022));
+    if(s?.type!=='walk'||!this.curvedCrewWalk)return step;
+    const direction=Math.sign(s.x-this.x),limit=Math.min(Math.abs(s.x-this.x),step);
+    if(!limit)return 0;
+    const x=(this.x-700)*.022,from=actorWalkway(this,x).z;
+    const distance=dx=>Math.hypot(dx,(actorWalkway(this,x+direction*dx*.022).z-from)/.022);
+    if(distance(limit)<=step+1e-9)return limit;
+    // Solve the actual displacement, including tight turns at the table,
+    // rather than estimating their changing slope with one full step.
+    let low=0,high=limit;
+    for(let i=0;i<22;i++){const mid=(low+high)/2;if(distance(mid)>step)high=mid;else low=mid;}
+    return low;
   }
+
   update(dt) {
     this.knockTime=Math.max(0,this.knockTime-dt);
     this.advance(dt);
@@ -188,6 +202,7 @@ export class CrewMotion {
     const seg=this.queue[0];if(!seg)return;
     if(seg.type==='stairs'){this.stairStep(seg,dt);return;}
     if(seg.type==='replan'){
+      if(seg.leaveLoungeAccess)this.loungeTableAccess=false;
       const callback=this.onArrive;this.queue=this.planRoute(getStation(seg.target?.id)??seg.target);this.onArrive=callback;
       if(this.walksThrough&&this.queue[0]?.type==='walk')this.advance(dt);
       return;
@@ -204,9 +219,9 @@ export class CrewMotion {
     const step=mounting?Math.min(LADDER_ENTRY.miloHeight/.016-Math.abs(this.y-seg.startY),LADDER_ENTRY.miloHeight/.016/LADDER_ENTRY.seconds*dt):(seg.type==='walk'?this.walkStep(dt):speed*landingSpeed*dt);
     if(key==='x'){
       const dx=Math.sign(delta)*Math.min(Math.abs(delta),step),x=(this.x-700)*.022;
-      const from=crewWalkway(x,this.floor,this.facing,this.loungeAvoidance).z;
-      const to=crewWalkway(x+dx*.022,this.floor,this.facing,this.loungeAvoidance).z;
-      this.walkDistance+=this.loungeAvoidance?Math.hypot(dx,(to-from)/.022):Math.abs(dx);
+      const from=actorWalkway(this,x).z;
+      const to=actorWalkway(this,x+dx*.022).z;
+      this.walkDistance+=this.curvedCrewWalk?Math.hypot(dx,(to-from)/.022):Math.abs(dx);
     }
     if(key==='x'&&Math.abs(delta)>.01)this.facing=Math.sign(delta);
     if(Math.abs(delta)<=step){
@@ -218,6 +233,9 @@ export class CrewMotion {
   }
 }
 
+// A cat held by the visitor this long turns back this far along its lane
+// (kept inside the aisle, in pixels) to let him pass.
+export const CAT_GIVE_WAY=Object.freeze({after:2.5,distance:1.4,min:30,max:1370});
 export class CatMotion extends CrewMotion {
   constructor({turns=false,...options}={}){super({floor:CAT_SOFA.floor,x:1035,walkSpeed:CAT_WALK_SPEED,...options});this.turns=turns;this.heading=null;this.turn=null;this.onSofa=this.floor===CAT_SOFA.floor&&this.x>=CAT_SOFA.seatX;this.elevation=this.onSofa?LOUNGE_SEAT.top:0;this.z=this.onSofa?LOUNGE_SEAT.centerDepth:CAT_PORT.walkZ;this.hop=null;this.portalWalkDistance=0;this.depthWalkDistance=0;this.portal=null;this.destination=null;this.onDestination=null;this.waitingForCrew=false;}
   get busy(){return Boolean(this.chase||this.turn||this.portal||this.hop)||super.busy;}
@@ -239,6 +257,7 @@ export class CatMotion extends CrewMotion {
   }
   get climbing(){return false;}
   get stairKind(){return 'cat';}
+  get curvedCrewWalk(){return false;}
   // A calm cat keeps about 0.5 m/s up and down the flights (stair study).
   stairTravel(seg,dt){return this.walkSpeed*.022*1.25*dt;}
   get walksThrough(){return false;}
@@ -276,7 +295,7 @@ export class CatMotion extends CrewMotion {
     // Change decks by the stair tower when it is usable (not from the sofa);
     // the wall passage otherwise.
     if(crossing&&this.stairs&&!this.onSofa&&this.y===FLOORS[this.floor].y){
-      const trip=stairTrip(this.floor,this.destination.floor,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ});
+      const trip=this.stairs.trip(this.floor,this.destination.floor,(this.x-700)*.022,(this.destination.x-700)*.022,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ});
       if(this.stairs.available(this,trip)){
         this.queue=[];
         if(this.z!==CAT_PORT.walkZ)this.queue.push({type:'depth',z:CAT_PORT.walkZ});
@@ -341,7 +360,21 @@ export class CatMotion extends CrewMotion {
   update(dt,actor=null,droid=null){
     if(dt<=0)return;
     // On the stair tower only the stair traffic holds the cat.
-    if(!this.onStairTrip()&&this.visitor?.blocksCat(this,dt))return;
+    if(!this.onStairTrip()&&this.visitor?.blocksCat(this,dt)){
+      // Met head-on in the aisle (the visitor's path round the lounge table
+      // runs too close to the cat's lane to pass): after a moment the cat turns
+      // back and gives way, then goes on to where it was going.
+      this.visitorHold=(this.visitorHold??0)+dt;
+      const s=this.queue[0];
+      if(this.visitorHold>=CAT_GIVE_WAY.after&&s?.type==='walk'&&!this.retreating&&!this.turn&&!this.hop&&!this.portal&&!this.chase){
+        const away=Math.sign(this.x-700-(this.visitor.trafficPosition.x/.022))||-Math.sign(s.x-this.x)||1;
+        const x=Math.max(CAT_GIVE_WAY.min,Math.min(CAT_GIVE_WAY.max,this.x+away*CAT_GIVE_WAY.distance/.022));
+        if(Math.abs(x-this.x)>4){this.queue.unshift({type:'walk',x,giveWay:true});this.retreating=true;this.visitorHold=0;}
+      }
+      return;
+    }
+    this.visitorHold=0;
+    if(this.retreating&&this.queue[0]?.giveWay!==true)this.retreating=false;
     if(this.turn){
       this.turn.age=Math.min(this.turn.duration,this.turn.age+dt);this.heading=sampleCatTurn(this.turn).yaw;
       if(this.turn.age===this.turn.duration){

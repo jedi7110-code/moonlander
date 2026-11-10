@@ -367,11 +367,29 @@ export function sampleCatStairs(root,agent){
   return sampleCatPath(root,path,travel,agent.wait===Infinity?{exit:agent.exit??0}:{});
 }
 // Gait phase at travel t on a path (Walk cycles; walkDistance = phase x natural).
-export function catPathPhase(root,path,travel){return phaseAt(phaseTable(prepare(root),path),travel);}
+export function catPathPhase(root,path,travel){
+  return path.mirrorOf?phaseAt(phaseTable(mirrorRig(prepare(root)),path.mirrorOf),travel):phaseAt(phaseTable(prepare(root),path),travel);
+}
+// A right-tower trip (stair-trip.js) is sampled on its left-tower trip and
+// reflected: x -> -x, heading negated. In the left tower each paw is planned
+// for the leg that will carry it after the reflection: a stand-in with that
+// leg's step timing and its contact point reflected, so the stairs keep the
+// Walk clip's leg order on the landings between the flights.
+function mirrorRig(rig){
+  if(rig.mirror)return rig.mirror;
+  const legs=rig.legs.map(real=>Object.assign(Object.create(real),{real,side:-real.side,
+    contact:{x:-real.contact.x,z:real.contact.z},girdle:real.girdle&&real.girdle.clone().setX(-real.girdle.x)}));
+  return rig.mirror={...rig,legs,phase:new Map(),mirror:null};
+}
+function mirrorCatSample(sample){
+  const c=sample.center;
+  return {...sample,center:{...c,x:-c.x,dx:-c.dx,yaw:-c.yaw},
+    feet:sample.feet.map(f=>({...f,leg:f.leg.real,x:-f.x,...(f.next?{next:{...f.next,x:-f.next.x}}:{})}))};
+}
 // phaseOffset shifts the Walk clip only (used on the floor where the stair
 // rig is off, to continue the cabin walk's phase into a trip).
-export function sampleCatPath(root,path,travel,{exit=null,phaseOffset=0}={}){
-  const rig=prepare(root),table=phaseTable(rig,path);
+export function sampleCatPath(root,path,travel,{exit=null,phaseOffset=0,rig=prepare(root)}={}){
+  const table=phaseTable(rig,path);
   const frame=path.frame(travel);
   if(exit!==null){frame.x+=.35*exit;frame.z+=.48*exit;}
   const {gap}=nearestOnPath(path,travel),{full,none}=CAT_STAIR_GAIT.stairZone;
@@ -395,7 +413,9 @@ export function poseCatStairs(root,agent,time,dt){
   return poseCatPath(root,path,travel,time,dt,{exit:agent.wait===Infinity?agent.exit??0:null,moving:agent.wait!==Infinity&&!agent.waiting});
 }
 export function poseCatPath(root,path,travel,time,dt,{exit=null,moving=true,phaseOffset=0}={}){
-  const rig=prepare(root),s=root.userData,sample=sampleCatPath(root,path,travel,{exit,phaseOffset}),{center,body,weight,feet}=sample;
+  const rig=prepare(root),s=root.userData;
+  const sample=path.mirrorOf?mirrorCatSample(sampleCatPath(root,path.mirrorOf,travel,{exit,phaseOffset,rig:mirrorRig(rig)})):sampleCatPath(root,path,travel,{exit,phaseOffset});
+  const {center,body,weight,feet}=sample;
   restore(rig.sampledBones);
   root.position.set(center.x,center.y,center.z);root.rotation.set(0,center.yaw,0,'YXZ');root.updateMatrixWorld(true);
   animateLucy(root,{time,dt:Math.max(dt,1/120),moving,yaw:center.yaw,headingControlled:true,mode:'idle',walkDistance:sample.walkDistance});

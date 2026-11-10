@@ -12,6 +12,11 @@ export const VIEWING_WALL={
 // which puts one window beside the stair entrance (bay -1) and none at the
 // turn landing, where the landing slab would cut across it.
 export const VIEWING_WALL_TOWER={firstIndex:-3,left:-17.695};
+// With the right stair tower (LEVEL 3 and LEVEL 2 only) the wall continues
+// over three more bays to the right tower's outer lining, mirroring the left.
+// Bay 17 has a window on LEVEL 2; on LEVEL 3 the tower's first flight and its
+// handrail rise across it, so it stays closed there.
+export const VIEWING_WALL_RIGHT_TOWER={lastIndex:18,right:17.695};
 export const viewingWallWindow=index=>(index%3+3)%3===2;
 export const viewingWallPanelX=index=>VIEWING_WALL.firstX+index*VIEWING_WALL.spacing;
 export function viewingWallFaceZ(y){

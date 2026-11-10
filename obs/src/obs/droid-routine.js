@@ -1,10 +1,10 @@
+import {crewPassages} from './cabin-walkway.js';
 import {FLOORS,LADDER_X,CAT_BOWL,WASTE_INCINERATOR as WASTE,ACCESS_LADDER,ladderApproachDepth} from './layout.js';
 import {planDroidTurn,sampleDroidTurn} from './droid-turn.js';
 import {DROID_STARTUP_SECONDS} from './droid-startup.js';
 import {crewLadderPath,ladderPathsConflict} from './ladder-traffic.js';
 import {worldActor,nextActor,nextDroid} from './curtis-traffic.js';
 import {DROID_LADDER_LANDING,LADDER_ENTRY,DROID_GAIT} from './pace.js';
-import {stairTrip} from './stair-trip.js';
 
 export const DROID_JOBS=Object.freeze({
   cargo:'支援物資を倉庫へ運搬',harvest:'野菜を収穫',laundry:'衣類を洗濯',
@@ -79,8 +79,7 @@ export class DroidRoutine {
   }
   blocksCrew(actor,dt=1/60){
     // (a bend round the robot itself is not a route the robot has to keep out of)
-    const route=actor?.loungeAvoidance?.robot?null:actor?.loungeAvoidance;
-    if(route&&route.floor===actor.floor){
+    for(const route of crewPassages(actor))if(route.floor===actor.floor){
       const from=worldActor(actor),to=nextActor(actor,dt);
       // Let a robot already passing the sofa clear the detour before Milo
       // leaves his usual aisle, where the two original lanes stay separate.
@@ -159,14 +158,14 @@ export class DroidRoutine {
   travel(floor,x,z){
     this.walk(this.plan.x,LANE);
     if(floor!==this.plan.floor&&this.stairs){
-      // By the left stair tower when it is usable when the robot gets there;
+      // By the nearer stair tower when it is usable when the robot gets there;
       // otherwise the step expands into the ladder route below (same end).
-      const trip=stairTrip(this.plan.floor,floor,{fromZ:LANE,toZ:LANE});
+      const trip=this.stairs.trip(this.plan.floor,floor,this.plan.x,x,{fromZ:LANE,toZ:LANE}),out=-(trip.side??-1);
       // From the dock (2 cm short of the trip start) just turn toward the tower.
       if(Math.abs(this.plan.x-trip.from.x)>.05)this.walk(trip.from.x,LANE);
-      this.turn(-Math.PI/2);
+      this.turn(-out*Math.PI/2);
       this.add('stairs',Infinity,null,{trip,t:0,floor,decided:false});
-      this.plan={x:trip.to.x,y:DROID_FLOORS[floor],z:LANE,floor,yaw:Math.PI/2};
+      this.plan={x:trip.to.x,y:DROID_FLOORS[floor],z:LANE,floor,yaw:out*Math.PI/2};
     }else if(floor!==this.plan.floor)this.ladderSteps(floor,x);
     this.walk(x,LANE);this.walk(x,z,floor);
   }
@@ -203,7 +202,7 @@ export class DroidRoutine {
     }
     const saved=this.steps,plan=this.plan;
     this.steps=[];this.plan={...this.position};this.ladderSteps(s.floor,end?.x??s.trip.to.x,end?.x??s.trip.to.x);
-    if(end)this.turn(end.yaw);else this.turn(Math.PI/2);
+    if(end)this.turn(end.yaw);else this.turn(-(s.trip.side??-1)*Math.PI/2);
     const ladder=this.steps;this.steps=saved;this.plan=plan;
     this.steps.splice(0,n,...ladder);this.age=0;
   }
@@ -220,7 +219,8 @@ export class DroidRoutine {
     Object.assign(this.position,{x:f.x,y:f.y,z:f.z,yaw:f.yaw});
     if(s.t>=s.trip.length){
       this.stairs.leave(this);
-      Object.assign(this.position,{x:s.trip.to.x,y:DROID_FLOORS[s.floor],z:LANE,floor:s.floor,yaw:Math.PI/2});
+      // (facing back into the cabin, away from the tower)
+      Object.assign(this.position,{x:s.trip.to.x,y:DROID_FLOORS[s.floor],z:LANE,floor:s.floor,yaw:-(s.trip.side??-1)*Math.PI/2});
       this.steps.shift();this.age=0;
     }
   }
@@ -321,8 +321,7 @@ export class DroidRoutine {
     this.waiting=false;this.waitingForCat=false;
     if(this.docked){if(this.time>=this.restUntil){const job=this.choose();if(job)this.request(job);}return;}
     const s=this.step;if(!s)return;
-    const route=this.actor?.loungeAvoidance?.robot?null:this.actor?.loungeAvoidance;
-    if(s.kind==='walk'&&route&&route.floor===this.actor.floor){
+    for(const route of crewPassages(this.actor))if(s.kind==='walk'&&route.floor===this.actor.floor){
       const crew=worldActor(this.actor),next=nextDroid(this,dt);
       const from=Math.abs(this.position.x-route.x),to=Math.abs(next.x-route.x);
       // Once Milo is in the detour, hold an approaching robot outside it.

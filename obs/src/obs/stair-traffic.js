@@ -27,6 +27,8 @@
 //   (blocksBystander, asked by the cabin's own walking). Where two paths
 //   cross, the bystander therefore stops short and the walker on the trip
 //   goes by without stopping.
+import {nearestStairTrip} from './stair-trip.js';
+
 export const STAIR_TRAFFIC=Object.freeze({
   clearance:{default:1.0,cat:.7}, // distance kept behind the walker in front (m)
   width:.42,          // lateral distance below which two walkers share a lane
@@ -51,13 +53,20 @@ const T=STAIR_TRAFFIC;
 // walkers passing between the outer decks. One kind of stream uses a deck's
 // crossing at a time; walkers of the same kind follow each other in file.
 const DECKS=[[0,6.784],[1,3.392],[2,0]];
-const crossingDeck=p=>{if(p.x<-13.45||p.x>-11.6)return null;for(const [deck,y] of DECKS)if(Math.abs(p.y-y)<.06)return deck;return null;};
-const role=(trip,deck)=>trip.fromFloor===deck?'enter':trip.toFloor===deck?'exit':`through${trip.direction}`;
+// (the crossing of a deck at either tower: `${side}:${deck}`, side -1 left, 1 right)
+const crossingDeck=p=>{const x=Math.abs(p.x),side=Math.sign(p.x);if(x<11.6||x>13.45)return null;for(const [deck,y] of DECKS)if(Math.abs(p.y-y)<.06)return `${side}:${deck}`;return null;};
+const role=(trip,crossing)=>{const deck=+crossing.split(':')[1];return trip.fromFloor===deck?'enter':trip.toFloor===deck?'exit':`through${trip.direction}`;};
+// both trips by the same tower (their route distances are comparable)
+const sameTower=(a,b)=>(a.side??-1)===(b.side??-1);
 const near=(a,b,r)=>Math.abs(a.y-b.y)<T.height&&Math.hypot(a.x-b.x,a.z-b.z)<r;
 const routeSpan=trip=>{const a=trip.routeS(trip.enterLength),b=trip.routeS(trip.exitStart);return [Math.min(a,b),Math.max(a,b)];};
 
 export class CabinStairs {
-  constructor(){this.walkers=new Map();this.time=0;this.order=0;this.avoid=new Map();this.bodies=null;this.gaveWay=new Map();}
+  // `right`: the cabin also has the right stair tower (LEVEL 3 <-> LEVEL 2).
+  constructor({right=false}={}){this.walkers=new Map();this.time=0;this.order=0;this.avoid=new Map();this.bodies=null;this.gaveWay=new Map();this.right=right;}
+  // The trip between two floors for a walk from x `fromX` to x `toX` (world
+  // metres): by the nearer tower that serves both floors.
+  trip(fromFloor,toFloor,fromX,toX,options={}){return nearestStairTrip(fromFloor,toFloor,fromX,toX,{right:this.right,...options});}
   // everybody the cabin reports who is not on a stair trip (and is not `agent`)
   bystanders(agent){return this.bodies?this.bodies().filter(b=>b.agent!==agent&&!this.walkers.has(b.agent)):[];}
   // May someone who is not on a trip walk from `from` to `to` this step? Not
@@ -118,7 +127,7 @@ export class CabinStairs {
       const p=this.position(w);
       if(near(p,start,T.entrance)||near(p,entry,T.entrance))return false;
       const s=w.trip.routeS(w.t);
-      if(w.trip.direction===trip.direction&&s!==null&&s>=lo-1e-9&&s<=hi+1e-9)sameWay++;
+      if(sameTower(w.trip,trip)&&w.trip.direction===trip.direction&&s!==null&&s>=lo-1e-9&&s<=hi+1e-9)sameWay++;
       if(w.waiting>=T.stopped&&samples.some(q=>near(p,q,.6)))return false;
     }
     return sameWay<T.sameWay;
