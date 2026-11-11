@@ -370,6 +370,12 @@ export function sampleCatStairs(root,agent){
 export function catPathPhase(root,path,travel){
   return path.mirrorOf?phaseAt(phaseTable(mirrorRig(prepare(root)),path.mirrorOf),travel):phaseAt(phaseTable(prepare(root),path),travel);
 }
+// Keep the nearest matching point in the repeating Walk clip. Whole cycles
+// have the same pose but must not be replayed when the entry offset fades out.
+export function catStairEntryPhase(root,path,travel,walkDistance){
+  const difference=walkDistance/CAT_STAIR_GAIT.natural-catPathPhase(root,path,travel);
+  return difference-Math.round(difference);
+}
 // A right-tower trip (stair-trip.js) is sampled on its left-tower trip and
 // reflected: x -> -x, heading negated. In the left tower each paw is planned
 // for the leg that will carry it after the reflection: a stand-in with that

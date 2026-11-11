@@ -8,7 +8,7 @@ import {createGroupShadowProxySteps} from './group-shadow-proxy.js';
 import {buildShip,buildShipInBackground,positionX,positionY,HABITAT_VIEW} from './ship.js';
 import {createMiloSteps,animateMilo} from './characters.js';
 import {poseHumanTrip} from './human-stair-gait.js';
-import {poseCatPath,catPathPhase,CAT_STAIR_GAIT} from './cat-stair-gait.js';
+import {poseCatPath,catStairEntryPhase,CAT_STAIR_GAIT} from './cat-stair-gait.js';
 import {loadCabinLucy as loadLucy,createCabinLucySteps as createLucySteps,animateCabinLucy as animateLucy,disposeCabinLucy as disposeLucy} from './lucy-cabin.js';
 import {currentAction} from './state.js';
 import {animatePlants} from './plants.js';
@@ -513,7 +513,10 @@ export class ObservationView {
     if(catStairs){
       // Lucy on the stair tower: the stair gait places her body and paws. Her
       // Walk clip continues the cabin phase on entry and hands it back on exit.
-      if(this.catStairTrip!==catStairs){this.catStairTrip=catStairs;this.catStairPhase=catWalk/CAT_STAIR_GAIT.natural-catPathPhase(this.cat,catStairs.trip,catStairs.t);}
+      if(this.catStairTrip!==catStairs){
+        this.catStairTrip=catStairs;
+        this.catStairPhase=catStairEntryPhase(this.cat,catStairs.trip,catStairs.t,catWalk);
+      }
       const fade=Math.max(.3,(catStairs.trip.flights[0]?.t0??1.6)-CAT_STAIR_GAIT.stairZone.none-.05);
       const cabin=this.cat.userData.cabin;cabin.poseRoot.position.set(0,0,0);cabin.poseRoot.quaternion.identity();
       const pose=poseCatPath(this.cat,catStairs.trip,catStairs.t,time,paused?0:dt,{moving:!catMotion.stairWaiting,phaseOffset:this.catStairPhase*(1-THREE.MathUtils.smoothstep(catStairs.t,0,fade))});

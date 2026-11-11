@@ -16,7 +16,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createLucy} from '../src/obs/lucy.js';
 import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {poseHumanTrip,sampleHumanPath,humanTripWeight} from '../src/obs/human-stair-gait.js';
-import {poseCatPath} from '../src/obs/cat-stair-gait.js';
+import {poseCatPath,catStairEntryPhase,CAT_STAIR_GAIT} from '../src/obs/cat-stair-gait.js';
 import {crewWalkway} from '../src/obs/cabin-walkway.js';
 
 const px=x=>700+x/.022,mx=x=>(x-700)*.022,my=y=>(870-y)*.016;
@@ -108,6 +108,31 @@ test('Lucy takes the right tower too, and her paws there are her left-tower paws
   }
   assert.ok(compared>5);
   assert.ok(jump.b<=jump.a+.005,`paws move as smoothly as on the left tower (${jump.b.toFixed(3)} vs ${jump.a.toFixed(3)} m in a half frame)`);
+});
+
+test('a long walk before the LEVEL 2 stairs does not rewind the walking animation',async()=>{
+  const root=await lucy(),dt=1/60,step=.495*dt,stride=CAT_STAIR_GAIT.natural;
+  for(const makeTrip of [stairTrip,rightStairTrip]){
+    const path=makeTrip(1,2,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ});
+    const startPhase=catStairEntryPhase(root,path,step,30);
+    const fade=Math.max(.3,path.flights[0].t0-CAT_STAIR_GAIT.stairZone.none-.05);
+    let previous=null;
+    for(let t=step;t<=fade+step;t+=step){
+      const phaseOffset=startPhase*(1-THREE.MathUtils.smoothstep(t,0,fade));
+      const pose=poseCatPath(root,path,t,t/.495,dt,{phaseOffset});
+      if(previous){
+        assert.ok(pose.walkDistance>previous.walkDistance,'the walk clip keeps moving forward');
+        for(let i=0;i<pose.feet.length;i++){
+          const a=pose.feet[i],b=previous.feet[i];
+          assert.ok(Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z)<.06,'paws move continuously into the staircase');
+        }
+      }else{
+        const cycles=(30-pose.walkDistance)/stride;
+        assert.ok(Math.abs(cycles-Math.round(cycles))<.001,'entry matches the last cabin pose');
+      }
+      previous=pose;
+    }
+  }
 });
 
 test('the two towers keep their own traffic',()=>{
