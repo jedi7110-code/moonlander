@@ -39,13 +39,17 @@ function prefetchDuringOpening(){
 }
 
 async function boot(){
-  const opening=shouldPlayExteriorOpening(location.search);
+  const opening=shouldPlayExteriorOpening(location.search,history.state);
   if(opening){
     exteriorCinema.show({opening:true,waitForHost:true,waitForEntry:true});
     const prefetch=prefetchDuringOpening();
     // No cabin assembly competes with the opening. The entry click disposes
     // the film renderer before the original connection screen loads.
     await exteriorCinema.whenEntryRequested();
+    // Keep this history entry in the cabin if the browser reloads it. A new
+    // visit has its own history entry and still plays the opening.
+    try{history.replaceState({...history.state,obsCabinEntered:true},'');}
+    catch{ /* History can be unavailable in an embedded browser. */ }
     prefetch?.stop();
     document.getElementById('space-boot').hidden=true;
     document.getElementById('loading').hidden=false;

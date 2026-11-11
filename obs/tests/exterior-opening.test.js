@@ -48,7 +48,7 @@ test('the existing final compositor applies the fade once without an extra rende
 
 const loadingSource=(await readFile(new URL('../public/assets/obs/exterior-loading.js',import.meta.url),'utf8'))
   .replace(/^import .*;$/m,'');
-function loadingFixture(search,spaceScene='film'){
+function loadingFixture(search,spaceScene='film',historyState=null){
   const cover={hidden:false},painted=[],callbacks=[],dataset={};
   const pixels=()=>({data:new Uint8ClampedArray(400)});
   const context={createImageData:pixels,getImageData:pixels,putImageData(){painted.push(canvas.style.visibility);},drawImage(){}};
@@ -56,7 +56,7 @@ function loadingFixture(search,spaceScene='film'){
   runInNewContext(loadingSource,{
     document:{body:{dataset:{spaceScene}},documentElement:{dataset},
       getElementById:id=>id==='space-boot'?cover:canvas,createElement:()=>({getContext:()=>context})},
-    location:{search,origin:'http://localhost'},URLSearchParams,performance:{now:()=>100},
+    location:{search,origin:'http://localhost'},history:{state:historyState},URLSearchParams,performance:{now:()=>100},
     innerWidth:10,innerHeight:10,devicePixelRatio:1,addEventListener(){},removeEventListener(){},
     requestAnimationFrame:callback=>callbacks.push(callback),MutationObserver:class{observe(){}disconnect(){}},
     parent:{postMessage(){}},createStarCatalog:()=>[],skyHazeColor:()=>[0,0,0],
@@ -80,4 +80,10 @@ test('neither the OBS host nor the film loading sky flashes ahead of the opening
     assert.equal(fixture.cover.hidden,true);
     assert.equal(fixture.painted.length,0);
   }
+});
+
+test('a reloaded cabin skips the temporary opening sky',()=>{
+  const fixture=loadingFixture('','cabin',{obsCabinEntered:true});
+  assert.equal(fixture.cover.hidden,true);
+  assert.equal(fixture.painted.length,0);
 });

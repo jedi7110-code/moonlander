@@ -16,6 +16,9 @@ import {ExteriorCinemaUI} from './obs/exterior-cinema-ui.js';
 const $=id=>document.getElementById(id),canvas=$('ship-view');
 const entryQuery=new URLSearchParams(location.search),embedded=entryQuery.get('embedded')==='1',freeView=entryQuery.get('viewer')==='free';
 const softPanelLines=entryQuery.get('panelLines')==='soft';
+// The cabin keeps its WebGL scene while this embedded viewer is open. On an
+// iPhone, leave more room for that scene in the WebContent process.
+const compactRenderer=embedded&&/iPhone|iPod/.test(navigator.userAgent);
 let enhancedPlanets=entryQuery.get('planetScale')==='enhanced';
 const tell=action=>{if(embedded)parent.postMessage({type:'tara-exterior',action},location.origin);};
 document.addEventListener('keydown',event=>{if(embedded&&event.key==='Escape'){event.preventDefault();tell('exit');}});
@@ -23,13 +26,13 @@ let cleanup=()=>{},closed=false;
 window.addEventListener('pagehide',event=>{if(!event.persisted){closed=true;cleanup();}});
 try{
   const scene=new THREE.Scene();scene.background=new THREE.Color('#030609');
-  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.outputColorSpace=THREE.SRGBColorSpace;
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:!compactRenderer,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,compactRenderer?1.25:1.6));renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   // Use the cinema's linear star blending and final color conversion. Direct
   // canvas rendering converts each point before blending, changing the sky.
-  const presentation=createExteriorDissolve(renderer,{samples:softPanelLines?EXTERIOR_SOFT_PANEL_LINES.samples:0});
+  const presentation=createExteriorDissolve(renderer,{samples:softPanelLines&&!compactRenderer?EXTERIOR_SOFT_PANEL_LINES.samples:0});
   const ship=createProductionExterior({panelLines:softPanelLines?EXTERIOR_SOFT_PANEL_LINES:null});
   cleanup=()=>{ship.dispose();presentation.dispose();renderer.dispose();renderer.forceContextLoss();};
   await ship.prepareProbe();

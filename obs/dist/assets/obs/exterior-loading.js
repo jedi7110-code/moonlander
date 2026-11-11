@@ -5,7 +5,7 @@ import {createStarCatalog,skyHazeColor,starGlow,srgbByte,linearByte} from './ext
   const cover=document.getElementById('space-boot'),canvas=document.getElementById('space-boot-sky');
   if(!cover||!canvas)return;
   const query=new URLSearchParams(location.search),isCabin=document.body.dataset.spaceScene==='cabin';
-  if(isCabin&&(query.has('preview')||query.get('opening')==='0')){cover.hidden=true;return;}
+  if(isCabin&&(history.state?.obsCabinEntered===true||query.has('preview')||query.get('opening')==='0')){cover.hidden=true;return;}
   const seconds=Math.max(0,Number(query.get('time'))||0);
   canvas.style.visibility=(isCabin||query.get('mode')==='opening')&&seconds<1?'hidden':'visible';
   const started=performance.now();document.documentElement.dataset.spaceStartedMs=String(started);
