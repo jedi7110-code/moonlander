@@ -47,6 +47,8 @@ test('approaching and leaving the hatch face the direction of travel, including 
   for(const phase of REPAIR_STUDY_PHASES.filter(p=>['approach','return'].includes(p.id))){
     for(let t=phase.start+.01;t<phase.end-.01;t+=1/60){
       const a=sampleRepairStudy(t-.001),b=sampleRepairStudy(t+.001),direction=Math.sign(b.pose.depth-a.pose.depth);
+      // (the planned step arrives before its phase is over: he stands for the rest of it)
+      if(!direction)continue;
       const {visit}=poseRepairStudy(root,t);
       assert.ok(Math.cos(visit.pose.yaw)*direction>.999,'walking root faces its actual depth movement');
       const forward=new Vector3(0,0,1).transformDirection(root.userData.head.matrixWorld);

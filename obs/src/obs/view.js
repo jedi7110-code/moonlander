@@ -1,3 +1,5 @@
+import {stationVisit} from './station-step.js';
+import {MiloPoseBlend} from './milo-pose-blend.js';
 import * as THREE from 'three';
 import {CABIN_PIXEL_RATIO,CABIN_SHADOW_SIZE,CABIN_AMBIENCE,limitCabinLights,limitShadowCasters} from './lighting.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
@@ -27,7 +29,7 @@ import {animateMedical,medicalExitTime,medicalReadings} from './medical.js';
 import {BUNK_BED,reclineProgress,reclineExitProgress} from './recline.js';
 import {animateBunk} from './bunk.js';
 import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
-import {diningPhase,diningApproach} from './dining.js';
+import {diningApproach} from './dining.js';
 import {loungeWorldPose} from './lounge-conversation.js';
 import {applyCabinLadder,updateCabinClimb} from './cabin-ladder.js';
 import {crewWalkway,actorWalkway} from './cabin-walkway.js';
@@ -463,8 +465,10 @@ export class ObservationView {
       endHeight:positionY(climb.y),endYaw:(Math.sign(nextX-actor.x)||actor.facing)*Math.PI/2,endDepth:crewWalkway(0,climb.floor).z,
     }:null);
     const bathroom=brain.bathroom?.pose;
-    if(action==='plant'&&!brain.harvestDelivery)this.milo.position.z=.78-.76*THREE.MathUtils.smoothstep(Math.min(actionTime,brain.curDurSec-actionTime),0,1.2);
-    if(['galley','hydro'].includes(action))this.milo.position.z=CABIN_AISLE.crewZ-diningApproach(action)*diningPhase(actionTime,brain.curDurSec).approach;
+    // Up to the shelf or the counter and back: a step or two of the planned walk.
+    // (the work at the fitting has its own clock: it runs while he stands there)
+    const step=brain.state==='performing'&&!actor.busy&&!brain.harvestDelivery?stationVisit(action,actionTime,brain.curDurSec):null;
+    if(step)this.milo.position.z=(action==='plant'?.78:CABIN_AISLE.crewZ)-step.offset;
     if(action==='gym')this.milo.position.z=brain.gymVisit?.pose.depth??BIKE.depth;
     if(brain.gymVisit)brain.gymVisit.startYaw??=this.milo.rotation.y;
     if(brain.bunkVisit)brain.bunkVisit.startYaw??=this.milo.rotation.y;
@@ -473,11 +477,13 @@ export class ObservationView {
       const pose=loungeWorldPose(brain);
       this.milo.position.x=pose.x;this.milo.position.z=pose.z;
     }
-    const miloPose={moving:actor.busy&&!actor.climbing,waiting:actor.waitingForVisitor||actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid||actor.waitingForStairs,climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime,actionDuration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],conversation:brain.isSeatedInLounge()&&brain.leisure==='conversation'?brain.loungeCompanion:null,leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair};
+    const miloPose={stationStep:step,gait:actor.planned?actor.walkPose:undefined,moving:actor.busy&&!actor.climbing,waiting:actor.waitingForVisitor||actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid||actor.waitingForStairs||Boolean(actor.turn),climbing:false,facing:actor.facing,walkYaw:walkway.yaw,walkDistance:positionX(actor.walkDistance)-positionX(0),action,time,shipHour:brain.hour,dt:paused?0:dt,actionTime:step?step.time:actionTime,actionDuration:step?step.duration:brain.curDurSec,callingTime:brain.state==='knocking'?brain.knockT:null,health:brain.health,bathroom,diningDocks:this.ship.diningDocks[action],conversation:brain.isSeatedInLounge()&&brain.leisure==='conversation'?brain.loungeCompanion:null,leisure:brain.loungeStow?.leisure??brain.loungeExit?.leisure??(brain.state==='performing'||brain.loungeEntry?brain.leisure:null),catReady:catRoutine.mode==='play',loungeDocks:this.ship.loungeProps,loungeStow:brain.loungeStow,loungeExit:brain.loungeExit,gymVisit:brain.gymVisit,loungeEntry:brain.loungeEntry,reclineExit:brain.reclineExit,bunkVisit:brain.bunkVisit,smokingVisit:brain.smokingVisit,hatchRepair:brain.hatchRepair};
     // On a stair trip the cabin walk carries Milo up to the stairs and away
     // from them; the stair walk places the body and legs at the flights.
-    if(stairTrip&&!brain.grooming)poseHumanTrip(this.milo,stairTrip.trip,stairTrip.t,time,{waiting:actor.stairWaiting,arrival:stairTrip.arrival,cabinPose:(walkDistance,walkStride)=>animateMilo(this.milo,{...miloPose,waiting:miloPose.waiting||actor.stairWaiting,walkDistance,walkStride})});
+    if(stairTrip&&!brain.grooming)poseHumanTrip(this.milo,stairTrip.trip,stairTrip.t,time,{waiting:actor.stairWaiting,arrival:stairTrip.arrival,cabinPose:(walkDistance,walkStride)=>animateMilo(this.milo,{...miloPose,gait:undefined,waiting:miloPose.waiting||actor.stairWaiting,walkDistance,walkStride})});
     else if(!brain.grooming)animateMilo(this.milo,miloPose);
+    // (the planned walk turns on the spot before it sets off: it needs to know where the figure faces)
+    actor.viewYaw=this.milo.rotation.y;
     if(this.cabinClimb)applyCabinLadder(this.milo,this.cabinClimb);
     this.harvestDelivery.update(this.milo,brain);
     for(const [id,fixture]of Object.entries(this.ship.bathrooms)){
@@ -544,6 +550,10 @@ export class ObservationView {
       this.groomingMotion.update(grooming.time,{...pose,health:brain.health});this.hairGrowth.setGrowth(pose.hair,pose.beard);
     }else this.hairGrowth.setGrowth(brain.hairGrowth?.progress??0);
     for(const tool of Object.values(this.groomingTools))tool.visible=Boolean(grooming);
+    // Where two motions do not hand over in the same pose, the jump is taken up over a moment.
+    this.miloPoseBlend??=new MiloPoseBlend(this.milo);
+    if(actor.poseSeam){actor.poseSeam=false;this.miloPoseBlend.begin();}
+    this.miloPoseBlend.apply(paused?0:dt,{detect:!this.cabinClimb&&!stairTrip});
     // The mirror is useful only through Milo's eyes; other cameras and XR
     // keep the inexpensive metal surface. Offscreen reflections are culled.
     const mirrorVisible=isMiloMirrorView(this.characterCamera,this.renderer.xr.isPresenting);

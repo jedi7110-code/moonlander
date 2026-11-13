@@ -34,6 +34,24 @@
         "pax-upload"
       ],
       "port": 8090
+    },
+    {
+      "name": "moon-obs-dev",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd obs && exec npx vite --host 127.0.0.1 --port 5173 --strictPort"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "moon-milo-study",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd obs && exec node studies/milo/study-server.mjs"
+      ],
+      "port": 8768
     }
   ]
 }

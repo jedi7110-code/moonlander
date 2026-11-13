@@ -492,7 +492,7 @@ test('real grooming visit runs each motor only in its visible phase at 30, 60 an
     }
     assert.deepEqual([...phases],['cutRight','transfer','cutLeft'],'motor continues through the hand transfer');
     assert.deepEqual(changes.map(({tool,active})=>[tool,active]),[['clipper',true],['clipper',false],['shaver',true],['shaver',false]]);
-    for(const [i,expected]of [11,29,37,47].entries())assert.ok(Math.abs(changes[i].age-expected)<=dt+1e-7,'entry turn and slower tool return are reflected in timing');
+    for(const [i,expected]of [11.8,29.8,37.8,47.8].entries())assert.ok(Math.abs(changes[i].age-expected)<=dt+1e-7,'entry turn and slower tool return are reflected in timing');
     assert.equal(h.events.length,0,'no one-shot buzz per stroke');
   }
 });
@@ -816,7 +816,7 @@ test('cat elevator doors stay silent while stationary and do not replay a muted 
 test('real bathroom phases gate shower water and a single toilet flush on departure',()=>{
   for(const id of ['shower','toilet']){
     const h=harness(),visit=new BathroomVisit(id);h.state.brain.bathroom=visit;h.driver.update(1/60,h.state);
-    for(let i=0;i<400;i++){visit.update(1/60);h.driver.update(1/60,h.state);}
+    for(let i=0;i<520;i++){visit.update(1/60);h.driver.update(1/60,h.state);}
     assert.equal(visit.phase,'use');assert.equal(h.loops.get('shower').active,id==='shower');
     for(let i=0;i<120;i++)h.driver.update(1/60,h.state);
     assert.equal(h.events.filter(e=>e.id==='flush').length,0);

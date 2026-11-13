@@ -95,7 +95,7 @@ export class DroidRoutine {
     // Retargeting away from the shaft is always allowed, even from inside a hold.
     if(from*to>0&&Math.abs(to)>=Math.abs(from))return false;
     if(from*to>0&&Math.abs(to)*.022>DROID_LADDER_TRAFFIC.crewWaitX)return false;
-    const next=Math.max(0,Math.abs(from)-actor.walkSpeed*Math.max(0,dt));
+    const next=Math.max(0,Math.abs(from)-Math.max(actor.walkSpeed*Math.max(0,dt),actor.reach??0));
     return next*.022<=DROID_LADDER_TRAFFIC.crewWaitX;
   }
   available(job){

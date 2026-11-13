@@ -1,3 +1,5 @@
+import {plannedPassage} from './station-step.js';
+import {poseMiloGait} from './milo-gait.js';
 import * as THREE from 'three';
 import {box,cylinder,pipe} from './materials.js';
 import {animateMilo} from './characters.js';
@@ -6,7 +8,10 @@ import {applyMocapWalk,miloWalkData} from './mocap-walk.js';
 import {headingEase} from './heading.js';
 import {applyAuthoredMiloTurn} from './milo-turn.js';
 
-export const GROOMING_DURATION=54;
+// The walk into the back room and the walk out take this long each: the planned walk's own
+// time over that distance. The authored clock allows 4 seconds for each; it is stretched there.
+export const GROOMING_WALK=4.8;
+export const GROOMING_DURATION=54+2*(GROOMING_WALK-4);
 export const VANITY={x:-.86,z:-3.22,standX:-.37,floor:.11};
 export const TOOL_TIP=new THREE.Vector3(0,.084,-.034);
 export const SHAVER_TIP=new THREE.Vector3(0,.089,0);
@@ -15,20 +20,24 @@ const s=(t,a,b)=>THREE.MathUtils.smoothstep(t,a,b);
 const v=(x,y,z)=>new THREE.Vector3(x,y,z);
 
 export function sampleGrooming(seconds){
-  const time=THREE.MathUtils.clamp(seconds,0,GROOMING_DURATION);
+  const real=THREE.MathUtils.clamp(seconds,0,GROOMING_DURATION),leaveAt=50+GROOMING_WALK-4;
+  // (the authored clock: 4 s to walk in, then as authored, 4 s to walk out from its 50th second)
+  const time=real<=GROOMING_WALK?real*4/GROOMING_WALK:real<=leaveAt?real-(GROOMING_WALK-4):50+(real-leaveAt)*4/GROOMING_WALK;
   // Allow 3.3 seconds to bring the left hand around from the nape and lower
   // the clipper. Keep this slower return inside the same authored trajectory.
   const t=time<=27?time:time<=30.3?27+(time-27)*1.3/3.3:time-2;
   const phase=t<4?'enter':t<5.5?'turn':t<9?'pickClipper':t<15?'cutRight':t<21?'transfer':t<27?'cutLeft':t<29?'putClipper':t<33?'pickShaver':t<43?'shave':t<45?'putShaver':t<48?'check':'leave';
   const labels={enter:'2階の奥部屋へ',turn:'鏡の前に立つ',pickClipper:'バリカンを手に取る',cutRight:'右側から頭頂部を刈る',transfer:'正面で左手に持ち替える',cutLeft:'左側と後頭部を刈る',putClipper:'バリカンを戻す',pickShaver:'シェーバーを手に取る',shave:'髭を剃る',putShaver:'シェーバーを戻す',check:'鏡で仕上がりを確認',leave:'短髪A・髭なしにリセット完了'};
-  const enter=s(t,0,4),leave=s(t,48,52);
-  return{time,motionTime:t,phase,label:labels[phase],hair:1-.5*(s(t,9,15)+s(t,21,27)),beard:1-s(t,33,43),
+  // Into the back room and out of it in a planned walk (from standing, his steps, to standing).
+  const way=Math.hypot(VANITY.standX,.78-VANITY.z),entering=plannedPassage(way,real,GROOMING_WALK),leaving=plannedPassage(way,real-leaveAt,GROOMING_WALK);
+  const enter=entering.fraction,leave=leaving.fraction;
+  return{time:real,motionTime:t,phase,label:labels[phase],hair:1-.5*(s(t,9,15)+s(t,21,27)),beard:1-s(t,33,43),
     x:VANITY.standX*enter*(1-leave),z:THREE.MathUtils.lerp(.78,VANITY.z,enter)*(1-leave)+.78*leave,
     // Finish the approach, then turn with small planted steps at the mirror.
     yaw:t<46?Math.PI+Math.PI/2*headingEase((t-4)/1.5):Math.PI*1.5+Math.PI/2*headingEase((t-46)/2),
     moving:(t>0&&t<4)||(t>48&&t<52),
     walkWeight:s(t,0,.65)*(1-s(t,3.2,4))+s(t,48,48.65)*(1-s(t,51.2,52)),
-    walkDistance:(.78-VANITY.z)*(enter+leave),done:t===52};
+    walkDistance:(.78-VANITY.z)*(enter+leave),gait:t<4?entering.gait:t>48?leaving.gait:null,done:t===52};
 }
 
 export function createVanity(m,metals){
@@ -200,11 +209,7 @@ export function prepareGroomingMotion(milo,station,tools,{origin=new THREE.Vecto
     // frame at the doorway and mirror. Shorten the stride into the rest pose.
     delete milo.userData.headingTurn;delete milo.userData.standingTurn;
     animateMilo(milo,{moving:false,time:0,action:null,dt:0,health});
-    if(state.walkWeight>0){
-      const rest=capturePose();
-      applyMocapWalk(milo,miloWalkData,state.walkDistance/miloWalkData.cycleDistance*miloWalkData.duration);
-      blendPose(rest,1-state.walkWeight);
-    }
+    if(state.gait)poseMiloGait(milo,state.gait);
     for(const rig of milo.userData.arms)rig.arm.rotation.z+=rig.side*.065*s(t,4,5.5)*(1-s(t,45,46));
     setMealHandFit(milo,s(t,5.5,7)*(1-s(t,44.3,45)));
     milo.position.set(origin.x+state.x,origin.y+floor,origin.z+state.z);milo.rotation.y=yaw??state.yaw;

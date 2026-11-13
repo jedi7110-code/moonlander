@@ -3,6 +3,7 @@ import {getStation,FLOORS} from './state.js';
 import {getLang} from '../../../js/obs/i18n.js?v=15';
 import {medicalReadings,medicalEntryTime,medicalDuration,MED_BED} from './medical.js';
 import {CrewHealth} from './health.js';
+import {HARVEST_PLACING,stationWrap,stationVisit} from './station-step.js';
 import {BathroomVisit,BATHROOM_TURN_DECAY} from './bathroom.js';
 import {PlantBed} from './plant-state.js';
 import {CABIN_PACE} from './pace.js';
@@ -77,7 +78,10 @@ export class CabinBrain extends Brain {
     const medicalBoarding=this.reclineExit?.id==='medical'||(this.cur?.id==='medical'&&this.state==='performing'&&medicalEntryTime(this.curDurSec-this.performT,this.curDurSec)<MED_BED.transition);
     const loungeTransition=this.loungeEntry||this.loungeStow||this.loungeExit;
     const turning=BATHROOM_TURN_DECAY[this.bathroom?.phase]??(this.gymVisit?.phase==='mount'&&this.gymVisit.age<GYM_TURN_SECONDS?GYM_TURN_DECAY:1);
-    return super._decayMul(need)*CABIN_PACE.needDecay*(boarding ? BUNK_TRANSITION_DECAY : medicalBoarding ? .14 : loungeTransition ? LOUNGE_TRANSITION_DECAY : turning);
+    // (the turn and the steps up to a shelf or counter and back are added to the visit: the
+    // visit as a whole keeps the needs budget of the work alone)
+    const wrap=this.state==='performing'?stationWrap(this.cur?.id):null,stepping=wrap?Math.max(0,this.curDurSec-wrap.lead-wrap.tail)/this.curDurSec:1;
+    return super._decayMul(need)*CABIN_PACE.needDecay*(boarding ? BUNK_TRANSITION_DECAY : medicalBoarding ? .14 : loungeTransition ? LOUNGE_TRANSITION_DECAY : turning*stepping);
   }
   update(dt){
     if(this.state==='playingGame')return;
@@ -134,9 +138,9 @@ export class CabinBrain extends Brain {
         harvest.age+=dt;
         if(harvest.age>=1.4){harvest.phase='carrying';harvest.age=0;this.deliverHarvest();}
       }else if(harvest.phase==='placing'){
-        harvest.age=Math.min(5.2,harvest.age+dt);
+        harvest.age=Math.min(HARVEST_PLACING.seconds,harvest.age+dt);
         if(harvest.age>=4.1&&!harvest.deposited){this.kitchenGreens=harvest.count;harvest.deposited=true;}
-        if(harvest.age>=5.2){this.harvestDelivery=null;super._endPerform();this.finishDeparture();}
+        if(harvest.age>=HARVEST_PLACING.seconds){this.harvestDelivery=null;super._endPerform();this.finishDeparture();}
       }
     }
     if(grooming&&this.grooming===grooming){
@@ -326,6 +330,9 @@ export class CabinBrain extends Brain {
       station={...station,dur:medicalDuration(this.health.duration)*1000};this.cur=station;this.health.beginTreatment();
       this.medicalSample=medicalReadings(this.needs,this.health);
     }
+    // Stepping up to the shelf or the counter and back takes its own time (station-step.js).
+    const wrap=stationWrap(station.id);
+    if(wrap){station={...station,dur:station.dur+(wrap.lead+wrap.tail)*1000};this.cur=station;}
     super._startPerform(station.id==='gym'?{...station,need:null}:station);
     if(enteringLounge){this.cur=station;this.loungeEntry={age:0,...(this.loungeCompanion?{companion:true,transitionSeconds:LOUNGE_COMPANION_SECONDS}:{})};this.state='enteringLounge';}
     else if(station.id==='lounge'&&this.leisure==='smoking')this.smokingVisit=new SmokingVisit({seated:true});
@@ -340,7 +347,8 @@ export class CabinBrain extends Brain {
     if(this.loungeEntry){this.afterActivity??=()=>{};return;}
     if(this.gymVisit){this.state='leavingGym';this.recoverNeed=null;this.gymVisit.requestExit();return;}
     if(this.cur?.id==='lounge'){this.beginLoungeExit();return;}
-    if(this.cur?.id==='plant'){
+    if(this.cur?.id==='plant'&&this.plantAborted)this.plantAborted=false;
+    else if(this.cur?.id==='plant'){
       const count=this.plants.harvest(this.care);this.plants.tend();
       this.scene.obsUI?.plantResult?.(count);
       if(count){
@@ -381,10 +389,20 @@ export class CabinBrain extends Brain {
     if(this.loungeExit||this.isSeatedInLounge()){
       this.afterActivity=callback;this.beginLoungeExit();return true;
     }
-    if(!this.bathroom&&!(this.state==='performing'&&['galley','hydro'].includes(this.cur?.id)))return false;
+    // (at the counter or the shelf he first steps back into the aisle)
+    if(!this.bathroom&&!(this.state==='performing'&&['galley','hydro','plant'].includes(this.cur?.id)))return false;
     this.afterActivity=callback;
+    // (work at the shelf is broken off: nothing is harvested, and he only steps back)
+    // (from wherever he is on the way to the shelf: only as long as it takes to walk that back)
+    if(this.cur?.id==='plant'){this.plantAborted=true;this.performT=Math.min(this.performT,stationVisit('plant',this.curDurSec-this.performT,this.curDurSec).walked);}
     if(this.bathroom){this.state='leavingBathroom';this.recoverNeed=null;this.bathroom.requestExit();}
     return true;
+  }
+  // The clock of the work at a station ({time, duration} in seconds). At the shelf and the
+  // counters a visit also has the turn and the steps up to the fitting and back around it.
+  get workClock(){
+    const duration=this.curDurSec,time=duration-this.performT,visit=this.state==='performing'&&Number.isFinite(time)?stationVisit(this.cur?.id,time,duration):null;
+    return visit?{time:visit.time,duration:visit.duration}:{time,duration};
   }
   finishDeparture(){const callback=this.afterActivity;this.afterActivity=null;callback?.();}
   deliverHarvest(){

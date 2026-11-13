@@ -15,6 +15,7 @@ import {restWeight,applyCatSitting} from './cat-rest.js';
 import {createDiningProps,applyDiningPose,resetDiningPose,diningPhase,placeHand,diningApproach} from './dining.js';
 import {applyWalkingPose} from './walking.js';
 import {applyMocapWalk,miloWalkData} from './mocap-walk.js';
+import {poseMiloGait} from './milo-gait.js';
 import {relaxMiloHand} from './milo-hands.js';
 export {relaxMiloHand} from './milo-hands.js';
 import {applyCallingPose} from './calling.js';
@@ -219,7 +220,9 @@ export function* createMiloSteps(m,headModel=new THREE.Group(),{elbowStyle='supp
   root.userData.updateWristTwists?.();attachMiloWatch(root);attachMiloBioSensor(root);attachSmokingProps(root);attachHatchRepairTool(root);return root;
 }
 
-export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',walkStride=1,actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,conversation=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,hatchRepair=null,sequentialBedEntry=true}) {
+// gait: the pose state of a planned walk (MiloWalker.pose), null while a planned walker stands;
+// left out, the figure walks the plain cycle whenever it is moving.
+export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,action,time,shipHour=8,dt=1/60,walkDistance=time*1.188,walkStyle='measured',walkStride=1,gait,stationStep=null,actionTime=time,actionDuration,callingTime=null,health=null,bathroom=null,diningDocks=null,leisure=null,conversation=null,catReady=false,loungeDocks=null,loungeStow=null,loungeExit=null,gymVisit=null,loungeEntry=null,reclineExit=null,bunkVisit=null,smokingVisit=null,hatchRepair=null,sequentialBedEntry=true}) {
   const {body,chest,head,arms,legs,bandage}=root.userData;
   setMiloNeckProtraction(root,0);
   root.userData.spineCurve=null;
@@ -237,7 +240,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   root.userData.repairTool.visible=false;
   root.userData.smokingProps.cigarette.visible=false;root.userData.smokingProps.lighter.visible=false;root.userData.smokingProps.flame.visible=false;
   for(const prop of ['tablet','phones','toy'])root.userData.leisure[prop].visible=false;
-  const stride=time*(climbing?5.4:6.5),walking=(moving||Boolean(bathroom?.moving))&&!climbing&&!waiting;
+  const planned=gait!==undefined,stride=time*(climbing?5.4:6.5);
+  const walking=planned?(Boolean(gait)||Boolean(bathroom?.moving))&&!climbing:(moving||Boolean(bathroom?.moving))&&!climbing&&!waiting;
   const seated=['lounge','console'].includes(action)&&!moving;
   const dining=['galley','hydro'].includes(action)&&!moving;
   const calling=callingTime!==null&&!moving&&!action;
@@ -251,10 +255,12 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
     root.rotation.y+=angleDelta(root.rotation.y,desired)*(1-Math.exp(-8*Math.min(dt,.1)));
   }
   else advanceMiloTurn(root,desired,dt,!walking&&!climbing&&!seated&&!loungeExit&&!loungeEntry&&action!=='gym');
-  body.position.y=walking?0:Math.sin(time*1.5)*.003;
+  const breath=Math.sin(time*1.5)*.003;
+  body.position.y=walking?0:breath;
   body.position.x=0;body.position.z=0;body.rotation.set(0,0,0);chest.scale.x=1+Math.sin(time*1.6)*.006;
   chest.rotation.set(0,0,0);chest.position.set(0,0,0);head.position.set(0,1.637,-.009);
-  head.rotation.set(0,!moving?Math.sin(time*.32)*.12:0,0);
+  // (a planned walker looks about whenever it stands, and the walk takes the look away gradually)
+  head.rotation.set(0,(planned?!climbing:!moving)?Math.sin(time*.32)*.12:0,0);
   for(const {arm,elbow,hand,fingers,thumb,side} of arms){arm.position.set(side*.207,1.488,0);hand.rotation.set(0,root.userData.bodySkin?side*Math.PI/2:0,0);arm.rotation.set(climbing?-2+Math.sin(stride+side*Math.PI/2)*.35:-.05,0,side*.025,'XYZ');
     elbow.rotation.set(climbing?-.70:-.08,0,0);
     fingers.forEach(finger=>{finger.rotation.set(0,0,0);finger.userData.links.forEach(link=>link.rotation.set(0,0,0));});thumb.position.set(-side*.029,-.051,.025);thumb.rotation.set(0,0,0);thumb.userData.ip.rotation.set(0,0,0);
@@ -277,9 +283,14 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
     // Bathroom passages move in depth without setting CrewMotion.busy. They
     // still use Milo's selected walk, driven by actual passage distance.
     const distance=bathroom?.moving?bathroom.walkDistance:walkDistance;
-    if(walkStyle==='legacy')applyWalkingPose(root,distance);
+    if(bathroom?.moving&&bathroom.gait)poseMiloGait(root,bathroom.gait,{breath});
+    else if(gait&&!bathroom?.moving)poseMiloGait(root,gait,{breath});
+    else if(walkStyle==='legacy')applyWalkingPose(root,distance);
     else applyMocapWalk(root,miloWalkData,distance/miloWalkData.cycleDistance*miloWalkData.duration,walkStride);
   }
+  // stepping up to a fitting or back from it (station-step.js)
+  const stepping=!walking&&!moving&&stationStep?.gait?stationStep.gait:null;
+  if(stepping)poseMiloGait(root,stepping,{breath});
   if(!dining&&!bathroom)applyCurrentMiloTurn(root,{upperBody:!calling});
   if(seated&&action==='lounge'&&!leisure)applyDeskHands(root);
   applyCallingPose(root,calling?callingTime:null,dt);
@@ -301,7 +312,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   if(bunkVisit)applyBunkVisitPose(root,bunkVisit);
   else if(action==='bunk'&&!moving)applySleepingHands(root,reclineExit?reclineExitProgress(reclineExit):reclineProgress(actionTime,actionDuration??BUNK_BED.duration,BUNK_BED.transition));
   if(action==='plant'&&!moving){
-    const weight=THREE.MathUtils.smoothstep(Math.min(actionTime,(actionDuration??9)-actionTime),0,1.2);
+    // (the arms come up as he arrives at the shelf, and down as he steps back)
+    const weight=stationStep?THREE.MathUtils.smoothstep(stationStep.fraction,.35,1):THREE.MathUtils.smoothstep(Math.min(actionTime,(actionDuration??9)-actionTime),0,1.2);
     for(const {arm,elbow,side,hand}of arms){
       arm.rotation.x=THREE.MathUtils.lerp(-.05,-1.12+Math.sin(actionTime*2+side)*.12,weight);
       elbow.rotation.x=THREE.MathUtils.lerp(-.08,-.8,weight);hand.rotation.y=side*.5*weight;
@@ -310,9 +322,17 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   }
   bandage.visible=Boolean(health?.bandageTime>0||(health?.treatment?.kind==='injury'&&health.treatment.elapsed>health.treatment.duration*.5));
   updateInjuryAppearance(root,health);
-  if(health?.needsCare&&!climbing&&!['medical','gym','bunk','lounge','console','smoking'].includes(action)){
-    if(health.condition.kind==='injury'){arms[0].arm.rotation.x=-.70;arms[0].elbow.rotation.x=-1.3;}
-    else{head.rotation.x=.12+Math.sin(time*9)*.012;if(!walking)body.position.y-=.008;}
+  const unwell=health?.needsCare&&!climbing&&!['medical','gym','bunk','lounge','console','smoking'].includes(action);
+  // The injured arm is drawn up and let down over a moment, not from one frame to the next.
+  const guarding=Boolean(unwell&&health.condition.kind==='injury');
+  const guard=root.userData.armGuard=THREE.MathUtils.clamp((root.userData.armGuard??(guarding?1:0))+(guarding?1:-1)*Math.max(0,dt)/.4,0,1);
+  if(guard>0){
+    const w=THREE.MathUtils.smoothstep(guard,0,1);
+    arms[0].arm.rotation.x=THREE.MathUtils.lerp(arms[0].arm.rotation.x,-.70,w);arms[0].elbow.rotation.x=THREE.MathUtils.lerp(arms[0].elbow.rotation.x,-1.3,w);
+  }
+  if(unwell){
+    if(health.condition.kind==='injury'){}
+    else{head.rotation.x=.12+Math.sin(time*9)*.012;if(!walking)body.position.y-=.008;else if(gait)body.position.y-=.008*(1-gait.walk);}
   }
   root.visible=true;
   if(bathroom){
@@ -328,7 +348,7 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
   }
   if(dining&&!climbing){
     const phase=diningPhase(actionTime,actionDuration??(action==='galley'?6:5));
-    if(phase.approach>0&&phase.approach<1){
+    if(!stationStep&&phase.approach>0&&phase.approach<1){
       const armJoints=arms.flatMap(({arm,elbow,hand})=>[arm,elbow,hand]);
       const restingArms=armJoints.map(joint=>joint.quaternion.clone());
       applyWalkingPose(root,diningApproach(action)*phase.approach);
@@ -338,7 +358,8 @@ export function animateMilo(root,{moving,waiting=false,climbing,facing,walkYaw,a
       const weight=Math.sin(Math.PI*phase.approach);
       for(const {leg,knee,boot}of legs){leg.rotation.x*=weight;knee.rotation.x*=weight;boot.rotation.x*=weight;}
     }
-    body.position.y=0;applyCurrentMiloTurn(root,{upperBody:false});
+    if(!stepping)body.position.y=0;
+    applyCurrentMiloTurn(root,{upperBody:false});
     applyDiningPose(root,action,actionTime,actionDuration,diningDocks);
   }
   if(smokingVisit){if(smokingVisit.seated&&loungeDocks)applyLoungeSmokingPose(root,smokingVisit,loungeDocks);else applySmokingPose(root,smokingVisit);}

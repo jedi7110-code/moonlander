@@ -1,3 +1,4 @@
+import {plannedPassage} from './station-step.js';
 import {ASHTRAY,CABIN_AISLE} from './layout.js';
 import {angleDelta,headingEase} from './heading.js';
 
@@ -64,7 +65,9 @@ export class SmokingVisit {
     const facing=entry+angleDelta(entry,-2.55),out=facing+angleDelta(facing,0),end=out+angleDelta(out,start);
     let depth=ASHTRAY.standZ,yaw=facing,turn=null,gesture=null;
     if(phase==='turnIn'){depth=CABIN_AISLE.crewZ;turn={from:start,to:entry};}
-    if(phase==='approach'){depth=mix(CABIN_AISLE.crewZ,ASHTRAY.standZ,smooth(u));yaw=entry;}
+    // (to the ashtray and back in a planned walk: from standing, a few steps, to standing)
+    const passage=phase==='approach'||phase==='return'?plannedPassage(Math.abs(CABIN_AISLE.crewZ-ASHTRAY.standZ),this.age,durations[phase]):null;
+    if(phase==='approach'){depth=mix(CABIN_AISLE.crewZ,ASHTRAY.standZ,passage.fraction);yaw=entry;}
     if(phase==='settle')turn={from:entry,to:facing};
     if(phase==='smoke')gesture=smokingGesture(this.age);
     if(phase==='extinguish'){
@@ -74,12 +77,12 @@ export class SmokingVisit {
         cigarette:source.cigarette&&t<2.3,extinguish:smooth(t/1.4),tap:t>=1.4&&t<2.1?Math.sin(t*15)*.003:0,label:'灰皿で火を消す'};
     }
     if(phase==='turnOut')turn={from:facing,to:out};
-    if(phase==='return'){depth=mix(ASHTRAY.standZ,CABIN_AISLE.crewZ,smooth(u));yaw=out;}
+    if(phase==='return'){depth=mix(ASHTRAY.standZ,CABIN_AISLE.crewZ,passage.fraction);yaw=out;}
     if(phase==='align'){depth=CABIN_AISLE.crewZ;turn={from:out,to:end};}
     if(this.done){depth=CABIN_AISLE.crewZ;yaw=end;}
     if(turn){turn.progress=u;yaw=mix(turn.from,turn.to,headingEase(u));}
     const moving=phase==='approach'||phase==='return';
-    return{phase,depth,yaw,turn,gesture,moving,walkDistance:Math.abs(CABIN_AISLE.crewZ-ASHTRAY.standZ)*smooth(u),
+    return{phase,depth,yaw,turn,gesture,moving,gait:passage?.gait??null,walkDistance:Math.abs(CABIN_AISLE.crewZ-ASHTRAY.standZ)*smooth(u),
       walkWeight:moving?smooth(this.age/.32)*smooth((durations[phase]-this.age)/.32):0};
   }
 }

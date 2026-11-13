@@ -1,11 +1,17 @@
 import {animatePocketShutter} from './shutter.js';
 import {updateBathroomCeilingLight} from './bathroom-lighting.js';
+import {planMiloWalk,miloWalkState} from './milo-gait.js';
+import {CREW_WALK_SPEED} from './pace.js';
 
 const smooth=t=>t*t*(3-2*t);
-const phases=[['reach',1.4],['open',.7],['enter',2.8],['close',.7],['use',Infinity],['reopen',1.8],['leave',2.8],['shut',.7]];
 export const BATHROOM_OUTSIDE_DEPTH=.78,BATHROOM_INSIDE_DEPTH=-2.8;
+// The way in and out is a planned walk from standing to standing (milo-gait.js), at the
+// cabin's walking speed: Milo sets off, takes his steps and stops with the feet together.
+export const BATHROOM_PASSAGE=planMiloWalk(BATHROOM_OUTSIDE_DEPTH-BATHROOM_INSIDE_DEPTH,CREW_WALK_SPEED*.022);
+const phases=[['reach',1.4],['open',.7],['enter',BATHROOM_PASSAGE.duration],['close',.7],['use',Infinity],['reopen',1.8],['leave',BATHROOM_PASSAGE.duration],['shut',.7]];
 // A longer visual turn must not charge extra hunger/thirst to the visit.
-export const BATHROOM_TURN_DECAY={reach:.4/1.4,reopen:.7/1.8};
+// (nor must the walk through the door, which takes its natural time now instead of 2.8 seconds)
+export const BATHROOM_TURN_DECAY={reach:.4/1.4,reopen:.7/1.8,enter:2.8/BATHROOM_PASSAGE.duration,leave:2.8/BATHROOM_PASSAGE.duration};
 
 export function animateBathroom(fixture,pose=null,dt=0){
   animatePocketShutter(fixture.door,pose?.opening??0);
@@ -40,8 +46,10 @@ export class BathroomVisit {
     const phase=this.phase,t=this.age/phases[this.index][1],s=smooth(t);
     const opening=phase==='open'||phase==='reopen'?s:phase==='close'||phase==='shut'?1-s:['enter','leave'].includes(phase)?1:0;
     const outside=BATHROOM_OUTSIDE_DEPTH,inside=BATHROOM_INSIDE_DEPTH;
-    const depth=phase==='enter'?outside+(inside-outside)*s:phase==='leave'?inside+(outside-inside)*s:['close','use','reopen'].includes(phase)?inside:outside;
+    const moving=['enter','leave'].includes(phase),gait=moving?miloWalkState(BATHROOM_PASSAGE,this.age):null;
+    const depth=phase==='enter'?outside-gait.x:phase==='leave'?inside+gait.x:['close','use','reopen'].includes(phase)?inside:outside;
     // Automatic doors: turn toward the opening, then walk through the cleared frame.
-    return{opening,depth,walkDistance:Math.abs(depth-(phase==='enter'?outside:inside)),moving:['enter','leave'].includes(phase),inside:depth<-1.72,reach:0,turn:phase==='reach'?s:1,yaw:phase==='reopen'?Math.PI*(1-s):['leave','shut'].includes(phase)?0:Math.PI,phase,turnProgress:t};
+    // (walkDistance counts the walk cycle's phase: a footfall sounds where a foot lands)
+    return{opening,depth,gait,walkDistance:gait?gait.u*BATHROOM_PASSAGE.cycle.C:0,moving,inside:depth<-1.72,reach:0,turn:phase==='reach'?s:1,yaw:phase==='reopen'?Math.PI*(1-s):['leave','shut'].includes(phase)?0:Math.PI,phase,turnProgress:t};
   }
 }

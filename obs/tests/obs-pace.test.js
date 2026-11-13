@@ -12,6 +12,7 @@ const setup=()=>{
   const care=new Supplies(),actor=new CrewMotion(),scene={time:{delayedCall(){}},sound:{add(){return{play(){},once(_event,fn){fn();},destroy(){}};}},obsUI:{hideWant(){},showWant(){},flashMonitor(){}}};
   return{care,actor,scene,brain:new CabinBrain(scene,actor,{care,random:()=>.8})};
 };
+import {stationWrap} from '../src/obs/station-step.js';
 test('3D slows clock and passive depletion without changing the original 2D pace',()=>{
   const {care,actor,scene,brain}=setup(),original=new Brain(scene,actor,{care});
   for(const b of [brain,original]){b.state='goingTo';Object.keys(b.needs).forEach(key=>b.needs[key]=80);b.update(10);}
@@ -23,8 +24,10 @@ test('satisfied needs do not spend supplies, but a manual meal still completes a
   const {care,actor,brain}=setup();Object.keys(brain.needs).forEach(key=>brain.needs[key]=90);brain.exercise=90;
   brain._choose();assert.equal(brain.state,'idle');assert.equal(actor.busy,false);assert.equal(care.supplies.food,3);
   actor.floor=2;actor.y=870;actor.x=getStation('galley').x;
-  brain._go(getStation('galley'));actor.update(.1);assert.equal(brain.performT,10);assert.equal(care.supplies.food,2);
-  brain.update(10);assert.equal(brain.needs.hunger,100);assert.notEqual(brain.state,'performing');
+  // (the meal's 10 seconds, and the turn and the steps up to the counter and back)
+  const wrap=stationWrap('galley'),visit=10+wrap.lead+wrap.tail;
+  brain._go(getStation('galley'));actor.update(.1);assert.ok(Math.abs(brain.performT-visit)<1e-9);assert.equal(care.supplies.food,2);
+  brain.update(visit+1e-6);assert.equal(brain.needs.hunger,100);assert.notEqual(brain.state,'performing');
 });
 test('cat appetite slows without stretching movement or sleep recovery',()=>{
   const {care}=setup(),cat=new CatRoutine(care);cat.hunger=80;cat.energy=20;cat.rest('sleep',20);cat.update(10);

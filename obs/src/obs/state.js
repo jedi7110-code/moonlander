@@ -7,7 +7,10 @@ import {BUNK_PHASE_SECONDS} from './bunk-visit.js';
 import {actorWalkway,LOUNGE_TABLE_PASSAGE} from './cabin-walkway.js';
 import {worldActor,nextActor} from './curtis-traffic.js';
 import {CabinMouseChase} from './mouse-chase.js';
-import {humanTripDistance} from './human-stair-gait.js';
+import {humanTripDistance,humanTripStride} from './human-stair-gait.js';
+import {MiloWalker} from './milo-gait.js';
+import {miloWalkData} from './mocap-walk.js';
+import {turnSeconds} from './heading.js';
 
 const toPx=x=>x/.022+700,toPxY=y=>870-y/.016;
 
@@ -77,18 +80,35 @@ export function advanceCabinTraffic(actor,cat,dt,droid=null){
   const patience=droid?.waiting?ROBOT_DETOUR.moment:ROBOT_DETOUR.limit;
   if(blocked&&actor.robotWait>1&&actor.queue[1]?.type==='stairs'&&!actor.queue[1].entered)actor.stairsFallback(actor.queue[1]);
   else if(blocked&&actor.robotWait<patience)actor.waitingForStairs=true;
-  if(!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid&&!actor.waitingForVisitor&&!actor.waitingForStairs)actor.update(dt);
+  const held=actor.waitingForHatch||actor.waitingForCat||actor.waitingForDroid||actor.waitingForVisitor||actor.waitingForStairs;
+  // (a planned walk is not frozen where it is: held, it comes to a stop in step)
+  if(actor.planned)actor.update(dt,Boolean(held));
+  else if(!held)actor.update(dt);
   cat.update(dt,actor,droid);
 }
 
+// The planned walk (see milo-gait.js): Milo walks from standing to standing.
+export const CREW_GAIT=Object.freeze({
+  arrive:.5,      // px: this close to where a walk was to end, it has arrived
+  startRoom:.6,   // m a walk needs to stop again after its first step: standing, the crew does not set off into less room
+  turnFrom:.12,   // rad: facing this far off the way to go, the crew turns on the spot first
+  turnSettle:.05, // s after that turn before the first step
+  stairRun:.3,    // m of a stair trip's own first stretch (straight along the aisle) a walk may still use to get into stride
+  release:.35,    // s a walk held up goes on stopping after it is let go (no stop-and-go while the way clears)
+});
 export class CrewMotion {
-  constructor({floor=getStation('console').floor,x=360,walkSpeed=CREW_WALK_SPEED,climbSpeed=38*LADDER_PACE}={}) {
+  // planned: walk in planned bouts (start from standing, stop in step, turn before setting
+  // off) instead of sliding along at a constant speed. The cabin's Milo does; the cat and
+  // the plain studies keep the constant speed.
+  constructor({floor=getStation('console').floor,x=360,walkSpeed=CREW_WALK_SPEED,climbSpeed=38*LADDER_PACE,planned=false}={}) {
     this.floor=floor;this.x=x;this.y=FLOORS[floor].y;this.walkSpeed=walkSpeed;this.climbSpeed=climbSpeed;
     this.walkDistance=0;
     this.queue=[];this.onArrive=null;this.facing=1;this.symbol='';this.knockTime=0;this.commandVersion=0;
+    this.planned=planned;this.gait=null;this.gaitDirection=1;this.turn=null;this.viewYaw=null;this.bouts=0;
   }
-  get busy(){return this.queue.length>0;}
-  get climbing(){return this.queue[0]?.type==='climb';}
+  // (a planned walk that has to give way to a climb or a new errand first comes to a stop)
+  get busy(){return this.queue.length>0||Boolean(this.gait);}
+  get climbing(){return this.queue[0]?.type==='climb'&&!this.gait;}
   // walking a stair trip (between two decks by the left stair tower)
   get onStairs(){const s=this.queue[0];return s?.type==='stairs'&&s.entered?s:null;}
   onStairTrip(){return this.queue[0]?.type==='stairs';}
@@ -147,7 +167,8 @@ export class CrewMotion {
   get walksThrough(){return true;}
   // The walk counter (which drives the walk cycle and the footstep sounds)
   // follows the trip's footfalls: they slow down and shorten at the stairs.
-  beginStairWalk(seg){seg.arrival={speed:this.walkSpeed*.022,entry:this.walkDistance*.022};}
+  // (a planned walk may join the trip a little way along its first stretch: seg.t)
+  beginStairWalk(seg){seg.arrival={speed:this.walkSpeed*.022,entry:this.walkDistance*.022-seg.t};}
   stairWalk(seg){this.walkDistance=humanTripDistance(seg.trip,Math.min(seg.t,seg.trip.length),seg.arrival)/.022;}
   // One step along the stair trip at the head of the queue.
   stairStep(seg,dt){
@@ -171,7 +192,8 @@ export class CrewMotion {
       const over=(seg.t-seg.trip.length)/(this.walkSpeed*.022),through=this.walksThrough;
       this.stairs.leave(this);this.floor=seg.floor;this.x=toPx(seg.trip.to.x);this.y=FLOORS[seg.floor].y;
       this.queue.shift();
-      if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}
+      if(this.planned)this.leaveStairs(seg);
+      else if(!this.busy){const callback=this.onArrive;this.onArrive=null;callback?.();}
       // walking straight on into the cabin (or to a route planned on the
       // stairs): spend the rest of this step there
       else if(through&&over>0&&['walk','replan'].includes(this.queue[0].type))this.advance(over);
@@ -180,6 +202,8 @@ export class CrewMotion {
   get curvedCrewWalk(){return Boolean(this.loungeAvoidance)||(!this.loungeTableAccess&&this.floor===1&&
     Math.abs((this.x-700)*.022-LOUNGE_TABLE_PASSAGE.x)<LOUNGE_TABLE_PASSAGE.halfWidth+1);}
   walkStep(dt){
+    // (a planned walk cannot stop on the spot: the traffic looks as far ahead as it still goes)
+    if(this.planned)return Math.max(this.reach,1e-6);
     const s=this.queue[0],step=this.walkSpeed*Math.max(0,dt);
     if(s?.type!=='walk'||!this.curvedCrewWalk)return step;
     const direction=Math.sign(s.x-this.x),limit=Math.min(Math.abs(s.x-this.x),step);
@@ -194,11 +218,142 @@ export class CrewMotion {
     return low;
   }
 
-  update(dt) {
-    this.knockTime=Math.max(0,this.knockTime-dt);
-    this.advance(dt);
+  update(dt,hold=false) {
+    if(!hold)this.knockTime=Math.max(0,this.knockTime-dt);
+    // (a planned walk that was being held up comes to its stop before it sets off again)
+    this.heldFor=hold?CREW_GAIT.release:Math.max(0,(this.heldFor??0)-dt);
+    this.advance(dt,hold||Boolean(this.planned&&this.gait?.halting&&this.heldFor>0));
   }
-  advance(dt){
+  arrived(){if(!this.queue.length){const callback=this.onArrive;this.onArrive=null;callback?.();}}
+  // ---- The planned walk
+  // what the walk shows now (for the pose), or null while standing
+  get walkPose(){return this.gait?.pose??null;}
+  // px the crew still travels at least: as far as a walk under way needs to stop, or the
+  // room a first step takes
+  get reach(){
+    if(!this.planned)return 0;
+    if(this.gait)return this.gait.stopReach/.022;
+    const s=this.queue[0];return s?.type==='walk'?Math.min(Math.abs(s.x-this.x),CREW_GAIT.startRoom/.022):0;
+  }
+  // metres along the lane from here to x (px)
+  pathLength(to){
+    const a=(this.x-700)*.022,b=(to-700)*.022,n=Math.max(1,Math.ceil(Math.abs(b-a)/.05));
+    let sum=0,z=actorWalkway(this,a).z;
+    for(let i=1;i<=n;i++){const next=actorWalkway(this,a+(b-a)*i/n).z;sum+=Math.hypot((b-a)/n,next-z);z=next;}
+    return sum;
+  }
+  moveAlong(metres,direction){
+    if(!(metres>0))return;
+    const step=metres/.022,x=(this.x-700)*.022,from=actorWalkway(this,x).z;
+    const distance=dx=>Math.hypot(dx,(actorWalkway(this,x+direction*dx*.022).z-from)/.022);
+    let dx=step;
+    if(distance(step)>step+1e-9){let low=0,high=step;for(let i=0;i<22;i++){const mid=(low+high)/2;if(distance(mid)>step)high=mid;else low=mid;}dx=low;}
+    this.x+=direction*dx;
+  }
+  // which way along the aisle a stair trip sets off
+  tripDirection(trip){return Math.sign(trip.frame(.2).x-trip.from.x)||1;}
+  // Does the walk to this segment's end go on beyond it without stopping? (Into a stair trip,
+  // or past a waypoint of the lounge route when the way goes on in the same direction.)
+  walksOn(seg,direction){
+    const next=this.queue[1];
+    // (a trip that sets off the other way is entered from standing: stop at its start and turn)
+    if(next?.type==='stairs')return !next.entered&&this.tripDirection(next.trip)===direction;
+    if(next?.type==='replan'){const target=getStation(next.target?.id)??next.target;return target?.floor===this.floor&&Math.sign(target.x-seg.x)===direction;}
+    return false;
+  }
+  replan(seg){
+    if(seg.leaveLoungeAccess)this.loungeTableAccess=false;
+    const callback=this.onArrive;this.queue=this.planRoute(getStation(seg.target?.id)??seg.target);this.onArrive=callback;
+  }
+  // One tick of a walk under way.
+  walkOn(walker,seg,dt,hold){
+    const direction=this.gaitDirection;let goOn=!hold&&seg?.type==='walk',open=false,stairs=null;
+    walker.speed=this.walkSpeed*.022;
+    if(goOn){
+      const ahead=(seg.x-this.x)*direction;
+      open=this.walksOn(seg,direction);
+      stairs=open&&walker.open&&this.queue[1]?.type==='stairs'?this.queue[1]:null;
+      // (where it is to go now lies behind: stop, then turn round. On the way into a stair
+      // trip it may be a little past the entrance, still getting into stride.)
+      if(ahead<-CREW_GAIT.arrive&&!stairs)goOn=false;
+      else{
+        // Someone has come to stand at the stair entrance: decide for the ladder while the
+        // walk can still stop short of it.
+        if(stairs&&walker.remaining<=walker.stopDistance+.15&&!stairs.committed){
+          if(this.stairs.blockedAtStart(this,stairs.trip)){this.stairsFallback(stairs);return this.walkOn(walker,this.queue[0],dt,hold);}
+          stairs.committed=true;
+        }
+        if(ahead>CREW_GAIT.arrive)walker.retarget(this.pathLength(seg.x),{open});
+        else if(!stairs)walker.retarget(0,{open});
+      }
+    }
+    if(!goOn)walker.halt();
+    this.moveAlong(walker.step(dt),direction);
+    this.walkDistance=walker.phaseDistance/.022;
+    if(walker.done){
+      this.gait=null;
+      if(seg?.type==='walk'&&Math.abs(seg.x-this.x)<=CREW_GAIT.arrive){this.x=seg.x;this.queue.shift();this.arrived();}
+      else if(!seg)this.arrived();
+      return;
+    }
+    if(goOn&&open&&walker.open&&walker.remaining<=0){
+      // walking on: into the stair trip (which goes on in the plain cycle at this phase), or
+      // on along a route planned from here
+      const next=this.queue[1];
+      if(next?.type==='stairs'){
+        // A walk that set off close to the entrance is not in full stride yet: it takes its
+        // next steps on the trip's own first stretch, which runs straight on along the aisle.
+        const past=Math.max(0,(this.x-seg.x)*direction)*.022,ready=walker.pose.plain>.99&&walker.pose.walk>.99;
+        if(!ready&&past<CREW_GAIT.stairRun)return;
+        if(this.stairs.blockedAtStart(this,next.trip)){this.stairsFallback(next);return;}
+        // (the view takes up what little the two walks differ by at this moment)
+        this.queue.shift();this.gait=null;this.poseSeam=true;next.t=past;this.stairStep(next,0);
+      }else if(next?.type==='replan'){this.x=seg.x;this.queue.shift();this.replan(next);}
+    }
+  }
+  // Out of a stair trip (walked in the plain cycle) into a planned walk that comes to rest.
+  leaveStairs(seg){
+    const u=this.walkDistance*.022/miloWalkData.cycleDistance,stride=humanTripStride(seg.trip,seg.trip.length,seg.arrival);
+    if(this.queue[0]?.type==='replan')this.replan(this.queue[0]);
+    // (arriving where the trip ends: stop, and step back to that place if need be)
+    if(!this.queue.length)this.queue=[{type:'walk',x:this.x}];
+    const next=this.queue[0],direction=this.facing||1,ahead=next.type==='walk'?(next.x-this.x)*direction:0;
+    this.gaitDirection=direction;
+    this.gait=MiloWalker.resume(u,ahead>CREW_GAIT.arrive?this.pathLength(next.x):0,this.walkSpeed*.022,{stride,open:ahead>CREW_GAIT.arrive&&this.walksOn(next,direction)});
+  }
+  advancePlanned(dt,hold){
+    for(let pass=0;pass<4;pass++){
+      const seg=this.queue[0];
+      if(this.gait){this.walkOn(this.gait,seg,dt,hold);return;}
+      if(!seg)return;
+      if(seg.type==='replan'){this.replan(seg);continue;}
+      // Standing where a stair trip starts: set off along its first stretch (the trip takes
+      // over once the walk is in stride).
+      if(seg.type==='stairs'&&!seg.entered){this.queue.unshift({type:'walk',x:this.x});continue;}
+      if(seg.type!=='walk'){if(!hold)this.advanceLegacy(dt);return;}
+      const here=Math.abs(seg.x-this.x)<=CREW_GAIT.arrive,stairs=here&&this.queue[1]?.type==='stairs'&&!this.queue[1].entered?this.queue[1]:null;
+      if(here&&!stairs){this.x=seg.x;this.queue.shift();this.turn=null;this.arrived();if(this.queue.length)continue;return;}
+      const direction=stairs?this.tripDirection(stairs.trip):Math.sign(seg.x-this.x);this.facing=direction;
+      // Turn to face the way first (the figure's own turn on the spot, see milo-turn.js; the
+      // view reports where it faces).
+      const yaw=actorWalkway(this).yaw??direction*Math.PI/2;
+      if(this.turn&&Math.abs(Math.atan2(Math.sin(yaw-this.turn.yaw),Math.cos(yaw-this.turn.yaw)))>.05)this.turn=null;
+      if(!this.turn&&Number.isFinite(this.viewYaw)){
+        const delta=Math.atan2(Math.sin(yaw-this.viewYaw),Math.cos(yaw-this.viewYaw));
+        if(Math.abs(delta)>CREW_GAIT.turnFrom)this.turn={yaw,left:turnSeconds(delta)+CREW_GAIT.turnSettle};
+      }
+      if(this.turn){this.turn.left-=dt;if(this.turn.left>0)return;this.turn=null;this.viewYaw=yaw;}
+      if(hold)return;
+      if(stairs&&this.stairs.blockedAtStart(this,stairs.trip)){this.queue.shift();this.stairsFallback(stairs);continue;}
+      this.gaitDirection=direction;
+      this.gait=MiloWalker.start(stairs?0:this.pathLength(seg.x),this.walkSpeed*.022,{open:this.walksOn(seg,direction),vary:++this.bouts});
+    }
+  }
+  advance(dt,hold=false){
+    if(this.planned)this.advancePlanned(dt,hold);
+    else this.advanceLegacy(dt);
+  }
+  advanceLegacy(dt){
     const seg=this.queue[0];if(!seg)return;
     if(seg.type==='stairs'){this.stairStep(seg,dt);return;}
     if(seg.type==='replan'){
@@ -334,7 +489,7 @@ export class CatMotion extends CrewMotion {
     const crossing=this.crossing;
     if(!crossing||!actor||actor.floor!==this.floor||Math.abs(actor.y-this.y)>45)return false;
     const target=actor.queue[0]?.type==='walk'?actor.queue[0].x:actor.x;
-    const end=actor.x+Math.sign(target-actor.x)*Math.min(Math.abs(target-actor.x),actor.walkSpeed*seconds);
+    const end=actor.x+Math.sign(target-actor.x)*Math.min(Math.abs(target-actor.x),Math.max(actor.walkSpeed*seconds,actor.reach??0));
     return Math.max(actor.x,end)>=crossing.min&&Math.min(actor.x,end)<=crossing.max;
   }
   blocksCrew(actor,dt){return Boolean(this.crossing?.active&&this.crewInCrossing(actor,dt));}

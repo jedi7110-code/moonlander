@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {box,ball,batchStatic} from './materials.js';
 import {solveArm} from './meal-pose.js';
-import {applyWalkingPose} from './walking.js';
+import {poseMiloGait} from './milo-gait.js';
+import {stationStep,HARVEST_PLACING} from './station-step.js';
 
 export const HARVEST_DOCK=new THREE.Vector3(-10.0,1.043,-.10);
 const smooth=(a,b,t)=>THREE.MathUtils.smoothstep(t,a,b),v=(...a)=>new THREE.Vector3(...a);
@@ -28,11 +29,12 @@ export function createHarvestDelivery(m,scene){
     if(!delivery){tray.position.copy(HARVEST_DOCK);tray.quaternion.identity();return;}
     const placing=delivery.phase==='placing',pickup=delivery.phase==='pickup';
     // Let the normal planted-foot turn face the counter before reaching for it.
-    const age=placing?Math.max(0,delivery.age-1.6):delivery.age;
+    const age=placing?Math.max(0,delivery.age-HARVEST_PLACING.turn):delivery.age;
     if(placing){
-      const step=smooth(0,.8,age)*(1-smooth(2.8,3.6,age));
-      milo.position.z=.78-.35*step;
-      if(step>0&&step<1)applyWalkingPose(milo,.35*step);
+      // up to the counter and back in a step of the planned walk (it used to slide)
+      const step=stationStep(HARVEST_PLACING.approach,age,HARVEST_PLACING.seconds-HARVEST_PLACING.turn,{delay:0});
+      milo.position.z=.78-step.offset;
+      if(step.gait)poseMiloGait(milo,step.gait);
       const lean=.26*smooth(.5,1.4,age)*(1-smooth(2.6,3.5,age));
       chest.rotation.x=lean;const pivot=v(0,1.08,0);
       chest.position.copy(pivot).sub(pivot.clone().applyQuaternion(chest.quaternion));chest.updateMatrix();

@@ -114,7 +114,7 @@ test('entry, exit and cancellation never jump through the shelf or teleport into
     const visit=new SmokingVisit();visit.startYaw=-Math.PI/2;let previous=visit.pose;
     for(let time=0;time<SMOKING_SECONDS+.1;time+=1/60){
       if(time>=cancelAt)visit.requestExit();visit.update(1/60);const p=visit.pose;
-      assert.ok(Math.abs(p.depth-previous.depth)<.014);assert.ok(Math.abs(p.yaw-previous.yaw)<.05);
+      assert.ok(Math.abs(p.depth-previous.depth)<.022);assert.ok(Math.abs(p.yaw-previous.yaw)<.05);
       assert.ok(p.depth>=ASHTRAY.standZ-1e-9);if(p.gesture?.lit)assert.equal(p.depth,ASHTRAY.standZ);previous=p;
     }
     assert.ok(visit.done);assert.equal(visit.pose.depth,CABIN_AISLE.crewZ);assert.ok(Math.abs(Math.sin(visit.pose.yaw-visit.startYaw))<1e-9);

@@ -7,6 +7,9 @@ import {MeshStandardMaterial,Box3,Vector3} from 'three';
 import {createPlantRack,animatePlants} from '../src/obs/plants.js';
 import {CONDENSATE,CONDENSATE_INTERVALS,sampleCondensate} from '../src/obs/condensate.js';
 
+import {stationWrap,stationVisit} from '../src/obs/station-step.js';
+// the turn and the steps up to the shelf and back, which a visit takes besides the work
+const wrap=stationWrap('plant').lead+stationWrap('plant').tail;
 test('three beds grow at staggered rates and stop at maturity',()=>{
   const bed=new PlantBed();bed.update(70);assert.equal(bed.ready,1);
   const before=bed.rows.map(row=>row.growth);bed.update(0);assert.deepEqual(bed.rows.map(row=>row.growth),before);
@@ -33,8 +36,18 @@ test('harvesting requires arrival and completion; interrupted work grants no foo
   const {care,actor,brain,results}=setup();care.supplies.food=0;brain.plants.update(1000);
   brain._go(getStation('plant'));assert.equal(care.supplies.food,0);actor.update(.1);brain.update(3);assert.equal(care.supplies.food,0);
   brain._go(getStation('lounge'));assert.equal(care.supplies.food,0);assert.equal(brain.plants.ready,3);
-  actor.x=385;actor.floor=2;actor.y=870;brain._go(getStation('plant'));actor.update(.1);
-  brain.update(9);assert.equal(care.supplies.food,3);assert.deepEqual(results,[3]);assert.equal(brain.plants.ready,0);
+  // (he steps back from the shelf first; the work broken off harvests nothing)
+  brain.update(3);assert.equal(care.supplies.food,0);assert.equal(brain.plants.ready,3);assert.notEqual(brain.state,'performing');
+  actor.queue=[];actor.x=385;actor.floor=2;actor.y=870;brain._go(getStation('plant'));actor.update(.1);
+  brain.update(9+wrap);assert.equal(care.supplies.food,3);assert.deepEqual(results,[3]);assert.equal(brain.plants.ready,0);
+});
+test('work at the shelf broken off on the way to it turns back from where he is',()=>{
+  const {actor,brain}=setup();brain._go(getStation('plant'));actor.update(.1);brain.update(2.6);
+  const offset=()=>stationVisit('plant',brain.curDurSec-brain.performT,brain.curDurSec).offset,before=offset();
+  brain._go(getStation('lounge'));
+  assert.ok(before>.2&&before<.7&&Math.abs(offset()-before)<1e-9,'no jump to the shelf');
+  let last=before;for(let i=0;i<300&&brain.state==='performing';i++){brain.update(1/60);const now=offset();assert.ok(now<=last+1e-9&&last-now<.03);last=now;}
+  assert.ok(last<.01&&brain.state!=='performing');
 });
 test('autonomous harvest respects urgent needs and chat can request plant care',()=>{
   const {care,brain}=setup();care.take('food');brain.plants.update(1000);brain._choose();assert.equal(brain.actStation,'plant');
@@ -43,7 +56,7 @@ test('autonomous harvest respects urgent needs and chat can request plant care',
 });
 test('Milo carries the harvest to the kitchen before putting it down or accepting another trip',()=>{
   const {care,actor,brain}=setup();care.supplies.food=0;brain.plants.update(1000);
-  brain._go(getStation('plant'));actor.update(.1);brain.update(9);
+  brain._go(getStation('plant'));actor.update(.1);brain.update(9+wrap);
   assert.equal(brain.harvestDelivery.phase,'pickup');assert.equal(brain.kitchenGreens,0);
   const hunger=brain.needs.hunger,stock=care.supplies.food;
   brain.update(0);assert.equal(brain.harvestDelivery.age,0);

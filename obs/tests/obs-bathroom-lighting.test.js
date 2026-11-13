@@ -50,7 +50,7 @@ test('entry, occupied use, exit and droid cleaning keep their previous switch co
 });
 test('a complete visit fades naturally after the actor leaves, even once the pose is removed',()=>{
   const light=fixture('shower'),visit=new BathroomVisit('shower');let using=0,last=0,sawRise=false,sawFall=false;
-  for(let i=0;i<1800;i++){
+  for(let i=0;i<2400;i++){
     visit.update(1/120);if(visit.phase==='use'&&(using+=1/120)>1)visit.requestExit();
     updateBathroomCeilingLight(light,visit.done?null:visit.pose,1/120);
     const value=light.power.value;sawRise||=value>0&&value<1&&value>last;sawFall||=value>0&&value<1&&value<last;

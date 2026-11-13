@@ -1,3 +1,4 @@
+import {poseMiloGait} from './milo-gait.js';
 import * as THREE from 'three';
 import {ASHTRAY} from './layout.js';
 import {CIGARETTE,LIGHTER_TIP} from './smoking-props.js';
@@ -93,12 +94,8 @@ export function applySmokingPose(root,visit){
   const pose=visit.pose,{body,head,arms,legs,smokingProps:props}=root.userData;
   root.position.z=pose.depth;root.rotation.y=pose.yaw;body.position.set(0,0,0);head.rotation.set(0,0,0);
   for(const arm of arms)relaxMiloHand(arm);
-  if(pose.moving){
-    const joints=legs.flatMap(({leg,knee,boot})=>[leg,knee,boot]).concat(arms.flatMap(({arm,elbow,hand})=>[arm,elbow,hand]));
-    const rest=joints.map(joint=>joint.quaternion.clone());
-    applyMocapWalk(root,miloWalkData,pose.walkDistance/miloWalkData.cycleDistance*miloWalkData.duration);
-    joints.forEach((joint,i)=>joint.quaternion.slerpQuaternions(rest[i],joint.quaternion.clone(),pose.walkWeight));body.position.multiplyScalar(pose.walkWeight);
-  }
+  // (a planned walk from standing to standing: station-step.js)
+  if(pose.gait)poseMiloGait(root,pose.gait);
   if(pose.turn)applyAuthoredMiloTurn(root,pose.turn.from,pose.turn.to,pose.turn.progress,{upperBody:false});
   applySmokingHands(root,pose.gesture,v(ASHTRAY.x,root.position.y+ASHTRAY.y-.018,ASHTRAY.z));
 }

@@ -28,7 +28,8 @@ const bedLocation={x:(getStation('bunk').x-700)*.022,y:(870-FLOORS[getStation('b
 export class CabinSoundEvents {
   constructor(audio,{random=Math.random}={}){this.audio=audio;this.random=random;this.conversation=new LoungeConversationAudio(audio,{random});this.droidWork=new DroidWorkAudio(audio,{random});this.catVoiceTime=0;this.catVoice=null;this.doors=new Map();this.lids=new Map();this.steps=new Map();this.beats=new Map();this.previousBathroom=null;this.previousBathroomPhase=null;this.previousDroidStep=null;this.previousDelivery=null;this.deliveryAge=0;this.variant=0;}
   meal(dt,actor,brain){
-    const duration=brain.curDurSec,age=duration-brain.performT;
+    // (the meal's own clock: the visit also has the steps up to the counter and back)
+    const {duration,time:age}=brain.workClock??{duration:brain.curDurSec,time:brain.curDurSec-brain.performT};
     const active=brain.state==='performing'&&brain.cur?.id==='galley'&&!actor.busy&&!actor.climbing&&
       Number.isFinite(duration)&&duration>0&&Number.isFinite(age)&&age>=0&&age<=duration;
     const progress=active?diningPhase(age,duration).progress:0,previous=this.previousMeal;
@@ -254,8 +255,10 @@ export class CabinSoundEvents {
     const stairs=actor.onStairs,onStair=stairs?.trip.frame(stairs.t);
     const milo=onStair?{x:onStair.x,y:onStair.y+.1,z:onStair.z}:{x:(actor.x-700)*.022,y:(870-actor.y)*.016+.1,z:pose?.depth??.78};
     const walking=actor.busy&&!actor.climbing&&!actor.waitingForHatch&&!actor.waitingForCat&&!actor.waitingForDroid&&!actor.waitingForStairs&&!actor.stairWaiting;
-    this.stride('milo',(actor.walkDistance??0)*.022,walking,walkCycle.cycleDistance/2,milo);
-    this.stride('bathroom',pose?.walkDistance??0,Boolean(pose?.moving),walkCycle.cycleDistance/2,milo);
+    // (a planned walk counts the cycle's own phase: a footfall sounds where a foot lands, not where the walk starts)
+    const planned=actor.planned&&!stairs;
+    this.stride('milo',(actor.walkDistance??0)*.022,planned?Boolean(actor.gait):walking,walkCycle.cycleDistance/2,milo,'boots',Boolean(planned));
+    this.stride('bathroom',pose?.walkDistance??0,Boolean(pose?.moving),walkCycle.cycleDistance/2,milo,'boots',Boolean(pose?.gait));
     // Count ladder rungs from height, not time; waiting on the ladder is silent.
     // Height can increase or decrease; use travelled height for rung contacts.
     if(actor.climbing&&this.lastY!==undefined&&Math.abs(actor.y-this.lastY)<20){

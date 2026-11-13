@@ -177,6 +177,8 @@ test('injury posture and bandage are removed when no longer applicable',()=>{
   const options={moving:false,climbing:false,facing:1,action:null,time:0,health};
   health.startCondition('injury');animateMilo(milo,options);assert.equal(milo.userData.arms[0].elbow.rotation.x,-1.3);
   assert.equal(milo.userData.bandage.visible,false);health.beginTreatment();health.update(24,{needs});health.finishTreatment();
-  animateMilo(milo,options);assert.equal(milo.userData.bandage.visible,true);assert.equal(milo.userData.arms[0].elbow.rotation.x,-.08);
+  // (the guarded arm is let down over a moment, not from one frame to the next)
+  animateMilo(milo,options);assert.equal(milo.userData.bandage.visible,true);assert.ok(milo.userData.arms[0].elbow.rotation.x<-1);
+  for(let i=0;i<30;i++)animateMilo(milo,options);assert.ok(Math.abs(milo.userData.arms[0].elbow.rotation.x+.08)<1e-9);
   health.bandageTime=0;animateMilo(milo,options);assert.equal(milo.userData.bandage.visible,false);
 });

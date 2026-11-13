@@ -8,6 +8,7 @@ import {createMilo,animateMilo} from '../src/obs/characters.js';
 import {GroomingVisit,GROOMING_TURN_SECONDS} from '../src/obs/grooming-visit.js';
 import {headGeometry,MILO_HEAD_FORWARD} from '../src/obs/head.js';
 import {createVanity,createGroomingTools,prepareGroomingMotion,sampleGrooming,TOOL_GRIP,VANITY,GROOMING_DURATION} from '../studies/milo/grooming-model.js';
+import {GROOMING_WALK} from '../src/obs/grooming.js';
 import {growthCycleAtDay,studyDate} from '../studies/milo/growth-model.js';
 
 await loadMiloBody(`data:application/json;base64,${(await readFile(new URL('../public/assets/obs/milo/body.json',import.meta.url))).toString('base64')}`);
@@ -60,11 +61,13 @@ test('DAY 16 and DAY 31 reset appearance without resetting the calendar',()=>{
 
 test('hair is cut first, beard is shaved afterwards, and both remain reset on exit',()=>{
   assert.deepEqual([sampleGrooming(0).hair,sampleGrooming(0).beard],[1,1]);
-  assert.ok(sampleGrooming(15).hair<1);assert.equal(sampleGrooming(15).beard,1);
-  assert.equal(sampleGrooming(15).hair,sampleGrooming(21).hair,'haircut pauses during the handover');
-  assert.equal(sampleGrooming(29).hair,0);assert.equal(sampleGrooming(29).beard,1);
-  assert.ok(sampleGrooming(38).beard>0&&sampleGrooming(38).beard<1);
-  assert.deepEqual([sampleGrooming(46).hair,sampleGrooming(46).beard],[0,0]);
+  // (seconds of the visit: the authored clock plus what the walk in takes longer than its 4 s)
+  const at=authored=>sampleGrooming(authored+GROOMING_WALK-4);
+  assert.ok(at(15).hair<1);assert.equal(at(15).beard,1);
+  assert.equal(at(15).hair,at(21).hair,'haircut pauses during the handover');
+  assert.equal(at(29).hair,0);assert.equal(at(29).beard,1);
+  assert.ok(at(38).beard>0&&at(38).beard<1);
+  assert.deepEqual([at(46).hair,at(46).beard],[0,0]);
   assert.equal(sampleGrooming(GROOMING_DURATION).done,true);
 });
 

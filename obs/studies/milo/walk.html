@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>マイロ / 歩き方スタディ</title>
+<style>
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%}body{margin:0;background:#1c2526;color:#f1f0e8;font:14px/1.45 system-ui,-apple-system,"Hiragino Sans",sans-serif;display:flex;flex-direction:column}
+header{padding:12px 16px 10px;display:flex;gap:10px 22px;flex-wrap:wrap;align-items:flex-end;background:#232e2f;border-bottom:1px solid #3a4748}
+header h1{font-size:17px;margin:0;letter-spacing:.02em}header p{margin:2px 0 0;font-size:12px;opacity:.75;max-width:60ch}
+.group{display:flex;flex-direction:column;gap:4px}.group>span{font-size:11px;letter-spacing:.06em;opacity:.7}.row{display:flex;gap:5px;flex-wrap:wrap}
+button,select{font:inherit;background:#33403f;color:inherit;border:1px solid #6d7a79;border-radius:6px;padding:6px 10px;cursor:pointer}
+button[aria-pressed=true]{background:#ece8dc;color:#222a2c;border-color:#ece8dc}button:disabled,select:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #f2c96d;outline-offset:2px}
+#stage{position:relative;flex:1;min-height:320px}canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.lane{position:absolute;left:14px;right:14px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;pointer-events:none;font-size:12px}
+.lane strong{display:block;font-size:14px}.lane .tag{background:#10181acc;border-radius:6px;padding:6px 10px}.lane .numbers{background:#10181acc;border-radius:6px;padding:6px 10px;font-variant-numeric:tabular-nums;text-align:right;white-space:pre-line}
+#lane-top{top:10px}#lane-bottom{top:calc(50% + 10px)}#divider{position:absolute;left:0;right:0;top:50%;height:1px;background:#5c6a69}
+#loading,#error{position:absolute;inset:0;display:grid;place-items:center;background:#1c2526;font-size:15px}#error{color:#ffcfa8;padding:24px;text-align:center}
+footer{padding:10px 16px 12px;display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;background:#232e2f;border-top:1px solid #3a4748}
+footer label{display:flex;gap:6px;align-items:center;font-size:12px}input[type=range]{width:min(46vw,460px);accent-color:#d8bf7c}output{font-variant-numeric:tabular-nums;font-size:12px;min-width:11ch}
+#help{font-size:11px;opacity:.7}
+@media (max-width:640px){header{padding:10px 12px}.lane .numbers{font-size:11px}input[type=range]{width:70vw}}
+</style></head>
+<body>
+<header>
+  <div><h1>マイロの歩き方スタディ</h1><p>上が現在の本編の歩き方、下が改善案です。同じ距離を同じ合図で歩き始めます。</p></div>
+  <div class="group"><span>距離</span><div class="row" id="distances"></div></div>
+  <div class="group"><span>体調（歩く速さ）</span><div class="row" id="speeds"></div></div>
+  <div class="group"><span>下段に出す案</span><div class="row" id="samples"></div></div>
+  <div class="group"><span>視点</span><div class="row" id="views"></div></div>
+</header>
+<section id="stage" aria-label="歩き方の比較">
+  <canvas id="walk-canvas" aria-label="上は現在の歩き方、下は改善案"></canvas><div id="divider"></div>
+  <div class="lane" id="lane-top"><div class="tag"><strong>現在（本編）</strong>実測の1周期を速さに合わせて再生</div><div class="numbers" id="numbers-top"></div></div>
+  <div class="lane" id="lane-bottom"><div class="tag"><strong id="sample-name">改善案</strong><span id="sample-note"></span></div><div class="numbers" id="numbers-bottom"></div></div>
+  <div id="loading" role="status">マイロを読み込み中…</div><p id="error" role="alert" hidden></p>
+</section>
+<footer>
+  <button id="play" disabled>一時停止</button><button id="restart" disabled>最初から</button>
+  <label>再生速度<select id="rate" disabled><option value="1">等速</option><option value=".5">0.5倍</option><option value=".25">0.25倍</option><option value=".1">0.1倍</option></select></label>
+  <label>時間<input id="time" type="range" min="0" max="1" step=".001" value="0" disabled aria-label="再生位置"></label><output id="clock" for="time">0.00秒</output>
+  <label><input id="marks" type="checkbox" checked disabled>足を置く位置を表示</label>
+  <span id="help">スペース：再生／停止　←→：1コマ送り</span>
+</footer>
+<script type="importmap">{"imports":{"three":"/obs/node_modules/three/build/three.module.js","three/addons/":"/obs/node_modules/three/examples/jsm/"}}</script>
+<script type="module" src="./walk-study.js"></script>
+</body></html>

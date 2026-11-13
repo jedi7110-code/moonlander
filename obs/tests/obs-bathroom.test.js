@@ -22,7 +22,7 @@ for(const id of ['shower','toilet'])test(`${id}: the flush door unplugs and clea
  const {door,lamp}=fixture,initial=door.position.clone(),visit=new BathroomVisit(id),bounds=new Box3();let exited=false;
  const available={color:lamp.material.color.clone(),emissive:lamp.material.emissive.clone()};
  let occupiedFrames=0,emptyFrames=0;
- for(let frame=0;!visit.done&&frame<1440;frame++){
+ for(let frame=0;!visit.done&&frame<2400;frame++){
   const pose=visit.pose;animateBathroom(fixture,pose,Infinity);animated.updateMatrixWorld(true);
   assert.equal(fixture.ceilingLight.power.value,['reach','open','shut'].includes(visit.phase)?0:1,'light stays on from full entry opening through use and exit, then switches off after departure');
   if(pose.inside){
@@ -62,7 +62,7 @@ test('only the occupied room turns red, including pause and switching to the oth
  try{rooms={shower:createBathroom(fixed,animated,m,-7,0,'shower'),toilet:createBathroom(fixed,animated,m,-4,0,'toilet')};}finally{delete globalThis.document;}
  assert.notEqual(rooms.shower.lamp.material,rooms.toilet.lamp.material);
  for(const active of ['shower','toilet']){
-   const visit=new BathroomVisit(active);visit.update(6);
+   const visit=new BathroomVisit(active);visit.update(8);
    assert.equal(visit.phase,'use');
    for(let frame=0;frame<3;frame++){
      visit.update(0);
@@ -103,7 +103,7 @@ test('ceiling and local bounce switch together, independently of the other bathr
 for(const id of ['shower','toilet'])test(`${id}: opens, enters, shuts, uses, exits and shuts without teleporting`,()=>{
  let started=0,ended=0;const visit=new BathroomVisit(id,{entered:()=>started++,exited:()=>ended++}),phases=[];
  let previous=.78;
- for(let i=0;i<120*6;i++){
+ for(let i=0;i<120*8;i++){
   visit.update(1/120);const pose=visit.pose;
   if(phases.at(-1)!==visit.phase)phases.push(visit.phase);
   assert.ok(Math.abs(pose.depth-previous)<.02);previous=pose.depth;
@@ -112,28 +112,28 @@ for(const id of ['shower','toilet'])test(`${id}: opens, enters, shuts, uses, exi
  assert.equal(started,1);assert.equal(visit.phase,'use');assert.equal(visit.pose.opening,0);
  assert.equal(visit.pose.depth,-2.8,'crew walks into the recessed room');
  visit.update(0);assert.equal(visit.phase,'use');visit.requestExit();
- for(let i=0;i<120*6;i++)visit.update(1/120);
+ for(let i=0;i<120*8;i++)visit.update(1/120);
  assert.equal(ended,1);assert.equal(visit.pose.depth,.78);assert.equal(visit.pose.opening,0);
  assert.deepEqual(phases,['reach','open','enter','close','use']);
 });
 test('using the bathroom starts only once its door is closed; a new order waits for exit',()=>{
  const {actor,brain,tick}=setup('shower');brain._go(getStation('shower'));tick(1);
  assert.equal(brain.state,'enteringBathroom');assert.equal(brain.recoverNeed,null);
- tick(5);assert.equal(brain.state,'performing');assert.equal(brain.bathroom.phase,'use');
+ tick(7);assert.equal(brain.state,'performing');assert.equal(brain.bathroom.phase,'use');
  brain._go(getStation('hydro'));assert.equal(actor.busy,false);const y=actor.y;
  tick(1);assert.equal(actor.y,y);assert.equal(brain.actStation,'shower');
- tick(5);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');assert.equal(actor.busy,true);
+ tick(7);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');assert.equal(actor.busy,true);
 });
 test('an order during entry does not interrupt passage through the door',()=>{
  const {brain,tick}=setup('toilet');brain._go(getStation('toilet'));tick(1.5);
  const depth=brain.bathroom.pose.depth;brain._go(getStation('galley'));assert.equal(brain.bathroom.pose.depth,depth);
- brain._go(getStation('hydro'));tick(10);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');
+ brain._go(getStation('hydro'));tick(14);assert.equal(brain.bathroom,null);assert.equal(brain.actStation,'hydro');
 });
 test('dining finishes returning its utensils before a new order starts',()=>{
  const {brain,care,tick}=setup('galley');brain._go(getStation('galley'));tick(1);
  const count=care.supplies.food;brain._go(getStation('hydro'));assert.equal(brain.actStation,'galley');
  tick(2);assert.equal(brain.actStation,'galley');assert.equal(care.supplies.food,count);
- tick(7.2);assert.equal(brain.actStation,'hydro');
+ tick(11.6);assert.equal(brain.actStation,'hydro');
 });
 
 test('pocket-door faces, toon outlines and shadows share fixed jamb clipping through the full slide',()=>{

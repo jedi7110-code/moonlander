@@ -47,19 +47,19 @@ test('OBS defaults to the approved measured walk and advances by distance, not e
   }
 });
 
-for(const id of ['shower','toilet'])test(`${id}: entry and exit use the same distance-driven measured walk as the aisle`,()=>{
+for(const id of ['shower','toilet'])test(`${id}: entry and exit use the same planned walk as the aisle`,()=>{
   const root=character(),reference=character(),visit=new BathroomVisit(id);
   const capture=r=>{const {body,chest,head,arms,legs}=r.userData;return [body,chest,head,...arms.flatMap(a=>[a.arm,a.elbow,a.hand]),...legs.flatMap(l=>[l.leg,l.knee,l.boot])].flatMap(o=>[...o.position.toArray(),...o.quaternion.toArray()]);};
   const phases=new Set();
-  for(let frame=0;!visit.done&&frame<120*12;frame++){
+  for(let frame=0;!visit.done&&frame<120*18;frame++){
     const bathroom=visit.pose;
     if(bathroom.moving&&frame%7===0){
       phases.add(bathroom.phase);
       for(const clock of [0,127]){
         animateMilo(root,{...idle,time:clock,action:id,bathroom,walkDistance:999,dt:0});
-        animateMilo(reference,{...idle,moving:true,walkDistance:bathroom.walkDistance});
+        animateMilo(reference,{...idle,time:clock,gait:bathroom.gait,dt:0});
         const expected=capture(reference);
-        capture(root).forEach((v,j)=>assert.ok(Math.abs(v-expected[j])<1e-9,`${bathroom.phase}: old gait or incorrect distance at ${j}`));
+        capture(root).forEach((v,j)=>assert.ok(Math.abs(v-expected[j])<1e-9,`${bathroom.phase}: not the planned walk at ${j}`));
         assert.equal(root.position.z,bathroom.depth);
         root.updateMatrixWorld(true);
         const heights=root.userData.legs.map(({boot})=>new Box3().setFromObject(boot).min.y);

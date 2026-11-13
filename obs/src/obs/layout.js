@@ -31,7 +31,7 @@ export const CAT_SOFA={floor:DECK.HABITATION,floorX:1005,seatX:1035,approachZ:.8
 export const EVA={id:'eva',floor:DECK.OPERATIONS,x:1111,need:null,dur:8000};
 export const AIRLOCK={id:'airlock',floor:DECK.OPERATIONS,x:1260,need:null,dur:8000};
 export const INNER_HATCH={id:'innerHatch',floor:DECK.OPERATIONS,x:990,need:null,dur:8000};
-export const EVA_PASSAGE={floor:DECK.OPERATIONS,x:1022,approach:48,clearance:27,openTime:.7};
+export const EVA_PASSAGE={floor:DECK.OPERATIONS,x:1022,approach:48,plannedApproach:44,clearance:27,openTime:.7};
 export const STATIONS=[...sharedStations.filter(station=>station.id!=='stereo').map(station=>({...station,floor:cabinFloor(station.floor),...(station.id==='hydro'?{x:528}:{}),...(['galley','hydro'].includes(station.id)?{dur:station.id==='galley'?10000:8000}:{})})),GYM,MEDICAL,EVA,AIRLOCK,INNER_HATCH,PLANT,GROOMING,SMOKING];
 export const getStation=id=>STATIONS.find(station=>station.id===id);
 export {LADDER_X};

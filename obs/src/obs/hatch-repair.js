@@ -1,3 +1,4 @@
+import {plannedPassage} from './station-step.js';
 import {CABIN_AISLE} from './layout.js';
 import {angleDelta,headingEase} from './heading.js';
 
@@ -48,14 +49,16 @@ export class HatchRepairVisit {
     const start=this.startYaw??Math.PI/2,into=start+angleDelta(start,approachYaw),face=into+angleDelta(into,Math.PI/2),out=face+angleDelta(face,returnYaw),end=out+angleDelta(out,start);
     let depth=HATCH_REPAIR_DEPTH,yaw=face,turn=null,reach=0,tool=false,twist=0;
     if(phase==='turnIn'){depth=CABIN_AISLE.crewZ;turn={from:start,to:into};}
-    if(phase==='approach'){depth=mix(CABIN_AISLE.crewZ,HATCH_REPAIR_DEPTH,smooth(u));yaw=into;}
+    // (the step to the hatch and back is a planned walk: from standing to standing)
+    const passage=['approach','return'].includes(phase)?plannedPassage(Math.abs(CABIN_AISLE.crewZ-HATCH_REPAIR_DEPTH),this.age,duration):null;
+    if(phase==='approach'){depth=mix(CABIN_AISLE.crewZ,HATCH_REPAIR_DEPTH,passage.fraction);yaw=into;}
     if(phase==='align')turn={from:into,to:face};
     if(phase==='inspect')reach=.6*smooth(this.age/1.3)*(1-smooth((this.age-2.8)/1.2));
     if(phase==='repair'){reach=smooth(this.age/1.4)*(1-smooth((this.age-8.6)/1.4));tool=true;twist=Math.sin(this.age*3.2)*.28*reach;}
     if(phase==='verify')reach=smooth(this.age/1.2)*(1-smooth((this.age-2.8)/1.2));
     if(phase==='release'&&this.releaseFrom){reach=this.releaseFrom.reach*(1-smooth(u));tool=this.releaseFrom.tool;twist=this.releaseFrom.twist*(1-smooth(u));}
     if(phase==='turnOut')turn={from:face,to:out};
-    if(phase==='return'){depth=mix(HATCH_REPAIR_DEPTH,CABIN_AISLE.crewZ,smooth(u));yaw=out;}
+    if(phase==='return'){depth=mix(HATCH_REPAIR_DEPTH,CABIN_AISLE.crewZ,passage.fraction);yaw=out;}
     if(phase==='alignOut'){depth=CABIN_AISLE.crewZ;turn={from:out,to:end};}
     if(this.done){depth=CABIN_AISLE.crewZ;yaw=end;}
     if(turn){turn.progress=u;yaw=mix(turn.from,turn.to,headingEase(u));}
@@ -63,7 +66,7 @@ export class HatchRepairVisit {
     let grip=phase==='repair'?1:phase==='inspect'?smooth((this.age-(HATCH_REPAIR_PHASES.inspect-.45))/.45):phase==='verify'?1-smooth(this.age/.45):0;
     if(phase==='release'&&this.releaseFrom)grip=(this.releaseFrom.grip??0)*(1-smooth((this.age-.65)/.55));
     if(this.hatch==='outer')return{phase,depth:CABIN_AISLE.crewZ,yaw:Math.PI/2,turn:null,reach,tool,twist,grip,moving:false,walkDistance:0,walkWeight:0};
-    return{phase,depth,yaw,turn,reach,tool,twist,grip,moving,
+    return{phase,depth,yaw,turn,reach,tool,twist,grip,moving,gait:passage?.gait??null,
       walkDistance:Math.abs(CABIN_AISLE.crewZ-HATCH_REPAIR_DEPTH)*smooth(u),
       walkWeight:moving?smooth(this.age/.3)*smooth((duration-this.age)/.3):0};
   }

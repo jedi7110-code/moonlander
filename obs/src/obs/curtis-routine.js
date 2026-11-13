@@ -190,7 +190,7 @@ export class CurtisRoutine {
     const from=(actor.x-700)*.022,to=(walk.x-700)*.022;
     if(from*to>0&&Math.abs(to)>=Math.abs(from))return false;
     if(from*to>0&&Math.abs(to)>CURTIS_LADDER_TRAFFIC.crewWaitX)return false;
-    return Math.max(0,Math.abs(from)-actor.walkSpeed*.022*dt)<=CURTIS_LADDER_TRAFFIC.crewWaitX;
+    return Math.max(0,Math.abs(from)-Math.max(actor.walkSpeed*dt,actor.reach??0)*.022)<=CURTIS_LADDER_TRAFFIC.crewWaitX;
   }
   update(dt,{actor=null,droid=null,cat=null,brain=null}={}){
     if(dt<=0||this.disposed)return;
