@@ -199,7 +199,7 @@ test('supplies are finite and never regenerate without an order',()=>{
 test('cat eats only on reaching the bowl and consumes one delivery',()=>{
   const care=new Supplies(),cat=new CatRoutine(care);cat.fetch();cat.update(1);assert.equal(care.has('catfood'),true);
   const laneDetour=2*(CAT_PORT.walkZ-CAT_BOWL.depth)/(cat.motion.walkSpeed*.022);
-  for(let i=0;i<(45+laneDetour+2*cat.motion.passageWalkSeconds)*60&&cat.mode!=='eat';i++)cat.update(1/60);
+  for(let i=0;i<(60+laneDetour+2*cat.motion.passageWalkSeconds)*60&&cat.mode!=='eat';i++)cat.update(1/60);
   assert.equal(cat.mode,'eat');assert.equal(cat.motion.floor,CAT_BOWL.floor);assert.equal(cat.motion.x,CAT_BOWL.approachX);assert.equal(cat.motion.facing,-1);assert.equal(care.supplies.catfood,2);assert.equal(cat.hunger,100);
 });
 test('the bowl is between the galley and water station, with the cat eating beside it',()=>{

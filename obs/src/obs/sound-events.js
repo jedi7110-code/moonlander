@@ -185,7 +185,8 @@ export class CabinSoundEvents {
     const previous=this.previousCurtis,step=curtis.step;
     const continuous=dt<=.1&&previous?.routine===curtis;
     const position={x:point.x,y:point.y+.1,z:point.z};
-    const walking=step?.kind==='walk'&&!curtis.waiting;
+    // (a planned walk sounds where a foot lands, from the cycle's own phase)
+    const walking=curtis.planned?Boolean(curtis.gait)||Boolean(curtis.sideStep):step?.kind==='walk'&&!curtis.waiting;
     this.stride('curtis',curtis.walkDistance??0,walking&&continuous,walkCycle.cycleDistance/2,position,'boots',true);
     const climbing=continuous&&step?.kind==='climb'&&previous.step===step&&!curtis.waiting&&
       curtis.age>previous.age&&curtis.age-previous.age<=dt+1e-6&&Math.abs(point.y-previous.y)<.2;

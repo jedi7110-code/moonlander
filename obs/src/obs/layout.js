@@ -18,7 +18,11 @@ export const ladderApproachDepth=(floor,droid=false)=>floor===2?(droid?-.77:-.33
 export const HYDRO_TRAY={depth:.40,z:-.40,cupZ:-.28,standZ:.10};
 export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,turnInset:.65,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66,doorSeconds:.7};
 export const CAT_SCALE=.8;
-export const CAT_BOWL={floor:2,x:490,depth:.89,approachX:490+18*CAT_SCALE,foodHeight:.14,foodColor:0x7e5532};
+// In the corner between the galley's right side (x -8.52) and the grow rack's front posts
+// (z -.49), off the crew aisle. It leaves the narrow gap beside the galley open (the mouse's
+// way out, mouse-route.js). Lucy eats standing on its right, the droid fills it from the front right.
+const CAT_BOWL_X=700-8.20/.022;
+export const CAT_BOWL={floor:2,x:CAT_BOWL_X,depth:-.20,approachX:CAT_BOWL_X+18*CAT_SCALE,foodHeight:.14,foodColor:0x7e5532};
 // Stand beyond the lower-hinged loading flap's forward sweep.
 export const WASTE_INCINERATOR={floor:2,x:-12.10,z:-.39,width:.80,height:.96,depth:.86,approachZ:1.02,depositAt:1.7,insertDuration:3.1,burnDuration:3};
 export const LOUNGE_SEAT={depth:.06,top:.48,centerDepth:-.10,cushionDepth:.60};

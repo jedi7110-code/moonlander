@@ -16,7 +16,9 @@
 //   audit.report();                           // transitions and spots inside one motion
 // A ship's day is 15 minutes; 40 s of real time covers about 5 minutes of it.
 // Results of the first run: studies/milo/motion-seams.md.
-globalThis.startSeamAudit=async function(){
+// Curtis (the visitor): startSeamAudit({who:'curtis'}). His visits are then
+// started one after another, without the usual minutes between them.
+globalThis.startSeamAudit=async function({who='milo'}={}){
   const frame=document.createElement('iframe');frame.style.cssText='position:fixed;left:0;top:0;width:960px;height:540px;border:0;opacity:.01;pointer-events:none';
   document.body.append(frame);frame.src='/obs/obs.html?debug&opening=0&audit=1';
   const A={on:true,synthetic:false,now:0,queue:[],after:null,frame};
@@ -33,14 +35,20 @@ globalThis.startSeamAudit=async function(){
   view.startupLighting?.activate?.();S.brain.releaseOpeningSleep?.();
   // pose everything, draw nothing (render's last argument)
   const render=view.render.bind(view);view.render=(dt,time,actor,brain,cat,care,paused,airlock,xr)=>render(dt,time,actor,brain,cat,care,paused,airlock,xr,true);
-  const milo=view.milo,U=milo.userData,Vector3=milo.position.constructor,Quaternion=milo.quaternion.constructor;
+  let milo=view.milo;
+  const curtis=who==='curtis'?S.curtis??view.curtisRoutine:null;
+  if(curtis){await view.prepareCurtis();curtis.ready=true;curtis.due=curtis.time;milo=view.curtis.root;}
+  const U=milo.userData,Vector3=milo.position.constructor,Quaternion=milo.quaternion.constructor;
   const side=s=>s<0?'L':'R';
   // [name, object, limit in rad/s]
   const joints=[['body',U.body,10],['chest',U.chest,10],['head',U.head,10],...U.arms.flatMap(a=>[['arm'+side(a.side),a.arm,26],['elbow'+side(a.side),a.elbow,26]]),
     ...U.legs.flatMap(l=>[['leg'+side(l.side),l.leg,26],['knee'+side(l.side),l.knee,30],['boot'+side(l.side),l.boot,30]])];
   // [name, object, limit in m/s]; the first two are the ankles
   const points=[...U.legs.map(l=>['boot'+side(l.side),l.boot,6.5]),...U.arms.map(a=>['hand'+side(a.side),a.hand,5.5]),['head',U.head,3],['hips',U.body,2.4]];
-  const context=()=>{const b=S.brain,a=S.actor,bits=[b.state,b.cur?.id??b.actKey??''];
+  const visitor=()=>{const r=curtis,s=r.step;if(!r.active||!s)return 'away';
+    const bits=[s.kind+(s.kind==='walk'?(Math.abs(s.to.x-s.from.x)<1e-8?':depth':':aisle'):'')+(r.gait?'+walking':r.turn?'+turning':''),'floor'+r.floor];
+    if(r.waiting)bits.push('waiting');if(Math.abs(r.passOffset??0)>.01)bits.push('aside');return bits.join('|');};
+  const context=()=>{if(curtis)return visitor();const b=S.brain,a=S.actor,bits=[b.state,b.cur?.id??b.actKey??''];
     if(a.busy)bits.push('move:'+(a.queue[0]?.type??'')+(a.gait?'+walking':a.turn?'+turning':''));if(a.onStairs)bits.push('stairs');
     if(b.bathroom)bits.push('bath:'+b.bathroom.phase);
     for(const key of ['loungeEntry','loungeExit','loungeStow','reclineExit'])if(b[key])bits.push(key);
@@ -53,9 +61,11 @@ globalThis.startSeamAudit=async function(){
     event.count++;event.max=Math.max(event.max,value);if(event.times.length<4)event.times.push(+result.seconds.toFixed(2));result.events.set(key,event);};
   A.after=()=>{
     if(!A.sampling)return;
+    // (one visit after another; nothing to measure while he is away)
+    if(curtis&&!curtis.active){curtis.due=Math.min(curtis.due,curtis.time);previous=null;return;}
     milo.updateMatrixWorld(true);
     const now={context:context(),place:milo.getWorldPosition(new Vector3()),heading:milo.getWorldQuaternion(new Quaternion()),joints:joints.map(([,o])=>o.quaternion.clone()),
-      points:points.map(([,o])=>o.getWorldPosition(new Vector3())),offFloor:Boolean(S.actor.climbing||S.actor.onStairs)};
+      points:points.map(([,o])=>o.getWorldPosition(new Vector3())),offFloor:Boolean(curtis?['climb','stairs'].includes(curtis.step?.kind):S.actor.climbing||S.actor.onStairs)};
     result.seconds+=1/60;result.frames[now.context]=(result.frames[now.context]??0)+1;
     if(previous){
       const from=previous.context,to=now.context,speed=now.place.distanceTo(previous.place)*60,turn=now.heading.angleTo(previous.heading)*60;

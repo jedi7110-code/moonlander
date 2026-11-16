@@ -13,7 +13,7 @@ const setup=(floor=2,x=600)=>{
 
 test('separate lanes are supported across all decks without filling the ladder well',()=>{
   assert(CAT_PORT.walkZ-CABIN_AISLE.crewZ>1);assert(CABIN_AISLE.deckFront-CAT_PORT.walkZ>.3);
-  assert.equal(CAT_BOWL.depth,.89);assert.equal(CAT_SOFA.approachZ,.89);assert.equal(LOUNGE_SEAT.centerDepth,-.10);
+  assert(CAT_BOWL.depth<CABIN_AISLE.crewZ-.9,'the bowl stands off the crew aisle');assert.equal(CAT_SOFA.approachZ,.89);assert.equal(LOUNGE_SEAT.centerDepth,-.10);
   const material=new MeshStandardMaterial(),m=new Proxy({},{get:()=>material});
   for(let level=0;level<3;level++){
     const root=createDeckFloor(m,0,level);root.updateMatrixWorld(true);
@@ -93,4 +93,13 @@ test('a wall entry waits for the person and later exits fully onto the front ais
   actor.goTo({floor:1,x:CAT_PORT.x+200});
   for(let i=0;i<(18+2*cat.motion.passageWalkSeconds)*60;i++)step();
   assert.equal(cat.motion.floor,2);assert.equal(cat.motion.busy,false);assert.equal(cat.motion.z,CAT_PORT.walkZ);assert.equal(cat.motion.hidden,false);
+});
+
+test('Lucy eating at the bowl in the galley corner does not hold Milo on the aisle; crossing to it still does',()=>{
+  const cat=new CatMotion({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX});cat.z=CAT_BOWL.depth;
+  const actor=new CrewMotion({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX-50});actor.goTo({floor:CAT_BOWL.floor,x:CAT_BOWL.approachX+200});
+  assert.equal(cat.atBowl,true);assert.equal(cat.crossing?.active,true);
+  assert.equal(cat.blocksCrew(actor,1/60),false,'eating behind the aisle');
+  cat.z=CAT_BOWL.depth+.6;assert.equal(cat.atBowl,false);
+  assert.equal(cat.blocksCrew(actor,1/60),true,'on her way across the aisle');
 });

@@ -492,7 +492,10 @@ export class CatMotion extends CrewMotion {
     const end=actor.x+Math.sign(target-actor.x)*Math.min(Math.abs(target-actor.x),Math.max(actor.walkSpeed*seconds,actor.reach??0));
     return Math.max(actor.x,end)>=crossing.min&&Math.min(actor.x,end)<=crossing.max;
   }
-  blocksCrew(actor,dt){return Boolean(this.crossing?.active&&this.crewInCrossing(actor,dt));}
+  // Standing at the bowl, behind the crew aisle in the galley's corner: in nobody's way on the aisle
+  // (the droid, which comes up to the bowl itself, still waits for her).
+  get atBowl(){return !this.busy&&this.floor===CAT_BOWL.floor&&Math.abs(this.x-CAT_BOWL.approachX)<1&&Math.abs(this.z-CAT_BOWL.depth)<.05;}
+  blocksCrew(actor,dt){return Boolean(this.crossing?.active&&!this.atBowl&&this.crewInCrossing(actor,dt));}
   droidInCrossing(droid,seconds){
     const crossing=this.crossing;if(!crossing||!droid?.position)return false;
     const floorY=(870-this.y)*.016,minX=(crossing.min-LADDER_X)*.022,maxX=(crossing.max-LADDER_X)*.022;
@@ -512,6 +515,13 @@ export class CatMotion extends CrewMotion {
     return false;
   }
   blocksDroid(droid,dt){return Boolean(this.crossing?.active&&this.droidInCrossing(droid,dt));}
+  advanceTurn(dt){
+    this.turn.age=Math.min(this.turn.duration,this.turn.age+dt);this.heading=sampleCatTurn(this.turn).yaw;
+    if(this.turn.age===this.turn.duration){
+      this.turn=null;
+      if(this.pendingHeading!==undefined){const target=this.pendingHeading;delete this.pendingHeading;this.face(target);}
+    }
+  }
   update(dt,actor=null,droid=null){
     if(dt<=0)return;
     // On the stair tower only the stair traffic holds the cat.
@@ -521,23 +531,21 @@ export class CatMotion extends CrewMotion {
       // back and gives way, then goes on to where it was going.
       this.visitorHold=(this.visitorHold??0)+dt;
       const s=this.queue[0];
-      if(this.visitorHold>=CAT_GIVE_WAY.after&&s?.type==='walk'&&!this.retreating&&!this.turn&&!this.hop&&!this.portal&&!this.chase){
-        const away=Math.sign(this.x-700-(this.visitor.trafficPosition.x/.022))||-Math.sign(s.x-this.x)||1;
+      // (a visitor who walks as planned does not walk past her either: she also gives way from her
+      // lane while resting in it, or before a crossing she has not begun)
+      const lane=s?.type==='walk'||(this.visitor.planned&&(!s||(s.type==='depth'&&!s.started))&&!this.onSofa&&Math.abs(this.z-CAT_PORT.walkZ)<.05);
+      if(this.visitorHold>=CAT_GIVE_WAY.after&&lane&&!this.retreating&&!this.turn&&!this.hop&&!this.portal&&!this.chase){
+        const away=Math.sign(this.x-700-(this.visitor.trafficPosition.x/.022))||-Math.sign((s.x??this.x)-this.x)||1;
         const x=Math.max(CAT_GIVE_WAY.min,Math.min(CAT_GIVE_WAY.max,this.x+away*CAT_GIVE_WAY.distance/.022));
         if(Math.abs(x-this.x)>4){this.queue.unshift({type:'walk',x,giveWay:true});this.retreating=true;this.visitorHold=0;}
       }
+      // (a turn on the spot comes nearer nobody: she finishes it, and can then give way)
+      else if(this.turn&&this.visitor.planned)this.advanceTurn(dt);
       return;
     }
     this.visitorHold=0;
     if(this.retreating&&this.queue[0]?.giveWay!==true)this.retreating=false;
-    if(this.turn){
-      this.turn.age=Math.min(this.turn.duration,this.turn.age+dt);this.heading=sampleCatTurn(this.turn).yaw;
-      if(this.turn.age===this.turn.duration){
-        this.turn=null;
-        if(this.pendingHeading!==undefined){const target=this.pendingHeading;delete this.pendingHeading;this.face(target);}
-      }
-      return;
-    }
+    if(this.turn){this.advanceTurn(dt);return;}
     if(this.turns&&!this.portal){
       const segment=this.queue[0];let desired=null;
       if(this.hop){const sign=this.hop.up?1:-1;desired=Math.atan2((CAT_SOFA.seatX-CAT_SOFA.floorX)*.022*sign,(LOUNGE_SEAT.centerDepth-CAT_SOFA.approachZ)*sign);}

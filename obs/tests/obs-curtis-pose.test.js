@@ -35,6 +35,8 @@ test('visit poses use the real body rig, remain finite, and restore the parked m
   const view={scene,ship:{coffeeMug:new Object3D()},width:1200,height:800};
   const visitor=new CurtisView(root,view);visitor.toon={update(){},dispose(){}};
   const routine=new CurtisRoutine({random:()=>0});routine.ready=true;routine.beginVisit();
+  // (the poses are visited out of order: the safety net for hand-overs would blend between them)
+  visitor.poseBlend={apply(){return false;},begin(){},reset(){}};
   const visited=new Set();
   for(const step of [...routine.steps]){
     if(step.kind==='walk'&&visited.has('walk'))continue;

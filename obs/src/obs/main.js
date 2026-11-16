@@ -384,7 +384,7 @@ async function start(){
     if(new URLSearchParams(location.search).has('debug')){globalThis.cabinView=view;globalThis.cabinSim={actor,brain,cat,care,airlock,stairs,get droid(){return view.droidRoutine;}};}
     view.audio=audio;
     const droid=new DroidRoutine({care,brain,actor,cat});droid.stairs=stairs;view.droidRoutine=droid;brain.droidRoutine=droid;
-    const curtis=new CurtisRoutine({prepare:()=>Promise.all([view.prepareCurtis(),audio.loadDeferred('coffeeMachine')])});curtis.stairs=stairs;stairs.bodies=cabinBodies({actor,droid,catMotion:cat.motion,curtis,crewDepth});
+    const curtis=new CurtisRoutine({planned:true,prepare:()=>Promise.all([view.prepareCurtis(),audio.loadDeferred('coffeeMachine')])});curtis.stairs=stairs;stairs.bodies=cabinBodies({actor,droid,catMotion:cat.motion,curtis,crewDepth});
     view.curtisRoutine=curtis;droid.visitor=curtis;cat.motion.visitor=curtis;
     view.feedback=feedback;
     idleCamera=new IdleCamera(view);unbindIdleCamera=idleCamera.bindActivity(document);

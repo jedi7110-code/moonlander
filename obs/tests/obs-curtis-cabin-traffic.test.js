@@ -25,7 +25,7 @@ test('half-hour cabin visits, doorway transfers and three-way traffic never form
       const scene={time:{delayedCall(){}},sound:{add:()=>({play(){},once(){},destroy(){}})},obsUI:new Proxy({},{get:()=>()=>{}})};
       const brain=new CabinBrain(scene,actor,{care,random});brain.beginWakeUp();brain.catRoutine=cat;
       const droid=new DroidRoutine({care,brain,actor,cat});brain.droidRoutine=droid;
-      const curtis=new CurtisRoutine({random});curtis.ready=true;droid.visitor=curtis;cat.motion.visitor=curtis;
+      const curtis=new CurtisRoutine({random,planned:true});curtis.ready=true;droid.visitor=curtis;cat.motion.visitor=curtis;
       const dt=1/60;let held=0;
       for(let i=0;i<1800*60;i++){
         curtis.update(dt,{actor,droid,cat,brain});

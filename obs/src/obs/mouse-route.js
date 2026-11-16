@@ -7,8 +7,9 @@ const POINTS=[
   [[-10.75,-1.38],[-11.35,-1.38],[-11.35,1.35],[-5.85,1.35],[-5.85,-1.38],[-6.65,-1.38]],
   // Habitation: the gaps on either side of the lounge sofa.
   [[5.8,-.78],[4.95,-.78],[4.95,.60],[9.645,.60],[9.645,-.78],[9.2,-.78]],
-  // Life support: between the galley, vegetable rack and its control cabinet.
-  [[-8.95,-1.4],[-8.49,-1.4],[-8.49,-.22],[-5.425,-.22],[-5.425,-1.42],[-6,-1.42]],
+  // Life support: between the galley, vegetable rack and its control cabinet (out of the gap
+  // beside the galley and round the front of Lucy's bowl).
+  [[-8.95,-1.4],[-8.49,-1.4],[-8.49,.12],[-5.425,.12],[-5.425,-1.42],[-6,-1.42]],
 ];
 
 function createMouseRoute(points){

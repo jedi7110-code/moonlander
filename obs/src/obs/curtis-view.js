@@ -16,6 +16,7 @@ import {CURTIS,CurtisRoutine} from './curtis-routine.js';
 import {solveHingeArm} from './arm-ik.js';
 import {curtisCoffeePose} from './curtis-coffee.js';
 import {updateCupWater} from './cup-water.js';
+import {MiloPoseBlend} from './milo-pose-blend.js';
 
 export class CurtisView {
   static async create(view){
@@ -69,7 +70,7 @@ export class CurtisView {
   render(routine,dt,{actor,brain}={}){
     const root=this.root,s=routine.step;
     this.stream.visible=false;
-    if(!routine.active||!s){root.visible=false;if(this.view.ship.coffeeMug)this.view.ship.coffeeMug.visible=true;return;}
+    if(!routine.active||!s){root.visible=false;this.poseBlend?.reset();if(this.view.ship.coffeeMug)this.view.ship.coffeeMug.visible=true;return;}
     const p=routine.trafficPosition??routine.position,age=routine.age;
     const coffee=s.kind==='coffee'?curtisCoffeePose(age):null;
     this.dock.position.copy(this.cupHome);
@@ -88,14 +89,18 @@ export class CurtisView {
       const pose=exit?loungeExitPose(poseAge):{depth:.06};
       root.position.x=CURTIS.seatX;root.position.z=pose.depth;
     }
-    const curtisPose={moving:s.kind==='walk'||s.kind==='stairs',waiting:routine.waiting,climbing:false,
+    // (planned: the walk's own pose; a side-step out of the way is walked in the plain cycle)
+    const gait=routine.planned&&!routine.sideStep?routine.gait?.pose??null:undefined;
+    const curtisPose={gait,moving:s.kind==='walk'||s.kind==='stairs',waiting:routine.waiting||Boolean(routine.turn),climbing:false,
       facing:Math.sign(Math.sin(routine.yaw))||1,walkYaw:routine.yaw,walkDistance:routine.walkDistance,
       action:seated?'lounge':s.kind==='coffee'?'hydro':null,
       time:routine.time,dt,actionTime:coffee?(coffee.brewing?0:coffee.drinkTime):age,actionDuration:coffee?coffee.drinkDuration:s.duration,
       leisure:conversation?'conversation':null,conversation,loungeExit:exit,diningDocks:s.kind==='coffee'?{mug:this.dock}:null};
     // On the stair tower the stair walk places body and legs (as for Milo).
-    if(s.kind==='stairs'&&s.decided)poseHumanTrip(root,s.trip,s.t,routine.time,{waiting:routine.waiting,arrival:s.arrival,cabinPose:(walkDistance,walkStride)=>animateMilo(root,{...curtisPose,walkDistance,walkStride})});
+    if(s.kind==='stairs'&&s.entered)poseHumanTrip(root,s.trip,s.t,routine.time,{waiting:routine.waiting,arrival:s.arrival,cabinPose:(walkDistance,walkStride)=>animateMilo(root,{...curtisPose,gait:undefined,walkDistance,walkStride})});
     else animateMilo(root,curtisPose);
+    // (the planned walk turns on the spot before it sets off: it needs to know where the figure faces)
+    routine.viewYaw=root.rotation.y;
     if(seated){
       if(s.kind==='sit')root.rotation.y+=Math.PI*(1-THREE.MathUtils.smoothstep(age,0,.6));
       const weight=s.kind==='sit'?THREE.MathUtils.smoothstep(lowering,0,1):s.kind==='stand'?1-THREE.MathUtils.smoothstep(age,0,s.duration):1;
@@ -156,6 +161,11 @@ export class CurtisView {
         root.userData.updateWristTwists?.();
       }
     }
+    // Where two motions do not hand over in the same pose, the jump is taken up over a moment
+    // (as for Milo; the ladder and the stair flights are quick and exact by themselves).
+    this.poseBlend??=new MiloPoseBlend(root);
+    if(routine.poseSeam){routine.poseSeam=false;this.poseBlend.begin();}
+    this.poseBlend.apply(dt,{detect:s.kind!=='climb'&&s.kind!=='stairs'});
     root.visible=true;
     if(!coffee?.brewing){root.userData.dining.water.scale.y=1;root.userData.dining.water.visible=true;}
     if(this.view.ship.coffeeMug)this.view.ship.coffeeMug.visible=!coffee;
