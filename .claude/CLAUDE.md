@@ -141,8 +141,8 @@ UI表示:
 ## 開発フロー
 - ローカル: `python3 -m http.server 8080`（`.claude/launch.json` で `moon-dev` という名前）
 - 実機テスト: 同じ Wi-Fi で `http://192.168.1.203:8080/` （Mac の en0 IP は変動）
-- 本番: Vercel（origin = GitHub `jedi7110-code/moonlander`、bitbucket もミラー）
-- リモート: `origin`（GitHub）と `bitbucket` の両方にプッシュする運用
+- 本番: Vercel（GitHub `jedi7110-code/moonlander` につながる）
+- リモート: `github`（GitHub）と `origin`（Bitbucket `paxcreation/moon`）。プッシュは `git push github main` だけ。Bitbucket へは上げない（2026-11-16 から）
 
 ## 着陸ベース（基地）配置メモ
 - `flag` / `flag-flash` の Y は `scene.moon.y + 35`（足元基準）
