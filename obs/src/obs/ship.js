@@ -401,7 +401,8 @@ function* buildShipSteps(sourceMaterials,{mergeStatic=true,floorBuilder=createDe
   // Keep the fixture batched with the cabin; only the mirror and tool mounts need transforms.
   staticRoot.updateMatrixWorld(true);
   for(const mount of [groomingStation.mirror,...Object.values(groomingStation.docks)])animated.attach(mount);
-  const catPorts=FLOOR_Y.map((y,level)=>catPort(staticRoot,m,positionX(CAT_PORT.x),y,level,animated));
+  // (the cat's wall passages are not shown while closed: CAT_PORT.open)
+  const catPorts=CAT_PORT.open?FLOOR_Y.map((y,level)=>catPort(staticRoot,m,positionX(CAT_PORT.x),y,level,animated)):[];
   // The upper shaft is a visible continuation, not an additional playable deck.
   yield;
   const ladder=createAccessLadder(m);staticRoot.add(ladder);

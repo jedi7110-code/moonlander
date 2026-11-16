@@ -393,9 +393,11 @@ export class CrewMotion {
 // A cat held by the visitor this long turns back this far along its lane
 // (kept inside the aisle, in pixels) to let him pass.
 export const CAT_GIVE_WAY=Object.freeze({after:2.5,distance:1.4,min:30,max:1370});
+// s a cat waiting by a stair entrance waits before asking again
+const CAT_STAIR_RETRY=1;
 export class CatMotion extends CrewMotion {
   constructor({turns=false,...options}={}){super({floor:CAT_SOFA.floor,x:1035,walkSpeed:CAT_WALK_SPEED,...options});this.turns=turns;this.heading=null;this.turn=null;this.onSofa=this.floor===CAT_SOFA.floor&&this.x>=CAT_SOFA.seatX;this.elevation=this.onSofa?LOUNGE_SEAT.top:0;this.z=this.onSofa?LOUNGE_SEAT.centerDepth:CAT_PORT.walkZ;this.hop=null;this.portalWalkDistance=0;this.depthWalkDistance=0;this.portal=null;this.destination=null;this.onDestination=null;this.waitingForCrew=false;}
-  get busy(){return Boolean(this.chase||this.turn||this.portal||this.hop)||super.busy;}
+  get busy(){return Boolean(this.chase||this.turn||this.portal||this.hop)||this.stairWait!=null||super.busy;}
   face(yaw){
     if(!this.turns)return false;
     if(this.heading===null){this.heading=yaw;return false;}
@@ -420,7 +422,8 @@ export class CatMotion extends CrewMotion {
   get walksThrough(){return false;}
   beginStairWalk(){}
   stairWalk(seg,travel){this.walkDistance+=travel/.022;}
-  // Jammed stairs: the cat takes its wall passage instead (stairs avoided now).
+  // Jammed stairs: the cat takes its wall passage instead (stairs avoided now), or, while the
+  // passages are closed, waits by the entrance until the stairs are usable again.
   stairsFallback(){this.queue=[];this.plan();}
   stairStep(seg,dt){
     super.stairStep(seg,dt);
@@ -450,7 +453,7 @@ export class CatMotion extends CrewMotion {
     }
     const crossing=this.destination.floor!==this.floor;
     // Change decks by the stair tower when it is usable (not from the sofa);
-    // the wall passage otherwise.
+    // the wall passage otherwise, while it is open (CAT_PORT.open).
     if(crossing&&this.stairs&&!this.onSofa&&this.y===FLOORS[this.floor].y){
       const trip=this.stairs.trip(this.floor,this.destination.floor,(this.x-700)*.022,(this.destination.x-700)*.022,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ});
       if(this.stairs.available(this,trip)){
@@ -459,6 +462,15 @@ export class CatMotion extends CrewMotion {
         if(this.x!==toPx(trip.from.x))this.queue.push({type:'walk',x:toPx(trip.from.x)});
         this.queue.push({type:'stairs',trip,floor:this.destination.floor,t:0,entered:false,target:this.destination});
         this.onArrive=()=>this.plan();return;
+      }
+      if(!CAT_PORT.open){
+        // (stairs only: she goes to the entrance and waits there until they are usable)
+        this.queue=[];
+        if(this.z!==CAT_PORT.walkZ)this.queue.push({type:'depth',z:CAT_PORT.walkZ});
+        if(Math.abs(this.x-toPx(trip.from.x))>.5)this.queue.push({type:'walk',x:toPx(trip.from.x)});
+        this.onArrive=()=>{this.stairWait=CAT_STAIR_RETRY;};
+        if(!this.queue.length){this.onArrive=null;this.stairWait=CAT_STAIR_RETRY;}
+        return;
       }
     }
     this.queue=[];
@@ -578,6 +590,9 @@ export class CatMotion extends CrewMotion {
       if(dt<=0||this.hop)return;
     }
     if(!this.portal){
+      // (waiting by a stair entrance: ask again in a moment)
+      if(this.stairWait!=null&&!this.queue.length){this.stairWait-=dt;if(this.stairWait<=0){this.stairWait=null;this.plan();}return;}
+      this.stairWait=null;
       const segment=this.queue[0];
       if(segment?.type==='depth'){
         segment.started=true;

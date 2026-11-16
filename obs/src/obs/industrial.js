@@ -5,6 +5,9 @@ import {CABIN_LIGHT_COLOR,CABIN_WARM_LIGHT_COLOR,CABIN_DECK_LIGHT} from './light
 
 const WORK_LIGHTS=[[-10.3,29],[-7.35,18],[-4.4,25],[-1.65,16],[1.75,16],[4.3,32],[7.6,18],[10.9,27]];
 const LOUNGE_LIGHTS=[6.25,8.65];
+// m the ceiling work lights are raised to meet the ceiling plate, and those under its cut-outs
+// (which hang on rods from the deck structure above: 3.06 m, the top deck's 3.40 m)
+const WORK_LIGHT_LIFT=.036,WORK_LIGHT_HANGERS=[-1.65,7.6];
 
 // Clear strips between fitted equipment; the hatch-side bay has recessed lining.
 export const REAR_WALL_PIPE_RUNS=[
@@ -228,10 +231,18 @@ export function addIndustrialDeck(root,m,y,level,{floorDetails=true}={}){
     box(root,m.warmLamp,x,y+2.58,-.08,1.06,.025,.30).name='Lounge overhead diffuser';
   }
   for(const [x] of WORK_LIGHTS){
-    box(root,m.dark,x,y+2.775,.37,.89,.13,.49,.03).name='Ceiling work light housing';
-    box(root,m.metal,x,y+2.70,.37,.80,.055,.41,.015);
-    box(root,level===DECK.OPERATIONS?m.coolLamp:m.lamp,x,y+2.66,.37,.71,.024,.32,.008).name='Ceiling work light diffuser';
-    for(const dx of [-.27,0,.27])rod(root,m.dark,[x+dx,y+2.64,.16],[x+dx,y+2.64,.58],.012);
+    // Mounted flush under the ceiling plate (its underside is 2.875 m above the deck); the
+    // housing reaches 1 mm into it. Where the plate is cut away (beside the ladder, and over
+    // the lounge's right side), it hangs from the structure above on two rods.
+    const lift=WORK_LIGHT_LIFT;
+    box(root,m.dark,x,y+2.775+lift,.37,.89,.13,.49,.03).name='Ceiling work light housing';
+    box(root,m.metal,x,y+2.70+lift,.37,.80,.055,.41,.015);
+    box(root,level===DECK.OPERATIONS?m.coolLamp:m.lamp,x,y+2.66+lift,.37,.71,.024,.32,.008).name='Ceiling work light diffuser';
+    for(const dx of [-.27,0,.27])rod(root,m.dark,[x+dx,y+2.64+lift,.16],[x+dx,y+2.64+lift,.58],.012);
+    if(WORK_LIGHT_HANGERS.includes(x)){
+      const top=level===DECK.OPERATIONS?3.406:3.072;
+      for(const dx of [-.38,.38])rod(root,m.dark,[x+dx,y+top,.37],[x+dx,y+2.84+lift,.37],.016).name='Ceiling work light hanger';
+    }
   }
   // Deep front fascia and overhead trunking flank the open ladder shaft.
   for(const side of [-1,1]){

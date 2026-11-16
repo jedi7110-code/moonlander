@@ -1,3 +1,4 @@
+import {CAT_PORT} from '../src/obs/layout.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Group,MeshStandardMaterial,Plane,Raycaster,Vector3} from 'three';
@@ -69,7 +70,8 @@ test('front-facing signs stay clear of fixtures, ceiling beams and one another',
       assert.ok(!hit||hit.distance>=origin.distanceTo(point)-.0001,`${sign.name} is obstructed at ${u}, ${v}`);
     }
   }
-  assert.ok(checked>=15);
+  // (the three DUCT labels of the cat's wall passages are not built while those are closed)
+  assert.ok(checked>=(CAT_PORT.open?15:12));
   for(const root of [ship.staticMesh,ship.animated])root.traverse(mesh=>{mesh.geometry?.dispose();mesh.material?.map?.dispose();});
   material.dispose();
 });

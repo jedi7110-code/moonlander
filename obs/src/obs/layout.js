@@ -16,7 +16,9 @@ export const CABIN_AISLE={crewZ:.78,catZ:2.20,deckBack:-1.81,deckFront:2.55,cros
 export const ACCESS_LADDER=Object.freeze({depth:-1.08,rearPanelZ:-1.46,wellEdge:-.17,offset:-1.11,droidClimbZ:-.77});
 export const ladderApproachDepth=(floor,droid=false)=>floor===2?(droid?-.77:-.33):.23;
 export const HYDRO_TRAY={depth:.40,z:-.40,cupZ:-.28,standZ:.10};
-export const CAT_PORT={x:744,walkZ:CABIN_AISLE.catZ,turnInset:.65,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66,doorSeconds:.7};
+// open: the wall passages between the decks are in use (closed and not shown for now: Lucy
+// changes decks by the stair towers only).
+export const CAT_PORT={open:false,x:744,walkZ:CABIN_AISLE.catZ,turnInset:.65,insideZ:-2.8,wallZ:-1.48,width:.50,height:.66,doorSeconds:.7};
 export const CAT_SCALE=.8;
 // In the corner between the galley's right side (x -8.52) and the grow rack's front posts
 // (z -.49), off the crew aisle. It leaves the narrow gap beside the galley open (the mouse's

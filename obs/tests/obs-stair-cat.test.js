@@ -26,12 +26,18 @@ test('Lucy changes decks by the stair tower and arrives at her destination',()=>
   }
 });
 
-test('a crowded tower sends Lucy through her wall passage instead',()=>{
-  const stairs=new CabinStairs({quickest:false});stairs.enter({},'crew',stairTrip(1,0,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ}),.2);
-  const motion=cat(1,stairs);let arrived=false,portal=false;
+test('with her wall passage closed, Lucy waits by a crowded tower and takes the stairs once they clear',()=>{
+  assert.equal(CAT_PORT.open,false);
+  const stairs=new CabinStairs({quickest:false}),other={};stairs.enter(other,'crew',stairTrip(1,0,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ}),.2);
+  const motion=cat(1,stairs);let arrived=false,portal=false,used=false,waited=0;
   motion.goTo({floor:0,x:500,z:CAT_PORT.walkZ},()=>{arrived=true;});
-  run(motion,stairs,240,()=>{portal||=Boolean(motion.portal);});
-  assert(portal,'used the wall passage');assert(arrived);assert.equal(motion.floor,0);
+  run(motion,stairs,240,i=>{
+    portal||=Boolean(motion.portal);used||=Boolean(motion.onStairs);
+    if(motion.stairWait!=null)waited++;
+    if(i===20*60)stairs.leave(other);
+  });
+  assert(!portal,'never the wall passage');assert(waited>60,'waited by the entrance');
+  assert(used,'then the stairs');assert(arrived);assert.equal(motion.floor,0);
 });
 
 test('Lucy on the stairs does not hold the crew with an aisle crossing',()=>{
