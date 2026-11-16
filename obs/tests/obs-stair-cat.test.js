@@ -14,7 +14,7 @@ const run=(motion,stairs,seconds,each=()=>{})=>{const crew=new CrewMotion({floor
 
 test('Lucy changes decks by the stair tower and arrives at her destination',()=>{
   for(const [from,to] of [[1,0],[1,2],[0,2],[2,0]]){
-    const stairs=new CabinStairs(),motion=cat(from,stairs);let arrived=false,used=false,portal=false,prev=null,maxStep=0;
+    const stairs=new CabinStairs({quickest:false}),motion=cat(from,stairs);let arrived=false,used=false,portal=false,prev=null,maxStep=0;
     motion.goTo({floor:to,x:500,z:CAT_PORT.walkZ},()=>{arrived=true;});
     run(motion,stairs,240,()=>{
       used||=Boolean(motion.onStairs);portal||=Boolean(motion.portal);
@@ -27,7 +27,7 @@ test('Lucy changes decks by the stair tower and arrives at her destination',()=>
 });
 
 test('a crowded tower sends Lucy through her wall passage instead',()=>{
-  const stairs=new CabinStairs();stairs.enter({},'crew',stairTrip(1,0,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ}),.2);
+  const stairs=new CabinStairs({quickest:false});stairs.enter({},'crew',stairTrip(1,0,{fromZ:CAT_PORT.walkZ,toZ:CAT_PORT.walkZ}),.2);
   const motion=cat(1,stairs);let arrived=false,portal=false;
   motion.goTo({floor:0,x:500,z:CAT_PORT.walkZ},()=>{arrived=true;});
   run(motion,stairs,240,()=>{portal||=Boolean(motion.portal);});
@@ -35,14 +35,14 @@ test('a crowded tower sends Lucy through her wall passage instead',()=>{
 });
 
 test('Lucy on the stairs does not hold the crew with an aisle crossing',()=>{
-  const stairs=new CabinStairs(),motion=cat(1,stairs);motion.goTo({floor:0,x:500,z:CAT_PORT.walkZ});
+  const stairs=new CabinStairs({quickest:false}),motion=cat(1,stairs);motion.goTo({floor:0,x:500,z:CAT_PORT.walkZ});
   let checked=false;
   run(motion,stairs,240,()=>{if(motion.onStairs){assert.equal(motion.crossing,null);checked=true;}});
   assert(checked);
 });
 
 test('a new destination while Lucy is on the stairs is followed after the trip, never in mid-air',()=>{
-  const stairs=new CabinStairs(),motion=cat(1,stairs);let arrived=false,retargeted=false;
+  const stairs=new CabinStairs({quickest:false}),motion=cat(1,stairs);let arrived=false,retargeted=false;
   motion.goTo({floor:0,x:500,z:CAT_PORT.walkZ});
   run(motion,stairs,240,()=>{
     if(!retargeted&&motion.onStairs&&motion.onStairs.t>3){retargeted=true;motion.goTo({floor:1,x:900,z:CAT_PORT.walkZ},()=>{arrived=true;});}

@@ -14,7 +14,7 @@ const dt=1/60;
 const flat=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 
 // A whole visit; the view's figure turns toward where he faces at a person's pace.
-function visit({seed=.3,stairs=new CabinStairs(),each=()=>{}}={}){
+function visit({seed=.3,stairs=new CabinStairs({quickest:false}),each=()=>{}}={}){
   const c=new CurtisRoutine({random:()=>seed,firstDelay:0,planned:true});c.ready=true;c.stairs=stairs;
   let yaw=Math.PI;
   for(let i=0;i<900*60;i++){
@@ -27,7 +27,7 @@ function visit({seed=.3,stairs=new CabinStairs(),each=()=>{}}={}){
 }
 
 test('a planned visit walks every stretch from standing to standing and finishes, by the stairs and by the ladder',()=>{
-  for(const [seed,stairs] of [[.3,new CabinStairs()],[.7,new CabinStairs()],[.3,null]]){
+  for(const [seed,stairs] of [[.3,new CabinStairs({quickest:false})],[.7,new CabinStairs({quickest:false})],[.3,null]]){
     let fastest=0,walks=0,last=null,stops=[],usedStairs=false;
     const c=visit({seed,stairs,each:(c,before,kind)=>{
       usedStairs||=c.step?.kind==='stairs'&&c.step.entered;
@@ -117,7 +117,7 @@ test('he walks on into a stair trip and out of it without breaking step',()=>{
 });
 
 test('with the stairs taken, he decides for the ladder before the entrance and finishes the visit',()=>{
-  const stairs=new CabinStairs();stairs.enter({},'droid',stairTrip(1,0),.2);
+  const stairs=new CabinStairs({quickest:false});stairs.enter({},'droid',stairTrip(1,0),.2);
   let used=false,climbs=0,lastKind=null;
   const c=visit({stairs,each:c=>{const k=c.step?.kind;used||=k==='stairs'&&c.step.entered;if(k==='climb'&&lastKind!=='climb')climbs++;lastKind=k;}});
   assert.equal(used,false);assert.equal(climbs,3,'down, between the decks, and out');assert.equal(c.active,false);

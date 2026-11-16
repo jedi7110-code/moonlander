@@ -157,10 +157,12 @@ export class DroidRoutine {
   }
   travel(floor,x,z){
     this.walk(this.plan.x,LANE);
-    if(floor!==this.plan.floor&&this.stairs){
+    // (by the ladder when it is the quicker way)
+    const trip=floor!==this.plan.floor&&this.stairs?this.stairs.trip(this.plan.floor,floor,this.plan.x,x,{fromZ:LANE,toZ:LANE}):null;
+    if(trip&&!this.stairs.ladderQuicker(trip,this.plan.x,x,{speed:SPEED,climb:CLIMB_SPEED,transfer:LADDER_ENTRY.seconds+DROID_LADDER_LANDING.seconds})){
       // By the nearer stair tower when it is usable when the robot gets there;
       // otherwise the step expands into the ladder route below (same end).
-      const trip=this.stairs.trip(this.plan.floor,floor,this.plan.x,x,{fromZ:LANE,toZ:LANE}),out=-(trip.side??-1);
+      const out=-(trip.side??-1);
       // From the dock (2 cm short of the trip start) just turn toward the tower.
       if(Math.abs(this.plan.x-trip.from.x)>.05)this.walk(trip.from.x,LANE);
       this.turn(-out*Math.PI/2);

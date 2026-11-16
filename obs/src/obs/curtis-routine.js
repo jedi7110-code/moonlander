@@ -97,9 +97,10 @@ export class CurtisRoutine {
   }
   // Inside the cabin the visitor changes decks by the stair tower when it is
   // usable when he gets there; otherwise (or without stairs) by the ladder.
-  changeDeck(from,to){
-    if(!this.stairs){this.aisleTo(0,from);this.climbTo(to);return;}
-    const at=this.steps.at(-1)?.to??this.position,trip=this.stairs.trip(from,to,at.x,at.x);
+  changeDeck(from,to,toX=null){
+    const at=this.steps.at(-1)?.to??this.position,trip=this.stairs?.trip(from,to,at.x,toX??at.x);
+    // (when the ladder is the quicker way, the ladder: the towers stand at the ends of the cabin)
+    if(!trip||this.stairs.ladderQuicker(trip,at.x,toX??at.x,{speed:CURTIS_WALK_SPEED,climb:.46,transfer:2.4})){this.aisleTo(0,from);this.climbTo(to);return;}
     this.aisleTo(trip.from.x,from);
     const last=this.steps.at(-1)?.to??this.position;
     this.steps.push({kind:'stairs',from:{...last},to:{x:trip.to.x,y:FLOORS[to],z:trip.to.z},duration:Infinity,trip,t:0,decided:false,fromFloor:from,floor:to});
@@ -250,7 +251,11 @@ export class CurtisRoutine {
   // Held up while walking (or before setting off): the walk comes to a stop in step.
   holdWalk(dt){this.waiting=true;if(this.planned&&(this.gait||this.step?.kind==='walk'))this.walkPlanned(dt,true);}
   // A depth step out onto the aisle (from the rear room, the coffee machine or the sofa).
-  outToAisle(s){return s?.kind==='walk'&&Math.abs(s.to.x-s.from.x)<1e-8&&s.to.z>s.from.z+.1&&Math.abs(s.to.z-curtisWalkway(s.to.x,this.floor))<.06;}
+  outToAisle(s){
+    // (for the step he is on, from where he is: its start may have been moved up to him)
+    const fromZ=s===this.step?Math.min(s.from.z,this.position.z):s.from.z;
+    return s?.kind==='walk'&&Math.abs(s.to.x-s.from.x)<1e-8&&Math.abs(this.position.x-s.to.x)<1e-6+(s===this.step?0:Infinity)&&s.to.z>fromZ+.1&&Math.abs(s.to.z-curtisWalkway(s.to.x,this.floor))<.06;
+  }
   // The step out onto the aisle that the walk under way comes up to (after the one it is on),
   // and how far ahead it starts.
   aisleAhead(){
@@ -359,7 +364,7 @@ export class CurtisRoutine {
     this.active=true;this.visits++;this.age=0;this.passOffset=0;this.position={x:0,y:CURTIS.top,z:ladderApproachDepth(0)};
     this.climbTo(1,{enter:true});
     if(this.random()<.5){this.lounge();this.coffee();}else{this.coffee();this.lounge();}
-    this.changeDeck(1,0);this.aisleTo(CURTIS.roomX,0);
+    this.changeDeck(1,0,CURTIS.roomX);this.aisleTo(CURTIS.roomX,0);
     // The rear room has an open portal and a raised 11 cm metal floor.
     this.walk(CURTIS.roomX,FLOORS[0],-1.30);
     this.walk(CURTIS.roomX,FLOORS[0]+.11,-1.85);
@@ -452,7 +457,8 @@ export class CurtisRoutine {
     const approaching=s.kind==='walk'&&Math.abs(near.x)<=CURTIS_LADDER_TRAFFIC.waitX&&Math.abs(s.to.x)<Math.abs(this.position.x)-1e-8;
     const entering=s.kind==='climb'||approaching;
     if(path&&entering&&!this.ladderClaim){
-      const crewNear=actor&&(actor.climbing||Math.abs((actor.x-700)*.022)<1.5);
+      // (planned: Milo walking cannot stop on the spot: within where he waits for the shaft, and as far as he still goes)
+      const crewNear=actor&&(actor.climbing||Math.abs((actor.x-700)*.022)<1.5||(this.planned&&actor.busy&&Math.abs((actor.x-700)*.022)<CURTIS_LADDER_TRAFFIC.crewWaitX+(actor.reach??0)*.022));
       const droidAtLanding=droid?.position&&Math.abs(droid.position.y-this.position.y)<1.4&&
         Math.abs(droid.position.x)<CURTIS_LADDER_TRAFFIC.clearX;
       if((crewNear&&ladderPathsConflict(path,crewLadderPath(actor)))||
@@ -523,16 +529,18 @@ export class CurtisRoutine {
       const onAisle=Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.mergeX&&s.from.z>=.65&&s.to.z>=.65;
       const leavingBridge=this.ladderClaim&&Math.abs(this.position.x)>CURTIS_LADDER_TRAFFIC.bridgeX&&s.from.z>=.2&&s.to.z>=.2;
       const aisle=onAisle||leavingBridge;
-      let offset=0;
+      let offset=0,crowded=false;
       if(aisle){
         const nearby=obstacles.filter(o=>Math.abs(o.p.y-p.y)<1.4&&Math.abs(o.p.x-p.x)<2.2);
         // (a planned walk keeps the lane free where it still goes as well)
         const laneFree=z=>nearby.every(o=>!close({...p,z},o.p,o.r+(o.r===CREW_CLEARANCE?.08:.03))&&!(ahead&&close({...ahead,z},o.p,o.r+(o.r===CREW_CLEARANCE?.08:.03))));
         const current=this.position.z+(this.passOffset??0);
-        if(!laneFree(this.position.z))offset=CURTIS_LADDER_TRAFFIC.passZ-this.position.z;
+        crowded=!laneFree(this.position.z);
+        if(crowded)offset=CURTIS_LADDER_TRAFFIC.passZ-this.position.z;
         else if(nearby.length&&laneFree(current))offset=Math.min(this.passOffset??0,Math.max(0,CURTIS_LADDER_TRAFFIC.passZ-this.position.z));
       }
-      if(this.ladderClaim&&Math.abs(this.position.x)<CURTIS_LADDER_TRAFFIC.mergeX&&Math.abs(s.to.x)<Math.abs(this.position.x))offset=0;
+      // (planned: someone passing him beside the bridge goes by first)
+      if(this.ladderClaim&&Math.abs(this.position.x)<CURTIS_LADDER_TRAFFIC.mergeX&&Math.abs(s.to.x)<Math.abs(this.position.x)&&!(this.planned&&crowded))offset=0;
       const shift=Math.sign(offset-(this.passOffset??0))*Math.min(Math.abs(offset-(this.passOffset??0)),dt*.85);
       const lateral={...p,z:p.z+shift};
       // (planned: he steps aside standing; a walk under way first comes to its stop, and only
@@ -549,10 +557,13 @@ export class CurtisRoutine {
       // corridor, see passageObstacle. Not into someone already standing there.)
       const transfer=this.planned&&this.outToAisle(s)&&(Boolean(this.gait)||distance(this.position,s.from)>.02);
       // (crew already waiting for him outside the step's end lets him go first)
-      const crewAbout=end=>obstacles.some(o=>o.crew&&!o.lounging&&close(o.p,end,o.r+.7)&&!(o.held&&!close(o.p,end,o.r)));
+      const crewAbout=end=>obstacles.some(o=>o.crew&&!o.lounging&&close(o.p,end,o.r+.7)&&!(o.held&&!close(o.p,end,.45)));
       const coming=this.planned?this.aisleAhead():null;
       if(this.planned&&((this.outToAisle(s)&&!transfer&&crewAbout(s.to))||(coming&&coming.distance<=this.reach+.1&&crewAbout(coming.step.to)))){this.holdWalk(dt);return;}
-      const finishes=o=>(transfer||(this.planned&&this.outToAisle(s)&&o.held))&&o.crew&&!close(o.p,s.to,o.r);
+      // (finishing it, he may come inside the usual clearance of someone who stopped by its end,
+      // and closer still, short of touching, to someone who is waiting for him there: one of the
+      // two has to move, and he is the one already under way)
+      const finishes=o=>(transfer||(this.planned&&this.outToAisle(s)&&o.held))&&o.crew&&!close(o.p,s.to,o.held?.45:o.r-.12);
       // (planned: where the way comes out toward the passing lane, the side-step there will be
       // narrower: he may then be nearer the crew than `next` says)
       const narrowed=this.planned&&(this.passOffset??0)>0?{...next,z:Math.min(next.z,Math.max(next.z-(this.passOffset??0),CURTIS_LADDER_TRAFFIC.passZ))}:null;

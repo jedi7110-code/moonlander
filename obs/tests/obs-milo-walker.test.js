@@ -151,7 +151,7 @@ test('planned crew: turns on the spot before it sets off when the view says it f
   assert.ok(facing.gait&&!facing.turn,'already facing the way: it sets off at once');
 });
 test('planned crew: walks on into a stair trip and out of it without stopping, and takes the ladder from standing',()=>{
-  const actor=new CrewMotion({planned:true,floor:1,x:400});actor.stairs=new CabinStairs({right:true});let arrived=0;
+  const actor=new CrewMotion({planned:true,floor:1,x:400});actor.stairs=new CabinStairs({right:true,quickest:false});let arrived=0;
   actor.goTo({floor:2,x:500},()=>arrived++);
   let entered=null,left=null,previous=null,t=0;
   while(actor.busy&&t<90){
@@ -238,7 +238,7 @@ test('planned crew: every deck change by the stairs arrives without walking past
   const ids=['galley','hydro','plant','gym','bunk','shower','toilet','lounge','console','medical','grooming','smoking'];
   for(const from of ids)for(const to of ids){
     const a=getStation(from),b=getStation(to);if(a.floor===b.floor)continue;
-    const actor=new CrewMotion({planned:true,floor:a.floor,x:a.x});actor.stairs=new CabinStairs({right:true});let arrived=0,turnsBack=0,last=0;
+    const actor=new CrewMotion({planned:true,floor:a.floor,x:a.x});actor.stairs=new CabinStairs({right:true,quickest:false});let arrived=0,turnsBack=0,last=0;
     actor.goTo(b,()=>arrived++);
     let t=0;while(actor.busy&&t<120){actor.stairs.update(dt);actor.update(dt);t+=dt;
       // (a walk that has to stop and come back shows as a change of walking direction on one deck before the trip)
@@ -247,10 +247,10 @@ test('planned crew: every deck change by the stairs arrives without walking past
   }
 });
 test('a stair trip that sets off the other way, or starts where the crew stands, is entered from standing',()=>{
-  const stairs=new CabinStairs({right:true}),trip=stairs.trip(2,1,11.9,0),entrance=700+trip.from.x/.022;
+  const stairs=new CabinStairs({right:true,quickest:false}),trip=stairs.trip(2,1,11.9,0),entrance=700+trip.from.x/.022;
   for(const offset of [.3,0,-.05,-1]){
     // (+: beyond the entrance, the trip leads on outwards: walk back to it, turn, set off)
-    const actor=new CrewMotion({planned:true,floor:2,x:entrance+offset/.022});actor.stairs=new CabinStairs({right:true});let arrived=0,jump=0,previous=actor.x;
+    const actor=new CrewMotion({planned:true,floor:2,x:entrance+offset/.022});actor.stairs=new CabinStairs({right:true,quickest:false});let arrived=0,jump=0,previous=actor.x;
     actor.goTo({floor:1,x:600},()=>arrived++);
     let t=0;while(actor.busy&&t<120){actor.stairs.update(dt);actor.update(dt);t+=dt;jump=Math.max(jump,Math.abs(actor.x-previous)*.022);previous=actor.x;}
     assert.equal(arrived,1);assert.equal(actor.x,600);assert.ok(jump<.04,`start ${offset} m from the entrance: the place jumps ${jump.toFixed(2)} m in a tick`);

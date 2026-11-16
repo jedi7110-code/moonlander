@@ -22,7 +22,7 @@ function visit(stairs,each=()=>{}){
 }
 
 test('the visitor walks the stair tower from the lounge deck to the rear room and leaves by the shaft',()=>{
-  const stairs=new CabinStairs();let used=false,inRoom=false,climbs=0,lastKind=null;
+  const stairs=new CabinStairs({quickest:false});let used=false,inRoom=false,climbs=0,lastKind=null;
   const {c,maxStep}=visit(stairs,(c)=>{
     const k=c.step?.kind;used||=k==='stairs'&&c.step.decided;
     if(k==='climb'&&lastKind!=='climb')climbs++;lastKind=k;
@@ -35,7 +35,7 @@ test('the visitor walks the stair tower from the lounge deck to the rear room an
 });
 
 test('with the stairs crowded the visitor uses the ladder between decks as before',()=>{
-  const stairs=new CabinStairs();stairs.enter({},'droid',stairTrip(1,0),.2);
+  const stairs=new CabinStairs({quickest:false});stairs.enter({},'droid',stairTrip(1,0),.2);
   let used=false,climbs=0,lastKind=null;
   const {c}=visit(stairs,(c)=>{const k=c.step?.kind;used||=k==='stairs'&&c.step.decided&&stairs.walker(c);if(k==='climb'&&lastKind!=='climb')climbs++;lastKind=k;});
   assert(!used);assert.equal(climbs,3);assert(!c.active);
@@ -44,7 +44,7 @@ test('with the stairs crowded the visitor uses the ladder between decks as befor
 test('the visitor and the droid meeting at a stair exit never hold each other for good',()=>{
   const {DroidRoutine,DROID_FLOORS,DROID_LANE}=globalThis.__droid;
   for(const delay of [8.5,9,9.5,10]){
-    const stairs=new CabinStairs(),c=new CurtisRoutine({random:()=>.3,firstDelay:0});c.stairs=stairs;c.active=true;
+    const stairs=new CabinStairs({quickest:false}),c=new CurtisRoutine({random:()=>.3,firstDelay:0});c.stairs=stairs;c.active=true;
     c.position={x:-8,y:3.392,z:.78};c.changeDeck(1,0);c.aisleTo(-6,0);
     const droid=new DroidRoutine({care:new globalThis.__droid.Supplies(),brain:{plants:new globalThis.__droid.PlantBed(),actStation:null},actor:null,cat:{mode:'sleep'}});
     droid.stairs=stairs;droid.visitor=c;droid.position={x:-11.92,y:DROID_FLOORS[0],z:-.52,floor:0,yaw:Math.PI/2};droid.plan={...droid.position};droid.job='feed';

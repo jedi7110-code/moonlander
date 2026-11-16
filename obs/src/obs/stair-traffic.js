@@ -63,7 +63,9 @@ const routeSpan=trip=>{const a=trip.routeS(trip.enterLength),b=trip.routeS(trip.
 
 export class CabinStairs {
   // `right`: the cabin also has the right stair tower (LEVEL 3 <-> LEVEL 2).
-  constructor({right=false}={}){this.walkers=new Map();this.time=0;this.order=0;this.avoid=new Map();this.bodies=null;this.gaveWay=new Map();this.right=right;}
+  // quickest: walkers take the ladder when it is the quicker way (false: the stairs whenever usable, for the stair studies)
+  constructor({right=false,quickest=true}={}){this.walkers=new Map();this.time=0;this.order=0;this.avoid=new Map();this.bodies=null;this.gaveWay=new Map();this.right=right;this.quickest=quickest;}
+  ladderQuicker(trip,fromX,toX,walker){return this.quickest&&ladderQuicker(trip,fromX,toX,walker);}
   // The trip between two floors for a walk from x `fromX` to x `toX` (world
   // metres): by the nearer tower that serves both floors.
   trip(fromFloor,toFloor,fromX,toX,options={}){return nearestStairTrip(fromFloor,toFloor,fromX,toX,{right:this.right,...options});}
@@ -210,6 +212,20 @@ export class CabinStairs {
 
 // Positions of everybody in the cabin for CabinStairs.bodies (world metres).
 // The robot on its charging dock is left out: the trips are laid out around it.
+// Which way is quicker between two places on different decks: the stair trip (with the walk to
+// its start and from its end) or the central ladder at x 0 (the walk to it and from it, the climb at
+// `climb` m/s, and `transfer` s getting on and off). The towers stand at the ends of the cabin, so
+// from the middle of it the ladder is often the quicker way; everybody then takes the ladder.
+export function stairSeconds(trip,fromX,toX,speed){
+  let t=0;const step=.1;
+  for(let s=0;s<trip.length;s+=step)t+=Math.min(step,trip.length-s)/(speed*Math.max(.2,trip.pace(s+step/2,speed)));
+  return t+(Math.abs(fromX-trip.from.x)+Math.abs(trip.to.x-toX))/speed;
+}
+export function ladderSeconds(trip,fromX,toX,{speed,climb,transfer}){
+  return (Math.abs(fromX)+Math.abs(toX))/speed+Math.abs(trip.to.y-trip.from.y)/climb+transfer;
+}
+export const ladderQuicker=(trip,fromX,toX,walker)=>ladderSeconds(trip,fromX,toX,walker)<stairSeconds(trip,fromX,toX,walker.speed);
+
 export function cabinBodies({actor,droid=null,catMotion=null,curtis=null,crewDepth=()=>.78}){
   return ()=>{
     const out=[{agent:actor,x:(actor.x-700)*.022,y:(870-actor.y)*.016,z:crewDepth(actor)}];

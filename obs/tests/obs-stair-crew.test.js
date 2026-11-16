@@ -17,7 +17,7 @@ test('without shared stairs the crew keeps using the ladder (plain studies and t
 test('floor changes walk the stair tower between every pair of decks and arrive',()=>{
   for(const from of [0,1,2])for(const to of [0,1,2]){
     if(from===to)continue;
-    const stairs=new CabinStairs(),actor=new CrewMotion({floor:from,x:400});actor.stairs=stairs;
+    const stairs=new CabinStairs({quickest:false}),actor=new CrewMotion({floor:from,x:400});actor.stairs=stairs;
     const target=stationOn(to);let arrived=false,used=false,climbed=false,prev=null,maxStep=0;
     actor.goTo(target,()=>{arrived=true;});
     run(actor,stairs,120,()=>{
@@ -33,14 +33,14 @@ test('floor changes walk the stair tower between every pair of decks and arrive'
 });
 
 test('the crew takes the ladder when the stairs are crowded at the entrance',()=>{
-  const stairs=new CabinStairs(),blocker={},trip=stairTrip(2,0);
+  const stairs=new CabinStairs({quickest:false}),blocker={},trip=stairTrip(2,0);
   stairs.enter(blocker,'droid',trip,.2); // standing at the bottom entrance
   const actor=new CrewMotion({floor:2,x:400});actor.stairs=stairs;actor.goTo(stationOn(0));
   assert(actor.queue.some(s=>s.type==='climb'),'ladder planned');assert(!actor.queue.some(s=>s.type==='stairs'));
 });
 
 test('a jammed entrance makes the walker give up and take the ladder, then avoid the stairs',()=>{
-  const stairs=new CabinStairs(),actor=new CrewMotion({floor:2,x:400});actor.stairs=stairs;
+  const stairs=new CabinStairs({quickest:false}),actor=new CrewMotion({floor:2,x:400});actor.stairs=stairs;
   const target=stationOn(0);let arrived=false,placed=false,gaveUpAt=null,avoidedAfterGivingUp=false;
   actor.goTo(target,()=>{arrived=true;});
   for(let i=0;i<120*60&&actor.busy;i++){
@@ -56,7 +56,7 @@ test('a jammed entrance makes the walker give up and take the ladder, then avoid
 });
 
 test('walkers keep their distance in one lane and pass in opposite lanes',()=>{
-  const stairs=new CabinStairs(),a={},b={},c={};
+  const stairs=new CabinStairs({quickest:false}),a={},b={},c={};
   const up=stairTrip(2,0),down=stairTrip(0,2);
   stairs.enter(a,'crew',up,5);stairs.enter(b,'crew',up,4.5);stairs.enter(c,'crew',down,down.tOfRouteS(up.routeS(5))-.3);
   for(let i=0;i<600;i++){stairs.update(1/60);for(const w of [a,b,c])stairs.advance(w,.011,1/60);}
@@ -94,7 +94,7 @@ test('a walker held outside a deck crossing for 3 s walks on into it instead of 
   // The droid stands in the middle deck's crossing on its way down while the
   // crew arrives there from below: each waits for the other. The crew (first
   // on the stairs) goes on after 3 s and must then reach the crossing.
-  const stairs=new CabinStairs(),crew={},droid={},up=stairTrip(2,1),down=stairTrip(0,2,{fromZ:1.48});
+  const stairs=new CabinStairs({quickest:false}),crew={},droid={},up=stairTrip(2,1),down=stairTrip(0,2,{fromZ:1.48});
   stairs.enter(crew,'crew',up,10.9);stairs.enter(droid,'droid',down,14.1);
   let waited=0;
   for(let i=0;i<60*8;i++){
@@ -159,7 +159,7 @@ test('Milo walks into, over and out of the stairs without a jump in any limb',as
   const {crewWalkway}=await import('../src/obs/cabin-walkway.js');
   const material=new THREE.MeshStandardMaterial(),px=x=>(x-700)*.022,py=y=>(870-y)*.016;
   for(const [from,to] of [[1,2],[2,1]]){
-    const stairs=new CabinStairs(),actor=new CrewMotion({floor:from,x:470});actor.stairs=stairs;
+    const stairs=new CabinStairs({quickest:false}),actor=new CrewMotion({floor:from,x:470});actor.stairs=stairs;
     const root=createMilo(new Proxy({},{get:()=>material}));actor.goTo({floor:to,x:540});
     const rows=[];let time=0,blended=0;
     for(let i=0;i<60*90&&actor.busy;i++){
@@ -210,7 +210,7 @@ test('stair trips work at every walking speed the crew health sets, for every ar
       for(let t=.02;t<=trip.length;t+=.02){const d=humanTripDistance(trip,t,arrival);assert(d>previous&&d-previous<.09,`${label} phase ${bin}: counter at ${t.toFixed(2)}`);previous=d;}
     }
     // the whole trip in the simulation, with the health changing on the way
-    const stairs=new CabinStairs(),actor=new CrewMotion({floor:from,x:430});actor.stairs=stairs;actor.walkSpeed*=factor;
+    const stairs=new CabinStairs({quickest:false}),actor=new CrewMotion({floor:from,x:430});actor.stairs=stairs;actor.walkSpeed*=factor;
     let arrived=false,counter=0,frames=0;actor.goTo({floor:to,x:540},()=>{arrived=true;});
     run(actor,stairs,240,()=>{
       if(actor.onStairs&&++frames===200)actor.walkSpeed*=factor===1?.48:1/factor;
@@ -222,7 +222,7 @@ test('stair trips work at every walking speed the crew health sets, for every ar
 
 test('outside a deck crossing a walker gives way to walkers still moving through it, but not for ever',()=>{
   const wait=(move)=>{
-    const stairs=new CabinStairs(),crew={},droid={},up=stairTrip(2,1),down=stairTrip(0,2,{fromZ:1.48});
+    const stairs=new CabinStairs({quickest:false}),crew={},droid={},up=stairTrip(2,1),down=stairTrip(0,2,{fromZ:1.48});
     stairs.enter(droid,'droid',down,14.1);stairs.enter(crew,'crew',up,10.9);
     let waited=0;
     for(let i=0;i<60*12;i++){
@@ -244,7 +244,7 @@ test('trips and people who are not on a trip keep off each other',async()=>{
   const B=STAIR_TRAFFIC.body,trip=stairTrip(1,2);
   // someone standing where the trip starts makes the stairs crowded
   {
-    const stairs=new CabinStairs(),crew={},other={},start=trip.frame(.6);
+    const stairs=new CabinStairs({quickest:false}),crew={},other={},start=trip.frame(.6);
     stairs.bodies=()=>[{agent:other,x:start.x,y:start.y,z:start.z+.3}];
     assert(!stairs.available(crew,trip),'crowded');
     stairs.bodies=()=>[{agent:other,x:start.x+3,y:start.y,z:start.z}];
@@ -254,20 +254,20 @@ test('trips and people who are not on a trip keep off each other',async()=>{
   }
   // a walker on a trip stops short of a bystander, goes on when the way is free, and never waits for ever
   {
-    const stairs=new CabinStairs(),crew={},other={},at=trip.frame(trip.exitStart+1.2);let here=true;
+    const stairs=new CabinStairs({quickest:false}),crew={},other={},at=trip.frame(trip.exitStart+1.2);let here=true;
     stairs.bodies=()=>here?[{agent:other,x:at.x,y:at.y,z:at.z}]:[];
     stairs.enter(crew,'crew',trip,trip.exitStart+.1);
     const walk=seconds=>{for(let i=0;i<seconds*60;i++){stairs.update(1/60);stairs.advance(crew,.015,1/60);}return stairs.walker(crew).t;};
     const gap=()=>{const p=trip.frame(stairs.walker(crew).t);return Math.hypot(p.x-at.x,p.z-at.z);};
     walk(4);assert(gap()>=B.space-.02&&gap()<B.space+.05,`stops ${gap().toFixed(2)} m short`);
     here=false;const before=stairs.walker(crew).t;assert(walk(1)>before+.5,'goes on when the way is free');
-    const again=new CabinStairs();again.bodies=()=>[{agent:other,x:at.x,y:at.y,z:at.z}];again.enter(crew,'crew',trip,trip.exitStart+.1);
+    const again=new CabinStairs({quickest:false});again.bodies=()=>[{agent:other,x:at.x,y:at.y,z:at.z}];again.enter(crew,'crew',trip,trip.exitStart+.1);
     for(let i=0;i<(B.limit+6)*60;i++){again.update(1/60);again.advance(crew,.015,1/60);}
     assert(again.walker(crew).t>trip.exitStart+1.6,'goes on after the limit');
   }
   // someone who is not on a trip does not walk closer than giveWay to a walker on a trip, but may walk away
   {
-    const stairs=new CabinStairs(),walker={},other={},p=trip.frame(trip.exitStart+1);
+    const stairs=new CabinStairs({quickest:false}),walker={},other={},p=trip.frame(trip.exitStart+1);
     stairs.enter(walker,'droid',trip,trip.exitStart+1);
     // (d metres behind the walker: not in its way ahead)
     const at=d=>({x:p.x-p.dx*d,y:p.y,z:p.z-p.dz*d});
@@ -290,7 +290,7 @@ test('trips and people who are not on a trip keep off each other',async()=>{
   }
   // in the cabin: Milo walking past the tower gives way to the droid coming off the stairs
   {
-    const stairs=new CabinStairs(),droid={},actor=new CrewMotion({floor:2,x:700-10.9/.022}),down=stairTrip(0,2,{fromZ:1.48,toZ:1.48});
+    const stairs=new CabinStairs({quickest:false}),droid={},actor=new CrewMotion({floor:2,x:700-10.9/.022}),down=stairTrip(0,2,{fromZ:1.48,toZ:1.48});
     actor.stairs=stairs;stairs.bodies=cabinBodies({actor});
     stairs.enter(droid,'droid',down,down.exitStart+.2);actor.goTo({floor:2,x:700-12.4/.022});
     const {advanceCabinTraffic}=await import('../src/obs/state.js');

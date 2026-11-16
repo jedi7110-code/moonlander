@@ -144,8 +144,10 @@ export class CrewMotion {
   planRoute(target,{ladder=false}={}){
     const queue=[],atFloor=this.y===FLOORS[this.floor].y;
     if(!ladder&&this.stairs&&atFloor&&target.floor!==this.floor){
-      const trip=this.stairs.trip(this.floor,target.floor,(this.x-700)*.022,(target.x-700)*.022);
-      if(this.stairs.available(this,trip)){
+      const fromX=(this.x-700)*.022,toX=(target.x-700)*.022,trip=this.stairs.trip(this.floor,target.floor,fromX,toX);
+      // (when the ladder is the quicker way, the ladder)
+      const ladder=this.stairs.ladderQuicker(trip,fromX,toX,{speed:this.walkSpeed*.022,climb:this.climbSpeed*.016,transfer:LADDER_ENTRY.seconds+LADDER_LANDING.seconds});
+      if(!ladder&&this.stairs.available(this,trip)){
         if(this.x!==toPx(trip.from.x))queue.push({type:'walk',x:toPx(trip.from.x)});
         queue.push({type:'stairs',trip,floor:target.floor,t:0,entered:false,target});
         queue.push({type:'walk',x:target.x});return queue;

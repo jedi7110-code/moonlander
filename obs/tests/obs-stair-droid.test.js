@@ -20,7 +20,7 @@ function setup(from,to,stairs){
 
 test('the droid walks the stair tower between decks and arrives where the ladder route would end',()=>{
   for(const [from,to] of [[0,2],[2,0],[0,1],[1,2]]){
-    const stairs=new CabinStairs(),{routine,done}=setup(from,to,stairs);
+    const stairs=new CabinStairs({quickest:false}),{routine,done}=setup(from,to,stairs);
     let used=false,climbed=false,prev=null,maxStep=0;
     for(let i=0;i<180*60&&!done();i++){
       stairs.update(1/60);routine.update(1/60);
@@ -34,7 +34,7 @@ test('the droid walks the stair tower between decks and arrives where the ladder
 });
 
 test('a crowded tower sends the droid up the ladder instead, ending at the same spot',()=>{
-  const stairs=new CabinStairs();stairs.enter({},'crew',stairTrip(0,2,{fromZ:DROID_LANE,toZ:DROID_LANE}),.3);
+  const stairs=new CabinStairs({quickest:false});stairs.enter({},'crew',stairTrip(0,2,{fromZ:DROID_LANE,toZ:DROID_LANE}),.3);
   const {routine,done}=setup(0,2,stairs);let climbed=false;
   for(let i=0;i<240*60&&!done();i++){stairs.update(1/60);routine.update(1/60);climbed||=routine.step?.kind==='climb';}
   assert(done());assert(climbed,'took the ladder');assert.equal(routine.position.floor,2);
@@ -57,7 +57,7 @@ test('droid feet stay on treads and move continuously along every trip',()=>{
 
 test('leaving the dock for the stairs the droid turns smoothly, also when it falls back to the ladder',()=>{
   for(const crowded of [false,true]){
-    const stairs=new CabinStairs();if(crowded)stairs.enter({},'crew',stairTrip(0,2,{fromZ:DROID_LANE,toZ:DROID_LANE}),.2);
+    const stairs=new CabinStairs({quickest:false});if(crowded)stairs.enter({},'crew',stairTrip(0,2,{fromZ:DROID_LANE,toZ:DROID_LANE}),.2);
     const routine=new DroidRoutine({care:new Supplies(),brain:{plants:new PlantBed(),actStation:null},actor:new CrewMotion({floor:1,x:900}),cat:{mode:'sleep'}});
     routine.stairs=stairs;routine.position={x:-11.92,y:DROID_FLOORS[0],z:-.52,floor:0,yaw:Math.PI/2};routine.plan={...routine.position};routine.job='feed';
     routine.travel(2,3,DROID_LANE);let done=false;routine.add('release',.1,()=>{done=true;routine.job=null;});

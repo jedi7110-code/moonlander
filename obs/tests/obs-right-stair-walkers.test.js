@@ -24,7 +24,7 @@ const material=new THREE.MeshStandardMaterial(),materials=new Proxy({},{get:()=>
 
 test('Milo takes the right tower between LEVEL 3 and LEVEL 2 from the right half, the left one from the left half',()=>{
   for(const [from,to,startX,endX,side] of [[2,1,9,8.4,1],[1,2,8.4,9,1],[2,1,3,5,1],[2,1,-3,-5,-1],[2,0,9,4.7,-1]]){
-    const stairs=new CabinStairs({right:true}),actor=new CrewMotion({floor:from,x:px(startX)});actor.stairs=stairs;
+    const stairs=new CabinStairs({right:true,quickest:false}),actor=new CrewMotion({floor:from,x:px(startX)});actor.stairs=stairs;
     let arrived=false,trip=null,prev=null,maxStep=0;actor.goTo({floor:to,x:px(endX)},()=>{arrived=true;});
     for(let i=0;i<60*120&&actor.busy;i++){
       stairs.update(1/60);actor.update(1/60);trip??=actor.onStairs?.trip;
@@ -65,7 +65,7 @@ test('the droid takes the right tower near the right end, its feet are the left 
       const [l1,r1]=droidStairFeet(L,t),[l2,r2]=droidStairFeet(R,t);
       for(const [p,q] of [[l1,r2],[r1,l2]])assert.ok(Math.abs(p.x+q.x)<1e-9&&p.y===q.y&&p.z===q.z&&p.planted===q.planted);
     }
-    const stairs=new CabinStairs({right:true}),actor=new CrewMotion({floor:1,x:px(-6)});
+    const stairs=new CabinStairs({right:true,quickest:false}),actor=new CrewMotion({floor:1,x:px(-6)});
     const routine=new DroidRoutine({care:new Supplies(),brain:{plants:new PlantBed(),actStation:null},actor,cat:{mode:'sleep'}});
     routine.stairs=stairs;routine.position={x:9,y:DROID_FLOORS[from],z:DROID_LANE,floor:from,yaw:0};routine.plan={...routine.position};routine.job='feed';
     routine.travel(to,8,DROID_LANE);let done=false,side=null,maxTurn=0,prev=routine.position.yaw;routine.add('release',.1,()=>{routine.job=null;done=true;});
@@ -83,7 +83,7 @@ async function lucy(){
   return createLucy(await new GLTFLoader().parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),''),{random:()=>.5});
 }
 test('Lucy takes the right tower too, and her paws there are her left-tower paws in a mirror',async()=>{
-  const stairs=new CabinStairs({right:true}),motion=new CatMotion({turns:true});motion.stairs=stairs;
+  const stairs=new CabinStairs({right:true,quickest:false}),motion=new CatMotion({turns:true});motion.stairs=stairs;
   Object.assign(motion,{floor:2,y:FLOORS[2].y,x:px(9),z:CAT_PORT.walkZ,onSofa:false,elevation:0});
   let side=null,arrived=false;motion.goTo({floor:1,x:px(9.6),z:CAT_PORT.walkZ},()=>{arrived=true;});
   const crew=new CrewMotion({floor:2,x:px(-10)});
@@ -136,7 +136,7 @@ test('a long walk before the LEVEL 2 stairs does not rewind the walking animatio
 });
 
 test('the two towers keep their own traffic',()=>{
-  const stairs=new CabinStairs({right:true}),a={},b={},c={};
+  const stairs=new CabinStairs({right:true,quickest:false}),a={},b={},c={};
   // someone standing at the right tower's LEVEL 3 entrance does not crowd the left tower, and the other way round
   stairs.enter(a,'crew',rightStairTrip(2,1),.2);
   assert(!stairs.available(b,rightStairTrip(2,1)),'right tower crowded');
@@ -145,7 +145,7 @@ test('the two towers keep their own traffic',()=>{
   stairs.enter(c,'crew',rightStairTrip(2,1),6);
   assert(stairs.available(b,stairTrip(2,0)),'left tower still free');
   // walkers at the two towers' LEVEL 2 crossings do not hold each other
-  const s2=new CabinStairs({right:true}),l={},r={};
+  const s2=new CabinStairs({right:true,quickest:false}),l={},r={};
   const L=stairTrip(2,1),R=rightStairTrip(1,2);
   s2.enter(l,'crew',L,L.exitStart-.2);s2.enter(r,'crew',R,R.enterLength+.05);
   let moved=0;for(let i=0;i<60;i++){s2.update(1/60);const before=s2.walker(l).t;s2.advance(l,.02,1/60);s2.advance(r,0,1/60);moved+=s2.walker(l).t-before;}
@@ -154,7 +154,7 @@ test('the two towers keep their own traffic',()=>{
 
 test('Milo walks into, over and out of the right tower without a jump in any limb',()=>{
   for(const [from,to,startX,endX] of [[2,1,8.6,9.6],[1,2,8.6,9.6]]){
-    const stairs=new CabinStairs({right:true}),actor=new CrewMotion({floor:from,x:px(startX)});actor.stairs=stairs;
+    const stairs=new CabinStairs({right:true,quickest:false}),actor=new CrewMotion({floor:from,x:px(startX)});actor.stairs=stairs;
     const root=createMilo(materials);actor.goTo({floor:to,x:px(endX)});
     const rows=[];let time=0,side=null;
     for(let i=0;i<60*90&&actor.busy;i++){
@@ -181,7 +181,7 @@ test('Milo walks into, over and out of the right tower without a jump in any lim
 
 test('Milo coming from the right staircase walks around the lounge table and joins the existing seat entrance',()=>{
   for(const dt of [1/120,1/60,1/30,.1]){
-    const stairs=new CabinStairs({right:true}),actor=new CrewMotion({floor:2,x:px(9.6)});actor.stairs=stairs;
+    const stairs=new CabinStairs({right:true,quickest:false}),actor=new CrewMotion({floor:2,x:px(9.6)});actor.stairs=stairs;
     const brain=new CabinBrain({obsUI:{hideWant(){}}},actor,{care:new Supplies(),random:()=>.8});
     brain.health.nextIncident=Infinity;brain.environment.nextFault=Infinity;
     brain._go(getStation('lounge'));
